@@ -118,10 +118,14 @@ Record that pause as `git-metadata-permission`.
 
 Every specialist packet carries the closed root map `path_roots: {
 repository_root: <absolute canonical worktree>, workspace_artifact_root:
-<absolute canonical workspace> }`. Resolve task `files` and OpenSpec source
+<absolute canonical workspace>, evidence_roots: {<evidence-service>:
+<absolute canonical read-only root>} }`; `evidence_roots` is empty unless a
+verified task evidence dispatch below requires it. Resolve task `files` and OpenSpec source
 coordinates only below `repository_root`; resolve `plan/...`, `inputs/...`,
 `reviews/...`, task shards, contracts, and `required_evidence_anchors` only
-below `workspace_artifact_root`. Validate containment before reading. Never
+below `workspace_artifact_root`. Resolve only exact hash-bound external
+coordinates below their named `evidence_roots` entry. Validate containment
+before reading. Never
 interpret a workspace artifact path relative to the repository, invent `../`
 traversal, or copy artifacts into the worktree. Missing root/domain or a path
 that escapes its declared root blocks the dispatch packet.
@@ -152,6 +156,22 @@ equals the Task Index and overlay `shard_path`. Missing, duplicate, stale,
 case-mismatched, escaped, or invented coordinates are
 `packet-artifact-invalid`; do not dispatch or ask a specialist to discover a
 replacement path.
+
+When a task's acceptance depends on an `evidence-only` repository, first seal
+the normal service dispatch and then invoke `openspec-bindings.mjs
+bind-evidence-dispatch` with the exact task-shard path and a non-empty set of
+`{service, path, sha256}` coordinates taken from the accepted research/evidence
+manifest. The helper resolves each service only through the aggregate's typed
+`evidence_repositories`, re-verifies repository identity, containment,
+regular/non-symlink identity, and live SHA-256, and writes a canonical
+workspace-local generation-1 evidence dispatch. The packet carries
+`evidence_dispatch_binding: {path, sha256}`, its
+`dispatch_identity_sha256`, and only the matching `path_roots.evidence_roots`.
+The specialist verifies that file before any external read. Evidence roots are
+strictly coordinate-only and read-only: never search, enumerate, execute a
+command, edit, stage, or resolve `discovery_scope` below them. Missing,
+unlisted, stale, escaped, or identity-mismatched evidence is
+`packet-artifact-invalid`; it never widens task ownership.
 
 Every OpenSpec-bound initial or correction packet carries one inseparable
 `openspec_snapshot: {path, sha256}` binding. `path` is the absolute canonical
@@ -207,6 +227,15 @@ closes. A successful seal writes
 workspace quality manifest, and every overlay-declared shard. Its existence
 makes all later repair ineligible.
 
+At implementation recovery, invoke `openspec-bindings.mjs audit-dispatches`
+before selecting any service or correction. The audit enumerates every
+writable binding in aggregate order, verifies each binding at its own durable
+progress position, and reports every missing or stale seal. For every `missing`
+entry invoke the existing create-only `seal-dispatch`, including when that
+service already has durable progress, then rerun the complete audit and require
+`verdict: pass`. Never audit only the currently requested service or infer a
+seal from completed tasks, prior agent events, or another binding's seal.
+
 Every initial or correction packet carries
 `derived_dispatch_binding: {path, sha256}` using the absolute canonical seal
 path and its exact digest. Immediately before every fresh dispatch, run
@@ -216,6 +245,20 @@ seal file/hash and assigned-shard membership check before any packet-derived
 read. `DISPATCH_BINDING_STALE`, a missing/changed seal, or a post-seal artifact
 mismatch blocks; never repair, rehash all bindings, substitute a new shard
 digest, or resend the packet against the changed bytes.
+
+If an already sealed task exhausted exactly two clean implementer/tester
+attempts only because its packet lacked required external evidence, Main may
+create one generation-2 evidence dispatch without changing the base seal or
+Gate 1. First persist a canonical `team_harness_packet_scope_insufficient`
+incident for the exact service, task shard, role, two exhausted attempts, and
+unchanged owned/evidence paths. Then invoke `bind-evidence-dispatch` with that
+artifact's path/hash and the verified external coordinates. Only a pass result
+creates a new task-local dispatch identity and resets that exact
+service+task+role package to `next_attempt: 1`; other packages, correction
+budgets, progress, seals, and historical attempts remain untouched. A second
+generation-2 identity, non-clean prior attempt, different failure code, or
+coordinate drift fails closed. Every fresh packet and recovery reruns
+`verify-evidence-dispatch` before dispatch.
 
 For an already repaired legacy `sharded-v1` workspace whose original approved
 aggregate contained placeholder overlays, never overwrite the original Gate or

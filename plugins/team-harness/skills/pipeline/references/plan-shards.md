@@ -134,6 +134,13 @@ values in `path_roots.repository_root` and
 `path_roots.workspace_artifact_root`. No consumer may resolve every relative
 path against cwd/worktree or use `../` to cross between these domains.
 
+Evidence-only repositories form a third, optional domain. Main may add
+`path_roots.evidence_roots.<service>` only when a canonical task-local
+`evidence_dispatch_binding` resolves that service from the aggregate and pins
+each permitted repository-relative file by SHA-256. These roots are read-only
+and coordinate-only: they never extend `Files:`, `discovery_scope`, writable
+ownership, OpenSpec source coordinates, or workspace evidence anchors.
+
 Specialist packets bind these inputs through a non-empty
 `artifact_coordinates` array of `{kind, root, path, anchor, sha256}`. Preserve
 the exact case-sensitive Task Index path (`plan/tasks/Task-N.md`); bind an

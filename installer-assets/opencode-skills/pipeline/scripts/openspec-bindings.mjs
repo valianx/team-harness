@@ -14,6 +14,7 @@ export const OPENSPEC_BINDINGS_SCHEMA_VERSION = 1;
 export const CONSOLIDATED_GATE1_SCHEMA_VERSION = 1;
 export const OPENSPEC_BINDING_REPAIR_SCHEMA_VERSION = 1;
 export const OPENSPEC_DISPATCH_BINDING_SCHEMA_VERSION = 1;
+export const OPENSPEC_EVIDENCE_DISPATCH_SCHEMA_VERSION = 1;
 export const LEGACY_V1_GATE_MIGRATION_SCHEMA_VERSION = 1;
 const MAX_BYTES = 1024 * 1024;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -24,6 +25,7 @@ const ERROR_CODES = new Set([
   "REPOSITORY_IDENTITY_UNREADABLE", "SNAPSHOT_INVALID", "SOURCE_CHANGED", "TASK_INTENT_CHANGED",
   "TASK_PROGRESS_INVALID", "PROGRESS_INVALID", "ATOMIC_TRANSITION_REQUIRED",
   "DERIVED_SET_BUSY", "DERIVED_REPAIR_INELIGIBLE", "DISPATCH_BINDING_INVALID", "DISPATCH_BINDING_STALE",
+  "EVIDENCE_DISPATCH_INVALID", "EVIDENCE_DISPATCH_STALE", "EVIDENCE_SOURCE_INVALID", "EVIDENCE_SOURCE_STALE",
   "GATE1_IDENTITY_STALE",
 ]);
 
@@ -104,6 +106,11 @@ async function atomicWrite(target, bytes) {
 function expectedSnapshotPath(service) { return `inputs/openspec/${service}/snapshot.json`; }
 function expectedOverlayPath(service) { return `plan/openspec/${service}/traceability.json`; }
 function expectedDispatchBindingPath(service) { return `inputs/openspec/${service}/dispatch-binding.json`; }
+function expectedEvidenceDispatchPath(service, taskShardPath, generation) {
+  const name = path.posix.basename(taskShardPath, ".md");
+  if (!/^Task-[1-9][0-9]*$/.test(name) || ![1, 2].includes(generation)) throw new Error("EVIDENCE_DISPATCH_INVALID");
+  return `inputs/openspec/${service}/evidence-dispatch/${name}/generation-${generation}.json`;
+}
 function expectedDerivedLockPath(service) { return `.team-harness/locks/openspec-${service}-derived.lock`; }
 
 async function withDerivedSetLock(root, service, callback) {
@@ -520,6 +527,375 @@ export async function verifyOpenSpecBindingDispatch(options = {}) {
     });
   } catch (error) {
     return dispatchBindingResult("verify-dispatch", "fail", errorCode(error, "DISPATCH_BINDING_INVALID"), common);
+  }
+}
+
+function dispatchAuditResult(verdict, errorCodeValue, details = {}) {
+  return {
+    schema_version: OPENSPEC_DISPATCH_BINDING_SCHEMA_VERSION,
+    kind: "team_harness_openspec_dispatch_binding_audit",
+    verdict,
+    error_code: errorCodeValue,
+    failed_binding: details.failed_binding ?? null,
+    bindings: details.bindings ?? [],
+  };
+}
+
+/** Audit every writable binding before recovery resumes any implementation packet. */
+export async function auditOpenSpecBindingDispatches({
+  workspace,
+  aggregatePath = "inputs/openspec-bindings.json",
+  aggregateSha256,
+  gate,
+  nonce,
+  continuationIdentitySha256 = null,
+  repositoryIdentityReader = readRepositoryIdentity,
+  snapshotVerifier = verifySnapshot,
+  overlayValidator = validateOpenSpecOverlay,
+} = {}) {
+  let root;
+  let manifest;
+  try {
+    root = await workspaceRoot(workspace);
+    const aggregateFile = await readWorkspaceFile(root, aggregatePath);
+    if (!SHA256.test(aggregateSha256 ?? "") || digest(aggregateFile.bytes) !== aggregateSha256) throw new Error("AGGREGATE_STALE");
+    manifest = JSON.parse(aggregateFile.bytes.toString("utf8"));
+    if (!isOpenSpecBindingsManifest(manifest) || !canonicalJsonBytes(manifest).equals(aggregateFile.bytes)) {
+      throw new Error("AGGREGATE_INVALID");
+    }
+    const current = await verifyOpenSpecBindingsManifest({
+      workspace: root,
+      aggregatePath,
+      aggregateSha256,
+      phase: "implementation",
+      repositoryIdentityReader,
+      snapshotVerifier,
+      overlayValidator,
+    });
+    if (current.verdict !== "pass") {
+      return dispatchAuditResult("fail", current.error_code, { failed_binding: current.failed_binding });
+    }
+  } catch (error) {
+    return dispatchAuditResult("fail", errorCode(error, "DISPATCH_BINDING_INVALID"));
+  }
+
+  const bindings = [];
+  for (const binding of manifest.bindings) {
+    try {
+      const audited = await withDerivedSetLock(root, binding.service, async () => {
+        const expected = await expectedOpenSpecDispatchBinding({
+          root, aggregatePath, aggregateSha256, service: binding.service, gate, nonce,
+          continuationIdentitySha256, overlayValidator,
+        });
+        const expectedBytes = canonicalJsonBytes(expected);
+        const relative = expectedDispatchBindingPath(binding.service);
+        const existing = await readOptionalWorkspaceFile(root, relative);
+        const snapshotFile = await readWorkspaceFile(root, binding.snapshot_path);
+        const snapshot = JSON.parse(snapshotFile.bytes.toString("utf8"));
+        const progressFile = await readWorkspaceFile(root, `${path.posix.dirname(binding.snapshot_path)}/openspec-progress.json`);
+        const progress = JSON.parse(progressFile.bytes.toString("utf8"));
+        if (!isOpenSpecSnapshot(snapshot) || !isOpenSpecProgress(progress, snapshot)) throw new Error("PROGRESS_INVALID");
+        if (existing !== null && !existing.bytes.equals(expectedBytes)) throw new Error("DISPATCH_BINDING_STALE");
+        return {
+          service: binding.service,
+          status: existing === null ? "missing" : "verified",
+          progressed: progress.completed.length > 0 || progress.events.length > 0,
+          dispatch_binding_path: relative,
+          dispatch_binding_sha256: digest(expectedBytes),
+          recovery_action: existing === null ? "seal-dispatch" : null,
+        };
+      });
+      bindings.push(audited);
+    } catch (error) {
+      return dispatchAuditResult("fail", errorCode(error, "DISPATCH_BINDING_INVALID"), { failed_binding: binding.service, bindings });
+    }
+  }
+  return bindings.some(binding => binding.status === "missing")
+    ? dispatchAuditResult("repair", "DISPATCH_BINDINGS_INCOMPLETE", { bindings })
+    : dispatchAuditResult("pass", null, { bindings });
+}
+
+function evidenceDispatchResult(operation, verdict, errorCodeValue, details = {}) {
+  return {
+    schema_version: OPENSPEC_EVIDENCE_DISPATCH_SCHEMA_VERSION,
+    kind: "team_harness_openspec_evidence_dispatch_action",
+    operation,
+    verdict,
+    error_code: errorCodeValue,
+    changed: details.changed ?? false,
+    service: details.service ?? null,
+    task_shard_path: details.task_shard_path ?? null,
+    generation: details.generation ?? null,
+    evidence_dispatch_path: details.evidence_dispatch_path ?? null,
+    evidence_dispatch_sha256: details.evidence_dispatch_sha256 ?? null,
+    dispatch_identity_sha256: details.dispatch_identity_sha256 ?? null,
+    next_attempt: details.next_attempt ?? null,
+  };
+}
+
+function validEvidenceCoordinate(value) {
+  return exactlyKeys(value, ["path", "sha256"])
+    && safeRelative(value.path) && !value.path.includes("\\") && SHA256.test(value.sha256 ?? "");
+}
+
+function validEvidenceSource(value) {
+  return exactlyKeys(value, ["service", "repository_root", "repository_identity", "purpose", "coordinates"])
+    && SLUG.test(value.service ?? "") && safeString(value.repository_root) && path.isAbsolute(value.repository_root)
+    && safeString(value.repository_identity, 2048) && safeString(value.purpose, 2048)
+    && Array.isArray(value.coordinates) && value.coordinates.length > 0
+    && value.coordinates.every(validEvidenceCoordinate)
+    && new Set(value.coordinates.map(item => item.path)).size === value.coordinates.length;
+}
+
+function validEvidenceRecovery(value) {
+  return value === null || (exactlyKeys(value, [
+    "role", "failure_code", "exhausted_attempts", "evidence_path", "evidence_sha256",
+  ]) && ["implementer", "tester"].includes(value.role)
+    && value.failure_code === "PACKET_SCOPE_INSUFFICIENT" && value.exhausted_attempts === 2
+    && safeRelative(value.evidence_path) && SHA256.test(value.evidence_sha256 ?? ""));
+}
+
+function validAttemptReset(value, recovery, service, taskShard) {
+  if (recovery === null) return value === null;
+  if (!exactlyKeys(value, ["scope", "package_identity_sha256", "previous_attempts", "next_attempt", "max_attempts"])
+    || value.scope !== "service-task-role" || !SHA256.test(value.package_identity_sha256 ?? "")
+    || value.previous_attempts !== 2 || value.next_attempt !== 1 || value.max_attempts !== 2) return false;
+  return value.package_identity_sha256 === digest(canonicalJsonBytes({
+    service, task_shard_path: taskShard.path, task_shard_sha256: taskShard.sha256, role: recovery.role,
+  }));
+}
+
+function evidenceDispatchIdentity(value) {
+  const { dispatch_identity_sha256: ignored, ...identity } = value;
+  return digest(canonicalJsonBytes(identity));
+}
+
+function isOpenSpecEvidenceDispatch(value) {
+  if (!exactlyKeys(value, [
+    "schema_version", "kind", "service", "generation", "base_dispatch_binding", "task_shard",
+    "evidence_sources", "recovery", "attempt_reset", "dispatch_identity_sha256",
+  ]) || value.schema_version !== OPENSPEC_EVIDENCE_DISPATCH_SCHEMA_VERSION
+    || value.kind !== "team_harness_openspec_evidence_dispatch" || !SLUG.test(value.service ?? "")
+    || ![1, 2].includes(value.generation)
+    || !exactlyKeys(value.base_dispatch_binding, ["path", "sha256"])
+    || value.base_dispatch_binding.path !== expectedDispatchBindingPath(value.service)
+    || !SHA256.test(value.base_dispatch_binding.sha256 ?? "")
+    || !exactlyKeys(value.task_shard, ["path", "sha256"]) || !safeRelative(value.task_shard.path)
+    || !SHA256.test(value.task_shard.sha256 ?? "")
+    || !Array.isArray(value.evidence_sources) || value.evidence_sources.length === 0
+    || !value.evidence_sources.every(validEvidenceSource)
+    || new Set(value.evidence_sources.map(item => item.service)).size !== value.evidence_sources.length
+    || !validEvidenceRecovery(value.recovery)
+    || value.generation !== (value.recovery === null ? 1 : 2)
+    || !validAttemptReset(value.attempt_reset, value.recovery, value.service, value.task_shard)
+    || !SHA256.test(value.dispatch_identity_sha256 ?? "")) return false;
+  const coordinates = value.evidence_sources.flatMap(source => source.coordinates.map(item => `${source.service}\0${item.path}`));
+  return new Set(coordinates).size === coordinates.length
+    && value.dispatch_identity_sha256 === evidenceDispatchIdentity(value);
+}
+
+async function expectedOpenSpecEvidenceDispatch({
+  root, aggregatePath, aggregateSha256, service, gate, nonce, continuationIdentitySha256,
+  taskShardPath, evidenceCoordinates, recovery, repositoryIdentityReader = readRepositoryIdentity,
+  overlayValidator = validateOpenSpecOverlay,
+}) {
+  if (!safeRelative(taskShardPath) || taskShardPath.includes("\\")
+    || !Array.isArray(evidenceCoordinates) || evidenceCoordinates.length === 0
+    || !evidenceCoordinates.every(value => exactlyKeys(value, ["service", "path", "sha256"])
+      && SLUG.test(value.service ?? "") && safeRelative(value.path) && !value.path.includes("\\")
+      && SHA256.test(value.sha256 ?? ""))
+    || new Set(evidenceCoordinates.map(value => `${value.service}\0${value.path}`)).size !== evidenceCoordinates.length
+    || !validEvidenceRecovery(recovery)) throw new Error("EVIDENCE_DISPATCH_INVALID");
+
+  const baseRelative = expectedDispatchBindingPath(service);
+  const baseFile = await readWorkspaceFile(root, baseRelative);
+  const base = JSON.parse(baseFile.bytes.toString("utf8"));
+  if (!isOpenSpecDispatchBinding(base) || !canonicalJsonBytes(base).equals(baseFile.bytes)) {
+    throw new Error("DISPATCH_BINDING_INVALID");
+  }
+  const expectedBase = await expectedOpenSpecDispatchBinding({
+    root, aggregatePath, aggregateSha256, service, gate, nonce, continuationIdentitySha256, overlayValidator,
+  });
+  if (!baseFile.bytes.equals(canonicalJsonBytes(expectedBase))) throw new Error("DISPATCH_BINDING_STALE");
+  const taskMatches = base.artifacts.filter(item => item.kind === "task-shard" && item.path === taskShardPath);
+  if (taskMatches.length !== 1) throw new Error("EVIDENCE_DISPATCH_INVALID");
+
+  const aggregateFile = await readWorkspaceFile(root, aggregatePath);
+  const manifest = JSON.parse(aggregateFile.bytes.toString("utf8"));
+  if (!isOpenSpecBindingsManifest(manifest) || digest(aggregateFile.bytes) !== aggregateSha256) {
+    throw new Error("AGGREGATE_STALE");
+  }
+  const sources = [];
+  const services = [...new Set(evidenceCoordinates.map(value => value.service))].sort();
+  for (const evidenceService of services) {
+    const matches = manifest.evidence_repositories.filter(item => item.service === evidenceService);
+    if (matches.length !== 1) throw new Error("EVIDENCE_SOURCE_INVALID");
+    const repository = matches[0];
+    if (await repositoryIdentityReader(repository.repository_root) !== repository.repository_identity) {
+      throw new Error("REPOSITORY_IDENTITY_MISMATCH");
+    }
+    const coordinates = evidenceCoordinates.filter(item => item.service === evidenceService)
+      .map(item => ({ path: item.path, sha256: item.sha256 })).sort((left, right) => left.path.localeCompare(right.path));
+    for (const coordinate of coordinates) {
+      const file = await readRepositoryFile(repository.repository_root, coordinate.path);
+      if (digest(file.bytes) !== coordinate.sha256) throw new Error("EVIDENCE_SOURCE_STALE");
+    }
+    sources.push({
+      service: evidenceService,
+      repository_root: repository.repository_root,
+      repository_identity: repository.repository_identity,
+      purpose: repository.purpose,
+      coordinates,
+    });
+  }
+
+  if (recovery !== null) {
+    const recoveryEvidence = await readWorkspaceFile(root, recovery.evidence_path);
+    if (digest(recoveryEvidence.bytes) !== recovery.evidence_sha256) throw new Error("EVIDENCE_DISPATCH_STALE");
+    let incident;
+    try { incident = JSON.parse(recoveryEvidence.bytes.toString("utf8")); }
+    catch { throw new Error("EVIDENCE_DISPATCH_INVALID"); }
+    if (!exactlyKeys(incident, [
+      "schema_version", "kind", "service", "task_shard_path", "role", "error_code",
+      "exhausted_attempts", "owned_paths_changed", "evidence_paths_changed",
+    ]) || incident.schema_version !== 1 || incident.kind !== "team_harness_packet_scope_insufficient"
+      || incident.service !== service || incident.task_shard_path !== taskShardPath || incident.role !== recovery.role
+      || incident.error_code !== recovery.failure_code || incident.exhausted_attempts !== recovery.exhausted_attempts
+      || incident.owned_paths_changed !== false || incident.evidence_paths_changed !== false
+      || !canonicalJsonBytes(incident).equals(recoveryEvidence.bytes)) {
+      throw new Error("EVIDENCE_DISPATCH_INVALID");
+    }
+  }
+  const taskShard = { path: taskShardPath, sha256: taskMatches[0].sha256 };
+  const attemptReset = recovery === null ? null : {
+    scope: "service-task-role",
+    package_identity_sha256: digest(canonicalJsonBytes({
+      service, task_shard_path: taskShard.path, task_shard_sha256: taskShard.sha256, role: recovery.role,
+    })),
+    previous_attempts: 2,
+    next_attempt: 1,
+    max_attempts: 2,
+  };
+  const value = {
+    schema_version: OPENSPEC_EVIDENCE_DISPATCH_SCHEMA_VERSION,
+    kind: "team_harness_openspec_evidence_dispatch",
+    service,
+    generation: recovery === null ? 1 : 2,
+    base_dispatch_binding: { path: baseRelative, sha256: digest(baseFile.bytes) },
+    task_shard: taskShard,
+    evidence_sources: sources,
+    recovery,
+    attempt_reset: attemptReset,
+    dispatch_identity_sha256: null,
+  };
+  value.dispatch_identity_sha256 = evidenceDispatchIdentity(value);
+  if (!isOpenSpecEvidenceDispatch(value)) throw new Error("EVIDENCE_DISPATCH_INVALID");
+  return value;
+}
+
+/** Bind verified read-only cross-repository evidence to one task without changing its permanent base seal. */
+export async function bindOpenSpecEvidenceDispatch({
+  workspace,
+  aggregatePath = "inputs/openspec-bindings.json",
+  aggregateSha256,
+  service,
+  gate,
+  nonce,
+  continuationIdentitySha256 = null,
+  taskShardPath,
+  evidenceCoordinates,
+  recovery = null,
+  repositoryIdentityReader = readRepositoryIdentity,
+  overlayValidator = validateOpenSpecOverlay,
+} = {}) {
+  const common = { service: SLUG.test(service ?? "") ? service : null, task_shard_path: safeRelative(taskShardPath) ? taskShardPath : null };
+  let root;
+  try { root = await workspaceRoot(workspace); }
+  catch (error) { return evidenceDispatchResult("bind-evidence-dispatch", "fail", errorCode(error, "WORKSPACE_INVALID"), common); }
+  if (!SLUG.test(service ?? "")) return evidenceDispatchResult("bind-evidence-dispatch", "fail", "ARGUMENT_INVALID", common);
+  try {
+    return await withDerivedSetLock(root, service, async () => {
+      const value = await expectedOpenSpecEvidenceDispatch({
+        root, aggregatePath, aggregateSha256, service, gate, nonce, continuationIdentitySha256,
+        taskShardPath, evidenceCoordinates, recovery, repositoryIdentityReader, overlayValidator,
+      });
+      const bytes = canonicalJsonBytes(value);
+      const relative = expectedEvidenceDispatchPath(service, taskShardPath, value.generation);
+      if (value.generation === 1
+        && await readOptionalWorkspaceFile(root, expectedEvidenceDispatchPath(service, taskShardPath, 2)) !== null) {
+        throw new Error("EVIDENCE_DISPATCH_STALE");
+      }
+      const existing = await readOptionalWorkspaceFile(root, relative);
+      if (existing !== null) {
+        if (!existing.bytes.equals(bytes)) throw new Error("EVIDENCE_DISPATCH_STALE");
+        return evidenceDispatchResult("bind-evidence-dispatch", "pass", null, {
+          ...common, changed: false, generation: value.generation, evidence_dispatch_path: relative,
+          evidence_dispatch_sha256: digest(bytes), dispatch_identity_sha256: value.dispatch_identity_sha256,
+          next_attempt: value.attempt_reset?.next_attempt ?? null,
+        });
+      }
+      await atomicWrite(path.resolve(root, relative), bytes);
+      return evidenceDispatchResult("bind-evidence-dispatch", "pass", null, {
+        ...common, changed: true, generation: value.generation, evidence_dispatch_path: relative,
+        evidence_dispatch_sha256: digest(bytes), dispatch_identity_sha256: value.dispatch_identity_sha256,
+        next_attempt: value.attempt_reset?.next_attempt ?? null,
+      });
+    });
+  } catch (error) {
+    return evidenceDispatchResult("bind-evidence-dispatch", "fail", errorCode(error, "EVIDENCE_DISPATCH_INVALID"), common);
+  }
+}
+
+/** Verify a task evidence extension, its parent seal, and every live read-only source before a fresh dispatch. */
+export async function verifyOpenSpecEvidenceDispatch({
+  workspace,
+  aggregatePath = "inputs/openspec-bindings.json",
+  aggregateSha256,
+  service,
+  gate,
+  nonce,
+  continuationIdentitySha256 = null,
+  evidenceDispatchPath,
+  evidenceDispatchSha256,
+  repositoryIdentityReader = readRepositoryIdentity,
+  overlayValidator = validateOpenSpecOverlay,
+} = {}) {
+  const common = { service: SLUG.test(service ?? "") ? service : null };
+  let root;
+  try { root = await workspaceRoot(workspace); }
+  catch (error) { return evidenceDispatchResult("verify-evidence-dispatch", "fail", errorCode(error, "WORKSPACE_INVALID"), common); }
+  if (!SLUG.test(service ?? "") || !safeRelative(evidenceDispatchPath) || !SHA256.test(evidenceDispatchSha256 ?? "")) {
+    return evidenceDispatchResult("verify-evidence-dispatch", "fail", "ARGUMENT_INVALID", common);
+  }
+  try {
+    return await withDerivedSetLock(root, service, async () => {
+      const existing = await readWorkspaceFile(root, evidenceDispatchPath);
+      if (digest(existing.bytes) !== evidenceDispatchSha256) throw new Error("EVIDENCE_DISPATCH_STALE");
+      const parsed = JSON.parse(existing.bytes.toString("utf8"));
+      if (!isOpenSpecEvidenceDispatch(parsed) || !canonicalJsonBytes(parsed).equals(existing.bytes)
+        || parsed.service !== service
+        || evidenceDispatchPath !== expectedEvidenceDispatchPath(service, parsed.task_shard.path, parsed.generation)) {
+        throw new Error("EVIDENCE_DISPATCH_INVALID");
+      }
+      const evidenceCoordinates = parsed.evidence_sources.flatMap(source => source.coordinates.map(coordinate => ({
+        service: source.service, path: coordinate.path, sha256: coordinate.sha256,
+      })));
+      const expected = await expectedOpenSpecEvidenceDispatch({
+        root, aggregatePath, aggregateSha256, service, gate, nonce, continuationIdentitySha256,
+        taskShardPath: parsed.task_shard.path, evidenceCoordinates, recovery: parsed.recovery,
+        repositoryIdentityReader, overlayValidator,
+      });
+      const expectedBytes = canonicalJsonBytes(expected);
+      if (!existing.bytes.equals(expectedBytes)) throw new Error("EVIDENCE_DISPATCH_STALE");
+      return evidenceDispatchResult("verify-evidence-dispatch", "pass", null, {
+        ...common, changed: false, task_shard_path: parsed.task_shard.path, generation: parsed.generation,
+        evidence_dispatch_path: evidenceDispatchPath, evidence_dispatch_sha256: digest(expectedBytes),
+        dispatch_identity_sha256: parsed.dispatch_identity_sha256,
+        next_attempt: parsed.attempt_reset?.next_attempt ?? null,
+      });
+    });
+  } catch (error) {
+    return evidenceDispatchResult("verify-evidence-dispatch", "fail", errorCode(error, "EVIDENCE_DISPATCH_INVALID"), common);
   }
 }
 
@@ -1034,8 +1410,8 @@ export async function migrateLegacyV1ApprovedPlaceholderWorkspace({
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [operation, raw] = process.argv.slice(2);
-  if (!["repair-derived", "seal-dispatch", "verify-dispatch", "migrate-v1", "verify-v1-migration"].includes(operation) || !safeString(raw, MAX_BYTES)) {
-    process.stderr.write("openspec-bindings.mjs accepts repair-derived, seal-dispatch, verify-dispatch, migrate-v1, or verify-v1-migration with one bounded JSON argument; other operations are library helpers.\n");
+  if (!["repair-derived", "seal-dispatch", "verify-dispatch", "audit-dispatches", "bind-evidence-dispatch", "verify-evidence-dispatch", "migrate-v1", "verify-v1-migration"].includes(operation) || !safeString(raw, MAX_BYTES)) {
+    process.stderr.write("openspec-bindings.mjs accepts repair-derived, seal-dispatch, verify-dispatch, audit-dispatches, bind-evidence-dispatch, verify-evidence-dispatch, migrate-v1, or verify-v1-migration with one bounded JSON argument; other operations are library helpers.\n");
     process.exitCode = 2;
   } else {
     let options;
@@ -1044,6 +1420,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const output = operation === "repair-derived" ? await repairOpenSpecBindingDerivedArtifacts(options)
       : operation === "seal-dispatch" ? await sealOpenSpecBindingDispatch(options)
         : operation === "verify-dispatch" ? await verifyOpenSpecBindingDispatch(options)
+          : operation === "audit-dispatches" ? await auditOpenSpecBindingDispatches(options)
+            : operation === "bind-evidence-dispatch" ? await bindOpenSpecEvidenceDispatch(options)
+              : operation === "verify-evidence-dispatch" ? await verifyOpenSpecEvidenceDispatch(options)
           : await migrateLegacyV1ApprovedPlaceholderWorkspace({
         ...options,
         mode: operation === "verify-v1-migration" ? "verify" : options.mode,

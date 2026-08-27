@@ -6,7 +6,11 @@ import { mkdtemp, mkdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { normalizeOpenSpecRecoveryState, recoverOpenSpecDesign } from "../skills/pipeline/scripts/openspec-recovery.mjs";
+import {
+  normalizeOpenSpecRecoveryState,
+  reconcileCorrectionCounters,
+  recoverOpenSpecDesign,
+} from "../skills/pipeline/scripts/openspec-recovery.mjs";
 
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 const pass = async () => ({ verdict: "pass" });
@@ -135,6 +139,53 @@ async function v4Fixture() {
     console.log("  [PASS] v4 resumes at one consolidated Gate 1");
   } finally { await rm(workspace, { recursive: true, force: true }); }
 }
+
+await use(async ({ workspace }) => {
+  const decision = {
+    event: "correction.decision",
+    decision: "authorize",
+    decision_ref: "5c8fc2636b2ac54d4242e19712add31b",
+    correction_authority: "gate1-autonomous",
+    correction_authority_gate_nonce: "gate-1-nonce",
+    correction_package: { anchor: "freeze-1", findings: ["PAYIN-AUD-001"] },
+  };
+  await writeFile(path.join(workspace, "00-execution-events.jsonl"), `${JSON.stringify(decision)}\n`);
+  const repaired = await reconcileCorrectionCounters({
+    workspace,
+    autonomousCorrectionCount: 3,
+    operatorCorrectionCount: 0,
+  });
+  assert.equal(repaired.verdict, "repair");
+  assert.equal(repaired.error_code, "CORRECTION_COUNTER_MISMATCH");
+  assert.deepEqual(repaired.state_patch, { autonomous_correction_count: 1, operator_correction_count: 0 });
+  const verified = await reconcileCorrectionCounters({
+    workspace,
+    autonomousCorrectionCount: 1,
+    operatorCorrectionCount: 0,
+  });
+  assert.equal(verified.verdict, "pass");
+  console.log("  [PASS] recovery projects correction budgets exactly from durable authority decisions");
+});
+
+await use(async ({ workspace }) => {
+  const decisions = Array.from({ length: 4 }, (_, index) => ({
+    event: "correction.decision",
+    decision: "authorize",
+    decision_ref: `autonomous-${index + 1}`,
+    correction_authority: "gate1-autonomous",
+    correction_authority_gate_nonce: "gate-1-nonce",
+    correction_package: { anchor: "freeze-1", findings: [`finding-${index + 1}`] },
+  }));
+  await writeFile(path.join(workspace, "00-execution-events.jsonl"), `${decisions.map(value => JSON.stringify(value)).join("\n")}\n`);
+  const blocked = await reconcileCorrectionCounters({
+    workspace,
+    autonomousCorrectionCount: 3,
+    operatorCorrectionCount: 0,
+  });
+  assert.equal(blocked.verdict, "blocked");
+  assert.equal(blocked.error_code, "AUTONOMOUS_CORRECTION_BUDGET_EXCEEDED");
+  console.log("  [PASS] recovery blocks an invalid fourth autonomous authority event instead of truncating it");
+});
 
 {
   const { workspace, state } = await v4Fixture();

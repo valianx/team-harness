@@ -149,6 +149,15 @@ heading, ID, or count can be checked mechanically.
 
 ## Dispatch completeness
 
+Repository files and OpenSpec coordinates resolve below
+`path_roots.repository_root`; plan and evidence artifacts resolve below
+`path_roots.workspace_artifact_root`. Evidence-only repositories form an
+optional third domain: `path_roots.evidence_roots.<service>` is allowed only
+when a canonical task-local `evidence_dispatch_binding` pins each permitted
+file by SHA-256. These roots are read-only and coordinate-only; they never
+extend `Files:`, `discovery_scope`, writable ownership, or workspace evidence
+anchors.
+
 Every task shard must declare all three fields in its `## Dispatch anchors`
 block:
 

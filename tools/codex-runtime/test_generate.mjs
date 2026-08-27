@@ -280,6 +280,9 @@ for (const marker of ["repairOpenSpecBindingDerivedArtifacts", "team_harness_ope
 for (const marker of ["sealOpenSpecBindingDispatch", "verifyOpenSpecBindingDispatch", "team_harness_openspec_dispatch_binding", "DERIVED_SET_BUSY", "DISPATCH_BINDING_STALE", "flag: \"wx\""]) {
   assert.ok(bindingsScript.includes(marker), `OpenSpec dispatch-binding implementation misses ${marker}`);
 }
+for (const marker of ["auditOpenSpecBindingDispatches", "DISPATCH_BINDINGS_INCOMPLETE", "bindOpenSpecEvidenceDispatch", "verifyOpenSpecEvidenceDispatch", "team_harness_packet_scope_insufficient", "service-task-role"]) {
+  assert.ok(bindingsScript.includes(marker), `OpenSpec evidence/recovery dispatch implementation misses ${marker}`);
+}
 for (const marker of ["migrate-v1", "verify-v1-migration", "team_harness_legacy_v1_gate_migration", "continuation_identity_sha256", "verifyLegacyV1CurrentBindings"]) {
   assert.ok(bindingsScript.includes(marker), `OpenSpec legacy-v1 migration implementation misses ${marker}`);
 }
@@ -292,6 +295,9 @@ for (const marker of ["derived-artifact-damage", "repair-derived", "DERIVED_REPA
 }
 for (const marker of ["seal-dispatch", "verify-dispatch", "derived_dispatch_binding", "DERIVED_SET_BUSY", "DISPATCH_BINDING_STALE", "never repair, rehash all bindings"]) {
   assert.ok(implementationContract.includes(marker), `OpenSpec immutable dispatch contract misses ${marker}`);
+}
+for (const marker of ["audit-dispatches", "evidence_dispatch_binding", "path_roots.evidence_roots", "team_harness_packet_scope_insufficient", "verify-evidence-dispatch"]) {
+  assert.ok(implementationContract.includes(marker), `OpenSpec cross-repository evidence contract misses ${marker}`);
 }
 for (const marker of ["migrate-v1", "gate1-v1-migration.json", "original Gate plus migration continuation identity"]) {
   assert.ok(implementationContract.includes(marker), `OpenSpec legacy-v1 implementation contract misses ${marker}`);
@@ -309,10 +315,16 @@ for (const marker of ["verify-v1-migration", "gate1-v1-migration.json", "passing
 for (const marker of ["dispatch-binding.json", "verify-dispatch", "DERIVED_SET_BUSY"]) {
   assert.ok(recoveryContract.includes(marker), `OpenSpec dispatch-binding recovery contract misses ${marker}`);
 }
+for (const marker of ["audit-dispatches", "REPAIR_CORRECTION_COUNTERS", "CORRECTION_COUNTER_MISMATCH", "verify-evidence-dispatch"]) {
+  assert.ok(recoveryContract.includes(marker), `OpenSpec exhaustive recovery contract misses ${marker}`);
+}
 for (const role of ["implementer", "tester"]) {
   const adapter = await readFile(join(root, `runtime/codex/instructions/${role}.md`), "utf8");
   for (const marker of ["derived_dispatch_binding", "assigned shard path and SHA-256", "rebound shard"]) {
     assert.ok(adapter.includes(marker), `${role} adapter misses immutable dispatch marker ${marker}`);
+  }
+  for (const marker of ["evidence_dispatch_binding", "evidence_roots", "Generation-2"]) {
+    assert.ok(adapter.includes(marker), `${role} adapter misses evidence dispatch marker ${marker}`);
   }
 }
 for (const marker of ["Team Harness Execution Contract", "EXECUTION_CONTRACT_INVALID", "discovery_scope", "required_seams", "observable_runtime_behavior"]) {

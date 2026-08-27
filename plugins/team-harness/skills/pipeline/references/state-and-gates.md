@@ -67,6 +67,7 @@ openspec_design_pass: preflight|provisioning|planning|snapshot|overlay|gate1-rea
 workspace_identity: {schema_version, kind, workspace_kind, logs_mode, coordinator_root, repo_base, date, feature, initiative, services, evidence_repositories}
 openspec_bindings: [{service, role, repository_root, repository_identity, change_name, planning_root, schema, cli_version, generated_skill_identity, task_intent_sha256, strict_validation, preflight, design_pass, snapshot_path, snapshot_sha256, overlay_path, overlay_sha256}]
 evidence_repositories: [{service, role: evidence-only, repository_root, repository_identity, purpose}]
+evidence_dispatch_bindings: [{service, task_shard_path, role: implementer|tester|null, generation: 1|2, path, sha256, dispatch_identity_sha256}]
 openspec_aggregate_path: inputs/openspec-bindings.json|null
 openspec_aggregate_sha256: {SHA-256|null}
 herdr_deliveries: [{message_id, target, pane_id, status, reason_code, staged, submitted, verified}]
@@ -173,9 +174,19 @@ during recovery before running quality.
 
 `autonomous_correction_count` is an integer from `0` through `3` and is the
 only correction budget. `operator_correction_count` is a non-negative,
-monotonic, deliberately unbounded integer. `iteration: N/3` is a
+monotonic, deliberately unbounded integer. Both are exact materialized
+projections of valid authorize `correction.decision` events for their matching
+authority; recovery verifies them even when present and mechanically repairs a
+mismatch before consulting either budget. `iteration: N/3` is a
 legacy-readable display mirror only; new runs may omit it and derive it for
 presentation. Initialize both counters at `0`.
+
+`evidence_dispatch_bindings` contains at most one active pointer per
+service/task pair. Generation 1 binds planned read-only evidence and has a null
+role. Generation 2 supersedes that pointer only for a certified
+`PACKET_SCOPE_INSUFFICIENT` recovery and names the exact implementer/tester role
+whose clean exhausted attempts restart; it never deletes or rewrites the prior
+workspace artifact.
 
 `cleaner_repo_evidence` is complete only when its canonical identity set equals
 `participating_repositories` exactly, with neither missing, extra, nor duplicate

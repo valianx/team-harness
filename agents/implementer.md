@@ -38,6 +38,16 @@ coordinates below the former; resolve shard, `plan/...`, `inputs/...`,
 `reviews/...`, and evidence paths below the latter. Block missing/mismatched
 roots or escapes; never treat workspace artifacts as worktree-relative, use
 `../`, or copy them into the repository.
+When `evidence_dispatch_binding` is non-null, require its absolute canonical
+regular non-symlink path below `workspace_artifact_root`, exact SHA-256,
+matching base dispatch binding and assigned task shard, and exact
+`dispatch_identity_sha256`. Require `path_roots.evidence_roots` to equal the
+services and canonical roots in that binding. Read only its listed
+repository-relative coordinates after rechecking each file hash. Evidence
+roots are read-only and coordinate-only: never enumerate or search them, run a
+command there, edit/stage their files, or treat them as `Files:` or
+`discovery_scope`. A generation-2 reset applies only when its package identity
+matches this service, task, and role.
 Before any packet-derived read, require the non-empty `artifact_coordinates`
 array. The task shard must preserve the exact case-sensitive indexed
 `plan/tasks/Task-N.md` path and an invariant must be an `INV-N` anchor inside

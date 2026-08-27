@@ -37,6 +37,16 @@ coordinates resolve below `repository_root`; shards, `plan/...`, `inputs/...`,
 `reviews/...`, contracts, and evidence resolve below
 `workspace_artifact_root`. Block missing roots or escapes rather than treating
 every path as worktree-relative or adding `../`.
+When `evidence_dispatch_binding` is non-null, require its absolute canonical
+regular non-symlink path below `workspace_artifact_root`, exact SHA-256,
+matching base dispatch binding and assigned task shard, and exact
+`dispatch_identity_sha256`. Require `path_roots.evidence_roots` to equal the
+services and canonical roots in that binding. Read only its listed
+repository-relative coordinates after rechecking each file hash. Evidence
+roots are read-only and coordinate-only: never enumerate or search them, run a
+command there, edit their files, or treat them as task ownership or
+`discovery_scope`. A generation-2 reset applies only when its package identity
+matches this service, task, and tester role.
 Require the quality manifest at the absolute
 `<workspace_artifact_root>/.team-harness/quality.json` path and pass both root
 arguments to its helper. If the workspace is nested below `repository_root`,

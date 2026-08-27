@@ -45,6 +45,91 @@ function result(verdict, actionCode, nextAction = null, errorCode = null) {
   };
 }
 
+function correctionCounterResult(verdict, errorCode, details = {}) {
+  return {
+    schema_version: 1,
+    kind: "team_harness_correction_counter_reconciliation",
+    verdict,
+    error_code: errorCode,
+    action_code: details.action_code ?? null,
+    autonomous_correction_count: details.autonomous_correction_count ?? null,
+    operator_correction_count: details.operator_correction_count ?? null,
+    state_patch: details.state_patch ?? null,
+  };
+}
+
+function parseExecutionEvents(bytes) {
+  const events = [];
+  let inFence = false;
+  for (const raw of bytes.toString("utf8").split("\n")) {
+    const line = raw.trim();
+    if (line === "```jsonl") { inFence = true; continue; }
+    if (line === "```" && inFence) { inFence = false; continue; }
+    if (line === "" || line.startsWith("#")) continue;
+    let value;
+    try { value = JSON.parse(raw); } catch { throw new Error("CORRECTION_COUNTER_EVENTS_INVALID"); }
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("CORRECTION_COUNTER_EVENTS_INVALID");
+    events.push(value);
+  }
+  return events;
+}
+
+/** Project correction budgets from their append-only authority events. */
+export async function reconcileCorrectionCounters({
+  workspace,
+  eventsPath = "00-execution-events.jsonl",
+  autonomousCorrectionCount,
+  operatorCorrectionCount,
+} = {}) {
+  if (!safeString(workspace) || !safeRelative(eventsPath)
+    || !Number.isInteger(autonomousCorrectionCount) || autonomousCorrectionCount < 0
+    || !Number.isInteger(operatorCorrectionCount) || operatorCorrectionCount < 0) {
+    return correctionCounterResult("blocked", "CORRECTION_COUNTER_STATE_INVALID");
+  }
+  let root;
+  let events;
+  try {
+    root = await realpath(path.resolve(workspace));
+    if (!(await lstat(root)).isDirectory()) throw new Error("workspace");
+    events = parseExecutionEvents(await readWorkspaceFile(root, eventsPath));
+  } catch (error) {
+    return correctionCounterResult("blocked", error?.message === "CORRECTION_COUNTER_EVENTS_INVALID"
+      ? error.message : "CORRECTION_COUNTER_EVENTS_UNREADABLE");
+  }
+  const references = new Set();
+  let autonomous = 0;
+  let operator = 0;
+  for (const event of events.filter(value => value.event === "correction.decision" && value.decision === "authorize")) {
+    const authority = event.correction_authority;
+    const reference = event.decision_ref;
+    const gateNonce = event.correction_authority_gate_nonce;
+    if (!["gate1-autonomous", "operator-live"].includes(authority)
+      || !safeString(reference) || references.has(reference)
+      || !event.correction_package || typeof event.correction_package !== "object" || Array.isArray(event.correction_package)
+      || (authority === "gate1-autonomous" ? !safeString(gateNonce) : gateNonce !== null)) {
+      return correctionCounterResult("blocked", "CORRECTION_COUNTER_EVENTS_INVALID");
+    }
+    references.add(reference);
+    if (authority === "gate1-autonomous") autonomous += 1;
+    else operator += 1;
+  }
+  if (autonomous > 3) {
+    return correctionCounterResult("blocked", "AUTONOMOUS_CORRECTION_BUDGET_EXCEEDED", {
+      autonomous_correction_count: autonomous,
+      operator_correction_count: operator,
+    });
+  }
+  const details = { autonomous_correction_count: autonomous, operator_correction_count: operator };
+  if (autonomousCorrectionCount === autonomous && operatorCorrectionCount === operator) {
+    return correctionCounterResult("pass", null, details);
+  }
+  return correctionCounterResult("repair", "CORRECTION_COUNTER_MISMATCH", {
+    ...details,
+    action_code: "REPAIR_CORRECTION_COUNTERS",
+    state_patch: { autonomous_correction_count: autonomous, operator_correction_count: operator },
+  });
+}
+
 function validV4Binding(value) {
   return value && typeof value === "object" && !Array.isArray(value) && CHANGE.test(value.service ?? "")
     && value.role === "writable-owner" && safeString(value.repository_root) && path.isAbsolute(value.repository_root)
@@ -217,6 +302,16 @@ export async function recoverOpenSpecDesign({ state, workspace, snapshotVerifier
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.stderr.write("openspec-recovery.mjs is a library helper; Main supplies bounded state directly.\n");
-  process.exitCode = 2;
+  const [operation, raw] = process.argv.slice(2);
+  if (operation !== "correction-counters" || !safeString(raw) || Buffer.byteLength(raw, "utf8") > 1024 * 1024) {
+    process.stderr.write("openspec-recovery.mjs accepts correction-counters with one bounded JSON argument; Design recovery remains a library helper.\n");
+    process.exitCode = 2;
+  } else {
+    let options;
+    try { options = JSON.parse(raw); }
+    catch { options = {}; }
+    const output = await reconcileCorrectionCounters(options);
+    process.stdout.write(`${JSON.stringify(output)}\n`);
+    if (!["pass", "repair"].includes(output.verdict)) process.exitCode = 1;
+  }
 }

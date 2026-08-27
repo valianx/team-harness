@@ -118,8 +118,8 @@ the normalized (LF) bytes against these canonical SHA-256 digests:
 | Role | SHA-256 of normalized TOML |
 |---|---|
 | pipeline-architect | `01c3366215ac8e4eddd1cffa7e92f0b8793a8c9ced0411ab2e6d612cdccaa69f` |
-| pipeline-implementer | `874b20898439b6cd944fd83d33a4e4663e5d3fc76d4e09f23c9b178152e6d6bd` |
-| pipeline-tester | `76ac91d1e162900f39a21531c7b99f53ebd13827b27e688aaea469f0cb4ff77b` |
+| pipeline-implementer | `26e87b86336fd4a2b1c57bd93a06a24fcd5b49874bbc45aec0bf6d1a7e3f771b` |
+| pipeline-tester | `d489697c84fb7567c9a6268fcaa339c502c60f912c0caa6e47309ad90c397a52` |
 | pipeline-cleaner | `8e17564f9835653b016b278324773d101b9c6158cda6d9826549e1af02026a9e` |
 | pipeline-qa | `85fa7bb2c471f6a70914965ae7980ad961e912908cc17492aa1dfcdc2346b655` |
 | pipeline-security | `cd15f37113ef88b9cfff744e97ff0ff51c31f1bf6817d2c9240957f27c4b7883` |
