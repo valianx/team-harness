@@ -102,79 +102,36 @@ cannot capture a trustworthy PR snapshot — authenticate gh or paste the diff a
 
 Do not recreate the helper inline.
 
-### 2. Capture immutable context
+### 2. Prepare the isolated review run
 
 ```bash
 REVIEW_ROOT="$(git rev-parse --show-toplevel)"
-python3 "$REVIEW_CONTEXT_HELPER" ensure-workspaces-ignore --repo-root "$REVIEW_ROOT"
-WORKSPACES_ROOT="$REVIEW_ROOT/workspaces"
-if ! git -C "$REVIEW_ROOT" check-ignore -q -- "workspaces/.team-harness-ignore-probe"; then
-  echo "cannot create a safe local review workspace — workspaces/ is not ignored" >&2
-  exit 1
-fi
-if [ -L "$WORKSPACES_ROOT" ] || { [ -e "$WORKSPACES_ROOT" ] && [ ! -d "$WORKSPACES_ROOT" ]; }; then
-  echo "cannot create a safe local review workspace — workspaces is not a real directory" >&2
-  exit 1
-fi
-if [ "${RESUME_FROM_DRAFT:-false}" = "true" ]; then
-  RUN_META="$(python3 "$REVIEW_CONTEXT_HELPER" resume-run --repo-root "$REVIEW_ROOT" --pr {number})"
-else
-  RUN_META="$(python3 "$REVIEW_CONTEXT_HELPER" create-run --repo-root "$REVIEW_ROOT" --pr {number})"
-fi
+RUN_META="$(python3 "$REVIEW_CONTEXT_HELPER" prepare-run \
+  --repo-root "$REVIEW_ROOT" --repo "{owner}/{repo}" --pr {number})"
 ARTIFACTS="$(printf '%s' "$RUN_META" | jq -r '.artifact_root')"
 REVIEW_OWNER_TOKEN="$(printf '%s' "$RUN_META" | jq -r '.owner_token')"
+CONTEXT="$(printf '%s' "$RUN_META" | jq -r '.context')"
+CONVERSATION="$(printf '%s' "$RUN_META" | jq -r '.conversation')"
+SNAPSHOT_GIT="$(printf '%s' "$RUN_META" | jq -r '.snapshot')"
+DIFF="$(printf '%s' "$RUN_META" | jq -r '.diff')"
+FILES="$(printf '%s' "$RUN_META" | jq -r '.files')"
+CHECKS="$(printf '%s' "$RUN_META" | jq -r '.checks')"
+WORKTREE="$(printf '%s' "$RUN_META" | jq -r '.worktree')"
 cleanup_owned_review_run() {
   python3 "$REVIEW_CONTEXT_HELPER" cleanup-run --repo-root "$REVIEW_ROOT" \
     --artifact-root "$ARTIFACTS" --owner-token "$REVIEW_OWNER_TOKEN"
 }
-if ! git -C "$REVIEW_ROOT" check-ignore -q -- "$ARTIFACTS"; then
-  echo "cannot use the local review workspace — created directory is not ignored" >&2
-  cleanup_owned_review_run
-  exit 1
-fi
-CONTEXT="$ARTIFACTS/pr-review-context.json"
-CONVERSATION="$ARTIFACTS/pr-review-conversation.md"
-SNAPSHOT_GIT="$ARTIFACTS/pr-review-snapshot.git"
-GATHER_DEADLINE="$(python3 "$REVIEW_CONTEXT_HELPER" deadline --seconds 60)"
-
-if [ "${RESUME_FROM_DRAFT:-false}" = "true" ]; then
-  for leaf in "$CONTEXT" "$ARTIFACTS/pr-review-final.md" "$ARTIFACTS/pr-review-inline.json"; do
-    if [ -L "$leaf" ] || [ ! -f "$leaf" ]; then
-      echo "cannot resume review — required artifact is not a regular non-symlink file" >&2
-      exit 1
-    fi
-  done
-fi
-
-CONTEXT_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-context.XXXXXX")"
-CONVERSATION_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-conversation.XXXXXX")"
-if ! {
-  python3 "$REVIEW_CONTEXT_HELPER" capture \
-    --repo "{owner}/{repo}" --pr {number} --git-dir "$REVIEW_ROOT" \
-    --snapshot-dir "$SNAPSHOT_GIT" --deadline-epoch "$GATHER_DEADLINE" \
-    --output "$CONTEXT_TMP" &&
-  python3 "$REVIEW_CONTEXT_HELPER" render \
-    --context "$CONTEXT_TMP" --output "$CONVERSATION_TMP" &&
-  python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
-    --temporary-name "${CONTEXT_TMP##*/}" --final-name "${CONTEXT##*/}" &&
-  python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
-    --temporary-name "${CONVERSATION_TMP##*/}" --final-name "${CONVERSATION##*/}";
-}; then
-  if [ "${RESUME_FROM_DRAFT:-false}" != "true" ]; then
-    cleanup_owned_review_run
-  fi
-  exit 1
-fi
 ```
 
-Every later artifact write follows the same leaf-safe rule: create a unique
-regular temporary file inside `$ARTIFACTS`, write only that temporary file,
-verify with `lstat` that it is regular and non-symlink and canonically contained
-under `$ARTIFACTS`, reject an existing final leaf unless it is also regular and
-non-symlink, then atomically rename the temporary file over the final leaf.
-Never redirect or open a fixed final artifact path directly. The exclusive
-fresh-directory creation and these atomic promotions are mandatory, not
-best-effort snapshot checks.
+`prepare-run` is the sole owner of creation, capture, rendering, materialization,
+atomic promotion, and failure cleanup. It creates one private
+`workspaces/pr-review-{number}/run-{owner_token}/`, validates the Git ignore,
+uses one shared 60-second budget, and returns only after the immutable context,
+conversation, diff, file list, checks, bare snapshot, and detached worktree are
+ready. On any failure it removes only the marker-bound run it created; if safe
+cleanup cannot be proven, it preserves that run and returns the cleanup blocker.
+Main never recreates these mechanics with `mktemp`, shell promotion chains, or
+a fixed `workspaces/pr-review-{number}` path.
 
 Read metadata and immutable refs from `$CONTEXT`. Store `head_oid`, `base_oid`,
 `merge_base_oid`, `context_hash`, `fetched_at`, `is_cross_repository`, and the classified and raw
@@ -187,49 +144,10 @@ fetch, then repacks every reachable snapshot object locally so the bare reposito
 self-contained before use. It must never fetch, update refs, create worktree administration, or
 otherwise write inside the operator checkout's `.git`.
 
-`GATHER_DEADLINE` is shared by context capture, diff and file-list generation, checks collection,
-and detached worktree creation. Every subprocess is non-interactive and consumes only the time
-remaining in that one 60-second budget. A timeout or snapshot validation failure fails closed
-without sandbox escalation. Every later freshness recapture starts a new deadline, reuses
-`$SNAPSHOT_GIT`, and passes the same `--snapshot-dir`.
-
-### 3. Materialize review artifacts
-
-Write data once and pass paths to agents. Do not duplicate the diff, policy, or conversation
-inside Task prompts.
-
-```bash
-DIFF="$ARTIFACTS/pr-review-diff.patch"
-FILES="$ARTIFACTS/pr-review-files.txt"
-CHECKS="$ARTIFACTS/pr-review-checks.txt"
-DIFF_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-diff.XXXXXX")"
-FILES_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-files.XXXXXX")"
-CHECKS_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-checks.XXXXXX")"
-WORKTREE="$ARTIFACTS/pr-review-worktree"
-
-if ! python3 "$REVIEW_CONTEXT_HELPER" materialize \
-  --repo "{owner}/{repo}" --pr {number} --context "$CONTEXT" \
-  --artifact-root "$ARTIFACTS" --snapshot-dir "$SNAPSHOT_GIT" \
-  --diff-name "${DIFF_TMP##*/}" --files-name "${FILES_TMP##*/}" \
-  --checks-name "${CHECKS_TMP##*/}" --worktree "$WORKTREE" \
-  --deadline-epoch "$GATHER_DEADLINE"; then
-  cleanup_owned_review_run
-  exit 1
-fi
-# Return from these commands after promotion. Never bind review cleanup to this
-# shell's EXIT lifecycle; the coordinator owns cleanup after every specialist joins.
-if ! {
-  python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
-    --temporary-name "${DIFF_TMP##*/}" --final-name "${DIFF##*/}" &&
-  python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
-    --temporary-name "${FILES_TMP##*/}" --final-name "${FILES##*/}" &&
-  python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
-    --temporary-name "${CHECKS_TMP##*/}" --final-name "${CHECKS##*/}";
-}; then
-  cleanup_owned_review_run
-  exit 1
-fi
-```
+Write data once and pass these paths to agents. Do not duplicate the diff,
+policy, or conversation inside Task prompts. Every later artifact write uses
+the helper's leaf-safe temporary-write and atomic-promotion commands; never
+open a fixed final artifact path directly.
 
 Do not execute the PR's code or install dependencies. Existing CI results are evidence; local
 test execution is an explicit operator action outside this skill.
@@ -238,13 +156,7 @@ If the PR body links an issue with `Closes`, `Fixes`, or `Resolves`, fetch its n
 body, and labels once into `$ARTIFACTS/pr-review-issue.json`. Treat failure as
 `linked issue: unavailable`, not as a reason to weaken snapshot checks.
 
-### 4. Create the frozen worktree and coordinator-owned cleanup
-
-`materialize` creates the detached worktree within the shared deadline and first
-attempts bounded partial-worktree cleanup on failure. The coordinator then calls
-`cleanup-run` outside that expired capture budget. The helper removes only the
-isolated run whose path, marker, PR, and secret owner token all match; it never
-touches a sibling run. A dirty or unprovable worktree is preserved and surfaced.
+### 3. Coordinator-owned cleanup
 
 The coordinator owns the successful snapshot lifecycle. Never register an `EXIT`,
 PTY, exec-session, subshell, or background-process cleanup hook in the command that
@@ -283,7 +195,7 @@ Detect an existing pipeline workspace from `workspaces/*/01-plan.md` or
 
 Do not preload or paste sketches into dispatches.
 
-### 5. Load optional policy and prior-review identity
+### 4. Load optional policy and prior-review identity
 
 Set `policy_path` to `$WORKTREE/.team-harness/review-policy.md` when present; otherwise use
 `none`. Do not paste its contents into Task prompts.

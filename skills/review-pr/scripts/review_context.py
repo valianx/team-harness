@@ -309,6 +309,49 @@ def create_review_run(repo_root: Path, pr: int) -> dict[str, Any]:
     raise ContextError("cannot allocate an isolated review run")
 
 
+def _temporary_leaf(artifact_root: Path, prefix: str) -> Path:
+    _safe_leaf(prefix)
+    _, directory_fd = _open_directory(artifact_root)
+    try:
+        for _ in range(8):
+            name = f"{prefix}.{secrets.token_hex(8)}"
+            try:
+                leaf_fd = os.open(
+                    name,
+                    os.O_RDWR | os.O_CREAT | os.O_EXCL | NOFOLLOW,
+                    0o600,
+                    dir_fd=directory_fd,
+                )
+            except FileExistsError:
+                continue
+            os.close(leaf_fd)
+            return artifact_root / name
+    finally:
+        os.close(directory_fd)
+    raise ContextError("cannot allocate a temporary review artifact")
+
+
+def _write_existing_leaf(path: Path, content: bytes) -> None:
+    root, directory_fd = _open_directory(path.parent)
+    del root
+    name = _safe_leaf(path.name)
+    try:
+        before = _regular_stat_at(directory_fd, name)
+        leaf_fd = os.open(name, os.O_WRONLY | os.O_TRUNC | NOFOLLOW, dir_fd=directory_fd)
+        try:
+            opened = os.fstat(leaf_fd)
+            if (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
+                raise ContextError("temporary artifact changed before write")
+            view = memoryview(content)
+            while view:
+                view = view[os.write(leaf_fd, view):]
+            os.fsync(leaf_fd)
+        finally:
+            os.close(leaf_fd)
+    finally:
+        os.close(directory_fd)
+
+
 def find_resumable_review_run(repo_root: Path, pr: int) -> dict[str, Any]:
     parent = _review_parent(repo_root, pr, create=False)
     candidates: list[dict[str, Any]] = []
@@ -1313,24 +1356,46 @@ def command_deadline(args: argparse.Namespace) -> int:
     return 0
 
 
-def command_capture(args: argparse.Namespace) -> int:
+def capture_to_path(
+    *,
+    repo: str,
+    pr: int,
+    output: Path,
+    git_dir: Path,
+    snapshot_dir: Path | None,
+    deadline_epoch: float | None,
+    remote: str = "origin",
+) -> dict[str, Any]:
     global _capture_deadline
-    artifact_root, artifact_fd = _open_directory(args.output.parent)
+    artifact_root, artifact_fd = _open_directory(output.parent)
     os.close(artifact_fd)
-    requested_snapshot = args.snapshot_dir or artifact_root / "pr-review-snapshot.git"
+    requested_snapshot = snapshot_dir or artifact_root / "pr-review-snapshot.git"
     snapshot_dir = resolve_snapshot_dir(artifact_root, requested_snapshot)
-    configure_deadline(args.deadline_epoch)
+    configure_deadline(deadline_epoch)
     try:
         context = capture(
-            args.repo,
-            args.pr,
-            args.git_dir.resolve(),
-            args.remote,
+            repo,
+            pr,
+            git_dir.resolve(),
+            remote,
             snapshot_dir,
         )
     finally:
         _capture_deadline = None
-    write_json(args.output, context)
+    write_json(output, context)
+    return context
+
+
+def command_capture(args: argparse.Namespace) -> int:
+    context = capture_to_path(
+        repo=args.repo,
+        pr=args.pr,
+        output=args.output,
+        git_dir=args.git_dir,
+        snapshot_dir=args.snapshot_dir,
+        deadline_epoch=args.deadline_epoch,
+        remote=args.remote,
+    )
     print(
         json.dumps(
             {
@@ -1347,31 +1412,43 @@ def command_capture(args: argparse.Namespace) -> int:
     return 0
 
 
-def command_materialize(args: argparse.Namespace) -> int:
+def materialize_review_artifacts(
+    *,
+    repo: str,
+    pr: int,
+    context_path: Path,
+    artifact_root_value: Path,
+    snapshot_dir_value: Path,
+    diff_name: str,
+    files_name: str,
+    checks_name: str,
+    worktree: Path,
+    deadline_epoch: float,
+) -> None:
     global _capture_deadline
-    artifact_root, artifact_fd = _open_directory(args.artifact_root)
+    artifact_root, artifact_fd = _open_directory(artifact_root_value)
     os.close(artifact_fd)
-    snapshot_dir = resolve_snapshot_dir(artifact_root, args.snapshot_dir)
-    context = load_context(args.context)
+    snapshot_dir = resolve_snapshot_dir(artifact_root, snapshot_dir_value)
+    context = load_context(context_path)
     git_refs = context.get("git_refs") or {}
     base_ref = git_refs.get("base")
     head_ref = git_refs.get("head")
     head_oid = context.get("head_oid")
     if not all(isinstance(value, str) and value for value in (base_ref, head_ref, head_oid)):
         raise ContextError("context is missing immutable Git refs for materialization")
-    if args.worktree.is_symlink() or args.worktree.exists():
+    if worktree.is_symlink() or worktree.exists():
         raise ContextError("frozen worktree path already exists; remove it before retrying")
 
-    configure_deadline(args.deadline_epoch)
+    configure_deadline(deadline_epoch)
     try:
         run_to_leaf(
             artifact_root,
-            args.diff_name,
+            diff_name,
             ["git", "--git-dir", str(snapshot_dir), "diff", f"{base_ref}...{head_ref}"],
         )
         run_to_leaf(
             artifact_root,
-            args.files_name,
+            files_name,
             [
                 "git",
                 "--git-dir",
@@ -1383,8 +1460,8 @@ def command_materialize(args: argparse.Namespace) -> int:
         )
         run_to_leaf(
             artifact_root,
-            args.checks_name,
-            ["gh", "pr", "checks", str(args.pr), "--repo", args.repo],
+            checks_name,
+            ["gh", "pr", "checks", str(pr), "--repo", repo],
             combine_stderr=True,
             allow_failure=True,
         )
@@ -1396,7 +1473,7 @@ def command_materialize(args: argparse.Namespace) -> int:
                 "worktree",
                 "add",
                 "--detach",
-                str(args.worktree),
+                str(worktree),
                 head_oid,
             ]
         )
@@ -1408,12 +1485,12 @@ def command_materialize(args: argparse.Namespace) -> int:
             cleanup_timeout = None
             cleanup_error = (
                 "shared deadline exhausted before partial worktree cleanup; "
-                f"inspect {args.worktree} and {snapshot_dir}"
+                f"inspect {worktree} and {snapshot_dir}"
             )
         if (
             cleanup_timeout is not None
-            and args.worktree.exists()
-            and not args.worktree.is_symlink()
+            and worktree.exists()
+            and not worktree.is_symlink()
         ):
             try:
                 cleanup = subprocess.run(
@@ -1423,7 +1500,7 @@ def command_materialize(args: argparse.Namespace) -> int:
                         str(snapshot_dir),
                         "worktree",
                         "remove",
-                        str(args.worktree),
+                        str(worktree),
                     ],
                     check=False,
                     capture_output=True,
@@ -1433,18 +1510,33 @@ def command_materialize(args: argparse.Namespace) -> int:
                 if cleanup.returncode != 0:
                     cleanup_error = (
                         "partial worktree cleanup failed within the shared deadline; "
-                        f"inspect {args.worktree} and {snapshot_dir}"
+                        f"inspect {worktree} and {snapshot_dir}"
                     )
             except (OSError, subprocess.TimeoutExpired):
                 cleanup_error = (
                     "partial worktree cleanup did not complete within the shared "
-                    f"deadline; inspect {args.worktree} and {snapshot_dir}"
+                    f"deadline; inspect {worktree} and {snapshot_dir}"
                 )
         if cleanup_error is not None:
             raise ContextError(f"{error}; {cleanup_error}") from error
         raise
     finally:
         _capture_deadline = None
+
+
+def command_materialize(args: argparse.Namespace) -> int:
+    materialize_review_artifacts(
+        repo=args.repo,
+        pr=args.pr,
+        context_path=args.context,
+        artifact_root_value=args.artifact_root,
+        snapshot_dir_value=args.snapshot_dir,
+        diff_name=args.diff_name,
+        files_name=args.files_name,
+        checks_name=args.checks_name,
+        worktree=args.worktree,
+        deadline_epoch=args.deadline_epoch,
+    )
     print(json.dumps({"status": "materialized", "worktree": str(args.worktree)}))
     return 0
 
@@ -1734,6 +1826,95 @@ def command_ensure_workspaces_ignore(args: argparse.Namespace) -> int:
     return 0
 
 
+def prepare_review_run(repo_root: Path, repo: str, pr: int) -> dict[str, Any]:
+    ensure_workspaces_ignored(repo_root)
+    run = create_review_run(repo_root, pr)
+    artifact_root = Path(run["artifact_root"])
+    owner_token = run["owner_token"]
+    try:
+        ignored = subprocess.run(
+            ["git", "-C", str(repo_root), "check-ignore", "-q", "--", str(artifact_root)],
+            check=False,
+            capture_output=True,
+            timeout=COMMAND_TIMEOUT_SECONDS,
+            env=command_environment(),
+        )
+        if ignored.returncode != 0:
+            raise ContextError("created review run is not ignored by Git")
+
+        deadline = time.time() + COMMAND_TIMEOUT_SECONDS
+        snapshot = artifact_root / "pr-review-snapshot.git"
+        context_path = artifact_root / "pr-review-context.json"
+        conversation_path = artifact_root / "pr-review-conversation.md"
+        diff_path = artifact_root / "pr-review-diff.patch"
+        files_path = artifact_root / "pr-review-files.txt"
+        checks_path = artifact_root / "pr-review-checks.txt"
+        worktree = artifact_root / "pr-review-worktree"
+
+        context_tmp = _temporary_leaf(artifact_root, "tmp-pr-review-context")
+        conversation_tmp = _temporary_leaf(artifact_root, "tmp-pr-review-conversation")
+        context = capture_to_path(
+            repo=repo,
+            pr=pr,
+            output=context_tmp,
+            git_dir=repo_root,
+            snapshot_dir=snapshot,
+            deadline_epoch=deadline,
+        )
+        _write_existing_leaf(conversation_tmp, render_context(context).encode("utf-8"))
+        promote_artifact(artifact_root, context_tmp.name, context_path.name)
+        promote_artifact(artifact_root, conversation_tmp.name, conversation_path.name)
+
+        diff_tmp = _temporary_leaf(artifact_root, "tmp-pr-review-diff")
+        files_tmp = _temporary_leaf(artifact_root, "tmp-pr-review-files")
+        checks_tmp = _temporary_leaf(artifact_root, "tmp-pr-review-checks")
+        materialize_review_artifacts(
+            repo=repo,
+            pr=pr,
+            context_path=context_path,
+            artifact_root_value=artifact_root,
+            snapshot_dir_value=snapshot,
+            diff_name=diff_tmp.name,
+            files_name=files_tmp.name,
+            checks_name=checks_tmp.name,
+            worktree=worktree,
+            deadline_epoch=deadline,
+        )
+        promote_artifact(artifact_root, diff_tmp.name, diff_path.name)
+        promote_artifact(artifact_root, files_tmp.name, files_path.name)
+        promote_artifact(artifact_root, checks_tmp.name, checks_path.name)
+        return {
+            **run,
+            "status": "prepared",
+            "head_oid": context["head_oid"],
+            "base_oid": context["base_oid"],
+            "merge_base_oid": context["merge_base_oid"],
+            "context_hash": context["context_hash"],
+            "context": str(context_path),
+            "conversation": str(conversation_path),
+            "snapshot": str(snapshot),
+            "diff": str(diff_path),
+            "files": str(files_path),
+            "checks": str(checks_path),
+            "worktree": str(worktree),
+        }
+    except Exception as error:
+        try:
+            cleanup_review_run(repo_root, artifact_root, owner_token)
+        except Exception as cleanup_error:
+            raise ContextError(
+                f"{error}; owned review-run cleanup incomplete: {cleanup_error}"
+            ) from error
+        if isinstance(error, ContextError):
+            raise
+        raise ContextError("cannot prepare the isolated review run") from error
+
+
+def command_prepare_run(args: argparse.Namespace) -> int:
+    print(json.dumps(prepare_review_run(args.repo_root, args.repo, args.pr), sort_keys=True))
+    return 0
+
+
 def command_create_run(args: argparse.Namespace) -> int:
     print(json.dumps(create_review_run(args.repo_root, args.pr), sort_keys=True))
     return 0
@@ -1851,6 +2032,12 @@ def build_parser() -> argparse.ArgumentParser:
     ignore_parser = subparsers.add_parser("ensure-workspaces-ignore")
     ignore_parser.add_argument("--repo-root", required=True, type=Path)
     ignore_parser.set_defaults(func=command_ensure_workspaces_ignore)
+
+    prepare_run_parser = subparsers.add_parser("prepare-run")
+    prepare_run_parser.add_argument("--repo-root", required=True, type=Path)
+    prepare_run_parser.add_argument("--repo", required=True)
+    prepare_run_parser.add_argument("--pr", required=True, type=int)
+    prepare_run_parser.set_defaults(func=command_prepare_run)
 
     create_run_parser = subparsers.add_parser("create-run")
     create_run_parser.add_argument("--repo-root", required=True, type=Path)

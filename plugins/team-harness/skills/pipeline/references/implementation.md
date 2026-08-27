@@ -134,14 +134,11 @@ each target path. A missing or ambiguous owner blocks before authority; Main
 never guesses or manually appends a shard/source/hash tuple. This derived owner
 does not widen scope because its path was already in the correction package.
 
-The specialist prompt carries only `dispatch_reference: {schema_version, kind,
-path, sha256, scope_identity_sha256}` plus attempt/decision correlation. The
-specialist verifies that reference and sends token-bound `dispatch-ready`
-before any repository/workspace read. Main counts an attempt only after this
-acknowledgement. A pre-ready reference failure consumes no attempt and no new
-operator authority: Main may mechanically re-certify under the same decision
-when `scope_identity_sha256` is unchanged. A changed scope needs a fresh
-package and decision.
+Prompt contents, reference verification, readiness, pre-ready failure, and
+silent-start handling are owned only by
+`agents/_shared/dispatch-contract.md` § "Pipeline specialist reference". Apply
+that contract here; never restate or specialize its handshake in this phase
+reference.
 
 The capsule is the one canonical owner of roots, owned files, discovery,
 required seams, snapshot/execution/source coordinates, permanent and optional

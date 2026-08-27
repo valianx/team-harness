@@ -192,8 +192,6 @@ async function fixture() {
     task_ids: ["Task-13", "Task-9"],
     test_contract_evidence: stateSummary(indexBytes, tasks, 2),
     dispatch_request: {
-      schema_version: 1,
-      kind: "team_harness_dispatch_request",
       role: "implementer",
       mode: "implementation",
       evidence_dispatch_binding: null,
@@ -202,7 +200,6 @@ async function fixture() {
         manifest_sha256: "b".repeat(64),
       },
       workspace_write_coordinates: [],
-      bounded_result_path: null,
       git_metadata_write_mode: "normal",
       scope_paths: [],
     },
@@ -296,6 +293,9 @@ try {
   assert.equal(Object.hasOwn(completeInput.dispatch_request, "bounded_command_path"), false);
   assert.equal(Object.hasOwn(completeInput.dispatch_request, "artifact_coordinates"), false);
   assert.equal(Object.hasOwn(completeInput.dispatch_request, "derived_dispatch_binding"), false);
+  assert.equal(Object.hasOwn(completeInput.dispatch_request, "schema_version"), false);
+  assert.equal(Object.hasOwn(completeInput.dispatch_request, "kind"), false);
+  assert.equal(Object.hasOwn(completeInput.dispatch_request, "bounded_result_path"), false);
   const { helper_bundle: omittedBundle, ...requestWithoutBundle } = completeInput.dispatch_request;
   assert.ok(omittedBundle);
   const missingBundleReference = await certifyCorrectionPacket({
@@ -337,6 +337,44 @@ try {
   assert.deepEqual(ownerCapsule.openspec.execution_items.map(item => item.task_id), ["Task-9", "Task-13"]);
   assert.equal(ownerCapsule.openspec.source_coordinates.length, 2);
 
+  const resultDirectory = path.join(value.workspace, "evidence", "bounded-results");
+  await mkdir(resultDirectory, { recursive: true });
+  const boundedResult = path.join(resultDirectory, "tester.json");
+  const withBoundedResult = await certifyCorrectionPacket({
+    ...completeInput,
+    dispatch_request: {
+      ...completeInput.dispatch_request,
+      workspace_write_coordinates: [{
+        path: boundedResult,
+        operations: ["create"],
+        purpose: "bounded-command-result",
+      }],
+    },
+  }, value.dependencies);
+  assert.equal(withBoundedResult.verdict, "pass", JSON.stringify(withBoundedResult));
+  const boundedCapsule = JSON.parse(await readFile(withBoundedResult.dispatch_reference.path));
+  assert.equal(boundedCapsule.workspace_writes.bounded_result_path, boundedResult);
+  const duplicateBoundedResult = await certifyCorrectionPacket({
+    ...completeInput,
+    dispatch_request: {
+      ...completeInput.dispatch_request,
+      workspace_write_coordinates: [
+        {
+          path: boundedResult,
+          operations: ["create"],
+          purpose: "bounded-command-result",
+        },
+        {
+          path: path.join(resultDirectory, "tester-2.json"),
+          operations: ["create"],
+          purpose: "bounded-command-result",
+        },
+      ],
+    },
+  }, value.dependencies);
+  assert.equal(duplicateBoundedResult.verdict, "fail");
+  assert.equal(duplicateBoundedResult.error_code, "PACKET_CONTRACT_INVALID");
+
   const verifiedReference = await verifyDispatchReference({
     workspace: value.workspace,
     dispatch_reference: certified.dispatch_reference,
@@ -345,7 +383,10 @@ try {
   assert.equal(verifiedReference.action, "ack-dispatch-ready");
   const mistypedReference = await verifyDispatchReference({
     workspace: value.workspace,
-    dispatch_reference: { ...certified.dispatch_reference, sha256: `0${certified.dispatch_reference.sha256.slice(1)}` },
+    dispatch_reference: {
+      ...certified.dispatch_reference,
+      sha256: `${certified.dispatch_reference.sha256.startsWith("0") ? "1" : "0"}${certified.dispatch_reference.sha256.slice(1)}`,
+    },
   });
   assert.equal(mistypedReference.verdict, "fail");
   assert.equal(mistypedReference.action, "repair-before-attempt");

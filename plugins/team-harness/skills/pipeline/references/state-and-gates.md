@@ -382,10 +382,9 @@ owners with the requested set; missing or ambiguous ownership blocks here.
 `repair-index` may add only missing required rows as `pending`; close them
 before retrying. No correction nonce or authority exists until the resolver
 returns `dispatch-ready-before-authority`. Immediately before spawn, re-certify
-the same identity. The specialist's token-bound `dispatch-ready` acknowledgement
-starts the attempt; a pre-ready reference failure consumes no attempt and may
-be mechanically re-certified under the same decision only when identity is
-unchanged.
+the same identity. Apply `agents/_shared/dispatch-contract.md` § "Pipeline
+specialist reference" for the sole readiness and pre-ready recovery contract;
+do not reproduce it in state transitions.
 
 The closed autonomous predicate requires every conjunct: a valid Gate-1
 approval dual record (`approved`; legacy `approved-autonomous` stays legible);

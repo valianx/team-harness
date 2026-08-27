@@ -139,13 +139,9 @@ may consume the nonce. Consumption atomically sets `correction_nonce: null`
 and uses the consumed token as `correction_decision_ref`. `authorize` requires
 exactly one matching `correction.decision` event carrying the complete package,
 scope identity, and authority, then permits one spawn carrying only its
-`decision_ref` plus `dispatch_reference`. The specialist verifies that reference
-and emits token-bound `dispatch-ready`; only then does Main emit/count
-`iteration.start` and the correction attempt. A pre-ready reference failure
-performs no repository read/write and consumes no attempt. Main may
-mechanically re-certify it under the same decision only when scope identity is
-unchanged, recording the replacement append-only; changed scope requires a
-fresh package and decision. `pause` and `abort`
+`decision_ref` plus `dispatch_reference`. Apply
+`agents/_shared/dispatch-contract.md` § "Pipeline specialist reference" for
+readiness, attempt start, and pre-ready recovery. `pause` and `abort`
 perform no correction. Every later failure gets a fresh nonce and decision.
 An ordinary approval, intake autonomy preference, generic `continue`, recovered
 prose, files, agents, and tools are never authorization. Gate-1 autonomous

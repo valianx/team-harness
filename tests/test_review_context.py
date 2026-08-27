@@ -87,6 +87,77 @@ class ReviewContextTests(unittest.TestCase):
             MODULE.cleanup_review_run(repo, Path(incomplete["artifact_root"]), incomplete["owner_token"])
             MODULE.cleanup_review_run(repo, complete_root, complete["owner_token"])
 
+    def test_prepare_run_owns_capture_materialization_and_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            subprocess.run(["git", "init", "-q", str(repo_root)], check=True)
+            captured = context()
+
+            def fake_capture(**values):
+                values["snapshot_dir"].mkdir()
+                MODULE.write_json(values["output"], captured)
+                return captured
+
+            def fake_materialize(**values):
+                root = values["artifact_root_value"]
+                for name in (values["diff_name"], values["files_name"], values["checks_name"]):
+                    (root / name).write_text("evidence\n", encoding="utf-8")
+                values["worktree"].mkdir()
+
+            with (
+                patch.object(MODULE, "capture_to_path", side_effect=fake_capture),
+                patch.object(MODULE, "materialize_review_artifacts", side_effect=fake_materialize),
+                patch.object(MODULE, "render_context", return_value="conversation\n"),
+            ):
+                prepared = MODULE.prepare_review_run(repo_root, "owner/repo", 34)
+
+            self.assertEqual(prepared["status"], "prepared")
+            self.assertEqual(prepared["context_hash"], captured["context_hash"])
+            for key in ("context", "conversation", "snapshot", "diff", "files", "checks", "worktree"):
+                self.assertTrue(Path(prepared[key]).exists(), key)
+            self.assertNotIn("tmp-pr-review", "\n".join(path.name for path in Path(prepared["artifact_root"]).iterdir()))
+
+    def test_prepare_run_cleans_its_owned_partial_run_on_capture_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            subprocess.run(["git", "init", "-q", str(repo_root)], check=True)
+            with patch.object(
+                MODULE,
+                "capture_to_path",
+                side_effect=MODULE.ContextError("capture failed"),
+            ):
+                with self.assertRaisesRegex(MODULE.ContextError, "capture failed"):
+                    MODULE.prepare_review_run(repo_root, "owner/repo", 34)
+
+            parent = repo_root / "workspaces" / "pr-review-34"
+            self.assertEqual(list(parent.glob("run-*")), [])
+
+    def test_prepare_run_cleans_its_owned_partial_run_on_materialize_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo_root = Path(directory)
+            subprocess.run(["git", "init", "-q", str(repo_root)], check=True)
+            captured = context()
+
+            def fake_capture(**values):
+                values["snapshot_dir"].mkdir()
+                MODULE.write_json(values["output"], captured)
+                return captured
+
+            with (
+                patch.object(MODULE, "capture_to_path", side_effect=fake_capture),
+                patch.object(MODULE, "render_context", return_value="conversation\n"),
+                patch.object(
+                    MODULE,
+                    "materialize_review_artifacts",
+                    side_effect=MODULE.ContextError("materialize failed"),
+                ),
+            ):
+                with self.assertRaisesRegex(MODULE.ContextError, "materialize failed"):
+                    MODULE.prepare_review_run(repo_root, "owner/repo", 34)
+
+            parent = repo_root / "workspaces" / "pr-review-34"
+            self.assertEqual(list(parent.glob("run-*")), [])
+
     def test_review_snapshot_lifecycle_outlives_exec_yields(self):
         contract = SKILL.read_text(encoding="utf-8")
         self.assertNotIn("Register the EXIT trap", contract)

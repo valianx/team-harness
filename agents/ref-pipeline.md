@@ -524,11 +524,9 @@ one `correction.decision` event before dispatch. The consumed nonce becomes its
 `decision_ref`; this sole authority record carries the complete correction
 package, `correction_authority`, authority Gate nonce, and exact
 `correction_dispatch_reference`. The specialist prompt carries only that
-reference plus ordinary correlation. It verifies the referenced capsule and
-emits token-bound `dispatch-ready`; only then does Main emit/count
-`iteration.start` and `agent.correction.spawn`. A reference failure before that
-acknowledgement consumes no attempt and may be mechanically re-certified under
-the same decision only when its scope identity is unchanged. Autonomous
+reference plus ordinary correlation. Read and apply
+`agents/_shared/dispatch-contract.md` § "Pipeline specialist reference" for
+readiness, attempt start, and pre-ready recovery. Autonomous
 authority carries the exact consumed Gate-1 nonce; operator-live carries null.
 It may not narrow to one finding, widen scope, or reuse an old nonce. After the
 bounded implementation/evidence work, require a recorded PASS for every package closure check

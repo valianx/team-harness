@@ -44,9 +44,9 @@ const BASE_INPUT_KEYS = new Set([
 ]);
 const CERTIFY_INPUT_KEYS = new Set([...BASE_INPUT_KEYS, "dispatch_request"]);
 const DISPATCH_REQUEST_KEYS = new Set([
-  "schema_version", "kind", "role", "mode", "helper_bundle",
+  "role", "mode", "helper_bundle",
   "evidence_dispatch_binding", "workspace_write_coordinates",
-  "bounded_result_path", "git_metadata_write_mode", "scope_paths",
+  "git_metadata_write_mode", "scope_paths",
 ]);
 const EVIDENCE_BINDING_KEYS = new Set(["path", "sha256", "dispatch_identity_sha256"]);
 const HELPER_BUNDLE_REF_KEYS = new Set(["manifest_path", "manifest_sha256"]);
@@ -418,8 +418,7 @@ function capsuleScopeIdentity(capsule) {
 
 async function deriveDispatchCapsule(input, model, source, testContracts, dependencies) {
   const request = input.dispatch_request;
-  if (!exactKeys(request, DISPATCH_REQUEST_KEYS) || request.schema_version !== 1
-    || request.kind !== "team_harness_dispatch_request" || !PACKET_ROLES.has(request.role)
+  if (!exactKeys(request, DISPATCH_REQUEST_KEYS) || !PACKET_ROLES.has(request.role)
     || !PACKET_MODES.has(request.mode) || request.role === "implementer" && request.mode !== "implementation"
     || !["normal", "native-escalation-required"].includes(request.git_metadata_write_mode)
     || !exactKeys(request.helper_bundle, HELPER_BUNDLE_REF_KEYS)
@@ -533,12 +532,12 @@ async function deriveDispatchCapsule(input, model, source, testContracts, depend
     workspace_write_coordinates: request.workspace_write_coordinates,
   });
   if (scope.verdict !== "pass") throw new Error("PACKET_CONTRACT_INVALID");
-  if (request.bounded_result_path !== null
-    && (typeof request.bounded_result_path !== "string" || !path.isAbsolute(request.bounded_result_path)
-      || !request.workspace_write_coordinates.some(coordinate => coordinate.path === request.bounded_result_path
-        && coordinate.operations.includes("create") && coordinate.purpose === "bounded-command-result"))) {
+  const boundedResults = request.workspace_write_coordinates.filter(coordinate =>
+    coordinate.operations.includes("create") && coordinate.purpose === "bounded-command-result");
+  if (boundedResults.length > 1) {
     throw new Error("PACKET_CONTRACT_INVALID");
   }
+  const boundedResultPath = boundedResults[0]?.path ?? null;
 
   const capsule = {
     schema_version: 1,
@@ -581,7 +580,7 @@ async function deriveDispatchCapsule(input, model, source, testContracts, depend
       workspace_write_scope_path: writeScope,
       test_transition_path: testTransition,
     },
-    workspace_writes: { coordinates: request.workspace_write_coordinates, bounded_result_path: request.bounded_result_path },
+    workspace_writes: { coordinates: request.workspace_write_coordinates, bounded_result_path: boundedResultPath },
     evidence_dispatch: evidence.binding === null ? null : { binding: evidence.binding, sources: evidence.sources },
     git_metadata_write_mode: request.git_metadata_write_mode,
   };

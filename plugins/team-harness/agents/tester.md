@@ -14,28 +14,12 @@ workspace artifacts. Follow existing repository conventions and
 
 ### OpenSpec-bound evidence
 
-The prompt carries only `dispatch_reference: {schema_version, kind, path,
-sha256, scope_identity_sha256}` plus attempt/decision correlation. Reject
-prompt-level copies of roots, hashes, pointers, helper paths, seals, artifact
-coordinates, or discovery/write scope; the referenced capsule is their single
-canonical owner.
-
-Before any repository or workspace read, verify the absolute canonical regular
-non-symlink reference below the workspace, its exact SHA-256, canonical
-`team_harness_dispatch_capsule` bytes, and recomputed scope identity. Then send
-the token-bound `dispatch-ready` acknowledgement; Main counts the attempt only
-after it. A reference failure is
-`dispatch-reference-invalid-before-ready`, consumes no attempt, performs no
-repository work, and may be mechanically re-certified under the same decision.
-
-After readiness, use only capsule-owned roots, test ownership, OpenSpec source
-coordinates, immutable acceptance evidence, quality command IDs, helpers,
-evidence sources, and workspace writes. Evidence roots remain coordinate-only
-and read-only. Repository test edits stay inside owned paths. Every workspace
-write requires the capsule's write-scope authorization for the exact path and
-operation; no role name implies report ownership. Use the capsule's bounded
-command/result coordinate exactly and never invent or rediscover another.
-Task-intent identity is never a source-content digest.
+Read and apply `agents/_shared/dispatch-contract.md` § "Pipeline specialist
+reference" before any OpenSpec-bound action. After readiness, repository test
+edits stay inside capsule ownership, evidence roots remain coordinate-only and
+read-only, and every workspace write requires the capsule's exact write-scope
+authorization. No role name implies report ownership. Task-intent identity is
+never a source-content digest.
 
 Use TH artifacts for routing and evidence controls, never as paraphrased
 behavioral intent. OpenSpec validation is supplemental; executable evidence

@@ -155,31 +155,13 @@ a gate. Gate releases remain dual-recorded and live-operator decisions.
 
 Every new specialist attempt, correction, and revalidation starts a fresh
 native V2 agent with `fork_turns: none`; no specialist attempt is continued for
-feedback or correction. Send only its exact role packet: the role
-instruction, assigned task shard, that shard's named invariants and evidence
-anchors, its `cross_runtime_preservation` obligation, the current frozen
-identity when one exists, and the minimal role-specific environment or facts.
-Never compensate for a missing packet fact with Main's transcript, an
-implementer's narrative, sibling shards, the full plan, historical tool output,
-or a prompt recap.
-
-For implementer and tester packets, also resolve the packaged
-`scripts/specialist-write-scope.mjs` and include its verified absolute path plus
-closed `workspace_write_coordinates`. The implementer validates that scope and
-authorizes every workspace write mechanically. The normal coordinate set is
-empty for implementers: the role returns structured evidence and Main alone consolidates
-`02-implementation.md`. A report, result, or evidence artifact is writable only
-when its exact absolute coordinate, purpose, and operation are assigned; the
-workspace root itself never grants write ownership.
-
-Before a dispatch that uses a task shard, preflight the exact shard and fail
-closed unless it declares usable `required_invariants`,
-`required_evidence_anchors`, and `cross_runtime_preservation` values for the
-applicable work. Resolve only those named anchors into the packet; do not
-delegate until each applicable obligation is present. A transcript, full plan,
-or sibling shard is never a substitute for a missing declaration. This
-preflight preserves the existing Claude and other-runtime contracts; it changes
-neither their models, gates, permissions, nor lifecycle routes.
+feedback or correction. Implementer and tester dispatches use only the
+content-addressed `dispatch_reference` defined in
+[implementation.md](references/implementation.md); that reference is the sole
+owner of task scope, evidence, helpers, roots, hashes, and workspace writes.
+Other roles receive only their minimal role-specific facts. Never compensate
+for a missing reference or role fact with Main's transcript, specialist prose,
+the full plan, historical tool output, or prompt-level copies of derived data.
 
 ### Wait heartbeat and phase SLA
 
@@ -207,9 +189,9 @@ use Main as the specialist fallback.
 
 Only while this pipeline is explicitly activated, materialize the immutable
 workspace helper bundle before specialist dispatch or correction authority.
-Apply the complete helper, correction-certificate, and V2 dispatch-packet
-contracts from [implementation.md](references/implementation.md), including
-its fail-closed pre-authority order. Use
+Apply the canonical dispatch resolver and bounded-command contracts from
+[implementation.md](references/implementation.md), including its fail-closed
+pre-authority order. Use
 [recovery.md](references/recovery.md) for legacy or missing-bundle recovery;
 never reconstruct those contracts from this routing file.
 
@@ -380,8 +362,8 @@ the role fields cannot see. The current digests are:
 | Role | SHA-256 of normalized TOML |
 |---|---|
 | `pipeline-architect` | `01c3366215ac8e4eddd1cffa7e92f0b8793a8c9ced0411ab2e6d612cdccaa69f` |
-| `pipeline-implementer` | `6126fcbb488bcdf934018c37db34a21bbf1de92c2eec283c480cafbef82b2295` |
-| `pipeline-tester` | `46ad2a635575b4a5b4303b5b05349f55f49ce888f976d9910eb51f01b118c64f` |
+| `pipeline-implementer` | `61c701017d450ec87341ee046728726f73ce70daa1ed3b2a3a60259e37de10ae` |
+| `pipeline-tester` | `dee55312be0779ae8bec12e8fcfb109562211f01eaf685625e77b9a8e39ec8d5` |
 | `pipeline-cleaner` | `8e17564f9835653b016b278324773d101b9c6158cda6d9826549e1af02026a9e` |
 | `pipeline-qa` | `85fa7bb2c471f6a70914965ae7980ad961e912908cc17492aa1dfcdc2346b655` |
 | `pipeline-security` | `cd15f37113ef88b9cfff744e97ff0ff51c31f1bf6817d2c9240957f27c4b7883` |

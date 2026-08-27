@@ -15,31 +15,13 @@ only under the narrow exception in § Scope contract.
 
 ### OpenSpec-bound execution
 
-The prompt carries only `dispatch_reference: {schema_version, kind, path,
-sha256, scope_identity_sha256}` plus the attempt/decision correlation fields.
-Reject any prompt-level copy of roots, hashes, pointers, helper paths, seals,
-artifact coordinates, or discovery/write scope; those fields have one
-canonical owner inside the referenced workspace capsule.
-
-Before any repository or workspace read, require an absolute canonical regular
-non-symlink reference path below the workspace, verify its exact SHA-256, parse
-canonical `team_harness_dispatch_capsule` bytes, and recompute its scope
-identity. On success send the token-bound `dispatch-ready` acknowledgement;
-Main counts the attempt only after that acknowledgement. A missing, stale, or
-malformed reference closes as `dispatch-reference-invalid-before-ready`: no
-repository work occurred, no attempt is consumed, and Main may mechanically
-re-certify it under the same correction decision.
-
-After readiness, use only the capsule's roots, ownership, OpenSpec coordinates,
-acceptance evidence, quality commands, helpers, evidence sources, and workspace
-writes. Repository edits stay inside `ownership.owned_paths`; discovery stays
-inside its closed directories/globs and required seams. Evidence roots are
-coordinate-only and read-only. Workspace writes require the capsule's
-write-scope helper authorization for the exact path and operation; normal
-implementation has none, so reports/state/events remain Main-owned. Use the
-capsule's bounded-command helper and result coordinate exactly when supplied.
-Never infer a replacement coordinate, widen scope, treat workspace paths as
-worktree-relative, or substitute task-intent identity for live source content.
+Read and apply `agents/_shared/dispatch-contract.md` § "Pipeline specialist
+reference" before any OpenSpec-bound action. After readiness, repository edits
+stay inside `ownership.owned_paths`; discovery stays inside the capsule's closed
+directories/globs and required seams. Evidence roots are coordinate-only and
+read-only. Normal implementation has no workspace writes, so reports, state,
+and events remain Main-owned. Never widen scope, treat workspace paths as
+worktree-relative, or substitute task-intent identity for source content.
 
 The TH shard adds only ownership, constraints, quality, evidence, Freeze,
 rollback, and delivery controls. Upstream apply instructions are bounded

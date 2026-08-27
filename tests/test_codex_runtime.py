@@ -76,10 +76,18 @@ def check_registry_and_projections() -> None:
         require(normalized == packaged_normalized, f"{name}: project/package projection drift")
         parsed = tomllib.loads(normalized.decode("utf-8"))
         require(parsed.get("sandbox_mode") == agent["sandbox_mode"], f"{name}: sandbox mode drift")
-        require(
-            parsed.get("developer_instructions") == instruction.read_text(encoding="utf-8").strip(),
-            f"{name}: generated instructions drift",
-        )
+        generated_instructions = parsed.get("developer_instructions")
+        adapter = instruction.read_text(encoding="utf-8").strip()
+        logical_role = agent.get("role", name)
+        if logical_role in {"implementer", "tester"}:
+            require(
+                isinstance(generated_instructions, str)
+                and generated_instructions.startswith("## Canonical pipeline specialist reference\n")
+                and generated_instructions.endswith(adapter),
+                f"{name}: generated shared dispatch instructions drift",
+            )
+        else:
+            require(generated_instructions == adapter, f"{name}: generated instructions drift")
         if agent.get("model_policy") == "spawn":
             require("model" not in parsed, f"{name}: spawn-selected role hardcodes a model")
             require("model_reasoning_effort" not in parsed, f"{name}: spawn-selected role hardcodes effort")
