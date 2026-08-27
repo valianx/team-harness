@@ -670,13 +670,15 @@ After every phase transition, update `00-state.md`. This is the orchestrator's p
 
 ### Artifact verification
 
-After every dispatch returning `success`, verify the expected doc exists on disk before proceeding.
+After every dispatch returning `success`, validate its structured return and,
+for every non-`none` row below, verify the expected doc exists on disk before
+proceeding.
 
 | Agent | Phase | Expected |
 |---|---|---|
 | `architect` | `design` | `01-plan.md` + any triggered `sketches/*` |
 | `architect` | `design` root-cause | `01-root-cause.md` **and** `01-plan.md` |
-| `implementer` | `implementation` | `02-implementation.md` |
+| `implementer` | `implementation` | none — Main consolidates `02-implementation.md` from verified returns |
 | `tester` | `implementation` regression | `02-regression-test.md` |
 | `tester` | `implementation` evidence | `03-testing.md` |
 | `qa` | `validation` | `reviews/04-validation.md` |
@@ -691,9 +693,20 @@ block's exact `audit_run`: `initial` maps to `reviews/04-adversary.md` and
 report or select the greatest suffix. If the exact current report is absent,
 verification fails even when an older amend report exists.
 
-Exists and non-empty → proceed. Otherwise append `artifact.missing` (`action: retry`) and re-dispatch **exactly once** with an explicit "your artifact was not found" instruction. A second failure → `artifact.missing` (`action: escalate`), `status: blocked`. This is the `artifact-missing` failure kind (`agents/ref-pipeline.md § Failures`).
+For a non-`none` row, exists and non-empty → proceed. Otherwise append
+`artifact.missing` (`action: retry`) and re-dispatch **exactly once** with an
+explicit "your artifact was not found" instruction. A second failure →
+`artifact.missing` (`action: escalate`), `status: blocked`. This is the
+`artifact-missing` failure kind (`agents/ref-pipeline.md § Failures`).
 
-**No agent in the table above is exempt.** `qa-plan` in ratify mode writes `reviews/01-plan-review.md § Plan Ratification` per the panel contract (`agents/_shared/plan-consolidation.md § "Section-ownership map"`), so its row is verified like any other. An exemption would only apply to an agent producing no artifact at all, and the table lists none.
+The implementer row deliberately has no specialist-written artifact: Main
+first verifies its structured return and exact `workspace_writes`, records the
+result durably, then writes the single cross-repository
+`02-implementation.md`. Verify that coordinator-owned consolidation before
+opening validation. `qa-plan` in ratify mode still writes
+`reviews/01-plan-review.md § Plan Ratification` per the panel contract
+(`agents/_shared/plan-consolidation.md § "Section-ownership map"`), so every
+other non-`none` row is verified after return.
 
 ### Final sanity check
 

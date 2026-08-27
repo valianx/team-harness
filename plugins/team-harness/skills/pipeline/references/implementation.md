@@ -130,6 +130,21 @@ interpret a workspace artifact path relative to the repository, invent `../`
 traversal, or copy artifacts into the worktree. Missing root/domain or a path
 that escapes its declared root blocks the dispatch packet.
 
+Resolve the packaged `scripts/specialist-write-scope.mjs` beside the active
+pipeline skill before every implementation dispatch. The packet carries that
+absolute canonical regular non-symlink path as `workspace_write_scope_path`
+plus a closed `workspace_write_coordinates` array of exact absolute paths,
+allowed `create|replace|append` operations, and purposes. The implementer runs
+the helper's `validate` operation before packet reads and its `authorize`
+operation before every workspace write. Normal implementation packets use an
+empty array: `02-implementation.md`, state, events, plans, inputs, evidence,
+reviews, and sibling reports remain coordinator-owned and read-only. A
+`bounded_result_path` or exceptional assigned evidence/report path is writable
+only when the same exact coordinate and operation were predeclared. Missing,
+escaped, symlinked, duplicated, or undeclared writes fail closed as
+`workspace-write-undeclared`; never infer report ownership from the role name
+or `workspace_artifact_root`.
+
 The quality manifest is the one deliberate workspace artifact named by a
 runner invocation: require the absolute
 `<workspace_artifact_root>/.team-harness/quality.json` path, verify it is a
@@ -840,10 +855,15 @@ snapshot-bound `openspec/` source and must exclude
 `.team-harness/quality.json`; either mismatch blocks Freeze. QA still audits
 the frozen result independently.
 
-Do not silently widen the approved scope. When implementation is complete, write a 5–30 line,
-≤8 KB `02-implementation.md` containing only outcome, deviations, exceptions, one-line checks,
-commit, and unresolved issues. Git is the changed-file authority; do not paste the diff, raw logs,
-or chronology. Set `phase: validation` and `next_action: run approved acceptance validation`.
+Do not silently widen the approved scope. Each implementer returns a bounded
+structured status with its exact `workspace_writes`, outcome, deviations,
+exceptions, one-line checks, correction closure results, commit, and unresolved
+issues. Main rejects success if `workspace_writes` contains a path or operation
+not authorized by the packet. After all repository results in the round are
+durably recorded, Main alone writes or replaces the 5–30 line, ≤8 KB
+`02-implementation.md` consolidation. Git is the changed-file authority; do not
+paste the diff, raw logs, or chronology. Main then sets `phase: validation` and
+`next_action: run approved acceptance validation`.
 
 Implementation checkpoints (pre-implementation red/green evidence when required,
 constraint reconciliation, test/evidence authoring, cleanup, the Freeze quality
@@ -856,9 +876,10 @@ acceptance criterion merely to manufacture a pass.
 
 ## Correction closure before Freeze
 
-For an authorized correction, the implementer runs every package closure check and records the
-actual result in `02-implementation.md`. Main verifies that every finding ID has one successful
-result before any Freeze rebuild. Missing or failed closure evidence is
+For an authorized correction, the implementer runs every package closure check
+and returns the actual result in `finding_resolutions`. Main verifies that every
+finding ID has one successful result, records it durably, and consolidates it
+into `02-implementation.md` before any Freeze rebuild. Missing or failed closure evidence is
 `failure_kind: correction-incomplete`: the consumed correction round remains consumed, no Freeze
 opens, and no validator is dispatched. Main consolidates the failed checks as the next package;
 an operator-live correction pauses and retains a fresh unbounded operator-live choice,
@@ -888,13 +909,15 @@ and do not edit version sites. Block as `major-release-required`, name the contr
 a separate explicitly scoped operator-led release-planning task.
 Mechanical paths are only `CHANGELOG.md`, `changelog.d/*`, and exact resolved version sites;
 every other path is substantive. The 400-line/8-file caps require a bounded
-`02-implementation.md § Reviewability Exceptions` justification when exceeded. Persist the
+implementer `reviewability_exceptions` justification when exceeded; Main
+persists it in `02-implementation.md § Reviewability Exceptions`. Persist the
 unconditional composition, size result, and optional justification, then record full
 `freeze_commit_sha` and `freeze_tree_sha` together with the frozen diff/evidence anchor. Build, tests, QA, and security see that exact identity. Any later tree change
 reopens Freeze and the affected validation; nothing ships from stale findings. When acceptance
 passes, retain that same Freeze identity; do not create duplicate validated SHA fields.
 
 When all approved implementation work and evidence checkpoints are complete, set `phase: validation`,
-`status: in_progress`, and `next_action: run approved acceptance validation`. Record changed files,
-commands, evidence, and unresolved issues in `02-implementation.md` without creating a second
+`status: in_progress`, and `next_action: run approved acceptance validation`.
+Main records changed files, commands, evidence, and unresolved issues from all
+verified specialist returns in `02-implementation.md` without creating a second
 implementation phase or widening the approved plan.

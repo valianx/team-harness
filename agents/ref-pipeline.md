@@ -253,7 +253,7 @@ Two columns only, because two facts are all you need: when to call it, and what 
 | Agent | When you call it | Return that advances the sequence |
 |---|---|---|
 | `architect` | `design`, or after an explicit live operator request for post-Gate-1 architect work | `01-plan.md` + classification |
-| `implementer` | `implementation`, after Gate 1 is released | `02-implementation.md` |
+| `implementer` | `implementation`, after Gate 1 is released | structured terminal result; Main consolidates `02-implementation.md` |
 | `tester` | `implementation` evidence checkpoint; bug-fix regression setup first | `03-testing.md` |
 | `cleaner` | once after green evidence and before Freeze, when the manifest declares `test` + `test_contract.path_rules` | cleanup commit or evidenced no-op |
 | `qa` | `validation`, over the frozen tree | `reviews/04-validation.md` |
@@ -645,7 +645,7 @@ You create the folder and own its structure and every coordination file in it. E
   01-root-cause.md               ← architect, bug-fix flow
   reviews/01-closure-rubric.md   ← architect, panel input (not a panel outcome)
   sketches/*                     ← architect, conditional
-  02-implementation.md           ← implementer
+  02-implementation.md           ← Main, consolidated from verified implementer returns
   02-regression-test.md          ← tester, implementation checkpoint
   03-testing.md                  ← tester
   failure-brief.md                ← the failing agent appends
@@ -1333,7 +1333,13 @@ temporary branches. A missing lane SHA or consolidation SHA is `blocked`, never 
 
 Trace: `stage2.lane.dispatch`, `stage2.lane.result`, `stage2.lanes.consolidated`.
 
-**Advance:** `success` → the remaining implementation checkpoints, **and for `type: fix`/`hotfix` only when `regression_test_passes != false`** — `true` or `not-applicable` both advance (`not-applicable` is correct when `regression_test_path` is null). `false` iterates the implementer against max-3. `failed` → read `02-implementation.md`.
+**Advance:** `success` → verify the returned workspace-write set, durably record
+the result, consolidate `02-implementation.md`, then run the remaining
+implementation checkpoints. For `type: fix`/`hotfix`, advance only when
+`regression_test_passes != false` — `true` or `not-applicable` both advance
+(`not-applicable` is correct when `regression_test_path` is null). `false`
+iterates the implementer against max-3. `failed` → use the structured terminal
+result; never require or trust a specialist-written implementation report.
 
 ### Implementation checkpoint — constraint reconciliation
 

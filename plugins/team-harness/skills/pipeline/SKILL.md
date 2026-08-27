@@ -163,6 +163,15 @@ Never compensate for a missing packet fact with Main's transcript, an
 implementer's narrative, sibling shards, the full plan, historical tool output,
 or a prompt recap.
 
+For implementation packets, also resolve the packaged
+`scripts/specialist-write-scope.mjs` and include its verified absolute path plus
+closed `workspace_write_coordinates`. The implementer validates that scope and
+authorizes every workspace write mechanically. The normal coordinate set is
+empty: the role returns structured evidence and Main alone consolidates
+`02-implementation.md`. A report, result, or evidence artifact is writable only
+when its exact absolute coordinate, purpose, and operation are assigned; the
+workspace root itself never grants write ownership.
+
 Before a dispatch that uses a task shard, preflight the exact shard and fail
 closed unless it declares usable `required_invariants`,
 `required_evidence_anchors`, and `cross_runtime_preservation` values for the
@@ -372,7 +381,7 @@ the role fields cannot see. The current digests are:
 | Role | SHA-256 of normalized TOML |
 |---|---|
 | `pipeline-architect` | `01c3366215ac8e4eddd1cffa7e92f0b8793a8c9ced0411ab2e6d612cdccaa69f` |
-| `pipeline-implementer` | `26e87b86336fd4a2b1c57bd93a06a24fcd5b49874bbc45aec0bf6d1a7e3f771b` |
+| `pipeline-implementer` | `8e24b0bc3f34de7da69d387ab663c6ffa5c0f966daabd274c0cfa3d10fde016c` |
 | `pipeline-tester` | `d489697c84fb7567c9a6268fcaa339c502c60f912c0caa6e47309ad90c397a52` |
 | `pipeline-cleaner` | `8e17564f9835653b016b278324773d101b9c6158cda6d9826549e1af02026a9e` |
 | `pipeline-qa` | `85fa7bb2c471f6a70914965ae7980ad961e912908cc17492aa1dfcdc2346b655` |

@@ -406,6 +406,7 @@ run_node_suite "openspec-recovery" "test_openspec_recovery.mjs" "node not found 
 run_node_suite "openspec-bindings" "test_openspec_bindings.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "openspec-events" "test_openspec_events.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "specialist-liveness" "test_specialist_liveness.mjs" "node not found — install Node.js to run this suite"
+run_node_suite "specialist-write-scope" "test_specialist_write_scope.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "openspec-design-e2e" "test_openspec_design_e2e.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "herdr-message" "test_herdr_message.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "resume-session-workspace" "test_resume_session_workspace.mjs" "node not found — install Node.js to run this suite"
