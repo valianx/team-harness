@@ -39,6 +39,9 @@ class ContextError(RuntimeError):
 
 
 SAFE_LEAF_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+REVIEW_PARENT_RE = re.compile(r"^pr-review-([1-9][0-9]*)$")
+REVIEW_RUN_RE = re.compile(r"^run-([a-f0-9]{32})$")
+REVIEW_OWNER_FILE = ".team-harness-review-owner.json"
 NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
 DIRECTORY = getattr(os, "O_DIRECTORY", 0)
 
@@ -217,6 +220,181 @@ def ensure_workspaces_ignored(repo_root: Path) -> None:
         os.replace(temporary, name, src_dir_fd=directory_fd, dst_dir_fd=directory_fd)
     finally:
         os.close(directory_fd)
+
+
+def _review_owner(pr: int, token: str) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "kind": "team_harness_pr_review_run_owner",
+        "pr": pr,
+        "owner_token": token,
+    }
+
+
+def _review_parent(repo_root: Path, pr: int, *, create: bool) -> Path:
+    if pr <= 0:
+        raise ContextError("PR number must be positive")
+    root, root_fd = _open_directory(repo_root)
+    os.close(root_fd)
+    workspaces = root / "workspaces"
+    if create:
+        workspaces.mkdir(mode=0o700, exist_ok=True)
+    workspaces_resolved, workspaces_fd = _open_directory(workspaces)
+    os.close(workspaces_fd)
+    if workspaces_resolved.parent != root:
+        raise ContextError("workspaces must be a direct child of the repository")
+    parent = workspaces_resolved / f"pr-review-{pr}"
+    if create:
+        parent.mkdir(mode=0o700, exist_ok=True)
+    parent_resolved, parent_fd = _open_directory(parent)
+    os.close(parent_fd)
+    if parent_resolved.parent != workspaces_resolved:
+        raise ContextError("review parent must be a direct child of workspaces")
+    return parent_resolved
+
+
+def _load_review_owner(artifact_root: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(safe_read_leaf(artifact_root, REVIEW_OWNER_FILE, limit=4096))
+    except (ContextError, json.JSONDecodeError) as error:
+        raise ContextError("review run has no valid ownership marker") from error
+    expected_keys = {"schema_version", "kind", "pr", "owner_token"}
+    if (
+        not isinstance(value, dict)
+        or set(value) != expected_keys
+        or value.get("schema_version") != 1
+        or value.get("kind") != "team_harness_pr_review_run_owner"
+        or not isinstance(value.get("pr"), int)
+        or not re.fullmatch(r"[a-f0-9]{32}", value.get("owner_token", ""))
+    ):
+        raise ContextError("review run has no valid ownership marker")
+    return value
+
+
+def create_review_run(repo_root: Path, pr: int) -> dict[str, Any]:
+    parent = _review_parent(repo_root, pr, create=True)
+    for _ in range(8):
+        token = secrets.token_hex(16)
+        artifact_root = parent / f"run-{token}"
+        try:
+            artifact_root.mkdir(mode=0o700)
+        except FileExistsError:
+            continue
+        marker = json.dumps(_review_owner(pr, token), sort_keys=True).encode("utf-8") + b"\n"
+        directory, directory_fd = _open_directory(artifact_root)
+        try:
+            marker_fd = os.open(
+                REVIEW_OWNER_FILE,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW,
+                0o600,
+                dir_fd=directory_fd,
+            )
+            try:
+                view = memoryview(marker)
+                while view:
+                    view = view[os.write(marker_fd, view):]
+                os.fsync(marker_fd)
+            finally:
+                os.close(marker_fd)
+        except Exception:
+            try:
+                os.unlink(REVIEW_OWNER_FILE, dir_fd=directory_fd)
+            except FileNotFoundError:
+                pass
+            os.close(directory_fd)
+            artifact_root.rmdir()
+            raise
+        os.close(directory_fd)
+        return {"artifact_root": str(directory), "owner_token": token, "pr": pr}
+    raise ContextError("cannot allocate an isolated review run")
+
+
+def find_resumable_review_run(repo_root: Path, pr: int) -> dict[str, Any]:
+    parent = _review_parent(repo_root, pr, create=False)
+    candidates: list[dict[str, Any]] = []
+    for child in parent.iterdir():
+        if not REVIEW_RUN_RE.fullmatch(child.name) or child.is_symlink() or not child.is_dir():
+            continue
+        try:
+            resolved, descriptor = _open_directory(child)
+            os.close(descriptor)
+            owner = _load_review_owner(resolved)
+            if owner["pr"] != pr or child.name != f"run-{owner['owner_token']}":
+                continue
+            context_leaf = safe_read_leaf(resolved, "pr-review-context.json")
+            draft_leaf = safe_read_leaf(resolved, "pr-review-final.md")
+            inline_leaf = safe_read_leaf(resolved, "pr-review-inline.json")
+            if not context_leaf or not draft_leaf or not inline_leaf:
+                continue
+        except (ContextError, OSError):
+            continue
+        candidates.append({
+            "artifact_root": str(resolved),
+            "owner_token": owner["owner_token"],
+            "pr": pr,
+        })
+    if len(candidates) != 1:
+        raise ContextError(
+            "resume requires exactly one complete isolated review run"
+        )
+    return candidates[0]
+
+
+def _remove_tree_contents(directory_fd: int) -> None:
+    with os.scandir(directory_fd) as entries:
+        for entry in entries:
+            metadata = entry.stat(follow_symlinks=False)
+            if stat.S_ISDIR(metadata.st_mode):
+                child_fd = os.open(entry.name, os.O_RDONLY | DIRECTORY | NOFOLLOW, dir_fd=directory_fd)
+                try:
+                    _remove_tree_contents(child_fd)
+                finally:
+                    os.close(child_fd)
+                os.rmdir(entry.name, dir_fd=directory_fd)
+            elif stat.S_ISREG(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
+                os.unlink(entry.name, dir_fd=directory_fd)
+            else:
+                raise ContextError("review run contains an unexpected special file")
+
+
+def cleanup_review_run(repo_root: Path, artifact_root: Path, owner_token: str) -> None:
+    if not re.fullmatch(r"[a-f0-9]{32}", owner_token):
+        raise ContextError("invalid review run owner token")
+    run, run_fd = _open_directory(artifact_root)
+    os.close(run_fd)
+    match = REVIEW_RUN_RE.fullmatch(run.name)
+    parent_match = REVIEW_PARENT_RE.fullmatch(run.parent.name)
+    if not match or not parent_match or match.group(1) != owner_token:
+        raise ContextError("review run path does not match its owner token")
+    pr = int(parent_match.group(1))
+    expected_parent = _review_parent(repo_root, pr, create=False)
+    if run.parent != expected_parent:
+        raise ContextError("review run is outside the repository review parent")
+    owner = _load_review_owner(run)
+    if owner != _review_owner(pr, owner_token):
+        raise ContextError("review run ownership mismatch")
+
+    snapshot = run / "pr-review-snapshot.git"
+    worktree = run / "pr-review-worktree"
+    if worktree.exists() or worktree.is_symlink():
+        if worktree.is_symlink() or not snapshot.is_dir() or snapshot.is_symlink():
+            raise ContextError("cannot prove ownership of the frozen worktree")
+        run_text([
+            "git", "--git-dir", str(snapshot), "worktree", "remove", str(worktree),
+        ])
+        if worktree.exists() or worktree.is_symlink():
+            raise ContextError("frozen worktree cleanup did not complete")
+
+    parent_fd = os.open(expected_parent, os.O_RDONLY | DIRECTORY | NOFOLLOW)
+    try:
+        pinned_fd = os.open(run.name, os.O_RDONLY | DIRECTORY | NOFOLLOW, dir_fd=parent_fd)
+        try:
+            _remove_tree_contents(pinned_fd)
+        finally:
+            os.close(pinned_fd)
+        os.rmdir(run.name, dir_fd=parent_fd)
+    finally:
+        os.close(parent_fd)
 
 
 def command_environment(extra_env: dict[str, str] | None = None) -> dict[str, str]:
@@ -1556,6 +1734,22 @@ def command_ensure_workspaces_ignore(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_create_run(args: argparse.Namespace) -> int:
+    print(json.dumps(create_review_run(args.repo_root, args.pr), sort_keys=True))
+    return 0
+
+
+def command_resume_run(args: argparse.Namespace) -> int:
+    print(json.dumps(find_resumable_review_run(args.repo_root, args.pr), sort_keys=True))
+    return 0
+
+
+def command_cleanup_run(args: argparse.Namespace) -> int:
+    cleanup_review_run(args.repo_root, args.artifact_root, args.owner_token)
+    print(json.dumps({"status": "cleaned", "artifact_root": str(args.artifact_root)}))
+    return 0
+
+
 def command_promote_artifact(args: argparse.Namespace) -> int:
     promote_artifact(args.artifact_root, args.temporary_name, args.final_name)
     return 0
@@ -1657,6 +1851,22 @@ def build_parser() -> argparse.ArgumentParser:
     ignore_parser = subparsers.add_parser("ensure-workspaces-ignore")
     ignore_parser.add_argument("--repo-root", required=True, type=Path)
     ignore_parser.set_defaults(func=command_ensure_workspaces_ignore)
+
+    create_run_parser = subparsers.add_parser("create-run")
+    create_run_parser.add_argument("--repo-root", required=True, type=Path)
+    create_run_parser.add_argument("--pr", required=True, type=int)
+    create_run_parser.set_defaults(func=command_create_run)
+
+    resume_run_parser = subparsers.add_parser("resume-run")
+    resume_run_parser.add_argument("--repo-root", required=True, type=Path)
+    resume_run_parser.add_argument("--pr", required=True, type=int)
+    resume_run_parser.set_defaults(func=command_resume_run)
+
+    cleanup_run_parser = subparsers.add_parser("cleanup-run")
+    cleanup_run_parser.add_argument("--repo-root", required=True, type=Path)
+    cleanup_run_parser.add_argument("--artifact-root", required=True, type=Path)
+    cleanup_run_parser.add_argument("--owner-token", required=True)
+    cleanup_run_parser.set_defaults(func=command_cleanup_run)
 
     promote_parser = subparsers.add_parser("promote-artifact")
     promote_parser.add_argument("--artifact-root", required=True, type=Path)

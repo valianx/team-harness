@@ -26,7 +26,8 @@ Remove options before parsing the PR identifier.
    - a genuinely cross-file finding lives in the review body;
    - the body may count inline findings but must not repeat them.
 8. Preserve every supported blocking finding. Brevity removes repetition and optional commentary, never blockers.
-9. Store every local review artifact under the repository's `workspaces/pr-review-{number}/`.
+9. Store each review in its own helper-created
+   `workspaces/pr-review-{number}/run-{owner-token}/` directory.
    Before creating that directory, ensure the repository `.gitignore` contains an anchored
    `/workspaces` or `/workspaces/` entry; add `/workspaces/` when neither exists. Never use
    `.claude/` for review state.
@@ -62,9 +63,10 @@ after it happens. Do not repeat it in progress updates or the review preview.
 
 ## Resume
 
-Require `workspaces/pr-review-{number}/pr-review-context.json`, a non-empty body draft, and
-`workspaces/pr-review-{number}/pr-review-inline.json` (an empty JSON array is valid). Capture a fresh context and run
-`review_context.py compare`.
+Resolve exactly one complete isolated run with `review_context.py resume-run`.
+It must contain `pr-review-context.json`, a non-empty body draft, and
+`pr-review-inline.json` (an empty JSON array is valid). Capture a fresh context
+and run `review_context.py compare`.
 
 - `current`: continue at Preview. Carry a reported `mergeability_changed` as one informational
   drift line in the preview; it never blocks resume.
@@ -102,7 +104,6 @@ Do not recreate the helper inline.
 REVIEW_ROOT="$(git rev-parse --show-toplevel)"
 python3 "$REVIEW_CONTEXT_HELPER" ensure-workspaces-ignore --repo-root "$REVIEW_ROOT"
 WORKSPACES_ROOT="$REVIEW_ROOT/workspaces"
-ARTIFACTS="$REVIEW_ROOT/workspaces/pr-review-{number}"
 if ! git -C "$REVIEW_ROOT" check-ignore -q -- "workspaces/.team-harness-ignore-probe"; then
   echo "cannot create a safe local review workspace — workspaces/ is not ignored" >&2
   exit 1
@@ -111,37 +112,20 @@ if [ -L "$WORKSPACES_ROOT" ] || { [ -e "$WORKSPACES_ROOT" ] && [ ! -d "$WORKSPAC
   echo "cannot create a safe local review workspace — workspaces is not a real directory" >&2
   exit 1
 fi
-python3 - "$REVIEW_ROOT" "$ARTIFACTS" <<'PY'
-from pathlib import Path
-import sys
-root = Path(sys.argv[1]).resolve(strict=True)
-candidate = Path(sys.argv[2]).resolve(strict=False)
-candidate.relative_to(root)
-PY
-if [ ! -e "$WORKSPACES_ROOT" ]; then
-  mkdir -m 700 "$WORKSPACES_ROOT"
-fi
 if [ "${RESUME_FROM_DRAFT:-false}" = "true" ]; then
-  if [ -L "$ARTIFACTS" ] || [ ! -d "$ARTIFACTS" ]; then
-    echo "cannot resume review — review workspace is not a real directory" >&2
-    exit 1
-  fi
+  RUN_META="$(python3 "$REVIEW_CONTEXT_HELPER" resume-run --repo-root "$REVIEW_ROOT" --pr {number})"
 else
-  if [ -e "$ARTIFACTS" ] || [ -L "$ARTIFACTS" ]; then
-    echo "cannot start a fresh review — review workspace already exists; resume or cancel it first" >&2
-    exit 1
-  fi
-  mkdir -m 700 "$ARTIFACTS"
+  RUN_META="$(python3 "$REVIEW_CONTEXT_HELPER" create-run --repo-root "$REVIEW_ROOT" --pr {number})"
 fi
-python3 - "$REVIEW_ROOT" "$ARTIFACTS" <<'PY'
-from pathlib import Path
-import sys
-root = Path(sys.argv[1]).resolve(strict=True)
-candidate = Path(sys.argv[2]).resolve(strict=True)
-candidate.relative_to(root)
-PY
+ARTIFACTS="$(printf '%s' "$RUN_META" | jq -r '.artifact_root')"
+REVIEW_OWNER_TOKEN="$(printf '%s' "$RUN_META" | jq -r '.owner_token')"
+cleanup_owned_review_run() {
+  python3 "$REVIEW_CONTEXT_HELPER" cleanup-run --repo-root "$REVIEW_ROOT" \
+    --artifact-root "$ARTIFACTS" --owner-token "$REVIEW_OWNER_TOKEN"
+}
 if ! git -C "$REVIEW_ROOT" check-ignore -q -- "$ARTIFACTS"; then
   echo "cannot use the local review workspace — created directory is not ignored" >&2
+  cleanup_owned_review_run
   exit 1
 fi
 CONTEXT="$ARTIFACTS/pr-review-context.json"
@@ -160,16 +144,23 @@ fi
 
 CONTEXT_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-context.XXXXXX")"
 CONVERSATION_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-conversation.XXXXXX")"
-python3 "$REVIEW_CONTEXT_HELPER" capture \
-  --repo "{owner}/{repo}" --pr {number} --git-dir "$REVIEW_ROOT" \
-  --snapshot-dir "$SNAPSHOT_GIT" --deadline-epoch "$GATHER_DEADLINE" \
-  --output "$CONTEXT_TMP"
-python3 "$REVIEW_CONTEXT_HELPER" render \
-  --context "$CONTEXT_TMP" --output "$CONVERSATION_TMP"
-python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
-  --temporary-name "${CONTEXT_TMP##*/}" --final-name "${CONTEXT##*/}"
-python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
-  --temporary-name "${CONVERSATION_TMP##*/}" --final-name "${CONVERSATION##*/}"
+if ! {
+  python3 "$REVIEW_CONTEXT_HELPER" capture \
+    --repo "{owner}/{repo}" --pr {number} --git-dir "$REVIEW_ROOT" \
+    --snapshot-dir "$SNAPSHOT_GIT" --deadline-epoch "$GATHER_DEADLINE" \
+    --output "$CONTEXT_TMP" &&
+  python3 "$REVIEW_CONTEXT_HELPER" render \
+    --context "$CONTEXT_TMP" --output "$CONVERSATION_TMP" &&
+  python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
+    --temporary-name "${CONTEXT_TMP##*/}" --final-name "${CONTEXT##*/}" &&
+  python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
+    --temporary-name "${CONVERSATION_TMP##*/}" --final-name "${CONVERSATION##*/}";
+}; then
+  if [ "${RESUME_FROM_DRAFT:-false}" != "true" ]; then
+    cleanup_owned_review_run
+  fi
+  exit 1
+fi
 ```
 
 Every later artifact write follows the same leaf-safe rule: create a unique
@@ -212,20 +203,28 @@ FILES_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-files.XXXXXX")"
 CHECKS_TMP="$(mktemp "$ARTIFACTS/tmp-pr-review-checks.XXXXXX")"
 WORKTREE="$ARTIFACTS/pr-review-worktree"
 
-python3 "$REVIEW_CONTEXT_HELPER" materialize \
+if ! python3 "$REVIEW_CONTEXT_HELPER" materialize \
   --repo "{owner}/{repo}" --pr {number} --context "$CONTEXT" \
   --artifact-root "$ARTIFACTS" --snapshot-dir "$SNAPSHOT_GIT" \
   --diff-name "${DIFF_TMP##*/}" --files-name "${FILES_TMP##*/}" \
   --checks-name "${CHECKS_TMP##*/}" --worktree "$WORKTREE" \
-  --deadline-epoch "$GATHER_DEADLINE"
-# Return from this command after promotion. Never bind review cleanup to this
+  --deadline-epoch "$GATHER_DEADLINE"; then
+  cleanup_owned_review_run
+  exit 1
+fi
+# Return from these commands after promotion. Never bind review cleanup to this
 # shell's EXIT lifecycle; the coordinator owns cleanup after every specialist joins.
-python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
-  --temporary-name "${DIFF_TMP##*/}" --final-name "${DIFF##*/}"
-python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
-  --temporary-name "${FILES_TMP##*/}" --final-name "${FILES##*/}"
-python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
-  --temporary-name "${CHECKS_TMP##*/}" --final-name "${CHECKS##*/}"
+if ! {
+  python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
+    --temporary-name "${DIFF_TMP##*/}" --final-name "${DIFF##*/}" &&
+  python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
+    --temporary-name "${FILES_TMP##*/}" --final-name "${FILES##*/}" &&
+  python3 "$REVIEW_CONTEXT_HELPER" promote-artifact --artifact-root "$ARTIFACTS" \
+    --temporary-name "${CHECKS_TMP##*/}" --final-name "${CHECKS##*/}";
+}; then
+  cleanup_owned_review_run
+  exit 1
+fi
 ```
 
 Do not execute the PR's code or install dependencies. Existing CI results are evidence; local
@@ -237,10 +236,11 @@ body, and labels once into `$ARTIFACTS/pr-review-issue.json`. Treat failure as
 
 ### 4. Create the frozen worktree and coordinator-owned cleanup
 
-`materialize` creates the detached worktree within the shared deadline and attempts to remove a
-partially created worktree using only the remaining budget if it fails. If no time remains or
-cleanup cannot finish in that budget, it fails closed and reports the exact residual paths for
-operator cleanup.
+`materialize` creates the detached worktree within the shared deadline and first
+attempts bounded partial-worktree cleanup on failure. The coordinator then calls
+`cleanup-run` outside that expired capture budget. The helper removes only the
+isolated run whose path, marker, PR, and secret owner token all match; it never
+touches a sibling run. A dirty or unprovable worktree is preserved and surfaced.
 
 The coordinator owns the successful snapshot lifecycle. Never register an `EXIT`,
 PTY, exec-session, subshell, or background-process cleanup hook in the command that
@@ -250,14 +250,16 @@ end after a bounded tool yield while reviewers still need the files. `$ARTIFACTS
 join, consolidation read, and post-dispatch integrity comparison regardless of how
 many tool yields occur or whether any one yield exceeds 30 seconds.
 
-Run cleanup explicitly from the coordinator only after every dispatched reviewer has
+Run `cleanup-run` explicitly from the coordinator only after every dispatched reviewer has
 reached a terminal result and all integrity/freshness checks that consume the snapshot
-have completed. Remove the worktree through `$SNAPSHOT_GIT` before removing the
-snapshot repository, then remove artifacts inside the exact `$ARTIFACTS` directory and
-that now-empty directory. Never remove any sibling workspace or force-remove an
-unexpected dirty worktree; surface it. If the coordinator process is lost before this
-terminal point, preserve the workspace for deterministic resume or explicit cancel;
-premature deletion is worse than a reported residual workspace.
+have completed. The helper removes the worktree through `$SNAPSHOT_GIT` before
+removing the owned run. Never remove the PR parent or a sibling run, and never
+force-remove an unexpected dirty worktree. If the coordinator process is lost
+before this terminal point, preserve the isolated run for deterministic resume
+or explicit cancel; premature deletion is worse than a reported residual run.
+
+On every terminal path except explicit `defer`, invoke
+`cleanup_owned_review_run` exactly once.
 
 Capture `git status --untracked-files=all` and `git diff HEAD` for the frozen worktree. Separately
 capture the regular review-artifact leaves under `$ARTIFACTS`, excluding the exact
