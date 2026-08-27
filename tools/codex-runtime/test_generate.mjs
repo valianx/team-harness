@@ -262,7 +262,7 @@ const correctionPacketPreflightScript = await readFile(join(root, "skills/pipeli
 const helperBundleScript = await readFile(join(root, "skills/pipeline/scripts/helper-bundle.mjs"), "utf8");
 const overlayPlanContract = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/plan-shards.md"), "utf8");
 const architectAdapter = await readFile(join(root, "runtime/codex/instructions/architect.md"), "utf8");
-const testerAdapter = await readFile(join(root, "runtime/codex/instructions/tester.md"), "utf8");
+const testerSemantic = await readFile(join(root, "agents/tester.md"), "utf8");
 const orchestratorStateContract = await readFile(join(root, "agents/_shared/orchestrator-state.md"), "utf8");
 for (const marker of ["boundedCommandProcessStatus", "result.outcome === \"completed\"", "result.exit_code === 0"]) {
   assert.ok(boundedCommandScript.includes(marker), `bounded-command process-status guard misses ${marker}`);
@@ -270,17 +270,17 @@ for (const marker of ["boundedCommandProcessStatus", "result.outcome === \"compl
 for (const marker of ["WORKSPACE_WRITE_UNDECLARED", "WORKSPACE_WRITE_OPERATION_DENIED", "WORKSPACE_WRITE_TARGET_EXISTS", "WORKSPACE_WRITE_TARGET_MISSING", "workspace_write_coordinates", "authorizeSpecialistWorkspaceWrite"]) {
   assert.ok(specialistWriteScopeScript.includes(marker), `specialist workspace-write scope misses ${marker}`);
 }
-for (const marker of ["task_intent_sha256", "source_coordinates", "content_sha256", "TEST_CONTRACT_COVERAGE_INCOMPLETE", "repair-index-before-presentation", "dispatch_packet_sha256", "bounded_command_path", "artifact_coordinates", "PACKET_ARTIFACT_INVALID"]) {
+for (const marker of ["task_intent_sha256", "source_coordinates", "content_sha256", "TEST_CONTRACT_COVERAGE_INCOMPLETE", "repair-index-before-presentation", "team_harness_dispatch_reference", "scope_identity_sha256", "ack-dispatch-ready", "repair-before-attempt"]) {
   assert.ok(correctionPacketPreflightScript.includes(marker), `correction packet preflight misses ${marker}`);
 }
 for (const marker of ["HELPER_COMPATIBILITY_EPOCH", "helper-bundles", "bundle_identity_sha256", "use-workspace-helper-bundle"]) {
   assert.ok(helperBundleScript.includes(marker), `pipeline helper bundle misses ${marker}`);
 }
-for (const marker of ["failure_stage", "upstream_constraints_checked", "pending_shard_dependencies", "deterministic valid UUID", "future shard seam"]) {
-  assert.ok(testerAdapter.includes(marker), `Codex tester adapter misses shard-local RED marker ${marker}`);
+for (const marker of ["failure_stage", "upstream_constraints_checked", "pending_shard_dependencies", "deterministic valid identifiers", "pending/future shard's seam"]) {
+  assert.ok(testerSemantic.includes(marker), `tester semantic contract misses shard-local RED marker ${marker}`);
 }
-for (const marker of ["workspace_write_scope_path", "workspace_write_coordinates", "exclusive creation", "workspace_writes"]) {
-  assert.ok(testerAdapter.includes(marker), `Codex tester adapter misses workspace ownership marker ${marker}`);
+for (const marker of ["team_harness_dispatch_capsule", "dispatch-ready", "write-scope authorization", "workspace_writes"]) {
+  assert.ok(testerSemantic.includes(marker), `tester semantic contract misses workspace ownership marker ${marker}`);
 }
 for (const marker of ["exact `## {name}` heading", "inputs/acceptance-matrix.md § Acceptance Matrix", "exactly-once, non-empty-body check"]) {
   assert.ok(orchestratorStateContract.includes(marker), `orchestrator artifact verification misses section marker ${marker}`);
@@ -312,16 +312,16 @@ const implementationContract = await readFile(join(root, "plugins/team-harness/s
 for (const marker of ["specialist-liveness.mjs", "fixed two-minute ACK grace", "probe_delivery_state: unconfirmed", "TH-LIVENESS-RESUME", "specialist-interrupted-with-progress", "specialist-retry-exhausted", "local fallback"]) {
   assert.ok(implementationContract.includes(marker), `specialist liveness pipeline contract misses ${marker}`);
 }
-for (const marker of ["specialist-write-scope.mjs", "workspace_write_coordinates", "Main alone writes or replaces", "workspace-write-undeclared"]) {
+for (const marker of ["Canonical dispatch reference", "specialist prompt carries only", "workspace writes", "Main alone writes or replaces"]) {
   assert.ok(implementationContract.includes(marker), `specialist workspace ownership contract misses ${marker}`);
 }
 for (const marker of ["derived-artifact-damage", "repair-derived", "DERIVED_REPAIR_INELIGIBLE", "existing `implementation` phase"]) {
   assert.ok(implementationContract.includes(marker), `OpenSpec implementation repair contract misses ${marker}`);
 }
-for (const marker of ["seal-dispatch", "verify-dispatch", "derived_dispatch_binding", "DERIVED_SET_BUSY", "DISPATCH_BINDING_STALE", "never repair, rehash all bindings"]) {
+for (const marker of ["seal-dispatch", "permanent seal", "DERIVED_SET_BUSY", "DISPATCH_BINDING_STALE", "Never audit only the currently requested service"]) {
   assert.ok(implementationContract.includes(marker), `OpenSpec immutable dispatch contract misses ${marker}`);
 }
-for (const marker of ["audit-dispatches", "evidence_dispatch_binding", "path_roots.evidence_roots", "team_harness_packet_scope_insufficient", "verify-evidence-dispatch"]) {
+for (const marker of ["audit-dispatches", "evidence dispatch", "Evidence roots", "team_harness_packet_scope_insufficient", "verify-evidence-dispatch"]) {
   assert.ok(implementationContract.includes(marker), `OpenSpec cross-repository evidence contract misses ${marker}`);
 }
 for (const marker of ["migrate-v1", "gate1-v1-migration.json", "original Gate plus migration continuation identity"]) {
@@ -345,11 +345,11 @@ for (const marker of ["audit-dispatches", "REPAIR_CORRECTION_COUNTERS", "CORRECT
 }
 for (const role of ["implementer", "tester"]) {
   const adapter = await readFile(join(root, `runtime/codex/instructions/${role}.md`), "utf8");
-  for (const marker of ["derived_dispatch_binding", "assigned shard path and SHA-256", "rebound shard"]) {
-    assert.ok(adapter.includes(marker), `${role} adapter misses immutable dispatch marker ${marker}`);
+  for (const marker of ["dispatch_reference", "team_harness_dispatch_capsule", "scope_identity_sha256", "dispatch-ready"]) {
+    assert.ok(adapter.includes(marker), `${role} adapter misses canonical dispatch marker ${marker}`);
   }
-  for (const marker of ["evidence_dispatch_binding", "evidence_roots", "Generation-2"]) {
-    assert.ok(adapter.includes(marker), `${role} adapter misses evidence dispatch marker ${marker}`);
+  for (const marker of ["evidence roots", "workspace writes", "Never accept prompt-level copies"]) {
+    assert.ok(adapter.includes(marker), `${role} adapter misses capsule ownership marker ${marker}`);
   }
 }
 for (const marker of ["Team Harness Execution Contract", "EXECUTION_CONTRACT_INVALID", "discovery_scope", "required_seams", "observable_runtime_behavior"]) {

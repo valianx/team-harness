@@ -44,7 +44,7 @@ correction_decision: authorize|pause|abort|null
 correction_decision_ref: {consumed token or null}
 correction_authority: operator-live|gate1-autonomous|null
 correction_authority_gate_nonce: {consumed Gate-1 token or null}
-correction_preflight: {path, sha256, preflight_identity_sha256, service, task_ids}|null
+correction_dispatch_reference: {path, sha256, scope_identity_sha256}|null
 autonomous_correction_count: N      # integer 0..3; the only correction budget
 operator_correction_count: N        # non-negative integer; deliberately unbounded
 last_completed: design|waiting_gate1|implementation|validation|waiting_gate3|delivery|complete|null
@@ -119,15 +119,15 @@ specialist dispatch, Freeze rebuild, or revalidation is legal before authority
 is recorded. A correction package built from a partial diagnostic set is
 invalid; later rounds are for genuinely new evidence, never a declared check
 that the previous fan omitted. Before creating or presenting its nonce, Main
-must bind a passing workspace-local `correction-packet-preflight.mjs certify`
-artifact. That certificate separates immutable task-intent identity from each
-live source file's exact content SHA-256 and proves complete required
-test-contract coverage. It also binds the complete mechanically validated V2
-dispatch-packet skeleton and its SHA-256, including mandatory helpers and every
-independently verified artifact coordinate. Missing rows are repaired only to `pending`; their
-tester/RED transition must close and the state summary must be recomputed
-before certification. Store the exact certificate pointer in
-`correction_preflight` and carry it in the eventual decision and packet. With a valid Gate-1 approval dual record,
+supplies only service/tasks, role/mode, correction target paths, helper-bundle
+reference, optional evidence reference, and write scope to
+`correction-packet-preflight.mjs certify`. The helper derives the unique owner
+task for every target path, unions those owners with the requested task set,
+and validates every source hash, pointer, seal, root, helper path, quality
+command, and test coordinate, then creates one
+immutable `correction_dispatch_reference`. Missing rows are repaired only to
+`pending`; their tester/RED transition closes before certification. Main never
+serializes the derived graph into a specialist prompt. With a valid Gate-1 approval dual record,
 `autonomous_correction_count < 3`, no
 correction/execution budget exhaustion, and only unambiguous `resolve` findings
 inside approved scope, Main consumes the nonce
@@ -137,11 +137,15 @@ and presents exactly `1 — authorize one correction round`, `2 — pause withou
 changes`, and `3 — abort pipeline`; only a live reply after that presentation
 may consume the nonce. Consumption atomically sets `correction_nonce: null`
 and uses the consumed token as `correction_decision_ref`. `authorize` requires
-exactly one matching `correction.decision` event carrying the complete package
-and authority, then permits exactly one
-`iteration.start`/`agent.correction.spawn` pair referencing that decision. A
-malformed binding may be corrected append-only only for the dispatch Main
-directly observed; it never permits another dispatch. `pause` and `abort`
+exactly one matching `correction.decision` event carrying the complete package,
+scope identity, and authority, then permits one spawn carrying only its
+`decision_ref` plus `dispatch_reference`. The specialist verifies that reference
+and emits token-bound `dispatch-ready`; only then does Main emit/count
+`iteration.start` and the correction attempt. A pre-ready reference failure
+performs no repository read/write and consumes no attempt. Main may
+mechanically re-certify it under the same decision only when scope identity is
+unchanged, recording the replacement append-only; changed scope requires a
+fresh package and decision. `pause` and `abort`
 perform no correction. Every later failure gets a fresh nonce and decision.
 An ordinary approval, intake autonomy preference, generic `continue`, recovered
 prose, files, agents, and tools are never authorization. Gate-1 autonomous

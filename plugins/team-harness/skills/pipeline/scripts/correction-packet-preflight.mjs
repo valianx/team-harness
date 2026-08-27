@@ -6,12 +6,15 @@ import { lstat, mkdir, open, readFile, realpath, rename, unlink, writeFile } fro
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { verifyOpenSpecBindingsManifest } from "./openspec-bindings.mjs";
+import {
+  OPENSPEC_DISPATCH_BINDING_SCHEMA_VERSION,
+  verifyOpenSpecBindingsManifest,
+} from "./openspec-bindings.mjs";
 import { verifyHelperBundle } from "./helper-bundle.mjs";
 import { isOpenSpecSnapshot } from "./openspec-snapshot.mjs";
 import { validateSpecialistWorkspaceWriteScope } from "./specialist-write-scope.mjs";
 
-export const CORRECTION_PACKET_PREFLIGHT_SCHEMA_VERSION = 2;
+export const CORRECTION_PACKET_PREFLIGHT_SCHEMA_VERSION = 3;
 
 const MAX_BYTES = 1024 * 1024;
 const MAX_TASKS = 128;
@@ -39,24 +42,22 @@ const BASE_INPUT_KEYS = new Set([
   "workspace", "aggregate_path", "aggregate_sha256", "service", "task_ids",
   "test_contract_evidence",
 ]);
-const CERTIFY_INPUT_KEYS = new Set([...BASE_INPUT_KEYS, "dispatch_packet"]);
-const DISPATCH_PACKET_KEYS = new Set([
-  "schema_version", "kind", "role", "mode", "path_roots", "artifact_coordinates",
-  "discovery_scope", "openspec_snapshot", "openspec_execution_items",
-  "derived_dispatch_binding", "evidence_dispatch_binding", "quality_manifest",
-  "helper_bundle", "bounded_command_path", "workspace_write_scope_path",
-  "test_transition_path", "workspace_write_coordinates", "bounded_result_path",
-  "git_metadata_write_mode",
+const CERTIFY_INPUT_KEYS = new Set([...BASE_INPUT_KEYS, "dispatch_request"]);
+const DISPATCH_REQUEST_KEYS = new Set([
+  "schema_version", "kind", "role", "mode", "helper_bundle",
+  "evidence_dispatch_binding", "workspace_write_coordinates",
+  "bounded_result_path", "git_metadata_write_mode", "scope_paths",
 ]);
-const PATH_ROOT_KEYS = new Set(["repository_root", "workspace_artifact_root", "evidence_roots"]);
-const ARTIFACT_COORDINATE_KEYS = new Set(["kind", "root", "path", "anchor", "sha256"]);
-const DISCOVERY_SCOPE_KEYS = new Set(["directories", "globs"]);
-const FILE_BINDING_KEYS = new Set(["path", "sha256"]);
 const EVIDENCE_BINDING_KEYS = new Set(["path", "sha256", "dispatch_identity_sha256"]);
-const HELPER_BUNDLE_KEYS = new Set([
-  "manifest_path", "manifest_sha256", "bundle_identity_sha256", "compatibility_epoch",
+const HELPER_BUNDLE_REF_KEYS = new Set(["manifest_path", "manifest_sha256"]);
+const DISPATCH_REFERENCE_KEYS = new Set([
+  "schema_version", "kind", "path", "sha256", "scope_identity_sha256",
 ]);
-const EXECUTION_ITEM_KEYS = new Set(["task_id", "json_pointer", "item_sha256", "sources"]);
+const DISPATCH_BINDING_KEYS = new Set([
+  "schema_version", "kind", "service", "aggregate", "gate_identity_sha256",
+  "continuation_identity_sha256", "snapshot", "overlay", "artifacts",
+]);
+const DISPATCH_ARTIFACT_KEYS = new Set(["kind", "path", "sha256"]);
 const PACKET_ROLES = new Set(["implementer", "tester"]);
 const PACKET_MODES = new Set(["implementation", "pre-implementation-contract", "validation"]);
 const ERROR_CODES = new Set([
@@ -107,10 +108,8 @@ function result(verdict, errorCode, action, details = {}) {
     missing_required_tasks: details.missing_required_tasks ?? [],
     pending_required_tasks: details.pending_required_tasks ?? [],
     pending_selected_tasks: details.pending_selected_tasks ?? [],
-    dispatch_packet_sha256: details.dispatch_packet_sha256 ?? null,
-    preflight_identity_sha256: details.preflight_identity_sha256 ?? null,
-    preflight_path: details.preflight_path ?? null,
-    preflight_sha256: details.preflight_sha256 ?? null,
+    scope_identity_sha256: details.scope_identity_sha256 ?? null,
+    dispatch_reference: details.dispatch_reference ?? null,
   };
 }
 
@@ -281,8 +280,18 @@ async function loadModel(input, dependencies) {
       expectedTasks.set(key, { ...item, service: binding.service, binding });
     }
   }
-  const selected = input.task_ids.map(taskId => expectedTasks.get(`${input.service}:${taskId}`));
-  if (selected.some(item => item === undefined)) throw new Error("SOURCE_COORDINATE_INVALID");
+  const requested = input.task_ids.map(taskId => expectedTasks.get(`${input.service}:${taskId}`));
+  if (requested.some(item => item === undefined)) throw new Error("SOURCE_COORDINATE_INVALID");
+  const scopePaths = input.dispatch_request?.scope_paths ?? [];
+  if (!validRelativeList(scopePaths)) throw new Error("ARGUMENT_INVALID");
+  const overlay = overlays.get(input.service);
+  const ownerItems = scopePaths.map(scopePath => {
+    const owners = overlay.execution_items.filter(item => Array.isArray(item.files) && item.files.includes(scopePath));
+    if (owners.length !== 1) throw new Error("PACKET_CONTRACT_INVALID");
+    return owners[0];
+  });
+  const selected = [...new Map([...requested, ...ownerItems].map(item => [item.id, item])).values()]
+    .sort((left, right) => left.id.localeCompare(right.id, "en", { numeric: true }));
   const indexFile = await readContainedFile(workspace, input.test_contract_evidence.index_path);
   if (hash(indexFile.bytes) !== input.test_contract_evidence.index_sha256) throw new Error("TEST_CONTRACT_INDEX_STALE");
   let index;
@@ -293,7 +302,18 @@ async function loadModel(input, dependencies) {
     .map(([taskId]) => taskId)
     .sort();
   const computedSummary = summary(input.test_contract_evidence.index_path, hash(indexFile.bytes), index.tasks, requiredTasks);
-  return { workspace, bindings, overlays, expectedTasks, selected, index, indexFile, requiredTasks, computedSummary };
+  return {
+    workspace,
+    manifest: verified.manifest,
+    bindings,
+    overlays,
+    expectedTasks,
+    selected,
+    index,
+    indexFile,
+    requiredTasks,
+    computedSummary,
+  };
 }
 
 async function canonicalRegularFile(root, target, errorCode) {
@@ -319,147 +339,254 @@ function anchorCount(bytes, anchor) {
   return bytes.toString("utf8").split(anchor).length - 1;
 }
 
-async function validateDispatchPacket(input, model, dependencies) {
-  const packet = input.dispatch_packet;
-  if (!exactKeys(packet, DISPATCH_PACKET_KEYS) || packet.schema_version !== 1
-    || packet.kind !== "team_harness_v2_dispatch_packet" || !PACKET_ROLES.has(packet.role)
-    || !PACKET_MODES.has(packet.mode)
-    || packet.role === "implementer" && packet.mode !== "implementation"
-    || !["normal", "native-escalation-required"].includes(packet.git_metadata_write_mode)) {
+async function workspaceCoordinate(workspace, value, errorCode) {
+  const target = typeof value === "string" && path.isAbsolute(value) ? value : path.resolve(workspace, value ?? "");
+  return { path: target, bytes: await canonicalRegularFile(workspace, target, errorCode) };
+}
+
+function validDispatchItem(item) {
+  return TASK_ID.test(item?.id ?? "") && safeRelative(item?.shard_path)
+    && validRelativeList(item?.files) && item.files.length > 0
+    && item.discovery_scope && validRelativeList(item.discovery_scope.directories)
+    && item.discovery_scope.directories.length > 0 && validRelativeList(item.discovery_scope.globs)
+    && item.discovery_scope.globs.length > 0
+    && Array.isArray(item.required_invariants) && item.required_invariants.every(value => typeof value === "string" && value.length > 0)
+    && Array.isArray(item.required_seams)
+    && Array.isArray(item.quality_command_ids) && item.quality_command_ids.length > 0
+    && item.quality_command_ids.every(value => typeof value === "string" && value.length > 0);
+}
+
+async function deriveEvidenceDispatch(request, model, dispatchBinding, selectedShardPaths) {
+  const reference = request.evidence_dispatch_binding;
+  if (reference === null) return { binding: null, roots: {}, sources: [] };
+  if (!exactKeys(reference, EVIDENCE_BINDING_KEYS) || !SHA256.test(reference.sha256 ?? "")
+    || !SHA256.test(reference.dispatch_identity_sha256 ?? "")) throw new Error("PACKET_CONTRACT_INVALID");
+  const file = await workspaceCoordinate(model.workspace, reference.path, "PACKET_ARTIFACT_INVALID");
+  if (hash(file.bytes) !== reference.sha256) throw new Error("PACKET_ARTIFACT_INVALID");
+  let value;
+  try { value = JSON.parse(file.bytes.toString("utf8")); } catch { throw new Error("PACKET_ARTIFACT_INVALID"); }
+  const { dispatch_identity_sha256: ignored, ...identity } = value ?? {};
+  if (value?.kind !== "team_harness_openspec_evidence_dispatch" || value.service !== dispatchBinding.service
+    || value.dispatch_identity_sha256 !== reference.dispatch_identity_sha256
+    || hash(canonicalBytes(identity)) !== reference.dispatch_identity_sha256
+    || value.base_dispatch_binding?.path !== dispatchBinding.path
+    || value.base_dispatch_binding?.sha256 !== dispatchBinding.sha256
+    || !selectedShardPaths.includes(value.task_shard?.path)
+    || !Array.isArray(value.evidence_sources) || value.evidence_sources.length === 0) {
+    throw new Error("PACKET_ARTIFACT_INVALID");
+  }
+  const roots = {};
+  const sources = [];
+  for (const source of value.evidence_sources) {
+    const approved = model.manifest.evidence_repositories?.find(item => item.service === source?.service);
+    if (!approved || approved.repository_root !== source.repository_root
+      || approved.repository_identity !== source.repository_identity || !Array.isArray(source.coordinates)
+      || source.coordinates.length === 0) throw new Error("PACKET_ARTIFACT_INVALID");
+    const root = await canonicalDirectory(source.repository_root);
+    roots[source.service] = root;
+    for (const coordinate of source.coordinates) {
+      if (!safeRelative(coordinate?.path) || !SHA256.test(coordinate?.sha256 ?? "")) throw new Error("PACKET_ARTIFACT_INVALID");
+      const artifact = await readContainedFile(root, coordinate.path);
+      if (hash(artifact.bytes) !== coordinate.sha256) throw new Error("PACKET_ARTIFACT_INVALID");
+    }
+    sources.push({ service: source.service, coordinates: source.coordinates });
+  }
+  return {
+    binding: { path: file.path, sha256: reference.sha256, dispatch_identity_sha256: reference.dispatch_identity_sha256 },
+    roots,
+    sources,
+  };
+}
+
+function capsuleScopeIdentity(capsule) {
+  return {
+    service: capsule.scope.service,
+    task_ids: capsule.scope.task_ids,
+    role: capsule.scope.role,
+    mode: capsule.scope.mode,
+    target_paths: capsule.scope.target_paths,
+    repository_root: capsule.scope.repository_root,
+    owned_paths: capsule.ownership.owned_paths,
+    task_intent_sha256: capsule.openspec.task_intent_sha256,
+    source_coordinates: capsule.openspec.source_coordinates,
+    dispatch_binding: capsule.openspec.dispatch_binding,
+    task_shards: capsule.openspec.task_shards,
+    test_contract_index: capsule.acceptance_evidence.test_contract_index,
+    test_contracts: capsule.acceptance_evidence.test_contracts,
+  };
+}
+
+async function deriveDispatchCapsule(input, model, source, testContracts, dependencies) {
+  const request = input.dispatch_request;
+  if (!exactKeys(request, DISPATCH_REQUEST_KEYS) || request.schema_version !== 1
+    || request.kind !== "team_harness_dispatch_request" || !PACKET_ROLES.has(request.role)
+    || !PACKET_MODES.has(request.mode) || request.role === "implementer" && request.mode !== "implementation"
+    || !["normal", "native-escalation-required"].includes(request.git_metadata_write_mode)
+    || !exactKeys(request.helper_bundle, HELPER_BUNDLE_REF_KEYS)
+    || !validRelativeList(request.scope_paths)
+    || !safeRelative(request.helper_bundle.manifest_path)
+    || !SHA256.test(request.helper_bundle.manifest_sha256 ?? "")) throw new Error("PACKET_CONTRACT_INVALID");
+
+  const binding = model.bindings.find(item => item.service === input.service);
+  if (!binding || await canonicalDirectory(binding.repository_root) !== binding.repository_root) {
     throw new Error("PACKET_CONTRACT_INVALID");
   }
-  if (!exactKeys(packet.path_roots, PATH_ROOT_KEYS)
-    || packet.path_roots.workspace_artifact_root !== model.workspace
-    || !packet.path_roots.evidence_roots || typeof packet.path_roots.evidence_roots !== "object"
-    || Array.isArray(packet.path_roots.evidence_roots)) throw new Error("PACKET_CONTRACT_INVALID");
-  const repository = await canonicalDirectory(packet.path_roots.repository_root);
-  const binding = model.bindings.find(item => item.service === input.service);
-  if (!binding || repository !== binding.repository_root) throw new Error("PACKET_CONTRACT_INVALID");
-  for (const [service, root] of Object.entries(packet.path_roots.evidence_roots)) {
-    if (!SERVICE.test(service) || await canonicalDirectory(root) !== root) throw new Error("PACKET_CONTRACT_INVALID");
-  }
-
-  if (!exactKeys(packet.helper_bundle, HELPER_BUNDLE_KEYS)) throw new Error("PACKET_CONTRACT_INVALID");
   const bundleVerifier = dependencies.helperBundleVerifier ?? verifyHelperBundle;
   const bundle = await bundleVerifier({
     workspace: model.workspace,
-    manifest_path: packet.helper_bundle.manifest_path,
-    manifest_sha256: packet.helper_bundle.manifest_sha256,
+    manifest_path: request.helper_bundle.manifest_path,
+    manifest_sha256: request.helper_bundle.manifest_sha256,
   });
-  if (bundle?.verdict !== "pass"
-    || bundle.bundle_identity_sha256 !== packet.helper_bundle.bundle_identity_sha256
-    || bundle.compatibility_epoch !== packet.helper_bundle.compatibility_epoch
-    || bundle.helper_paths?.["bounded-command.mjs"] !== packet.bounded_command_path
-    || bundle.helper_paths?.["specialist-write-scope.mjs"] !== packet.workspace_write_scope_path
-    || packet.test_transition_path !== (packet.role === "tester" && packet.mode === "pre-implementation-contract"
-      ? bundle.helper_paths?.["test-transition.mjs"] : null)) throw new Error("PACKET_CONTRACT_INVALID");
-  await canonicalRegularFile(model.workspace, packet.bounded_command_path, "PACKET_CONTRACT_INVALID");
-  await canonicalRegularFile(model.workspace, packet.workspace_write_scope_path, "PACKET_CONTRACT_INVALID");
-  if (packet.test_transition_path !== null) {
-    await canonicalRegularFile(model.workspace, packet.test_transition_path, "PACKET_CONTRACT_INVALID");
+  const boundedCommand = bundle?.helper_paths?.["bounded-command.mjs"];
+  const writeScope = bundle?.helper_paths?.["specialist-write-scope.mjs"];
+  const testTransition = request.role === "tester" && request.mode === "pre-implementation-contract"
+    ? bundle?.helper_paths?.["test-transition.mjs"] : null;
+  if (bundle?.verdict !== "pass" || !SHA256.test(bundle.bundle_identity_sha256 ?? "")
+    || typeof bundle.compatibility_epoch !== "string" || !boundedCommand || !writeScope || testTransition === undefined) {
+    throw new Error("PACKET_CONTRACT_INVALID");
   }
+  await canonicalRegularFile(model.workspace, boundedCommand, "PACKET_CONTRACT_INVALID");
+  await canonicalRegularFile(model.workspace, writeScope, "PACKET_CONTRACT_INVALID");
+  if (testTransition !== null) await canonicalRegularFile(model.workspace, testTransition, "PACKET_CONTRACT_INVALID");
 
-  if (!Array.isArray(packet.artifact_coordinates) || packet.artifact_coordinates.length === 0
-    || packet.artifact_coordinates.length > 128) throw new Error("PACKET_CONTRACT_INVALID");
-  const coordinateIds = new Set();
-  const taskShardCoordinates = [];
-  for (const coordinate of packet.artifact_coordinates) {
-    if (!exactKeys(coordinate, ARTIFACT_COORDINATE_KEYS)
-      || typeof coordinate.kind !== "string" || !/^[a-z][a-z0-9-]{0,63}$/.test(coordinate.kind)
-      || !["repository_root", "workspace_artifact_root"].includes(coordinate.root)
-      || !safeRelative(coordinate.path) || !SHA256.test(coordinate.sha256 ?? "")
-      || !(coordinate.anchor === null || typeof coordinate.anchor === "string")) {
-      throw new Error("PACKET_ARTIFACT_INVALID");
-    }
-    const coordinateId = `${coordinate.root}\0${coordinate.path}\0${coordinate.anchor ?? ""}`;
-    if (coordinateIds.has(coordinateId)) throw new Error("PACKET_ARTIFACT_INVALID");
-    coordinateIds.add(coordinateId);
-    const root = packet.path_roots[coordinate.root];
-    const target = path.resolve(root, coordinate.path);
-    const bytes = await canonicalRegularFile(root, target, "PACKET_ARTIFACT_INVALID");
-    if (hash(bytes) !== coordinate.sha256 || coordinate.anchor !== null && anchorCount(bytes, coordinate.anchor) !== 1) {
-      throw new Error("PACKET_ARTIFACT_INVALID");
-    }
-    if (coordinate.kind === "task-shard") {
-      if (coordinate.root !== "workspace_artifact_root" || coordinate.anchor !== null) throw new Error("PACKET_ARTIFACT_INVALID");
-      taskShardCoordinates.push(coordinate);
-    }
-  }
-  if (taskShardCoordinates.length === 0) throw new Error("PACKET_CONTRACT_INVALID");
-
-  if (!exactKeys(packet.discovery_scope, DISCOVERY_SCOPE_KEYS)
-    || !validRelativeList(packet.discovery_scope.directories)
-    || !validRelativeList(packet.discovery_scope.globs)) throw new Error("PACKET_CONTRACT_INVALID");
-
-  if (!exactKeys(packet.openspec_snapshot, FILE_BINDING_KEYS)
-    || !SHA256.test(packet.openspec_snapshot.sha256 ?? "")) throw new Error("PACKET_CONTRACT_INVALID");
-  const snapshotPath = path.resolve(model.workspace, binding.snapshot_path);
-  if (packet.openspec_snapshot.path !== snapshotPath || packet.openspec_snapshot.sha256 !== binding.snapshot_sha256
-    || hash(await canonicalRegularFile(model.workspace, snapshotPath, "PACKET_ARTIFACT_INVALID")) !== binding.snapshot_sha256) {
-    throw new Error("PACKET_ARTIFACT_INVALID");
-  }
-
-  if (!Array.isArray(packet.openspec_execution_items)
-    || packet.openspec_execution_items.length !== model.selected.length) throw new Error("PACKET_CONTRACT_INVALID");
-  for (const selected of model.selected) {
-    const overlay = model.overlays.get(input.service);
-    const overlayMatches = overlay.execution_items
-      .map((item, index) => ({ item, index }))
-      .filter(entry => entry.item.id === selected.id);
-    if (overlayMatches.length !== 1) throw new Error("PACKET_ARTIFACT_INVALID");
-    const [{ item: overlayItem, index }] = overlayMatches;
-    const matches = packet.openspec_execution_items.filter(item => item?.task_id === selected.id);
-    if (matches.length !== 1 || !exactKeys(matches[0], EXECUTION_ITEM_KEYS)
-      || matches[0].json_pointer !== `/execution_items/${index}`
-      || matches[0].item_sha256 !== hash(canonicalBytes(overlayItem))
-      || !equalJson(matches[0].sources, overlayItem.sources)) throw new Error("PACKET_ARTIFACT_INVALID");
-  }
-
-  if (!exactKeys(packet.derived_dispatch_binding, FILE_BINDING_KEYS)
-    || !SHA256.test(packet.derived_dispatch_binding.sha256 ?? "")) throw new Error("PACKET_CONTRACT_INVALID");
-  const dispatchBytes = await canonicalRegularFile(model.workspace, packet.derived_dispatch_binding.path, "PACKET_ARTIFACT_INVALID");
-  if (hash(dispatchBytes) !== packet.derived_dispatch_binding.sha256) throw new Error("PACKET_ARTIFACT_INVALID");
+  const overlay = model.overlays.get(input.service);
+  const selected = model.selected.map(item => {
+    const index = overlay.execution_items.findIndex(candidate => candidate.id === item.id);
+    if (index < 0 || !validDispatchItem(item)) throw new Error("PACKET_CONTRACT_INVALID");
+    return { item, index };
+  });
+  const dispatchRelative = `inputs/openspec/${input.service}/dispatch-binding.json`;
+  const dispatchFile = await readContainedFile(model.workspace, dispatchRelative);
   let dispatch;
-  try { dispatch = JSON.parse(dispatchBytes.toString("utf8")); } catch { throw new Error("PACKET_ARTIFACT_INVALID"); }
-  if (dispatch?.kind !== "team_harness_openspec_dispatch_binding" || dispatch.service !== input.service
-    || dispatch.snapshot?.path !== binding.snapshot_path || dispatch.snapshot?.sha256 !== binding.snapshot_sha256
+  try { dispatch = JSON.parse(dispatchFile.bytes.toString("utf8")); } catch { throw new Error("PACKET_ARTIFACT_INVALID"); }
+  if (!canonicalBytes(dispatch).equals(dispatchFile.bytes) || !exactKeys(dispatch, DISPATCH_BINDING_KEYS)
+    || dispatch.schema_version !== OPENSPEC_DISPATCH_BINDING_SCHEMA_VERSION
+    || dispatch.kind !== "team_harness_openspec_dispatch_binding" || dispatch.service !== input.service
+    || !exactKeys(dispatch.aggregate, new Set(["path", "sha256"]))
+    || dispatch.aggregate.path !== input.aggregate_path || dispatch.aggregate.sha256 !== input.aggregate_sha256
+    || !SHA256.test(dispatch.gate_identity_sha256 ?? "")
+    || !(dispatch.continuation_identity_sha256 === null || SHA256.test(dispatch.continuation_identity_sha256 ?? ""))
+    || !exactKeys(dispatch.snapshot, new Set(["path", "sha256"]))
+    || dispatch.snapshot.path !== binding.snapshot_path || dispatch.snapshot.sha256 !== binding.snapshot_sha256
+    || !exactKeys(dispatch.overlay, new Set(["path", "sha256"]))
+    || dispatch.overlay.path !== binding.overlay_path || dispatch.overlay.sha256 !== binding.overlay_sha256
     || !Array.isArray(dispatch.artifacts)) throw new Error("PACKET_ARTIFACT_INVALID");
-  for (const coordinate of taskShardCoordinates) {
-    const matches = dispatch.artifacts.filter(artifact => artifact?.path === coordinate.path && artifact?.sha256 === coordinate.sha256);
+  const dispatchBinding = { path: dispatchRelative, sha256: hash(dispatchFile.bytes) };
+
+  const expectedArtifacts = [
+    { kind: "plan", path: `services/${input.service}/01-plan.md` },
+    { kind: "quality-manifest", path: ".team-harness/quality.json" },
+    ...overlay.execution_items.map(item => ({ kind: "task-shard", path: item.shard_path }))
+      .sort((left, right) => left.path.localeCompare(right.path)),
+  ];
+  if (dispatch.artifacts.length !== expectedArtifacts.length
+    || dispatch.artifacts.some(artifact => !exactKeys(artifact, DISPATCH_ARTIFACT_KEYS)
+      || !SHA256.test(artifact.sha256 ?? ""))) throw new Error("PACKET_ARTIFACT_INVALID");
+  const artifactByPath = new Map();
+  for (const expected of expectedArtifacts) {
+    const matches = dispatch.artifacts.filter(artifact => artifact.kind === expected.kind && artifact.path === expected.path);
     if (matches.length !== 1) throw new Error("PACKET_ARTIFACT_INVALID");
+    const file = await readContainedFile(model.workspace, expected.path);
+    if (hash(file.bytes) !== matches[0].sha256) throw new Error("PACKET_ARTIFACT_INVALID");
+    artifactByPath.set(expected.path, matches[0]);
   }
 
-  if (packet.evidence_dispatch_binding === null) {
-    if (Object.keys(packet.path_roots.evidence_roots).length !== 0) throw new Error("PACKET_CONTRACT_INVALID");
-  } else {
-    if (!exactKeys(packet.evidence_dispatch_binding, EVIDENCE_BINDING_KEYS)
-      || !SHA256.test(packet.evidence_dispatch_binding.sha256 ?? "")
-      || !SHA256.test(packet.evidence_dispatch_binding.dispatch_identity_sha256 ?? "")
-      || Object.keys(packet.path_roots.evidence_roots).length === 0) throw new Error("PACKET_CONTRACT_INVALID");
-    const evidenceBytes = await canonicalRegularFile(model.workspace, packet.evidence_dispatch_binding.path, "PACKET_ARTIFACT_INVALID");
-    if (hash(evidenceBytes) !== packet.evidence_dispatch_binding.sha256) throw new Error("PACKET_ARTIFACT_INVALID");
+  const taskShards = [];
+  for (const { item } of selected) {
+    taskShards.push({ path: item.shard_path, sha256: artifactByPath.get(item.shard_path).sha256 });
   }
+  const planArtifact = artifactByPath.get(`services/${input.service}/01-plan.md`);
+  const planArtifacts = [{ path: `services/${input.service}/01-plan.md`, sha256: planArtifact.sha256 }];
+  const qualityArtifact = artifactByPath.get(".team-harness/quality.json");
+  const qualityPath = path.join(model.workspace, ".team-harness/quality.json");
 
-  if (!exactKeys(packet.quality_manifest, FILE_BINDING_KEYS)
-    || packet.quality_manifest.path !== path.join(model.workspace, ".team-harness", "quality.json")
-    || !SHA256.test(packet.quality_manifest.sha256 ?? "")
-    || hash(await canonicalRegularFile(model.workspace, packet.quality_manifest.path, "PACKET_ARTIFACT_INVALID")) !== packet.quality_manifest.sha256) {
+  const invariantIds = [...new Set(selected.flatMap(({ item }) => item.required_invariants))].sort();
+  const invariants = [];
+  if (invariantIds.length > 0) {
+    const invariantFile = await readContainedFile(model.workspace, "plan/invariants.md");
+    for (const anchor of invariantIds) {
+      if (anchorCount(invariantFile.bytes, anchor) !== 1) throw new Error("PACKET_ARTIFACT_INVALID");
+      invariants.push({ path: "plan/invariants.md", anchor, sha256: hash(invariantFile.bytes) });
+    }
+  }
+  const snapshotPath = path.resolve(model.workspace, binding.snapshot_path);
+  if (hash(await canonicalRegularFile(model.workspace, snapshotPath, "PACKET_ARTIFACT_INVALID")) !== binding.snapshot_sha256) {
     throw new Error("PACKET_ARTIFACT_INVALID");
   }
+  const ownedPaths = [...new Set(selected.flatMap(({ item }) => item.files))].sort();
+  const discoveryScope = {
+    directories: [...new Set(selected.flatMap(({ item }) => item.discovery_scope.directories))].sort(),
+    globs: [...new Set(selected.flatMap(({ item }) => item.discovery_scope.globs))].sort(),
+  };
+  const requiredSeams = selected.flatMap(({ item }) => item.required_seams);
+  const commandIds = [...new Set(selected.flatMap(({ item }) => item.quality_command_ids))].sort();
+  const executionItems = selected.map(({ item, index }) => ({
+    task_id: item.id,
+    json_pointer: `/execution_items/${index}`,
+    item_sha256: hash(canonicalBytes(item)),
+    sources: item.sources,
+  }));
+  const evidence = await deriveEvidenceDispatch(request, model, dispatchBinding, taskShards.map(item => item.path));
   const scope = validateSpecialistWorkspaceWriteScope({
-    role: packet.role,
+    role: request.role,
     workspace_artifact_root: model.workspace,
-    workspace_write_coordinates: packet.workspace_write_coordinates,
+    workspace_write_coordinates: request.workspace_write_coordinates,
   });
   if (scope.verdict !== "pass") throw new Error("PACKET_CONTRACT_INVALID");
-  if (packet.bounded_result_path !== null) {
-    if (typeof packet.bounded_result_path !== "string" || !path.isAbsolute(packet.bounded_result_path)
-      || !packet.workspace_write_coordinates.some(coordinate => coordinate.path === packet.bounded_result_path
-        && coordinate.operations.includes("create") && coordinate.purpose === "bounded-command-result")) {
-      throw new Error("PACKET_CONTRACT_INVALID");
-    }
+  if (request.bounded_result_path !== null
+    && (typeof request.bounded_result_path !== "string" || !path.isAbsolute(request.bounded_result_path)
+      || !request.workspace_write_coordinates.some(coordinate => coordinate.path === request.bounded_result_path
+        && coordinate.operations.includes("create") && coordinate.purpose === "bounded-command-result"))) {
+    throw new Error("PACKET_CONTRACT_INVALID");
   }
-  return canonical(packet);
+
+  const capsule = {
+    schema_version: 1,
+    kind: "team_harness_dispatch_capsule",
+    scope: {
+      service: input.service,
+      task_ids: selected.map(({ item }) => item.id),
+      role: request.role,
+      mode: request.mode,
+      target_paths: request.scope_paths,
+      repository_root: binding.repository_root,
+      scope_identity_sha256: null,
+    },
+    roots: { repository_root: binding.repository_root, workspace_artifact_root: model.workspace, evidence_roots: evidence.roots },
+    ownership: { owned_paths: ownedPaths, discovery_scope: discoveryScope, required_seams: requiredSeams },
+    openspec: {
+      aggregate: { path: input.aggregate_path, sha256: input.aggregate_sha256 },
+      snapshot: { path: snapshotPath, sha256: binding.snapshot_sha256 },
+      execution_items: executionItems,
+      dispatch_binding: { path: path.resolve(model.workspace, dispatchRelative), sha256: dispatchBinding.sha256 },
+      task_shards: taskShards,
+      plan_artifacts: planArtifacts,
+      invariants,
+      source_coordinates: source.sourceCoordinates,
+      task_intent_sha256: source.taskIntentSha256,
+    },
+    acceptance_evidence: {
+      test_contract_index: { path: model.computedSummary.index_path, sha256: model.computedSummary.index_sha256 },
+      test_contracts: testContracts,
+    },
+    quality: { manifest: { path: qualityPath, sha256: qualityArtifact.sha256 }, command_ids: commandIds },
+    helpers: {
+      bundle: {
+        manifest_path: request.helper_bundle.manifest_path,
+        manifest_sha256: request.helper_bundle.manifest_sha256,
+        bundle_identity_sha256: bundle.bundle_identity_sha256,
+        compatibility_epoch: bundle.compatibility_epoch,
+      },
+      bounded_command_path: boundedCommand,
+      workspace_write_scope_path: writeScope,
+      test_transition_path: testTransition,
+    },
+    workspace_writes: { coordinates: request.workspace_write_coordinates, bounded_result_path: request.bounded_result_path },
+    evidence_dispatch: evidence.binding === null ? null : { binding: evidence.binding, sources: evidence.sources },
+    git_metadata_write_mode: request.git_metadata_write_mode,
+  };
+  capsule.scope.scope_identity_sha256 = hash(canonicalBytes(capsuleScopeIdentity(capsule)));
+  return canonical(capsule);
 }
 
 async function deriveSourceCoordinates(model, service) {
@@ -520,10 +647,13 @@ export async function preflightCorrectionPacket(input = {}, dependencies = {}) {
   try {
     const model = await loadModel(normalizedInput, dependencies);
     const source = await deriveSourceCoordinates(model, input.service);
+    const preImplementationTester = input.dispatch_request?.role === "tester"
+      && input.dispatch_request?.mode === "pre-implementation-contract";
     const indexed = new Map(model.index.tasks.map(task => [task.task_id, task]));
     const missingRequiredTasks = model.requiredTasks.filter(taskId => !indexed.has(taskId));
     const details = {
       ...base,
+      task_ids: model.selected.map(item => item.id),
       task_intent_sha256: source.taskIntentSha256,
       source_coordinates: source.sourceCoordinates,
       test_contract_summary: model.computedSummary,
@@ -548,7 +678,7 @@ export async function preflightCorrectionPacket(input = {}, dependencies = {}) {
       verifiedRequiredTasks.add(taskId);
     }
     details.pending_required_tasks = pendingRequiredTasks;
-    if (pendingRequiredTasks.length > 0) {
+    if (pendingRequiredTasks.length > 0 && !preImplementationTester) {
       return result("repair", "TEST_CONTRACT_TASK_PENDING", "complete-required-test-contracts-before-presentation", details);
     }
     const testContracts = [];
@@ -562,6 +692,18 @@ export async function preflightCorrectionPacket(input = {}, dependencies = {}) {
       const evidence = indexed.get(taskId);
       if (!evidence || evidence.status === "pending") {
         pendingSelectedTasks.push(taskId);
+        if (preImplementationTester) {
+          testContracts.push({
+            task_id: taskId,
+            status: "pending",
+            contract_path: null,
+            contract_sha256: null,
+            red_evidence_path: null,
+            red_evidence_sha256: null,
+            red_commit_sha: null,
+            red_tree_sha: null,
+          });
+        }
         continue;
       }
       if (!["red", "green"].includes(evidence.status)) throw new Error("TEST_CONTRACT_EVIDENCE_INVALID");
@@ -579,52 +721,19 @@ export async function preflightCorrectionPacket(input = {}, dependencies = {}) {
     }
     details.test_contracts = testContracts;
     details.pending_selected_tasks = pendingSelectedTasks;
-    if (pendingSelectedTasks.length > 0) {
+    if (pendingSelectedTasks.length > 0 && !preImplementationTester) {
       return result("repair", "TEST_CONTRACT_TASK_PENDING", "run-preimplementation-tester-before-presentation", details);
     }
-    let dispatchPacket = null;
-    if (Object.hasOwn(input, "dispatch_packet")) {
-      dispatchPacket = await validateDispatchPacket(normalizedInput, model, dependencies);
-      details.dispatch_packet_sha256 = hash(canonicalBytes(dispatchPacket));
+    let dispatchCapsule = null;
+    if (Object.hasOwn(input, "dispatch_request")) {
+      dispatchCapsule = await deriveDispatchCapsule(normalizedInput, model, source, testContracts, dependencies);
+      details.scope_identity_sha256 = dispatchCapsule.scope.scope_identity_sha256;
     }
-    const identity = {
-      schema_version: CORRECTION_PACKET_PREFLIGHT_SCHEMA_VERSION,
-      kind: "team_harness_correction_packet_binding",
-      aggregate_path: input.aggregate_path,
-      aggregate_sha256: input.aggregate_sha256,
-      service: input.service,
-      task_ids: taskIds,
-      task_intent_sha256: source.taskIntentSha256,
-      source_coordinates: source.sourceCoordinates,
-      test_contract_index: { path: model.computedSummary.index_path, sha256: model.computedSummary.index_sha256 },
-      test_contracts: testContracts,
-      dispatch_packet: dispatchPacket,
-    };
-    details.preflight_identity_sha256 = hash(canonicalBytes(identity));
     return result("pass", null, "bind-preflight-before-presentation", details);
   } catch (error) {
     const code = ERROR_CODES.has(error?.message) ? error.message : "INTERNAL_ERROR";
     return failure(code, "block-before-presentation", base);
   }
-}
-
-function certificateFrom(resultValue, input) {
-  return {
-    schema_version: CORRECTION_PACKET_PREFLIGHT_SCHEMA_VERSION,
-    kind: "team_harness_correction_packet_binding",
-    aggregate_path: input.aggregate_path,
-    aggregate_sha256: input.aggregate_sha256,
-    service: resultValue.service,
-    task_ids: resultValue.task_ids,
-    task_intent_sha256: resultValue.task_intent_sha256,
-    source_coordinates: resultValue.source_coordinates,
-    test_contract_index: {
-      path: resultValue.test_contract_summary.index_path,
-      sha256: resultValue.test_contract_summary.index_sha256,
-    },
-    test_contracts: resultValue.test_contracts,
-    dispatch_packet: canonical(input.dispatch_packet),
-  };
 }
 
 async function atomicCreate(target, bytes, workspace) {
@@ -654,7 +763,7 @@ async function atomicCreate(target, bytes, workspace) {
   }
 }
 
-/** Persist a passing content-addressed binding that the eventual packet must carry exactly. */
+/** Resolve and persist the only specialist-facing artifact: one immutable dispatch reference. */
 export async function certifyCorrectionPacket(input = {}, dependencies = {}) {
   if (!exactKeys(input, CERTIFY_INPUT_KEYS)) {
     return failure("PACKET_CONTRACT_INVALID", "block-before-presentation", {
@@ -666,20 +775,66 @@ export async function certifyCorrectionPacket(input = {}, dependencies = {}) {
   if (audited.verdict !== "pass") return audited;
   try {
     const workspace = await canonicalDirectory(input.workspace);
-    const certificate = certificateFrom(audited, input);
-    const certificateBytes = canonicalBytes(certificate);
-    const certificateSha = hash(certificateBytes);
-    if (certificateSha !== audited.preflight_identity_sha256) throw new Error("INTERNAL_ERROR");
-    const relative = `evidence/correction-preflights/${certificateSha}.json`;
-    await atomicCreate(path.resolve(workspace, relative), certificateBytes, workspace);
+    const model = await loadModel({ ...input, task_ids: [...input.task_ids].sort() }, dependencies);
+    const source = await deriveSourceCoordinates(model, input.service);
+    const capsule = await deriveDispatchCapsule(input, model, source, audited.test_contracts, dependencies);
+    if (capsule.scope.scope_identity_sha256 !== audited.scope_identity_sha256) throw new Error("INTERNAL_ERROR");
+    const capsuleBytes = canonicalBytes(capsule);
+    const capsuleSha = hash(capsuleBytes);
+    const relative = `inputs/dispatches/${capsuleSha}.json`;
+    const absolute = path.resolve(workspace, relative);
+    await atomicCreate(absolute, capsuleBytes, workspace);
+    const dispatchReference = {
+      schema_version: 1,
+      kind: "team_harness_dispatch_reference",
+      path: absolute,
+      sha256: capsuleSha,
+      scope_identity_sha256: capsule.scope.scope_identity_sha256,
+    };
     return {
       ...audited,
-      preflight_path: relative,
-      preflight_sha256: certificateSha,
+      action: "dispatch-ready-before-authority",
+      dispatch_reference: dispatchReference,
     };
   } catch (error) {
     const code = ERROR_CODES.has(error?.message) ? error.message : "OUTPUT_WRITE_FAILED";
     return failure(code, "block-before-presentation", { service: audited.service, task_ids: audited.task_ids });
+  }
+}
+
+/** Verify one minimal reference before Main counts an attempt or the specialist reads the repository. */
+export async function verifyDispatchReference(input = {}) {
+  try {
+    if (!exactKeys(input, new Set(["workspace", "dispatch_reference"]))
+      || !exactKeys(input.dispatch_reference, DISPATCH_REFERENCE_KEYS)
+      || input.dispatch_reference.schema_version !== 1
+      || input.dispatch_reference.kind !== "team_harness_dispatch_reference"
+      || !SHA256.test(input.dispatch_reference.sha256 ?? "")
+      || !SHA256.test(input.dispatch_reference.scope_identity_sha256 ?? "")) {
+      throw new Error("PACKET_CONTRACT_INVALID");
+    }
+    const workspace = await canonicalDirectory(input.workspace);
+    const file = await workspaceCoordinate(workspace, input.dispatch_reference.path, "PACKET_ARTIFACT_INVALID");
+    if (hash(file.bytes) !== input.dispatch_reference.sha256) throw new Error("PACKET_ARTIFACT_INVALID");
+    let capsule;
+    try { capsule = JSON.parse(file.bytes.toString("utf8")); } catch { throw new Error("PACKET_ARTIFACT_INVALID"); }
+    if (!canonicalBytes(capsule).equals(file.bytes) || capsule?.schema_version !== 1
+      || capsule.kind !== "team_harness_dispatch_capsule"
+      || capsule.scope?.scope_identity_sha256 !== input.dispatch_reference.scope_identity_sha256) {
+      throw new Error("PACKET_ARTIFACT_INVALID");
+    }
+    if (hash(canonicalBytes(capsuleScopeIdentity(capsule))) !== input.dispatch_reference.scope_identity_sha256) {
+      throw new Error("PACKET_ARTIFACT_INVALID");
+    }
+    return result("pass", null, "ack-dispatch-ready", {
+      service: capsule.scope.service,
+      task_ids: capsule.scope.task_ids,
+      scope_identity_sha256: capsule.scope.scope_identity_sha256,
+      dispatch_reference: input.dispatch_reference,
+    });
+  } catch (error) {
+    const code = ERROR_CODES.has(error?.message) ? error.message : "INTERNAL_ERROR";
+    return failure(code, "repair-before-attempt");
   }
 }
 
@@ -753,6 +908,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     ? await preflightCorrectionPacket(input)
     : operation === "certify"
       ? await certifyCorrectionPacket(input)
+    : operation === "verify-reference"
+      ? await verifyDispatchReference(input)
     : operation === "repair-index"
       ? await repairTestContractCoverage(input)
       : failure("ARGUMENT_INVALID");

@@ -458,20 +458,19 @@ intent/scope/AC contradiction to resolve first—never as a silent waiver.
 2. **Contradiction → resolve before authorization.** Present the conflicting requirements and costs. Only the operator may resolve them; architect work still requires a separate explicit request.
 3. **Mechanical and enumerated → include together.** Do not split them into micro-rounds; one authorization covers the complete named `resolve` package and scope.
 4. **Mixed set → preserve all findings.** Resolve decision-bearing items first, then present one correction decision over the resulting complete package. Never dispatch a mechanical subset while another finding remains undecided.
-5. **Certify before authority.** Run the bundled
-   `correction-packet-preflight.mjs certify` over the exact aggregate, service,
-   selected task set, and current test-contract index. Its workspace-local
-   content-addressed certificate binds each live canonical source-file SHA-256
-   separately from `task_intent_sha256`, the complete required-test set across
-   every writable overlay, every required RED/GREEN artifact, and the complete
-   mechanically validated V2 packet skeleton with its own SHA-256. Missing
-   helpers, fields, or independently rehashed artifact coordinates block here,
-   before authority. `repair-index`
-   adds only missing `pending` rows; Main recomputes the extended coverage
-   summary and closes every required RED/GREEN row before retrying. Persist the
-   passing certificate in `correction_preflight`; failure creates no nonce and
-   consumes no authority. Re-certify immediately before spawn and require the
-   same path/hash/identity/packet hash.
+5. **Resolve before authority.** Give the bundled
+   `correction-packet-preflight.mjs certify` only the exact aggregate, service,
+   selected task set, role/mode, correction target paths, immutable
+   helper/evidence references, and declared workspace writes. The resolver
+   derives each target path's unique owner task and validates every root,
+   source, seal, live hash, test artifact, quality command, helper, and scope,
+   then returns one immutable content-addressed `dispatch_reference`. Main does
+   not serialize those derived fields into the specialist prompt. `repair-index`
+   adds only missing `pending` rows; Main recomputes coverage and closes every
+   required RED/GREEN row before retrying. Persist the passing reference in
+   `correction_dispatch_reference`; failure creates no nonce and consumes no
+   authority. Re-certify immediately before spawn and require the same
+   `scope_identity_sha256`.
 6. **Persist and authorize.** After every disposition is explicit and certification passes, persist one `correction_package` for the final `resolve` set and generate a fresh nonce. When every finding is an unambiguous in-scope `resolve`, the package is complete, no decision-bearing or ambiguous item remains, and `autonomous_correction_count < 3`, Main records one package-bound `gate1-autonomous` authorization without a live presentation and consumes that single decision through the same correction route. When any eligibility conjunct fails, show exactly the following choices and stop:
 
 ```text
@@ -524,12 +523,14 @@ Live choice `1`, or one eligible autonomous decision, records both the state dec
 one `correction.decision` event before dispatch. The consumed nonce becomes its
 `decision_ref`; this sole authority record carries the complete correction
 package, `correction_authority`, authority Gate nonce, and exact
-`correction_preflight` binding. The correction packet repeats that certificate
-path/hash/identity and the specialist verifies it before any packet-derived
-read. The one
-`iteration.start` and one `agent.correction.spawn` carry only that ref plus
-ordinary observations. Autonomous authority carries the exact consumed Gate-1
-nonce; operator-live carries null. It may not narrow to one finding, widen scope, or reuse an old nonce. After the
+`correction_dispatch_reference`. The specialist prompt carries only that
+reference plus ordinary correlation. It verifies the referenced capsule and
+emits token-bound `dispatch-ready`; only then does Main emit/count
+`iteration.start` and `agent.correction.spawn`. A reference failure before that
+acknowledgement consumes no attempt and may be mechanically re-certified under
+the same decision only when its scope identity is unchanged. Autonomous
+authority carries the exact consumed Gate-1 nonce; operator-live carries null.
+It may not narrow to one finding, widen scope, or reuse an old nonce. After the
 bounded implementation/evidence work, require a recorded PASS for every package closure check
 before any tester refresh or Freeze. Missing or failed closure evidence is `correction-incomplete`:
 do not dispatch tester, create a Freeze, or spend a final validation fan. After successful closure,
@@ -1251,11 +1252,11 @@ create-only per-service lock: `DERIVED_SET_BUSY` publishes no packet, while a
 successful permanent `inputs/openspec/<service>/dispatch-binding.json` makes
 all later repair ineligible. The seal binds the aggregate, Gate, optional
 migration continuation, snapshot, overlay, plan, workspace quality manifest,
-and every overlay-declared shard. Every fresh initial/correction dispatch runs
-`verify-dispatch`, carries the absolute/hash-matched
-`derived_dispatch_binding: {path, sha256}`, and proves its shard appears exactly
-once with the supplied artifact hash. Any post-seal mismatch is
-`DISPATCH_BINDING_STALE`; never rehash, rebind, or resend against changed bytes.
+and every overlay-declared shard. For every fresh initial/correction dispatch,
+the canonical resolver verifies the permanent seal and embeds the selected
+shard coordinates in the immutable capsule. The specialist prompt carries only
+the capsule reference. Any post-seal mismatch is `DISPATCH_BINDING_STALE`;
+never rehash, rebind, or dispatch against changed bytes.
 When Design and implementation use different checkouts, Main first materializes
 the exact snapshot-bound canonical source set below the implementation
 repository and verifies its hashes. Every created or changed

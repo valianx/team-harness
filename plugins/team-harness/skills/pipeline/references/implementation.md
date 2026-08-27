@@ -116,110 +116,43 @@ or tests under escalation. Approval timeout pauses on the exact pending Git
 operation; it does not discard an already-created task/test commit or diff.
 Record that pause as `git-metadata-permission`.
 
-Every specialist packet carries the closed root map `path_roots: {
-repository_root: <absolute canonical worktree>, workspace_artifact_root:
-<absolute canonical workspace>, evidence_roots: {<evidence-service>:
-<absolute canonical read-only root>} }`; `evidence_roots` is empty unless a
-verified task evidence dispatch below requires it. Resolve task `files` and OpenSpec source
-coordinates only below `repository_root`; resolve `plan/...`, `inputs/...`,
-`reviews/...`, task shards, contracts, and `required_evidence_anchors` only
-below `workspace_artifact_root`. Resolve only exact hash-bound external
-coordinates below their named `evidence_roots` entry. Validate containment
-before reading. Never
-interpret a workspace artifact path relative to the repository, invent `../`
-traversal, or copy artifacts into the worktree. Missing root/domain or a path
-that escapes its declared root blocks the dispatch packet.
+## Canonical dispatch reference
 
-Resolve the packaged `scripts/specialist-write-scope.mjs` beside the active
-pipeline skill before every implementer or tester dispatch. The packet carries that
-absolute canonical regular non-symlink path as `workspace_write_scope_path`
-plus a closed `workspace_write_coordinates` array of exact absolute paths,
-allowed `create|replace|append` operations, and purposes. The implementer runs
-the helper's `validate` operation before packet reads and its `authorize`
-operation before every workspace write. Normal implementation packets use an
-empty array: `02-implementation.md`, state, events, plans, inputs, evidence,
-reviews, and sibling reports remain coordinator-owned and read-only for the
-implementer. A tester packet assigns only the exact mode-specific
-`02-regression-test.md`, `03-testing.md`, test-contract, or bounded-result
-coordinates it needs. A
-`bounded_result_path` or exceptional assigned evidence/report path is writable
-only when the same exact coordinate and operation were predeclared. Missing,
-escaped, symlinked, duplicated, or undeclared writes fail closed as
-`workspace-write-undeclared`; never infer report ownership from the role name
-or `workspace_artifact_root`.
+Main never serializes roots, hashes, pointers, helper paths, seals, discovery
+scope, or artifact coordinates into a specialist prompt. It supplies the
+workspace, service/tasks, role/mode, correction target paths, immutable
+helper/evidence references, and declared workspace writes to
+`correction-packet-preflight.mjs certify`. That
+single resolver derives the repository, ownership, OpenSpec sources and seals,
+live hashes, test evidence, quality commands, helpers, evidence roots, and
+write scope; validates them together; and content-addresses one immutable
+`team_harness_dispatch_capsule` below `inputs/dispatches/`.
 
-The quality manifest is the one deliberate workspace artifact named by a
-runner invocation: require the absolute
-`<workspace_artifact_root>/.team-harness/quality.json` path, verify it is a
-regular non-symlink below `workspace_artifact_root`, and pass both absolute
-`--workspace` and `--manifest` arguments. The workspace may be disjoint from
-the checkout, contain its isolated worktree, or be an ignored child of the
-checkout. In the last case, also prove the manifest is ignored and untracked.
-It is operational state, never a task or product artifact. Never copy it into a
-product path, `git add -f` it, stage it, or include it in the product diff. A
-relative, symlinked, workspace-escaping, tracked, or non-ignored nested
-manifest fails closed.
+Correction target paths come verbatim from the consolidated correction scope.
+The resolver unions the requested tasks with the unique execution item owning
+each target path. A missing or ambiguous owner blocks before authority; Main
+never guesses or manually appends a shard/source/hash tuple. This derived owner
+does not widen scope because its path was already in the correction package.
 
-Every V2 implementer/tester packet also carries `artifact_coordinates`, a
-non-empty closed array of `{kind, root, path, anchor, sha256}` records. A task
-shard uses `kind: task-shard`, `root: workspace_artifact_root`, its exact
-case-sensitive Task Index path such as `plan/tasks/Task-3.md`, and `anchor:
-null`. An invariant uses `kind: invariant-anchor`, the canonical
-`plan/invariants.md` path, and an identifier such as `anchor: INV-2`; an
-invariant identifier is never converted into an `INV-2.md` filename. Before
-dispatch, Main resolves each record below its declared root, rejects symlinks,
-proves exact component spelling and regular-file SHA-256, and requires each
-non-null anchor to occur exactly once. It also proves the task coordinate
-equals the Task Index and overlay `shard_path`. Missing, duplicate, stale,
-case-mismatched, escaped, or invented coordinates are
-`packet-artifact-invalid`; do not dispatch or ask a specialist to discover a
-replacement path.
+The specialist prompt carries only `dispatch_reference: {schema_version, kind,
+path, sha256, scope_identity_sha256}` plus attempt/decision correlation. The
+specialist verifies that reference and sends token-bound `dispatch-ready`
+before any repository/workspace read. Main counts an attempt only after this
+acknowledgement. A pre-ready reference failure consumes no attempt and no new
+operator authority: Main may mechanically re-certify under the same decision
+when `scope_identity_sha256` is unchanged. A changed scope needs a fresh
+package and decision.
 
-When a task's acceptance depends on an `evidence-only` repository, first seal
-the normal service dispatch and then invoke `openspec-bindings.mjs
-bind-evidence-dispatch` with the exact task-shard path and a non-empty set of
-`{service, path, sha256}` coordinates taken from the accepted research/evidence
-manifest. The helper resolves each service only through the aggregate's typed
-`evidence_repositories`, re-verifies repository identity, containment,
-regular/non-symlink identity, and live SHA-256, and writes a canonical
-workspace-local generation-1 evidence dispatch. The packet carries
-`evidence_dispatch_binding: {path, sha256}`, its
-`dispatch_identity_sha256`, and only the matching `path_roots.evidence_roots`.
-The specialist verifies that file before any external read. Evidence roots are
-strictly coordinate-only and read-only: never search, enumerate, execute a
-command, edit, stage, or resolve `discovery_scope` below them. Missing,
-unlisted, stale, escaped, or identity-mismatched evidence is
-`packet-artifact-invalid`; it never widens task ownership.
-
-Every OpenSpec-bound initial or correction packet carries one inseparable
-`openspec_snapshot: {path, sha256}` binding. `path` is the absolute canonical
-snapshot file below `workspace_artifact_root`; a standalone digest, standalone
-path, relative path, symlink, missing file, containment failure, or digest
-mismatch is `packet-contract-invalid` and blocks before spawn. Main performs
-that regular-file and SHA-256 preflight immediately before every fresh dispatch;
-specialists never interpret a snapshot digest as a Git object or discover a
-missing coordinate.
-
-Every correction packet additionally carries
-`correction_packet_preflight: {path, sha256,
-preflight_identity_sha256, dispatch_packet_sha256}`. Before any correction
-nonce or decision, Main constructs the exact closed
-`team_harness_v2_dispatch_packet` skeleton that it will send. The skeleton
-contains role/mode, roots, every independently hashed `artifact_coordinates`
-entry, closed discovery scope, snapshot and execution-item bindings, derived
-and optional evidence dispatch bindings, quality manifest, helper bundle, the
-mandatory bounded-command/write-scope helpers, conditional test-transition
-helper, workspace writes/result, and Git metadata mode. `certify` rejects an
-absent field, a helper not present in the verified bundle, a missing or swapped
-per-file digest, stale snapshot/seal, invalid anchor, or unsafe scope before
-authority. The certificate binds the canonical skeleton and its SHA-256 along
-with the exact service/task set, aggregate/index identities, live source
-content SHA-256 values, and selected RED/GREEN evidence. Main adds only the
-certificate pointer to the certified skeleton, persists that same packet hash
-in the decision, and re-certifies byte-identically before spawn. The specialist
-verifies the certificate and exact skeleton before any other packet-derived
-read. Any omission or drift is `packet-contract-invalid` and cannot consume a
-dispatch or correction authority.
+The capsule is the one canonical owner of roots, owned files, discovery,
+required seams, snapshot/execution/source coordinates, permanent and optional
+evidence seals, immutable test evidence, quality command IDs, workspace helper
+paths, and workspace writes. Normal implementation has no workspace report
+write. Testers receive only their mode-specific coordinates. Evidence roots
+remain coordinate-only/read-only, and the quality manifest remains an ignored,
+untracked workspace artifact. The helper blocks stale, escaped, symlinked,
+duplicate, case/hash/anchor, seal, evidence, or write-scope mismatch before it
+can produce a reference; neither Main nor a specialist repairs individual
+capsule fields by hand.
 
 Before the first implementation specialist dispatch for an OpenSpec binding,
 run the normal overlay and plan-contract preflight. If it fails only because
@@ -275,15 +208,10 @@ service already has durable progress, then rerun the complete audit and require
 `verdict: pass`. Never audit only the currently requested service or infer a
 seal from completed tasks, prior agent events, or another binding's seal.
 
-Every initial or correction packet carries
-`derived_dispatch_binding: {path, sha256}` using the absolute canonical seal
-path and its exact digest. Immediately before every fresh dispatch, run
-`verify-dispatch`, require the same digest, then prove the assigned task-shard
-coordinate and hash occur exactly once in the seal. The specialist repeats the
-seal file/hash and assigned-shard membership check before any packet-derived
-read. `DISPATCH_BINDING_STALE`, a missing/changed seal, or a post-seal artifact
-mismatch blocks; never repair, rehash all bindings, substitute a new shard
-digest, or resend the packet against the changed bytes.
+The dispatch-reference resolver reads the permanent seal, verifies the selected
+shards against it, and embeds the verified coordinates in the capsule.
+`DISPATCH_BINDING_STALE`, a missing/changed seal, or post-seal artifact drift
+blocks capsule creation; neither Main nor the specialist substitutes a digest.
 
 If an already sealed task exhausted exactly two clean implementer/tester
 attempts only because its packet lacked required external evidence, Main may
@@ -296,8 +224,8 @@ creates a new task-local dispatch identity and resets that exact
 service+task+role package to `next_attempt: 1`; other packages, correction
 budgets, progress, seals, and historical attempts remain untouched. A second
 generation-2 identity, non-clean prior attempt, different failure code, or
-coordinate drift fails closed. Every fresh packet and recovery reruns
-`verify-evidence-dispatch` before dispatch.
+coordinate drift fails closed. Every fresh capsule derivation reruns
+`verify-evidence-dispatch` before it can return `dispatch-ready`.
 
 For an already repaired legacy `sharded-v1` workspace whose original approved
 aggregate contained placeholder overlays, never overwrite the original Gate or
@@ -313,18 +241,13 @@ that predates repair fails closed. A passing chain preserves Gate 1 and resumes
 the existing implementation phase under the original Gate plus migration continuation identity,
 without architect dispatch or a new gate.
 
-The packet declares `discovery_scope: {directories: [...], globs: [...]}` with
-only repository-relative task-owned search roots. Before dispatch, Main checks
-`required_seams`: every API, export, mutation adapter, public entry point,
-callsite, verification registry, allowlist, or exemption manifest whose
-validity a TC changes names its provider path, and that path is owned by this
-task or supplied by an already-closed dependency. An unresolved seam or provider
-outside both sets is `packet-scope-insufficient`; return the shard for an
-authorized plan correction rather than dispatching it or allowing a specialist
-to widen ownership.
+The resolver derives discovery scope and `required_seams` from the selected
+execution items. An unresolved seam or provider outside owned files and closed
+dependencies is `packet-scope-insufficient`; return the shard for an authorized
+plan correction rather than widening ownership.
 
-The packet provides paths, root domains, and the closed `discovery_scope`,
-never concatenated file contents. For initial source
+The capsule provides paths and closed discovery coordinates, never concatenated
+file contents. For initial source
 inspection, first inspect metadata, then read at most one file per tool call
 under a predeclared output cap. When a file is not known to fit, locate only
 task-relevant symbols/anchors with bounded `rg -n` and read
@@ -339,18 +262,17 @@ artifact identity; dumping the full file is not proof of reading and is
 prohibited. Tool-level truncation yields no read evidence: continue
 sequentially with narrower child pointers or per-file/range reads and never
 replay the aggregate command. Never run repository-wide `rg --files` and filter its
-output afterward. Enumerate one supplied `discovery_scope.directory` with one
+output afterward. Enumerate one capsule-supplied discovery directory with one
 exact supplied `-g` glob per call; if that pair can still be large, route it
-through `bounded_command_path` before execution. Resolve traceability through
-the packet's exact JSON Pointer and `sources`, and resolve Markdown through its
-supplied unique anchor plus bounded line ranges; broad context searches across
-architecture, traceability, and OpenSpec are packet defects, not discovery.
+through the capsule's bounded-command helper before execution. Resolve
+traceability through the capsule's exact JSON Pointer and `sources`, and
+Markdown through its unique anchor plus bounded ranges; broad context searches
+are dispatch defects, not discovery.
 
 For an OpenSpec-bound workspace, first verify `inputs/openspec-snapshot.json`
-against the repository and validate `plan/openspec-traceability.json`. The role
-packet carries the snapshot path and SHA-256, the assigned TH execution item and
-shard, and only its pinned OpenSpec task/design coordinates with source artifact
-path, line, and content hash. Obtain `openspec instructions apply --change
+against the repository and validate `plan/openspec-traceability.json`. The
+capsule carries the snapshot, assigned execution item/shard, and pinned OpenSpec
+task/design coordinates. Obtain `openspec instructions apply --change
 <bound-change> --json` as implementation guidance and include its bounded result;
 it never selects the phase, task, correction authority, state transition, or
 gate. The implementer reads canonical intent at those exact repository-local
@@ -551,14 +473,12 @@ creates one comprehensive correction package. A single surfaced symptom never
 authorizes an immediate dispatch while another selected diagnostic is pending.
 
 Before generating a correction nonce, presenting choices, or recording an
-autonomous decision, apply the correction packet certificate contract above
-with the exact aggregate, service/tasks, current test-contract state, and final
-V2 packet skeleton. Source identity, complete required-test coverage, packet
-schema, helpers, and every file coordinate must all pass in the same
-certificate. `repair-index` may add only missing `pending` rows; Main recomputes
-the extended summary and closes them before retrying. No pass means no nonce or
-consumed authority. Any pre-spawn drift requires a fresh consolidated packet
-and decision rather than reusing authority.
+autonomous decision, derive the canonical dispatch reference above. `repair-index`
+may add only missing `pending` rows; Main closes them before retrying. No
+`dispatch-ready-before-authority` result means no nonce or consumed authority.
+Before spawn, re-certify the same scope identity. A pre-ready transport/capsule
+repair with unchanged identity reuses the decision and consumes no attempt;
+identity drift requires a fresh consolidated package and decision.
 
 Test blobs are immutable only during their own active red-to-green transition.
 After that task closes and before final Freeze, a fresh tester may make
@@ -661,14 +581,12 @@ helper path—including `bounded-command.mjs`, `test-transition.mjs`, quality,
 OpenSpec, liveness, write-scope, and correction preflight—only from that
 immutable workspace bundle. A plugin-cache path is a transient bootstrap
 source and is never a packet or state coordinate. A missing, stale, or
-hash-mismatched bundle blocks before authority. Every initial
-or correction V2 implementer/tester packet must contain this non-null absolute value as
-`bounded_command_path`; omission, relative form, symlink, or an unavailable
-helper is `packet-contract-invalid` and blocks before any packet-derived read
-or command. This is mandatory even when the first anticipated commands are
-small because later diagnostics can be volume-unknown. Persist only the bundle
-manifest coordinate and identity; resolved absolute helper paths remain
-transient. Before executing a command, Main and the
+hash-mismatched bundle blocks before authority. Every initial or correction
+dispatch resolver derives the exact helper paths from this bundle and places
+them only inside the immutable capsule; Main never serializes them into the
+prompt. Missing or stale helpers block capsule creation. Persist only the
+bundle manifest coordinate and identity outside the capsule. Before executing
+a command, Main and the
 implementer classify its expected output volume from the known command scope
 and output mode. Routine commands with an expected small, bounded result run
 directly, including targeted file reads and searches, concise status checks,
@@ -702,8 +620,8 @@ and `exit_code: 0`. Persisted recovery commands retain the exact `--output
 <absolute_result_path> --` grammar; a positional output path is
 `ARGUMENT_INVALID`, proves no child execution, and may be corrected once before
 execution. A missing, invalid, non-successful, or hash-mismatched artifact
-blocks fail closed. Specialists use output mode only when Main supplied that
-exact coordinate in the packet; they never invent an evidence path.
+blocks fail closed. Specialists use output mode only when the capsule supplies
+that exact coordinate; they never invent an evidence path.
 
 The helper captures stdout and stderr independently to a 64 KiB maximum buffer
 per stream while separately counting all received bytes. Render its envelope

@@ -106,7 +106,7 @@ correction_decision: authorize|pause|abort|null
 correction_decision_ref: {consumed token or null}
 correction_authority: operator-live|gate1-autonomous|null
 correction_authority_gate_nonce: {consumed Gate-1 token or null}
-correction_preflight: {path, sha256, preflight_identity_sha256, dispatch_packet_sha256, service, task_ids}|null
+correction_dispatch_reference: {path, sha256, scope_identity_sha256}|null
 autonomous_correction_count: N
 operator_correction_count: N
 usage_schema_version: 1|null
@@ -373,20 +373,19 @@ final `resolve` IDs and file scope.
 
 Before either autonomous consumption or a live correction presentation, Main
 must materialize/verify `helper_bundle`, invoke its
-`correction-packet-preflight.mjs certify`, and persist the passing certificate
-under `correction_preflight`. Certification derives each selected OpenSpec
-source file's live content SHA-256; `task_intent_sha256` remains a separate
-intent identity and is never substituted for that file digest. It also derives
-the complete required pre-test set from all writable overlays and rejects a
-missing row even when the stored pending count is zero. `repair-index` may add
-only the missing required rows as `pending`; Main recomputes the extended state
-summary and closes every required RED/GREEN row before retrying certify. The
-same certificate binds the complete final V2 packet skeleton and rejects
-missing helpers, incomplete schema, or any stale/swapped artifact coordinate.
-No correction nonce exists and no authority is consumed until certification
-passes. Immediately before dispatch, rerun certify and require the same
-certificate path/hash/identity/packet hash or invalidate the decision and return to a fresh
-preflight and nonce.
+`correction-packet-preflight.mjs certify`, and persist its single
+`correction_dispatch_reference`. Main supplies no derived hashes, pointers,
+seals, roots, or helper paths: the resolver computes and validates them with
+complete required-test coverage before content-addressing the capsule. It also
+derives the unique owner task for every correction target path and unions those
+owners with the requested set; missing or ambiguous ownership blocks here.
+`repair-index` may add only missing required rows as `pending`; close them
+before retrying. No correction nonce or authority exists until the resolver
+returns `dispatch-ready-before-authority`. Immediately before spawn, re-certify
+the same identity. The specialist's token-bound `dispatch-ready` acknowledgement
+starts the attempt; a pre-ready reference failure consumes no attempt and may
+be mechanically re-certified under the same decision only when identity is
+unchanged.
 
 The closed autonomous predicate requires every conjunct: a valid Gate-1
 approval dual record (`approved`; legacy `approved-autonomous` stays legible);
@@ -427,7 +426,7 @@ correction_decision: null
 correction_decision_ref: null
 correction_authority: null
 correction_authority_gate_nonce: null
-correction_preflight: {passing certificate path/hash/identity and exact service/task set}
+correction_dispatch_reference: {path, sha256, scope_identity_sha256}
 autonomous_correction_count: {integer 0..3}
 operator_correction_count: {non-negative integer, no maximum}
 ```
