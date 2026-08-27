@@ -30,21 +30,31 @@ weight is below, because its write half is enforced by the recipient's own tool 
 
 ## Pipeline specialist reference
 
-An OpenSpec-bound implementer or tester prompt carries only
-`dispatch_reference: {schema_version, kind, path, sha256,
-scope_identity_sha256}` plus attempt/decision correlation. Roots, ownership,
+The canonical `team_harness_dispatch_reference` has exactly this shape:
+
+```text
+{schema_version: 1, kind: "team_harness_dispatch_reference", path, sha256,
+ scope_identity_sha256}
+```
+
+An OpenSpec-bound implementer or tester prompt carries only that
+`dispatch_reference` plus `attempt_token` and `decision_ref`. Roots, ownership,
 hashes, source pointers, helpers, seals, evidence, discovery scope, commands,
 and workspace writes exist only in the referenced immutable
 `team_harness_dispatch_capsule`; prompt-level copies are invalid.
 
 Before any repository or workspace read, the specialist verifies that the
 reference is an absolute canonical regular non-symlink workspace path, verifies
-its SHA-256 and canonical capsule bytes, and recomputes the scope identity. It
-then sends the token-bound `dispatch-ready` acknowledgement. Only that ACK
-starts and counts the attempt. A missing, stale, or malformed reference closes
-as `dispatch-reference-invalid-before-ready` with no repository work, attempt,
-replacement-budget use, or fresh authority. Main may mechanically re-certify
-only when semantic scope identity is unchanged.
+its SHA-256 and canonical capsule bytes, recomputes the scope identity, and
+validates the bounded correlation values. It then sends the token-bound
+`dispatch-ready` acknowledgement with the exact `attempt_token` and
+`decision_ref`; Main accepts readiness only when both equal the dispatched
+values and the decision ref matches the durable authority event, then records
+its timestamp as `agent.sla.extra.dispatch_ready_at`. Only that ACK
+starts and counts the attempt. A missing, stale, malformed, or mismatched
+reference/correlation closes as `dispatch-reference-invalid-before-ready` with
+no repository work, attempt, replacement-budget use, or fresh authority. Main
+may mechanically re-certify only when semantic scope identity is unchanged.
 
 Silence before readiness is `specialist-start-unconfirmed`, not a specialist
 attempt. At the normal role SLA Main uses the single liveness probe and grace,

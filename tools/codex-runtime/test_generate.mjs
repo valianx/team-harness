@@ -3,11 +3,12 @@ import { createHash } from "node:crypto";
 import { cp, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { generate, render } from "./generate.mjs";
 import { sharedPipelineScripts, syncSharedPipelineAssets } from "./sync-skills.mjs";
 import { PIPELINE_HELPERS } from "../../skills/pipeline/scripts/helper-bundle.mjs";
 
-const root = new URL("../..", import.meta.url).pathname;
+const root = fileURLToPath(new URL("../..", import.meta.url));
 // The roster is imported rather than restated: a second copy is how a fixture starts
 // passing against a list the shipped code no longer has.
 const pipelineScripts = sharedPipelineScripts;
@@ -275,7 +276,7 @@ for (const marker of ["boundedCommandProcessStatus", "result.outcome === \"compl
 for (const marker of ["WORKSPACE_WRITE_UNDECLARED", "WORKSPACE_WRITE_OPERATION_DENIED", "WORKSPACE_WRITE_TARGET_EXISTS", "WORKSPACE_WRITE_TARGET_MISSING", "workspace_write_coordinates", "authorizeSpecialistWorkspaceWrite"]) {
   assert.ok(specialistWriteScopeScript.includes(marker), `specialist workspace-write scope misses ${marker}`);
 }
-for (const marker of ["task_intent_sha256", "source_coordinates", "content_sha256", "TEST_CONTRACT_COVERAGE_INCOMPLETE", "repair-index-before-presentation", "team_harness_dispatch_reference", "scope_identity_sha256", "ack-dispatch-ready", "repair-before-attempt"]) {
+for (const marker of ["task_intent_sha256", "source_coordinates", "content_sha256", "TEST_CONTRACT_COVERAGE_INCOMPLETE", "repair-index-before-presentation", "team_harness_dispatch_reference", "scope_identity_sha256", "ack-dispatch-ready", "dispatch-reference-invalid-before-ready"]) {
   assert.ok(correctionPacketPreflightScript.includes(marker), `correction packet preflight misses ${marker}`);
 }
 for (const marker of ["HELPER_COMPATIBILITY_EPOCH", "helper-bundles", "bundle_identity_sha256", "use-workspace-helper-bundle"]) {

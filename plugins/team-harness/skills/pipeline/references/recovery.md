@@ -298,17 +298,21 @@ another binding's authorization to make the aggregate pass.
 
 If recovery finds a nonterminal implementation-or-later specialist attempt,
 reconstruct its attempt number, token, dispatch time, probe/ACK timestamps, and
-probe delivery state, continuation count, and declared owned/evidence paths
+`dispatch_ready_at`, probe delivery state, continuation count, and declared owned/evidence paths
 before waiting or replacing it. Feed that state to
 `scripts/specialist-liveness.mjs`; never reset the lease because Main restarted.
 Native send acceptance without an explicit receipt is `unconfirmed`; legacy
 v3.20.5 probe events lacking delivery state project to `unconfirmed`, never to
 `confirmed`. An expired attempt is interrupted before a read-only declared-path
 audit. When the helper returns `resume`, continue the same thread and token once
-with the unchanged packet and authority. Only a clean first attempt permits one
-fresh same-role replacement; a second continuation failure, confirmed-delivery
-partial progress, operator cancellation, or exhausted attempt `2` remains
-blocked, and Main never supplies a local role fallback.
+with the unchanged dispatch input and authority. When no `dispatch-ready` event
+exists, apply only `agents/_shared/dispatch-contract.md` § "Pipeline specialist
+reference": the start consumed no attempt/replacement budget, a clean audit
+pauses the same decision/reference, and recovery never loops redispatches. After
+readiness, only a clean first counted attempt permits one fresh same-role
+replacement; a second continuation failure, confirmed-delivery partial
+progress, operator cancellation, or exhausted attempt `2` remains blocked, and
+Main never supplies a local role fallback.
 
 At recovery into implementation, a missing/corrupt OpenSpec-derived plan
 index, shard, quality manifest, or overlay is eligible for the single

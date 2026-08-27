@@ -55,7 +55,7 @@ try {
   assert.equal(tampered.error_code, "BUNDLE_STALE");
 
   const symlinkWorkspace = path.join(root, "symlink-workspace");
-  await symlink(workspace, symlinkWorkspace);
+  await symlink(workspace, symlinkWorkspace, process.platform === "win32" ? "junction" : "dir");
   const rejected = await verifyHelperBundle({
     workspace: symlinkWorkspace,
     manifest_path: materialized.manifest_path,
@@ -67,7 +67,7 @@ try {
   const externalInputs = path.join(root, "external-inputs");
   await mkdir(escapingWorkspace);
   await mkdir(externalInputs);
-  await symlink(externalInputs, path.join(escapingWorkspace, "inputs"));
+  await symlink(externalInputs, path.join(escapingWorkspace, "inputs"), process.platform === "win32" ? "junction" : "dir");
   const escapedWrite = await materializeHelperBundle({ workspace: escapingWorkspace, source_root: removedCache + "/scripts" });
   assert.equal(escapedWrite.verdict, "fail");
   assert.equal(escapedWrite.error_code, "BUNDLE_WRITE_FAILED");

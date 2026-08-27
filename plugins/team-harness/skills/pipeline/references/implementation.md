@@ -76,10 +76,11 @@ Read `plan/delivery.md` to form dependency rounds. Before every task dispatch,
 preflight its exact `plan/tasks/Task-N.md` and fail closed unless its
 `required_invariants`, `required_evidence_anchors`, and
 `cross_runtime_preservation` declarations supply every applicable obligation.
-Pass only that shard, its named architecture/invariant anchors, frozen identity
-when present, and the role's necessary environment; never compensate with a
-transcript, implementer history, sibling tasks, or the full plan set. Delegate
-bounded, file-scoped work to fresh V2 specialists with `fork_turns: none`;
+The resolver binds that shard and its named anchors inside the immutable
+capsule; the specialist prompt still carries only the canonical dispatch
+reference and correlation. Never compensate with a transcript, implementer
+history, sibling tasks, or the full plan set. Delegate bounded, file-scoped
+work to fresh V2 specialists with `fork_turns: none`;
 state that other agents may be editing the repository and unrelated changes
 must be preserved. Parallelize only tasks with disjoint ownership. The primary
 thread records dispatches and results, waits for all tasks in a round, and
@@ -185,8 +186,8 @@ placeholder shards, and never auto-dispatch architect after Gate 1; only a
 separate explicit live operator request may reopen Design under the normal
 fresh-Gate contract.
 
-After any eligible repair closes—and before Main hashes or constructs the first
-specialist packet for that service—invoke `openspec-bindings.mjs seal-dispatch`
+After any eligible repair closes—and before Main certifies the first specialist
+capsule for that service—invoke `openspec-bindings.mjs seal-dispatch`
 with the same workspace, aggregate path/hash, service, complete Gate record,
 nonce, and any verified legacy continuation identity. `seal-dispatch` and
 `repair-derived` share one create-only per-service lock. `DERIVED_SET_BUSY`
@@ -211,7 +212,7 @@ shards against it, and embeds the verified coordinates in the capsule.
 blocks capsule creation; neither Main nor the specialist substitutes a digest.
 
 If an already sealed task exhausted exactly two clean implementer/tester
-attempts only because its packet lacked required external evidence, Main may
+attempts only because its capsule lacked required external evidence, Main may
 create one generation-2 evidence dispatch without changing the base seal or
 Gate 1. First persist a canonical `team_harness_packet_scope_insufficient`
 incident for the exact service, task shard, role, two exhausted attempts, and
@@ -287,8 +288,8 @@ the pull request.
 The overlay schema has no top-level `tasks` array. Main resolves the assigned
 item from exactly `.execution_items[] | select(.id == "Task-N")`, requires one
 match, and puts its JSON Pointer (`/execution_items/<zero-based-index>`), full
-item hash, and exact `sources` array in the role packet. The specialist consumes
-that packet binding and never probes `.tasks[]` or guesses another structure.
+item hash, and exact `sources` array in the capsule. The specialist consumes
+that capsule binding and never probes `.tasks[]` or guesses another structure.
 For manual diagnosis only, the fail-closed source query is:
 `jq -er --arg id 'Task-N' '[.execution_items[] | select(.id == $id)] |
 if length == 1 then .[0].sources[] else error("execution item cardinality")
@@ -364,8 +365,8 @@ names only its safe `error_context.command_id` and `error_context.field`; use
 those coordinates instead of dumping the manifest or runner source. A
 `version_argv` must probe the effective resolved runtime, such as `node` when a
 package script unwraps to a repository-local Node script.
-Specialist packets
-name quality check IDs and the resolved runner/transition helper; they never
+The capsule names quality check IDs and the resolved runner/transition helper;
+specialist prompts never
 prescribe a raw package-manager fallback as authoritative evidence.
 The same containment preflight applies when the manifest names
 `./node_modules/.bin/<tool>` directly; success records
@@ -412,6 +413,27 @@ failures remain in the same package. Main may repair the manifest from this
 complete diagnostic set, reruns only diagnostics made stale by that repair, and
 does not dispatch while any declared readiness diagnostic is absent or partial.
 This readiness evidence is diagnostic, not the final Freeze quality verdict.
+
+### Authorized dirty-progress recovery
+
+The readiness route above assumes a clean candidate. When a post-interrupt
+audit proves that the only tracked modifications are authorized production
+progress inside the interrupted implementer's owned paths, preserve that diff.
+Do not invoke `quality-runner.mjs` before the replacement: its clean-tree
+precondition is a Freeze property and cannot be satisfied until an implementer
+completes and commits the production work.
+
+Under the same unused correction authority, Main may run each selected local
+command once through the capsule's `bounded-command.mjs` as a
+**non-authoritative dirty-tree diagnostic**. Record the exact tracked status and
+diff digest before and after every command; any command-caused mutation, new
+out-of-scope path, or ambiguous ownership blocks recovery. These receipts may
+inform the correction package but never count as readiness or Freeze quality
+evidence. Re-audit the same owned paths immediately before dispatch, then send
+one fresh implementer the canonical dispatch reference. Main neither edits,
+commits, stashes, nor discards the preserved diff. After the implementer commits
+a clean candidate, run the ordinary RED/GREEN transition, closure checks, and
+single `post_implementation` Freeze quality checkpoint.
 
 Main then invokes `node <test-transition-path> --transition red` against that
 task baseline and current `HEAD` with `--output <coordinator evidence path>`.
@@ -498,13 +520,14 @@ record native acceptance as `probe_delivery_state: unconfirmed` unless an
 explicit delivery/read receipt proves `confirmed`, allow the fixed two-minute ACK grace,
 and permit at most one matching-checkpoint lease renewal. A matching
 ACK itself proves delivery. When the helper returns `interrupt`, interrupt
-first and then audit only the packet's declared owned paths and evidence paths.
+first and then audit only the capsule's declared owned paths and evidence paths.
 If delivery was unconfirmed and that audit finds progress, send exactly one
-`TH-LIVENESS-RESUME` to the same thread and token with the unchanged packet and
-decision reference; it consumes no new correction authority. Confirmed-delivery
+`TH-LIVENESS-RESUME` to the same thread and token with the unchanged dispatch
+reference and decision reference; it consumes no new correction authority. Confirmed-delivery
 progress, a second continuation failure, or operator cancellation blocks as
-`specialist-interrupted-with-progress`. A clean first attempt may be replaced
-once by a fresh same-role V2 specialist, and a clean second timeout blocks as
+`specialist-interrupted-with-progress`. Before readiness, apply only the shared
+dispatch contract; no attempt/replacement counter advances. After readiness, a
+clean first counted attempt may be replaced once by a fresh same-role V2 specialist, and a clean second timeout blocks as
 `specialist-retry-exhausted`. Never run a concurrent replacement, retry
 indefinitely, infer delivery from a successful send call, or let Main perform
 the role as a local fallback. Persist the classifier result and delivery state
@@ -528,10 +551,11 @@ required AC evidence, QA, security, Freeze, mandatory suites, or either gate.
 Close a terminal implementation attempt and prohibit post-terminal
 `followup_task`. Feedback, scope expansion, and every correction require a fresh
 agent (V2 `fork_turns: none`). Only after the mandatory live correction decision
-may Main create the bounded `Cause`/`Files`/`AC-N|TC-N`/`Suggested correction`
-packet with its nonce, current frozen anchor, complete finding IDs, scope, and
-one deterministic closure check plus expected result per finding. Record new
-work with a concise `agent.spawn` observation.
+may Main persist the bounded correction package with its nonce, current frozen
+anchor, complete finding IDs, scope, and one deterministic closure check plus
+expected result per finding. The resolver binds it into the capsule; the prompt
+still carries only the canonical reference and correlation. Record new work
+with a concise `agent.spawn` observation.
 
 Main separately writes a recoverable handoff and requires a fresh user thread
 after its first compaction or before continuing at 100 coordinator tool calls
@@ -816,7 +840,7 @@ Do not silently widen the approved scope. Each implementer returns a bounded
 structured status with its exact `workspace_writes`, outcome, deviations,
 exceptions, one-line checks, correction closure results, commit, and unresolved
 issues. Main rejects success if `workspace_writes` contains a path or operation
-not authorized by the packet. After all repository results in the round are
+not authorized by the capsule. After all repository results in the round are
 durably recorded, Main alone writes or replaces the 5–30 line, ≤8 KB
 `02-implementation.md` consolidation. Git is the changed-file authority; do not
 paste the diff, raw logs, or chronology. Main then sets `phase: validation` and

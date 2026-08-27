@@ -106,7 +106,7 @@ correction_decision: authorize|pause|abort|null
 correction_decision_ref: {consumed token or null}
 correction_authority: operator-live|gate1-autonomous|null
 correction_authority_gate_nonce: {consumed Gate-1 token or null}
-correction_dispatch_reference: {path, sha256, scope_identity_sha256}|null
+correction_dispatch_reference: team_harness_dispatch_reference|null
 autonomous_correction_count: N
 operator_correction_count: N
 usage_schema_version: 1|null
@@ -155,14 +155,19 @@ delivery_base_status: {base_ref, freeze_base_sha, remote_base_sha: {full SHA}|nu
 delivery_preview: {pr title, workspace paths, and SHA-256 digests bound to Gate 3}|null
 ```
 
+`team_harness_dispatch_reference` means the exact five-field object defined once
+in `agents/_shared/dispatch-contract.md` § "Pipeline specialist reference".
+
 New runs always set `obsidian_sync: null` and `obsidian_export_target: null`.
 The two fields remain only so recovery can honor legacy export-armed snapshots
 without rewriting their state schema.
 
 Specialist liveness remains append-only event state rather than a mutable
 coordinator-state field. `agent.sla.extra` records `{attempt, attempt_token,
-liveness_action, deadline_at, probe_delivery_state,
-probe_delivered_at|null, continuation_count}`. A successful native message call
+liveness_action, deadline_at, dispatch_ready_at|null, probe_delivery_state,
+probe_delivered_at|null, continuation_count}`. Only an accepted
+correlation-matched implementer/tester readiness ACK sets `dispatch_ready_at`;
+other roles keep it null. A successful native message call
 without an explicit delivery/read receipt records `unconfirmed`; a matching ACK
 itself proves delivery. After interruption, `agent.close.extra` repeats the
 identity and records `owned_paths_changed`, `evidence_changed`,
@@ -404,7 +409,8 @@ exact consumed Gate-1 release nonce in `correction_authority_gate_nonce`, and
 the incremented `autonomous_correction_count`, plus one
 `correction.decision` event carrying that `decision_ref`, the complete
 `correction_package`, `correction_authority: gate1-autonomous`, and the exact
-authority Gate nonce. Clear `correction_package` from state after appending the
+authority Gate nonce plus canonical `correction_dispatch_reference`. Clear
+`correction_package` from state after appending the
 decision. The one subsequent `iteration.start` and `agent.correction.spawn`
 carry only the same `decision_ref` plus their normal observation fields. This
 single decision record
@@ -425,7 +431,7 @@ correction_decision: null
 correction_decision_ref: null
 correction_authority: null
 correction_authority_gate_nonce: null
-correction_dispatch_reference: {path, sha256, scope_identity_sha256}
+correction_dispatch_reference: team_harness_dispatch_reference
 autonomous_correction_count: {integer 0..3}
 operator_correction_count: {non-negative integer, no maximum}
 ```
@@ -449,7 +455,8 @@ atomically records `correction_decision: authorize`, the consumed nonce in
 `correction_decision_ref`, `correction_authority: operator-live`,
 `correction_authority_gate_nonce: null`, `correction_pending: false`, and one matching
 `correction.decision` event carrying that `decision_ref`, the complete
-`correction_package`, and authority. Clear `correction_package` from state
+`correction_package`, authority, and canonical `correction_dispatch_reference`.
+Clear `correction_package` from state
 after appending the decision. It increments `operator_correction_count`
 exactly once, leaves `autonomous_correction_count` and `iteration` unchanged,
 and authorizes exactly one bounded correction over that complete package;

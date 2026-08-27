@@ -102,13 +102,13 @@ async function fixture() {
         id: "Task-9", pre_implementation_test: "required", sources: ["task:3.1"],
         shard_path: "plan/tasks/Task-9.md", files: ["src/task-9.ts"],
         discovery_scope: { directories: ["src"], globs: ["**/*.ts"] },
-        required_invariants: [], required_seams: [], quality_command_ids: ["test"],
+        required_invariants: ["I-1"], required_seams: [], quality_command_ids: ["test"],
       },
       {
         id: "Task-13", pre_implementation_test: "required", sources: ["task:3.5"],
         shard_path: "plan/tasks/Task-13.md", files: ["src/task-13.ts"],
         discovery_scope: { directories: ["src"], globs: ["**/*.ts"] },
-        required_invariants: [], required_seams: [], quality_command_ids: ["test"],
+        required_invariants: ["I-10"], required_seams: [], quality_command_ids: ["test"],
       },
     ],
   };
@@ -125,6 +125,7 @@ async function fixture() {
   await writeFile(path.join(workspace, task9Path), task9Bytes);
   await writeFile(path.join(workspace, task13Path), task13Bytes);
   await writeFile(path.join(workspace, servicePlanPath), servicePlanBytes);
+  await writeFile(path.join(workspace, "plan", "invariants.md"), "# Invariants\n\n- I-1\n- I-10\n");
 
   const qualityBytes = Buffer.from("{\"commands\":{\"test\":[\"npm\",\"test\"]}}\n");
   const qualityPath = path.join(workspace, ".team-harness", "quality.json");
@@ -352,8 +353,30 @@ try {
     },
   }, value.dependencies);
   assert.equal(withBoundedResult.verdict, "pass", JSON.stringify(withBoundedResult));
+  assert.notEqual(withBoundedResult.scope_identity_sha256, certified.scope_identity_sha256);
   const boundedCapsule = JSON.parse(await readFile(withBoundedResult.dispatch_reference.path));
   assert.equal(boundedCapsule.workspace_writes.bounded_result_path, boundedResult);
+  const nativeGitMetadata = await certifyCorrectionPacket({
+    ...completeInput,
+    dispatch_request: {
+      ...completeInput.dispatch_request,
+      git_metadata_write_mode: "native-escalation-required",
+    },
+  }, value.dependencies);
+  assert.equal(nativeGitMetadata.verdict, "pass", JSON.stringify(nativeGitMetadata));
+  assert.notEqual(nativeGitMetadata.scope_identity_sha256, certified.scope_identity_sha256);
+  const changedHelperBundle = await certifyCorrectionPacket({
+    ...completeInput,
+    dispatch_request: {
+      ...completeInput.dispatch_request,
+      helper_bundle: {
+        manifest_path: `inputs/runtime/team-harness/helper-bundles/${"c".repeat(64)}/manifest.json`,
+        manifest_sha256: "d".repeat(64),
+      },
+    },
+  }, value.dependencies);
+  assert.equal(changedHelperBundle.verdict, "pass", JSON.stringify(changedHelperBundle));
+  assert.notEqual(changedHelperBundle.scope_identity_sha256, certified.scope_identity_sha256);
   const duplicateBoundedResult = await certifyCorrectionPacket({
     ...completeInput,
     dispatch_request: {
@@ -378,18 +401,40 @@ try {
   const verifiedReference = await verifyDispatchReference({
     workspace: value.workspace,
     dispatch_reference: certified.dispatch_reference,
+    attempt_token: "payments-contract-recovery-v4-a1",
+    decision_ref: "7715759dac17313518c4866ded2d0905",
   });
   assert.equal(verifiedReference.verdict, "pass");
   assert.equal(verifiedReference.action, "ack-dispatch-ready");
+  assert.equal(verifiedReference.attempt_token, "payments-contract-recovery-v4-a1");
+  assert.equal(verifiedReference.decision_ref, "7715759dac17313518c4866ded2d0905");
   const mistypedReference = await verifyDispatchReference({
     workspace: value.workspace,
     dispatch_reference: {
       ...certified.dispatch_reference,
       sha256: `${certified.dispatch_reference.sha256.startsWith("0") ? "1" : "0"}${certified.dispatch_reference.sha256.slice(1)}`,
     },
+    attempt_token: "payments-contract-recovery-v4-a1",
+    decision_ref: "7715759dac17313518c4866ded2d0905",
   });
   assert.equal(mistypedReference.verdict, "fail");
-  assert.equal(mistypedReference.action, "repair-before-attempt");
+  assert.equal(mistypedReference.action, "dispatch-reference-invalid-before-ready");
+  const malformedToken = await verifyDispatchReference({
+    workspace: value.workspace,
+    dispatch_reference: certified.dispatch_reference,
+    attempt_token: "wrong token",
+    decision_ref: "7715759dac17313518c4866ded2d0905",
+  });
+  assert.equal(malformedToken.verdict, "fail");
+  assert.equal(malformedToken.action, "dispatch-reference-invalid-before-ready");
+  const malformedDecision = await verifyDispatchReference({
+    workspace: value.workspace,
+    dispatch_reference: certified.dispatch_reference,
+    attempt_token: "payments-contract-recovery-v4-a1",
+    decision_ref: "wrong\ndecision",
+  });
+  assert.equal(malformedDecision.verdict, "fail");
+  assert.equal(malformedDecision.action, "dispatch-reference-invalid-before-ready");
 
   const sealedDispatch = JSON.parse(await readFile(value.dispatchPath));
   await writeFile(value.dispatchPath, canonicalBytes({

@@ -76,7 +76,7 @@ turn: delivery may wait for a sampling boundary or a pending tool call to
 finish. When Main interrupts an unacknowledged probe whose delivery was not
 confirmed and the declared-path audit finds progress, it may send exactly one
 `TH-LIVENESS-RESUME {attempt_token}` to this same thread. That message resumes
-the unchanged packet and authority; acknowledge it with the current checkpoint
+the unchanged dispatch input and authority; acknowledge it with the current checkpoint
 and finish or return the normal terminal status. It is not feedback, a new
 correction, or permission to widen scope, and a second resume is forbidden.
 

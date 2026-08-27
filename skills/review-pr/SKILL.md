@@ -166,6 +166,15 @@ end after a bounded tool yield while reviewers still need the files. `$ARTIFACTS
 join, consolidation read, and post-dispatch integrity comparison regardless of how
 many tool yields occur or whether any one yield exceeds 30 seconds.
 
+Capture `git status --untracked-files=all` and `git diff HEAD` for the frozen worktree. Separately
+capture the regular review-artifact leaves under `$ARTIFACTS`, excluding the exact
+`$SNAPSHOT_GIT` and `$WORKTREE` directories and their contents — Git legitimately updates
+administrative data in the snapshot during freshness checks and cleanup, and the worktree's
+integrity is verified by its own status/diff snapshot above. Repeat both snapshots after all agents finish.
+The compared surfaces must be byte-identical; surface any other mutation as a defect before
+trusting a returned draft. Only after this check may the coordinator persist inline returns to the
+fixed `$ARTIFACTS/pr-review-*` paths.
+
 Run `cleanup-run` explicitly from the coordinator only after every dispatched reviewer has
 reached a terminal result and all integrity/freshness checks that consume the snapshot
 have completed. The helper removes the worktree through `$SNAPSHOT_GIT` before
@@ -176,15 +185,6 @@ or explicit cancel; premature deletion is worse than a reported residual run.
 
 On every terminal path except explicit `defer`, invoke
 `cleanup_owned_review_run` exactly once.
-
-Capture `git status --untracked-files=all` and `git diff HEAD` for the frozen worktree. Separately
-capture the regular review-artifact leaves under `$ARTIFACTS`, excluding the exact
-`$SNAPSHOT_GIT` and `$WORKTREE` directories and their contents — Git legitimately updates
-administrative data in the snapshot during freshness checks and cleanup, and the worktree's
-integrity is verified by its own status/diff snapshot above. Repeat both snapshots after all agents finish.
-The compared surfaces must be byte-identical; surface any other mutation as a defect before
-trusting a returned draft. Only after this check may the coordinator persist inline returns to the
-fixed `$ARTIFACTS/pr-review-*` paths.
 
 Detect an existing pipeline workspace from `workspaces/*/01-plan.md` or
 `workspaces/*/02-implementation.md` inside `$WORKTREE`. If present:

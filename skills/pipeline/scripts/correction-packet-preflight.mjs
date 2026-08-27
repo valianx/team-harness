@@ -23,6 +23,7 @@ const GIT_SHA = /^[a-f0-9]{40}$/;
 const SERVICE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const TASK_ID = /^Task-[1-9][0-9]*$/;
 const INDEX_TASK_ID = /^([a-z0-9]+(?:-[a-z0-9]+)*):(Task-[1-9][0-9]*)$/;
+const CORRELATION_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
 const STATUSES = new Set(["pending", "red", "green", "not_applicable"]);
 const INDEX_KEYS = new Set(["schema_version", "kind", "tasks"]);
 const INDEX_TASK_KEYS = new Set([
@@ -110,6 +111,8 @@ function result(verdict, errorCode, action, details = {}) {
     pending_selected_tasks: details.pending_selected_tasks ?? [],
     scope_identity_sha256: details.scope_identity_sha256 ?? null,
     dispatch_reference: details.dispatch_reference ?? null,
+    attempt_token: details.attempt_token ?? null,
+    decision_ref: details.decision_ref ?? null,
   };
 }
 
@@ -336,7 +339,21 @@ function validRelativeList(value) {
 
 function anchorCount(bytes, anchor) {
   if (typeof anchor !== "string" || anchor.length === 0 || anchor.length > 128) return 0;
-  return bytes.toString("utf8").split(anchor).length - 1;
+  const text = bytes.toString("utf8");
+  const tokenCharacter = /[A-Za-z0-9_.:\/-]/;
+  let count = 0;
+  let offset = 0;
+  while (offset <= text.length - anchor.length) {
+    const index = text.indexOf(anchor, offset);
+    if (index < 0) break;
+    const before = index === 0 ? "" : text[index - 1];
+    const afterIndex = index + anchor.length;
+    const after = afterIndex === text.length ? "" : text[afterIndex];
+    if ((before === "" || !tokenCharacter.test(before))
+      && (after === "" || !tokenCharacter.test(after))) count += 1;
+    offset = index + anchor.length;
+  }
+  return count;
 }
 
 async function workspaceCoordinate(workspace, value, errorCode) {
@@ -407,12 +424,16 @@ function capsuleScopeIdentity(capsule) {
     target_paths: capsule.scope.target_paths,
     repository_root: capsule.scope.repository_root,
     owned_paths: capsule.ownership.owned_paths,
+    discovery_scope: capsule.ownership.discovery_scope,
     task_intent_sha256: capsule.openspec.task_intent_sha256,
     source_coordinates: capsule.openspec.source_coordinates,
     dispatch_binding: capsule.openspec.dispatch_binding,
     task_shards: capsule.openspec.task_shards,
     test_contract_index: capsule.acceptance_evidence.test_contract_index,
     test_contracts: capsule.acceptance_evidence.test_contracts,
+    helper_bundle: capsule.helpers.bundle,
+    workspace_write_coordinates: capsule.workspace_writes.coordinates,
+    git_metadata_write_mode: capsule.git_metadata_write_mode,
   };
 }
 
@@ -804,12 +825,14 @@ export async function certifyCorrectionPacket(input = {}, dependencies = {}) {
 /** Verify one minimal reference before Main counts an attempt or the specialist reads the repository. */
 export async function verifyDispatchReference(input = {}) {
   try {
-    if (!exactKeys(input, new Set(["workspace", "dispatch_reference"]))
+    if (!exactKeys(input, new Set(["workspace", "dispatch_reference", "attempt_token", "decision_ref"]))
       || !exactKeys(input.dispatch_reference, DISPATCH_REFERENCE_KEYS)
       || input.dispatch_reference.schema_version !== 1
       || input.dispatch_reference.kind !== "team_harness_dispatch_reference"
       || !SHA256.test(input.dispatch_reference.sha256 ?? "")
-      || !SHA256.test(input.dispatch_reference.scope_identity_sha256 ?? "")) {
+      || !SHA256.test(input.dispatch_reference.scope_identity_sha256 ?? "")
+      || !CORRELATION_TOKEN.test(input.attempt_token ?? "")
+      || !CORRELATION_TOKEN.test(input.decision_ref ?? "")) {
       throw new Error("PACKET_CONTRACT_INVALID");
     }
     const workspace = await canonicalDirectory(input.workspace);
@@ -830,10 +853,12 @@ export async function verifyDispatchReference(input = {}) {
       task_ids: capsule.scope.task_ids,
       scope_identity_sha256: capsule.scope.scope_identity_sha256,
       dispatch_reference: input.dispatch_reference,
+      attempt_token: input.attempt_token,
+      decision_ref: input.decision_ref,
     });
   } catch (error) {
     const code = ERROR_CODES.has(error?.message) ? error.message : "INTERNAL_ERROR";
-    return failure(code, "repair-before-attempt");
+    return failure(code, "dispatch-reference-invalid-before-ready");
   }
 }
 
