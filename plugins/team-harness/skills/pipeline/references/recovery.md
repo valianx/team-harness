@@ -394,11 +394,29 @@ recovery event and updating `next_action`, load only the reference for the
 mapped phase. Findings and any tree change after Freeze follow the normal
 implementation → re-Freeze → validation route; recovery must not skip it.
 
-When `phase: implementation`, first validate that `test_contract_evidence`
+When `phase: implementation`, first validate `helper_bundle` through the
+workspace-local `helper-bundle.mjs verify`; after initial materialization no
+operation depends on the plugin cache remaining installed. If a legacy run has
+no bundle and the loaded package source still exists, materialize one before
+any nonce, decision, or dispatch. If the old cache vanished after an already
+consumed correction decision, a current package with the same
+`compatibility_epoch` may perform one atomic `helper.bundle.handoff` only when
+no specialist spawn/write followed that decision and re-certification proves
+the exact aggregate, task set, live source hashes, index, and evidence bytes
+unchanged. Preserve the decision reference and reversible state; this tooling
+handoff consumes no correction authority and changes no Gate-1 or product
+identity. Any changed semantic input, incompatible epoch, prior specialist
+progress, or failed verification blocks explicitly as
+`HELPER_BUNDLE_HANDOFF_INELIGIBLE`.
+
+Then validate that `test_contract_evidence`
 points to a bounded regular non-symlink `evidence/test-contracts.json`, that its
 SHA-256 matches `index_sha256`, and that its closed schema, task count, aggregate
-status, and four status counts match the state summary. Then validate each task
-entry before resuming the named task. `pending` resumes at the fresh tester
+status, four status counts, and required coverage counts match the state
+summary. Derive the required set from every accepted writable overlay and
+mechanically add only absent required rows as `pending`; never retain a legacy
+`pending: 0` summary as proof of coverage. Then validate each task entry before
+resuming the named task. `pending` resumes at the fresh tester
 dispatch; `red` requires readable contract and red-result files whose
 `contract_sha256` and `red_evidence_sha256` match the index before any
 implementer dispatch; `green` additionally requires matching

@@ -22,6 +22,7 @@ openspec_bindings: [{service, role, repository_root, repository_identity, change
 evidence_repositories: [{service, role: evidence-only, repository_root, repository_identity, purpose}]
 openspec_aggregate_path: inputs/openspec-bindings.json|null
 openspec_aggregate_sha256: {SHA-256|null}
+helper_bundle: {compatibility_epoch, bundle_root, bundle_identity_sha256, manifest_path, manifest_sha256}|null
 herdr_deliveries: [{message_id, target, pane_id, status, reason_code, staged, submitted, verified}]
 quality_manifest_path: {absolute workspace-local path|null}
 quality_manifest_sha256: {SHA-256|null}
@@ -43,6 +44,7 @@ correction_decision: authorize|pause|abort|null
 correction_decision_ref: {consumed token or null}
 correction_authority: operator-live|gate1-autonomous|null
 correction_authority_gate_nonce: {consumed Gate-1 token or null}
+correction_preflight: {path, sha256, preflight_identity_sha256, service, task_ids}|null
 autonomous_correction_count: N      # integer 0..3; the only correction budget
 operator_correction_count: N        # non-negative integer; deliberately unbounded
 last_completed: design|waiting_gate1|implementation|validation|waiting_gate3|delivery|complete|null
@@ -116,7 +118,14 @@ dispositions, and evidenced file scope. No repository/evidence mutation,
 specialist dispatch, Freeze rebuild, or revalidation is legal before authority
 is recorded. A correction package built from a partial diagnostic set is
 invalid; later rounds are for genuinely new evidence, never a declared check
-that the previous fan omitted. With a valid Gate-1 approval dual record,
+that the previous fan omitted. Before creating or presenting its nonce, Main
+must bind a passing workspace-local `correction-packet-preflight.mjs certify`
+artifact. That certificate separates immutable task-intent identity from each
+live source file's exact content SHA-256 and proves complete required
+test-contract coverage. Missing rows are repaired only to `pending`; their
+tester/RED transition must close and the state summary must be recomputed
+before certification. Store the exact certificate pointer in
+`correction_preflight` and carry it in the eventual decision and packet. With a valid Gate-1 approval dual record,
 `autonomous_correction_count < 3`, no
 correction/execution budget exhaustion, and only unambiguous `resolve` findings
 inside approved scope, Main consumes the nonce
@@ -301,7 +310,7 @@ task_decomposition: {...}|null              # implementation decomposition, not 
 ```
 regression_test_path: {path}|null
 regression_test_status: failing|passing|skipped|null
-test_contract_evidence: {status: pending|red|green|not-applicable|mixed, index_path, index_sha256, task_count, status_counts: {pending, red, green, not_applicable}}|null
+test_contract_evidence: {status: pending|red|green|not-applicable|mixed, index_path, index_sha256, task_count, status_counts: {pending, red, green, not_applicable}, required_task_count, required_covered_count, required_missing_count}|null
 plan_contract_evidence: {status: not-applicable, reason, result_path: null, result_sha256: null}|{status: pending|pass, reason, result_path, result_sha256, kind: team_harness_functional_plan_contract, plan_sha256, artifact_set_sha256}|{status: pending|pass, reason, result_path, result_sha256, kind: team_harness_openspec_overlay_validation, snapshot_sha256, overlay_sha256, change_name}|null
 plan_contract_repair_evidence: {status: not-needed|repaired|blocked, reason, result_path, result_sha256, before_sha256, after_sha256, added_paths, artifact_changes: [{path, before_sha256, after_sha256, operations}], contract_result_sha256}|null
 participating_repositories: [{repository, repo_root, worktree}]|[]

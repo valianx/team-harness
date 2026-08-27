@@ -458,7 +458,19 @@ intent/scope/AC contradiction to resolve first—never as a silent waiver.
 2. **Contradiction → resolve before authorization.** Present the conflicting requirements and costs. Only the operator may resolve them; architect work still requires a separate explicit request.
 3. **Mechanical and enumerated → include together.** Do not split them into micro-rounds; one authorization covers the complete named `resolve` package and scope.
 4. **Mixed set → preserve all findings.** Resolve decision-bearing items first, then present one correction decision over the resulting complete package. Never dispatch a mechanical subset while another finding remains undecided.
-5. **Persist and authorize.** After every disposition is explicit, persist one `correction_package` for the final `resolve` set and generate a fresh nonce. When every finding is an unambiguous in-scope `resolve`, the package is complete, no decision-bearing or ambiguous item remains, and `autonomous_correction_count < 3`, Main records one package-bound `gate1-autonomous` authorization without a live presentation and consumes that single decision through the same correction route. When any eligibility conjunct fails, show exactly the following choices and stop:
+5. **Certify before authority.** Run the bundled
+   `correction-packet-preflight.mjs certify` over the exact aggregate, service,
+   selected task set, and current test-contract index. Its workspace-local
+   content-addressed certificate binds each live canonical source-file SHA-256
+   separately from `task_intent_sha256`, the complete required-test set across
+   every writable overlay, every required RED/GREEN artifact, and the selected
+   packet evidence. `repair-index`
+   adds only missing `pending` rows; Main recomputes the extended coverage
+   summary and closes every required RED/GREEN row before retrying. Persist the
+   passing certificate in `correction_preflight`; failure creates no nonce and
+   consumes no authority. Re-certify immediately before spawn and require the
+   same path/hash/identity.
+6. **Persist and authorize.** After every disposition is explicit and certification passes, persist one `correction_package` for the final `resolve` set and generate a fresh nonce. When every finding is an unambiguous in-scope `resolve`, the package is complete, no decision-bearing or ambiguous item remains, and `autonomous_correction_count < 3`, Main records one package-bound `gate1-autonomous` authorization without a live presentation and consumes that single decision through the same correction route. When any eligibility conjunct fails, show exactly the following choices and stop:
 
 ```text
 1 — authorize one correction round
@@ -509,7 +521,10 @@ work after Gate 1.
 Live choice `1`, or one eligible autonomous decision, records both the state decision and
 one `correction.decision` event before dispatch. The consumed nonce becomes its
 `decision_ref`; this sole authority record carries the complete correction
-package, `correction_authority`, and authority Gate nonce. The one
+package, `correction_authority`, authority Gate nonce, and exact
+`correction_preflight` binding. The correction packet repeats that certificate
+path/hash/identity and the specialist verifies it before any packet-derived
+read. The one
 `iteration.start` and one `agent.correction.spawn` carry only that ref plus
 ordinary observations. Autonomous authority carries the exact consumed Gate-1
 nonce; operator-live carries null. It may not narrow to one finding, widen scope, or reuse an old nonce. After the
@@ -1130,8 +1145,11 @@ This checkpoint is task-gated and creates no phase or gate. A task with
 `Pre-implementation test: required` must have a workspace quality manifest
 whose `commands.test` is an exact argv array and whose
 `test_contract.path_rules` declares test-only paths. Main resolves
-`quality-runner.mjs` and `test-transition.mjs` relative to the loaded pipeline
-skill/reference and fails closed if the manifest or either helper is absent.
+`helper-bundle.mjs` relative to the loaded pipeline skill/reference, materializes
+the closed helper set below the workspace, persists its manifest identity, and
+then resolves `quality-runner.mjs` and `test-transition.mjs` only from that
+verified immutable bundle. Plugin-cache paths are bootstrap-only; a missing or
+stale bundle fails closed before authority or dispatch.
 The manifest path is absolute
 `<workspace>/.team-harness/quality.json`, a regular non-symlink below the
 workspace. Every helper call passes the absolute `--workspace` and

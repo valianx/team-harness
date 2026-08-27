@@ -63,6 +63,19 @@ Require a non-null absolute canonical regular non-symlink
 `bounded_command_path` before this first read. If it is missing, relative,
 unavailable, or a symlink, return `packet-contract-invalid`; never continue on
 the assumption that commands will remain small.
+Also require `helper_bundle: {manifest_path, manifest_sha256,
+bundle_identity_sha256, compatibility_epoch}`. Verify the absolute canonical
+workspace-local manifest and require `bounded_command_path`,
+`workspace_write_scope_path`, and every supplied operational helper to be an
+exact hash-matched entry in that immutable bundle before invoking it. A
+plugin-cache path or unmatched helper is `packet-contract-invalid`.
+For a correction packet, additionally require
+`correction_packet_preflight: {path, sha256,
+preflight_identity_sha256}`. Verify the content-addressed certificate and
+require its service, sorted task IDs, aggregate/index bindings, live source
+content hashes, and RED/GREEN evidence coordinates to equal the packet. Never
+substitute `task_intent_sha256` for a source file's `content_sha256`; missing or
+stale certification blocks before reads or writes.
 When Main supplies an exact absolute `bounded_result_path` for a deferred or
 authoritative command, invoke `node <bounded_command_path> --output
 <bounded_result_path> -- <argv...>` and return the fixed receipt. If transport

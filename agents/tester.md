@@ -62,6 +62,16 @@ non-null absolute canonical regular non-symlink `bounded_command_path`;
 absence, relative form, symlink, or unavailability is
 `packet-contract-invalid` before the first read or command, even when initial
 output is expected small.
+Also require `helper_bundle: {manifest_path, manifest_sha256,
+bundle_identity_sha256, compatibility_epoch}`. Verify the absolute canonical
+workspace-local manifest and require every supplied operational helper path to
+be an exact hash-matched entry in that immutable bundle. A plugin-cache path or
+unmatched helper is `packet-contract-invalid`. For a correction packet,
+require and hash-verify `correction_packet_preflight: {path, sha256,
+preflight_identity_sha256}` and require its service, sorted task IDs,
+aggregate/index identities, live source content hashes, and selected test
+evidence to equal the packet. `task_intent_sha256` is never a source-content
+digest; missing or stale certification blocks before reads or writes.
 Never issue evidence-bearing reads in parallel tool calls: their results share
 one response/context budget. Use one sequential call per file and exact JSON
 Pointer, unique anchor, or bounded line range, each with an independent cap.

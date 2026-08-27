@@ -200,6 +200,16 @@ that regular-file and SHA-256 preflight immediately before every fresh dispatch;
 specialists never interpret a snapshot digest as a Git object or discover a
 missing coordinate.
 
+Every correction packet additionally carries
+`correction_packet_preflight: {path, sha256,
+preflight_identity_sha256}`. The workspace-local certificate must match the
+decision's `correction_preflight`, the exact service and sorted task set, the
+aggregate/index identities, every live source content SHA-256, and every
+selected RED/GREEN evidence pointer. Main re-certifies immediately before
+spawn; the specialist verifies the certificate bytes and packet coordinates
+before any packet-derived read. Missing, stale, substituted task-intent hashes,
+or incomplete required-test coverage is `packet-contract-invalid`.
+
 Before the first implementation specialist dispatch for an OpenSpec binding,
 run the normal overlay and plan-contract preflight. If it fails only because
 the compact plan index, task shards, workspace quality manifest, or
@@ -392,7 +402,7 @@ a synthetic transition, and task IDs from one service never satisfy another.
 This is an implementation checkpoint, not a phase or gate. For every task whose
 Verification section declares `Pre-implementation test: required`, preflight
 the workspace's `.team-harness/quality.json`, the `quality-runner.mjs` and
-`test-transition.mjs` helpers relative to this loaded skill, and a clean current
+`test-transition.mjs` helpers from the verified workspace `helper_bundle`, and a clean current
 commit. Missing `commands.test`, `test_contract.path_rules`, or either helper
 blocks; never downgrade a required task to not-applicable during implementation.
 The manifest must also reject with `NON_HERMETIC_COMMAND` any package-manager
@@ -529,6 +539,23 @@ closure/readiness diagnostic, groups all terminal findings by root cause, and
 creates one comprehensive correction package. A single surfaced symptom never
 authorizes an immediate dispatch while another selected diagnostic is pending.
 
+Before generating a correction nonce, presenting choices, or recording an
+autonomous decision, invoke the bundled `correction-packet-preflight.mjs
+certify` with the exact aggregate path/hash, service, selected `Task-N` IDs,
+and current `test_contract_evidence`. The helper derives source coordinates
+from the approved snapshot but hashes the live canonical source files; its
+`task_intent_sha256` is deliberately separate from every
+`source_coordinates[].content_sha256`. It derives the complete required-test
+set across all writable overlays, so a missing row fails even when legacy
+state says `pending: 0`. `repair-index` may create only missing `pending` rows;
+Main must then recompute the extended state summary and close every required
+RED/GREEN row before retrying certification. Persist the content-addressed
+certificate and bind its path, SHA-256, identity, service, and task IDs in
+`correction_preflight` and the correction package. No pass means no nonce and
+no consumed authority. Immediately before the authorized dispatch, certify
+again and require byte-identical certificate coordinates; drift requires a
+fresh consolidated package and decision rather than reusing authority.
+
 Test blobs are immutable only during their own active red-to-green transition.
 After that task closes and before final Freeze, a fresh tester may make
 one test-only correction when a previously green expectation contradicts the
@@ -621,15 +648,23 @@ separate capped calls; this decomposition is the fail-closed recovery, never a
 replay of the failed composite command. An individual truncation leaves that
 conjunct unevaluated and blocks rather than silently passing.
 
-Only in this explicitly activated pipeline, preflight resolves the helper's
-absolute path relative to the loaded pipeline skill/reference and fails closed
-if unavailable. It must be a canonical regular non-symlink file. Every initial
+At implementation entry, resolve only `helper-bundle.mjs` relative to the
+loaded pipeline skill/reference and invoke `materialize` before any correction
+authority or specialist dispatch. Persist its workspace-relative manifest
+coordinate, digest, bundle identity, and compatibility epoch as
+`helper_bundle`. From then on, invoke `verify` and resolve every operational
+helper path—including `bounded-command.mjs`, `test-transition.mjs`, quality,
+OpenSpec, liveness, write-scope, and correction preflight—only from that
+immutable workspace bundle. A plugin-cache path is a transient bootstrap
+source and is never a packet or state coordinate. A missing, stale, or
+hash-mismatched bundle blocks before authority. Every initial
 or correction V2 implementer/tester packet must contain this non-null absolute value as
 `bounded_command_path`; omission, relative form, symlink, or an unavailable
 helper is `packet-contract-invalid` and blocks before any packet-derived read
 or command. This is mandatory even when the first anticipated commands are
-small because later diagnostics can be volume-unknown. Never persist that value
-in state, events, reports, summaries, or workspace artifacts. Before executing a command, Main and the
+small because later diagnostics can be volume-unknown. Persist only the bundle
+manifest coordinate and identity; resolved absolute helper paths remain
+transient. Before executing a command, Main and the
 implementer classify its expected output volume from the known command scope
 and output mode. Routine commands with an expected small, bounded result run
 directly, including targeted file reads and searches, concise status checks,

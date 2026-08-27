@@ -111,6 +111,13 @@ because it changes the persistent execution profile.
    still point safely at the new snapshot. Preserve the helper's
    `restartRequired` result for the final report.
 
+   The bridge is compatibility protection for non-pipeline skill execution;
+   active pipelines use their content-addressed workspace `helper_bundle`.
+   Never delete, rewrite, or garbage-collect those workspace bundles during
+   update. If an active legacy pipeline lacks one, its recovery contract—not
+   this update flow—performs the bounded compatibility handoff before another
+   nonce or dispatch.
+
    Always create or migrate the independent native configuration:
 
    ```bash

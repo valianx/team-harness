@@ -205,14 +205,26 @@ use Main as the specialist fallback.
 
 ### AC12/AC20 pre-execution command-output route
 
-Only while this pipeline is explicitly activated, pipeline preflight resolves
-the helper's absolute path relative to the loaded pipeline skill/reference
-(`scripts/bounded-command.mjs` from the skill directory or
-`../scripts/bounded-command.mjs` from a reference), never from the workspace
-or current directory; fail closed if it cannot be resolved. Include the helper
-in each role packet only as `bounded_command_path` with that absolute path. It
-is transient: never persist `bounded_command_path` in state, events, reports,
-summaries, or workspace artifacts.
+Only while this pipeline is explicitly activated, resolve
+`scripts/helper-bundle.mjs` from the loaded skill as a transient bootstrap and
+materialize its closed helper set below the canonical workspace before any
+specialist dispatch or correction authority. Persist only the returned
+workspace-relative manifest coordinate, digest, bundle identity, and
+compatibility epoch. Verify that manifest before each operation and resolve
+`bounded_command_path` and every other operational helper from the immutable
+workspace bundle, never from a versioned plugin-cache path or cwd. Resolved
+absolute helper paths remain transient and are not persisted in state, events,
+reports, or summaries. A missing/stale bundle blocks before authority.
+
+Before any correction nonce, presentation, autonomous decision, or dispatch,
+use the bundled `correction-packet-preflight.mjs certify`. Its content-addressed
+certificate must bind live source-file SHA-256 values separately from
+`task_intent_sha256`, prove complete required test-contract coverage across all
+writable overlays, and verify every required RED/GREEN artifact. Missing rows
+may be repaired only to `pending`; close every required row before
+certification. Persist the
+certificate pointer in state/decision/packet and require byte-identical
+re-certification immediately before spawn.
 
 Evidence-bearing reads are sequential transport operations even when their
 files are independent. Never batch, fan out, or issue multiple reads/searches/
@@ -381,8 +393,8 @@ the role fields cannot see. The current digests are:
 | Role | SHA-256 of normalized TOML |
 |---|---|
 | `pipeline-architect` | `01c3366215ac8e4eddd1cffa7e92f0b8793a8c9ced0411ab2e6d612cdccaa69f` |
-| `pipeline-implementer` | `fe09a0dc3322d083c09e844f5d5720253d8caa983068a3047939ab5eac04cbad` |
-| `pipeline-tester` | `4be2fcf6a9b76521a7309512882c018082354bfff8d40a370276cf2e9f63bbca` |
+| `pipeline-implementer` | `6a2d5bcd211b7da9fb246671cb7fc5b6676f71c735077aaf386d4fc5a34c8175` |
+| `pipeline-tester` | `dd23404a7693e565848446183b182148894779f729fee35df063dbc8991fc55a` |
 | `pipeline-cleaner` | `8e17564f9835653b016b278324773d101b9c6158cda6d9826549e1af02026a9e` |
 | `pipeline-qa` | `85fa7bb2c471f6a70914965ae7980ad961e912908cc17492aa1dfcdc2346b655` |
 | `pipeline-security` | `cd15f37113ef88b9cfff744e97ff0ff51c31f1bf6817d2c9240957f27c4b7883` |
