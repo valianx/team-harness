@@ -14,7 +14,11 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { execFileSync } from "node:child_process";
 import { inboundCC, outboundCC, ShimRejectError } from "../shim/shim.js";
-import { evaluate, type GateGuardReader } from "../bodies/gate-guard.js";
+import {
+  evaluate,
+  evaluateCodexForcePushFloor,
+  type GateGuardReader,
+} from "../bodies/gate-guard.js";
 import { CONTROL_CHAR_RE } from "../bodies/prepublish-guard.js";
 import type { NormalizedDecision } from "../shim/normalized-v1.js";
 
@@ -216,9 +220,20 @@ async function main(): Promise<void> {
 
   try {
     const normalized = inboundCC(raw);
-    const decision = evaluate(normalized, reader);
+    const decision = process.env.TEAM_HARNESS_CODEX_HOOK === "1"
+      ? evaluateCodexForcePushFloor(normalized)
+      : evaluate(normalized, reader);
     outboundCC(decision);
   } catch (err) {
+    if (process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
+      const fallback: NormalizedDecision = {
+        decision: "deny",
+        reason: "gate-guard: force-push safety evaluation failed; execution denied.",
+        mutations: null,
+      };
+      outboundCC(fallback);
+      return;
+    }
     if (err instanceof ShimRejectError) {
       // FAIL-OPEN: non-covered payload → none.
       const fallback: NormalizedDecision = { decision: "none", reason: "", mutations: null };
@@ -232,5 +247,16 @@ async function main(): Promise<void> {
 }
 
 main().catch(() => {
+  if (process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
+    try {
+      outboundCC({
+        decision: "deny",
+        reason: "gate-guard: force-push safety evaluation failed before completion; execution denied.",
+        mutations: null,
+      });
+    } catch {
+      // The process exit remains the final transport boundary.
+    }
+  }
   process.exit(0);
 });

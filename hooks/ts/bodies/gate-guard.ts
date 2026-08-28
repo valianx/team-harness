@@ -291,3 +291,35 @@ export function evaluate(input: NormalizedInput, reader: GateGuardReader): Norma
     "gate-guard: outward action blocked — the resolved pipeline lane has not registered gate3_release: ship or auto-ship at STAGE-GATE-3. Complete STAGE-GATE-3 before pushing or opening the PR. See agents/_shared/gate-contract.md § Outward-action release floor."
   );
 }
+
+// Codex keeps approval and pipeline-order decisions in its native permission
+// layer. Its packaged deny hook reuses the same bounded command analyzer only
+// for the unconditional force-push floor, without resolving or enforcing a
+// Team Harness lane.
+export function evaluateCodexForcePushFloor(input: NormalizedInput): NormalizedDecision {
+  const rawCmd =
+    typeof input.tool?.input?.["command"] === "string" ? (input.tool.input["command"] as string) : "";
+  if (!rawCmd) return none();
+
+  const analyzed = analyzeCommand(rawCmd);
+  let force = false;
+  for (const effective of analyzed.commands) {
+    const classified = classifyCoveredAction(effective);
+    if (classified?.binary !== "git" || classified.gitSubcommand?.toLowerCase() !== "push") {
+      continue;
+    }
+    if (classified.args.some(({ value }) =>
+      value.startsWith("+")
+      || /^--force(?:$|=|-)/i.test(value)
+      || /^-[^-]*f[^-]*$/i.test(value)
+    )) {
+      force = true;
+      break;
+    }
+  }
+  if (!force) return none();
+
+  return deny(
+    "gate-guard: force-push denied by the Codex deterministic floor; use a non-rewriting push or complete the operation outside Team Harness."
+  );
+}
