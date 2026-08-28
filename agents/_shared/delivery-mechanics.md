@@ -160,10 +160,11 @@ backoff, polling, or another agent turn. Do not wait for CI or merge. `BEHIND`, 
 review-time signal, not permission to mutate the validated branch. Offer an
 operator-directed rebase only when needed; never execute it automatically.
 
-If that single `gh pr view` invocation exits non-zero or omits the requested
-fields, it still consumes the one snapshot attempt. Record and report this
-terminal block from already-known PR coordinates; sanitize the error to one
-line and never retry:
+If that `gh pr view` invocation exits non-zero or omits the requested fields,
+record the failed snapshot observation from already-known PR coordinates and
+sanitize the error to one line. Do not poll or repeat unchanged transport; a
+later query is legal only after a verifiable transport/permission change or an
+explicit need for a fresher snapshot:
 
 ```yaml
 pr_url: {known URL}

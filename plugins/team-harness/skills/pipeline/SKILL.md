@@ -234,12 +234,9 @@ the receipt, inspect that exact predeclared artifact, compute and record its
 hash, and continue from it without rerunning the command. Missing, unsafe,
 invalid, or hash-mismatched output blocks fail closed.
 
-The helper is a development-output control, not a process-containment sandbox.
-The operator remains responsible for launched commands. Deadline cleanup
-covers the managed POSIX process group or the tree confirmed by Windows
-`taskkill`; a deliberately detached or reparented descendant outside that
-scope can outlive the helper. Native sandbox and permission policy remain the
-security boundary.
+The helper's process-containment boundary lives only in
+[implementation.md](references/implementation.md) § "Efficient execution,
+rotation, and tool diagnostics"; this entry contract does not copy it.
 
 Treat every terminal specialist result as a closed attempt. A post-terminal
 `followup_task` is prohibited for implementers and reviewers alike. Feedback,
@@ -341,12 +338,12 @@ the role fields cannot see. The current digests are:
 | Role | SHA-256 of normalized TOML |
 |---|---|
 | `pipeline-architect` | `01c3366215ac8e4eddd1cffa7e92f0b8793a8c9ced0411ab2e6d612cdccaa69f` |
-| `pipeline-implementer` | `64aa79ab7ac6936b56727c1417e5781a9123f813039edeb9bd43e387a6b38761` |
-| `pipeline-tester` | `cd0725f6acd6a5da9ca90cb5e1175e469fd6def727230538e21b009bfee1a9a5` |
-| `pipeline-cleaner` | `8e17564f9835653b016b278324773d101b9c6158cda6d9826549e1af02026a9e` |
-| `pipeline-qa` | `85fa7bb2c471f6a70914965ae7980ad961e912908cc17492aa1dfcdc2346b655` |
-| `pipeline-security` | `cd15f37113ef88b9cfff744e97ff0ff51c31f1bf6817d2c9240957f27c4b7883` |
-| `pipeline-delivery` | `934583fe9cfcfba24ef1eea9a09ece3af4e6441a81be34087c9bcb428aee9ba1` |
+| `pipeline-implementer` | `9763b2d84266b6dd35b26ed0b4fe4575ee110c7580382d6faa3cbbc4fd35a5bb` |
+| `pipeline-tester` | `892996d0aeaf3190839cc1ff873e601693e10631644aa7cf1217ba5b18a1de85` |
+| `pipeline-cleaner` | `53de2409258cb1e68a1f27824e67aa689015910dd053981388b55926d21d49b6` |
+| `pipeline-qa` | `9a9eb01701678ee46c037d3324045a0b44900a130ff48a0d351ac69fc68f46d4` |
+| `pipeline-security` | `0c9e1266f5d7746f97a93b763c5643854d41028f4386416c63d70da5dc2c9b53` |
+| `pipeline-delivery` | `f236589eea90624dcb8917f53ba7036831885a9c14b5228809e176cc2a62707b` |
 
 Do not accept a file solely because its comments or `name` field match. A
 digest mismatch is a stale or unrelated shadow; stop before workspace
@@ -396,15 +393,15 @@ following matrix is exhaustive:
 | Mechanical plan repair (references, identifiers, paths, counts, format, or field coherence with no semantic change) | Main repairs the canonical field and records the repair | `phase: implementation`; no new Gate 1; if Freeze was reached, rebuild Freeze and revalidate | prohibited | `0` |
 | Decision-bearing plan resolution, including a structural intent/scope/AC contradiction, security-obligation classification, or a change to intent, scope, behavior, or AC meaning | Main pauses for a bounded live operator decision and transcribes the approved resolution without reinterpretation | `phase: implementation`; `next_action` continues through implementation → Freeze → validation; no new Gate 1 and retain the final security floor when the classification is sensitive | prohibited unless the separate explicit current live operator request for architect work applies | `0` |
 | Explicit, current live operator request for architect work | Main records the request and dispatches `architect` | `phase: design`; the resulting plan requires a new Gate 1 | allowed only for that request | `0` |
-| Correctable code, test, documentation, hygiene, or security finding inside approved scope | Main includes it in the complete consolidated validation failure | `phase: validation`; live choice `1` or an eligible `gate1-autonomous` authorization authorizes one bounded implementation round → closure gate → stale-row tester refresh → new Freeze → fresh QA plus impact-required security; no new Gate 1 | prohibited | `+1` |
-| Missing or insufficient evidence | Main includes it in the same complete consolidated validation failure | `phase: validation`; live choice `1` or an eligible `gate1-autonomous` authorization authorizes one bounded evidence/correction round → closure gate → stale-row tester refresh → new Freeze when applicable → fresh QA plus impact-required security; no new Gate 1 | prohibited | `+1` |
+| Correctable code, test, documentation, hygiene, or security finding inside approved scope | Main records the complete failure and applies causal recovery | `phase: validation`; continue under Gate 1 → closure → stale-row tester refresh → new Freeze → fresh QA plus impact-required security | prohibited | observed `+1` |
+| Missing or insufficient evidence | Main records the complete failure and applies causal recovery with the evidence owner | `phase: validation`; continue under Gate 1 → closure → stale-row tester refresh → new Freeze when applicable → fresh QA plus impact-required security | prohibited | observed `+1` |
 
 After every required validation lens and selected closure/readiness diagnostic
 terminates, Main consolidates all blocking findings under stable IDs, the
 current frozen anchor, and the union file scope. It groups duplicate symptoms
 under their shared root cause and never creates a correction nonce from a
 partial result set.
-Before creating a correction nonce, Main performs one bounded evidence triage
+Before routing a correction, Main performs one bounded evidence triage
 against the approved intent, scope, ACs/TCs, and security floor, without dispatching
 another reviewer. For every finding it presents the ID, cause/evidence,
 implicated requirement, closure check, proposed `resolve|design-consistent|decision-required`
@@ -412,23 +409,21 @@ disposition, rationale, and consequence. The proposal is advisory. Only the
 live operator confirms a `design-consistent` or `decision-required`
 disposition. Under the Gate-1 authority carried by any valid approval, Main
 may confirm only unambiguous
-`resolve` findings inside approved scope while
-`autonomous_correction_count < 3`; all other
+`resolve` findings inside approved scope; all decision-bearing
 findings pause. `design-consistent` is legal only when no AC or security floor
 is violated. Calling a violating finding “part of the
 design” opens an explicit intent/scope/AC/TC decision first and never waives it.
 
 After all dispositions are explicit, Main builds the final package from every
-`resolve` finding. If every closed autonomous predicate passes, it creates a
-fresh nonce and dual-records one `gate1-autonomous` correction decision bound to
-the original Gate-1 nonce, then dispatches one fresh implementer. Every closure
-check must pass before stale-row tester refresh. Main freezes only after that refresh,
-then runs fresh QA and impact-required security. Each failed set repeats this analysis, for at most three
-autonomous corrections. Scope/behavior/AC/TC change, design or security ambiguity,
-conflict, unavailable coverage, infrastructure failure, or budget exhaustion
-always pauses.
+`resolve` finding and applies `agents/_shared/coordinator-recovery.md`. An
+in-scope correction cites the existing Gate-1 release and causal evidence; it
+does not create another operator ceremony. Every closure check must pass before
+stale-row tester refresh. Main freezes only after that refresh, then runs fresh
+QA and impact-required security. Scope/behavior/AC/TC change, design or security
+ambiguity, conflict, unavailable coverage, or an unrecoverable external
+prerequisite pauses.
 
-For any ineligible autonomous result, Main persists
+For a result that needs new authority, Main persists
 `correction_pending: true`, a fresh `correction_nonce`, and one complete
 `correction_package` containing the anchor, finding IDs, implicated AC/TC
 requirements, one closure check/expected result per finding, dispositions, and
@@ -447,18 +442,11 @@ closure gate, stale-row tester refresh, one new Freeze, fresh QA, and impact-req
 security. Its one `iteration.start`/`agent.correction.spawn` pair carries only
 the same `decision_ref` plus ordinary observations. Choice `2` performs no repository
 or evidence mutation and a later presentation uses a fresh nonce. Choice `3`
-aborts without correction. Under operator-live authority a second failure
-always pauses with a fresh decision. Gate-1 authority may start another fresh
-complete round only after another complete required validation set and eligible triage,
-while `autonomous_correction_count < 3`;
-there is no verifier-to-implementer bounce or agent follow-up.
-The max-3 counter limits only `gate1-autonomous` authority. At
-`iteration: 3/3`, `autonomous_correction_count: 3`, or after any number of prior
-operator rounds, the same live choice `1` remains available. Its matching
-decision increments the deliberately unbounded `operator_correction_count` and
-authorizes one fresh full-package round. It is not an exception or waiver and
-still requires closure, tester refresh, a new Freeze, fresh QA, and
-impact-required security.
+aborts without correction. Another failure always receives a new causal
+analysis. Correction and iteration counts are append-only observations and
+never deny Gate-1 recovery or a live operator decision. Every correction still
+requires closure, tester refresh, a new Freeze, fresh QA, and impact-required
+security.
 
 An authorized correctable sensitive finding requires a fresh security audit in
 the new full fan. Decision-bearing concerns, including

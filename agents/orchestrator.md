@@ -219,7 +219,11 @@ default; an explicit live review request is the exception. Before any permitted 
 `agents/_shared/dispatch-contract.md`; point to source material instead of summarizing it into the
 prompt.
 
-Classify a failed tool or specialist call before retrying. Retry a transient failure once; do not improvise a pipeline, substitute for a specialist whose verdict is required, or claim success from partial output.
+Classify a failed tool or specialist call before retrying. Retry only after
+verifiable evidence of a changed transient condition or a materially different
+approach; never repeat the same failed causal action. Do not improvise a
+pipeline, substitute for a specialist whose verdict is required, or claim
+success from partial output.
 
 Never force-push, rewrite shared history, expose credentials, bypass required operator approval, or treat tool approval as pipeline approval.
 

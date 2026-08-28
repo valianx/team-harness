@@ -244,7 +244,9 @@ After the diagrammer returns `status: success`, **read the `.excalidraw` file** 
 2. **Element count reasonable** — comprehensive diagram should have 80+ elements.
 3. **Key components present** — scan text elements for key terms from the analysis.
 
-**If validation fails:** re-invoke diagrammer with specific feedback. Max 2 re-invocations.
+**If validation fails:** re-invoke the diagrammer with specific feedback and a
+materially changed repair objective. Never repeat the same failed causal action;
+report the exact blocker when no verifiable repair remains.
 
 ### Step 3 — Report to user
 
@@ -786,7 +788,10 @@ For each module:
 - Each translator writes locale fragments (`{namespace}.en.json`, `{namespace}.es.json`) and modifies only its assigned files.
 - Each translator returns a status block with `strings-translated`, `files-modified`, and any `issues`.
 
-**Gate per batch:** if any translator returns `status: failed`, read its report, diagnose, and re-invoke that single batch (max 2 retries). Other successful batches are NOT re-run.
+**Gate per batch:** if any translator returns `status: failed`, read its report,
+diagnose, and re-invoke only that batch when evidence supports a materially
+different repair. Never repeat the same failed causal action. Other successful
+batches are not re-run.
 
 ### Step 5 — Merge + Build verify (sequential)
 
@@ -798,7 +803,8 @@ Invoke `translator` in **merge mode** via Task tool with:
 - glossary: `docs/glossary.md`
 - Instruction: "Merge all locale fragment files (`{namespace}.en.json`, `{namespace}.es.json`) into final `en.json` and `es.json`. Delete fragments. Run the project build. Produce the final `00-translation.md` report with aggregated stats."
 
-Gate: if build fails → translator fixes, max 2 retries. If still failing → report to user with build error.
+Gate: if build fails, the translator diagnoses and changes the cause. Continue
+while a verifiable repair remains; otherwise report the exact build blocker.
 
 ### Step 5b — Sequential fallback (small projects)
 
@@ -807,7 +813,8 @@ If Step 3 decided to skip parallelism, invoke single `translator` in `translate-
 - Runs Phase 3 → Phase 4 → Phase 5 sequentially
 - Writes final `00-translation.md`
 
-Gate: if build fails → re-invoke with error, max 2 retries.
+Gate: if build fails, re-invoke with the exact error only when the next action
+is causally distinct; otherwise report the blocker.
 
 ### Step 6 — Report to user
 

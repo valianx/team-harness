@@ -165,7 +165,7 @@ await use(async ({ workspace }) => {
     operatorCorrectionCount: 0,
   });
   assert.equal(verified.verdict, "pass");
-  console.log("  [PASS] recovery projects correction budgets exactly from durable authority decisions");
+  console.log("  [PASS] recovery projects correction observations exactly from durable authority decisions");
 });
 
 {
@@ -201,14 +201,15 @@ await use(async ({ workspace }) => {
     correction_package: { anchor: "freeze-1", findings: [`finding-${index + 1}`] },
   }));
   await writeFile(path.join(workspace, "00-execution-events.jsonl"), `${decisions.map(value => JSON.stringify(value)).join("\n")}\n`);
-  const blocked = await reconcileCorrectionCounters({
+  const repaired = await reconcileCorrectionCounters({
     workspace,
     autonomousCorrectionCount: 3,
     operatorCorrectionCount: 0,
   });
-  assert.equal(blocked.verdict, "blocked");
-  assert.equal(blocked.error_code, "AUTONOMOUS_CORRECTION_BUDGET_EXCEEDED");
-  console.log("  [PASS] recovery blocks an invalid fourth autonomous authority event instead of truncating it");
+  assert.equal(repaired.verdict, "repair");
+  assert.equal(repaired.error_code, "CORRECTION_COUNTER_MISMATCH");
+  assert.deepEqual(repaired.state_patch, { autonomous_correction_count: 4, operator_correction_count: 0 });
+  console.log("  [PASS] correction ordinals remain observable without creating a routing ceiling");
 });
 
 {

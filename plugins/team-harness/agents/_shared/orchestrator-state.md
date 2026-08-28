@@ -12,14 +12,15 @@ Everything in this file is written by the orchestrator and by nothing else. No s
 
 Where a field's semantics are defined elsewhere, this schema names the home and stops. It does not restate the rule.
 
-```
+```text
 pipeline_version: 4
-plan_format: sharded-v1             # lifecycle metadata; not a posture or route selector
+plan_format: sharded-v1
 openspec_preflight: pending|ready|provisionable|blocked-prerequisite|invalid-project|null
 openspec_design_pass: preflight|provisioning|planning|snapshot|overlay|gate1-ready|null
 workspace_identity: {schema_version, kind, workspace_kind, logs_mode, coordinator_root, repo_base, date, feature, initiative, services, evidence_repositories}
 openspec_bindings: [{service, role, repository_root, repository_identity, change_name, planning_root, schema, cli_version, generated_skill_identity, task_intent_sha256, strict_validation, preflight, design_pass, snapshot_path, snapshot_sha256, overlay_path, overlay_sha256}]
 evidence_repositories: [{service, role: evidence-only, repository_root, repository_identity, purpose}]
+evidence_dispatch_bindings: [{service, task_shard_path, role: implementer|tester|null, path, sha256, dispatch_identity_sha256, recovery_ref|null}]
 openspec_aggregate_path: inputs/openspec-bindings.json|null
 openspec_aggregate_sha256: {SHA-256|null}
 helper_bundle: {compatibility_epoch, bundle_root, bundle_identity_sha256, manifest_path, manifest_sha256}|null
@@ -28,15 +29,12 @@ quality_manifest_path: {absolute workspace-local path|null}
 quality_manifest_sha256: {SHA-256|null}
 type: feature|fix|refactor|hotfix|enhancement
 phase: design|waiting_gate1|implementation|validation|waiting_gate3|delivery|complete|blocked|aborted
-stage: 1|2|3|4                 # telemetry grouping; `phase` is the machine authority
+stage: 1|2|3|4
 status: in_progress|waiting_for_gate|iterating|paused|paused_for_amend|complete|blocked|blocked-incomplete|aborted
 gate_pending: gate1|gate3|null
-iteration: N/3
-cleaner_handoff_pending: true|false
-cleaner_handoff_nonce: {fresh token or null}
-cleaner_handoff_package: {repository, worktree, anchor, findings, eligibility, ineligible_reasons}|null
-cleaner_handoff_decision: authorize|pause|abort|null
-cleaner_handoff_decision_ref: {consumed token or null}
+iteration: N
+causal_recovery: {role, scope_identity_sha256, strategy_sha256, failure_kind, failure_evidence_sha256, recovery_kind, recovery_evidence_sha256, causal_identity_sha256}|null
+cleaner_handoff_package: {repository, worktree, anchor, findings, eligibility, ineligible_reasons, causal_identity_sha256}|null
 correction_pending: true|false
 correction_nonce: {fresh token or null}
 correction_package: {anchor, findings, scope, requirements, closure, dispositions}|null
@@ -45,118 +43,129 @@ correction_decision_ref: {consumed token or null}
 correction_authority: operator-live|gate1-autonomous|null
 correction_authority_gate_nonce: {consumed Gate-1 token or null}
 correction_dispatch_reference: team_harness_dispatch_reference|null
-autonomous_correction_count: N      # integer 0..3; the only correction budget
-operator_correction_count: N        # non-negative integer; deliberately unbounded
+autonomous_correction_count: N
+operator_correction_count: N
 last_completed: design|waiting_gate1|implementation|validation|waiting_gate3|delivery|complete|null
-next_action: {what to do next}      # the successor to a prose recovery section
-total_tokens: N
+next_action: {single recoverable action}
+total_tokens: N|unavailable
 ```
 
 `team_harness_dispatch_reference` means the exact five-field object defined once
 in `agents/_shared/dispatch-contract.md` § "Pipeline specialist reference".
 
-`quality_manifest_path`, when non-null, must resolve to a regular non-symlink
-below the recorded workspace. If that workspace is below a participating
-repository, the manifest must also be ignored and untracked. It is
-coordinator-owned operational state and never a product diff entry. Persist its
-exact file SHA-256 after each authorized manifest change; recovery revalidates
-both fields before any quality invocation.
+New runs always set `obsidian_sync: null` and `obsidian_export_target: null`.
+The two fields remain only so recovery can honor legacy export-armed snapshots
+without rewriting their state schema.
 
-`iteration: N/3` is a legacy-readable display mirror, not a required new-run
-field, total-round counter, or authority. New writers derive it for display
-when needed and increment only `autonomous_correction_count` for
-`gate1-autonomous` correction decisions. An
-`operator-live` authorization increments only `operator_correction_count` and
-may do so without limit, including while `iteration: 3/3` and after any prior
-operator round. A new pipeline initializes `iteration: 0/3`,
-`autonomous_correction_count: 0`, and `operator_correction_count: 0`. A
-plan repair that preserves approved meaning, an operator decision or its transcription,
-and explicitly requested architect work do not increment it and do not emit a new
-`iteration.start`. New writers emit only `cause: verification` for a correction round;
-`cause: operator` remains readable for historical traces but is not produced for new
-runs. A cleaner-to-implementer handoff is also excluded: it emits only
-`cleaner.handoff.decision` and `agent.cleaner-handoff.spawn`.
+Specialist liveness remains append-only event state rather than a mutable
+coordinator-state field. `agent.sla.extra` records
+`{attempt, attempt_token, liveness_action, deadline_at, probe_delivery_state,
+probe_delivered_at|null, continuation_count}`. Successful pre-spawn reference
+verification starts the attempt observation; no intermediate readiness state
+exists. A successful native message call
+without an explicit delivery/read receipt records `unconfirmed`; a matching ACK
+itself proves delivery. After interruption, `agent.close.extra` repeats the
+attempt identity and records `owned_paths_changed`, `evidence_changed`,
+`interruption_cause`, `continuation_count`, and the closed liveness
+`failure_kind`. These are nested `extra` fields on canonical agent events, not
+new event names or a mutable retry counter. Persist declared path names and
+booleans only, never partial file contents. Recovery uses those timestamps and
+cannot reset an expired lease; v3.20.5 probes without delivery state are
+`unconfirmed`. All ordinals are observations and routing follows
+`agents/_shared/coordinator-recovery.md`.
 
-**Cleaner handoff decisions.** The cleaner runs once per participating
-repository and immutable candidate/manifest identity; cross-repository work
-uses separate fresh cleaners with separate roots, worktrees, allowlists,
-baselines, manifests, and `cleaner_repo_evidence` — one cleaner never receives
-multiple repositories. Main records the cleaner result and the deterministic
-overreach-proof evidence first, then persists one package-bound nonce only
-when the closed eligibility predicate holds: exactly one repository/worktree,
-one coherent behavior-preserving objective, one to five findings, at most
-eight unique files, already-approved scope, no DDL/migration, public-schema,
-security-control, external-environment, or new decision dependency, local
-closure checks, and a complete workspace-local quality manifest. Otherwise it preserves
-commits/evidence, dispatches nobody, and pauses the same pipeline for an
-in-place repository-decomposed recovery package or live scope decision. An
-eligible package pauses with exactly `1 — authorize one implementer pass`,
-`2 — pause without changes`, and `3 — abort pipeline`; only a live reply after
-that presentation may consume the nonce. Choice `1` consumes it and permits one
-fresh terminal implementer attempt. Choice `2` consumes it into `pause` without
-mutation or dispatch; a later presentation uses a fresh nonce. Choice `3`
-records `abort` and closes the pipeline. The authorized implementer path
-never inherits Gate-1 autonomy, increments `iteration`, consumes the autonomous
-max-3 budget, or permits
-another cleaner for the same immutable attempt. The decision and spawn events
-no longer repeat the package. `cleaner.handoff.decision` is the sole authority
-record and carries the complete package; `agent.cleaner-handoff.spawn` carries
-only its `decision_ref`. If that binding event is malformed after a dispatch
-Main directly observed, append a corrected binding observation without
-dispatching again. Bare non-zero exits without the exact command, exit code,
-and bounded diagnostic are incomplete. After the
-attempt Main owns closure evidence and joins the same full-manifest
-`post_implementation` Freeze quality run used by every repository path (never
-a touched-file subset), followed by hygiene. Any remaining work requires a new
-package, fresh nonce, and another live authorization; generic continue,
-ordinary approval, files, tools, or specialist prose never suffice. Scope
-expansion is decided separately and never implies implementer authority.
+When non-null, `quality_manifest_path` must be a regular non-symlink below
+`workspace`. If that workspace is below a participating repository, the
+manifest must also be ignored and untracked. It is operational state, never a
+product diff entry. Persist the exact file hash in
+`quality_manifest_sha256` after each authorized change and verify both fields
+during recovery before running quality.
 
-**Validation correction decisions.** A failed validation fan completes every
-required lens and every selected closure/readiness diagnostic, even after an
-earlier failure. Main persists each terminal result, groups symptoms by root
-cause, and only then consolidates and triages all findings at `phase:
-validation`, with a fresh nonce, the failed Freeze anchor, exact finding IDs,
-dispositions, and evidenced file scope. No repository/evidence mutation,
-specialist dispatch, Freeze rebuild, or revalidation is legal before authority
-is recorded. A correction package built from a partial diagnostic set is
-invalid; later rounds are for genuinely new evidence, never a declared check
-that the previous fan omitted. Before creating or presenting its nonce, Main
-supplies only service/tasks, role/mode, correction target paths, helper-bundle
-reference, optional evidence reference, and write scope to
-`correction-packet-preflight.mjs certify`. The helper derives the unique owner
-task for every target path, unions those owners with the requested task set,
-and validates every source hash, pointer, seal, root, helper path, quality
-command, and test coordinate, then creates one
-immutable `correction_dispatch_reference`. Missing rows are repaired only to
-`pending`; their tester/RED transition closes before certification. Main never
-serializes the derived graph into a specialist prompt. With a valid Gate-1 approval dual record,
-`autonomous_correction_count < 3`, no
-correction/execution budget exhaustion, and only unambiguous `resolve` findings
-inside approved scope, Main consumes the nonce
-without another presentation using `correction_authority: gate1-autonomous` and
-the exact consumed Gate-1 nonce. When any of those conjuncts fails, Main pauses
-and presents exactly `1 — authorize one correction round`, `2 — pause without
-changes`, and `3 — abort pipeline`; only a live reply after that presentation
-may consume the nonce. Consumption atomically sets `correction_nonce: null`
-and uses the consumed token as `correction_decision_ref`. `authorize` requires
-exactly one matching `correction.decision` event carrying the complete package,
-authority, and canonical `team_harness_dispatch_reference` from
-`agents/_shared/dispatch-contract.md`, then permits one spawn carrying only its
-`decision_ref` plus `dispatch_reference`. Apply
-`agents/_shared/dispatch-contract.md` § "Pipeline specialist reference" for
-pre-spawn verification, attempt start, and mechanical recovery. `pause` and `abort`
-perform no correction. Every later failure gets a fresh nonce and decision.
-An ordinary approval, intake autonomy preference, generic `continue`, recovered
-prose, files, agents, and tools are never authorization. Gate-1 autonomous
-authority is valid only through its dual record and the eligibility predicate;
-it cannot cover `design-consistent`/`decision-required`, scope/behavior/AC
-change, security ambiguity or waiver, infrastructure failure, conflict, or a
-fourth autonomous round. Exhaustion disables only `gate1-autonomous` authority:
-Main still presents the ordinary three live choices with a fresh nonce and a
-complete package. Every matching `operator-live` choice `1` authorizes exactly
-one additional round and increments `operator_correction_count`; there is no
-exception label, exceptional allowance, or operator-live maximum.
+`autonomous_correction_count` and `operator_correction_count` are non-negative,
+monotonic exact materialized
+projections of valid authorize `correction.decision` events for their matching
+authority. Recovery verifies and mechanically repairs their projections, but
+never consults them for routing. `iteration: N/3` is legacy-readable display
+only; new runs record the unbounded `iteration: N` projection. Initialize all
+observational counters at `0`.
+
+`evidence_dispatch_bindings` contains at most one active pointer per
+service/task pair. A causal `PACKET_SCOPE_INSUFFICIENT` repair may supersede the
+pointer with a new immutable evidence binding; it never resets attempts, deletes
+history, or rewrites the prior workspace artifact.
+
+Also keep a short phase checklist and a bounded specialist-results table with
+only the latest result per role. The complete file must stay ≤160 lines and
+≤16 KB. Update existing fields in place; do not grow narrative inside the
+snapshot.
+
+`helper_bundle` binds the immutable workspace-local copy produced by
+`helper-bundle.mjs materialize`. `bundle_root` and `manifest_path` are
+workspace-relative; the other fields bind exact bytes and the compatibility
+epoch. Resolve operational helper paths only from a fresh `verify` pass over
+this manifest. Plugin-cache paths are bootstrap inputs only and are never
+durable operational coordinates.
+
+`test_contract_evidence` is always a bounded pointer and summary, never an
+inline per-task array. `index_path` names the workspace-owned
+`evidence/test-contracts.json` artifact and `index_sha256` binds its exact
+bytes. That closed schema-versioned artifact contains at most 128 task records
+with `task_id`, status, `not_applicable_reason`, `contract_path`,
+`contract_sha256`, `red_evidence_path`, `red_evidence_sha256`,
+`red_commit_sha`, `red_tree_sha`, `green_evidence_path`, and
+`green_evidence_sha256`. Main atomically replaces the artifact and recomputes
+the digest, task count, overall status, four status counts, and
+`required_task_count|required_covered_count|required_missing_count` after
+every task transition. The required set comes from every writable binding's
+accepted traceability overlay; `pending: 0` never proves complete coverage when
+a required row is absent. This keeps the snapshot below 16 KB even at the
+maximum task count.
+
+`worktree`, `worktree_branch`, and `worktree_base` are declared topology, not
+proof of creation. A worktree plan records all three before Gate 1 and keeps
+`working_branch: null` until implementation entry verifies the registered path,
+exact branch, and immutable base. A protected-`.git` approval timeout uses
+`status: paused` plus the exact pending command in `next_action`; it does not
+change `phase`, invalidate Gate 1, or create another gate.
+
+`usage_*`, `total_tokens`, and `cost_*` are the current aggregate rendered from
+`phase.end.usage` records under [observability.md](observability.md). They
+contain no root or session identifier, rollout path, raw rollout payload, or
+session list. An unavailable phase makes the aggregate unavailable rather than
+leaving a plausible subtotal; `reasoning_output_tokens` remains a component and
+is never added to `total_tokens` a second time.
+
+When lifecycle declarations exist, `agent_lifecycle_*`, `approved_ac_count`,
+and `cached_input_per_approved_ac` are the conditional aggregate defined in
+[observability.md](observability.md). The state key `n_a` aggregates only the
+closed event value `n-a`; it never introduces a new quality-verdict enum.
+
+Routine operator updates follow `plan-shards.md`: at most
+five lines containing only outcome, changed state, blocker/risk, next action,
+and artifact link. Do not copy specialist or workspace prose into the update.
+
+The named phase checklist uses the one canonical shape below; do not duplicate
+it elsewhere in this contract.
+
+Apply `agents/_shared/coordinator-recovery.md` after every non-success.
+
+**Cleaner findings.** A cleaner remains confined to one repository/worktree and
+behavior-preserving scope. If it exposes product work, Main records the evidence
+and uses the ordinary causal recovery policy with the owning implementer under
+the unchanged Gate 1. Legacy cleaner-handoff nonce/decision fields remain
+readable, but new runs do not create a second authority ceremony for in-scope
+work. Scope, behavior, schema, or security change still requires its existing
+operator decision.
+
+**Validation corrections.** Complete the required validation set, consolidate
+the findings, and certify the derived dispatch before repository work. An
+unambiguous correction inside approved intent, scope, AC meaning, and security
+floor continues under the valid Gate-1 release and
+`agents/_shared/coordinator-recovery.md`; its correction and iteration records
+are observations. Present a live decision only for a semantic or authority
+change. The dispatch reference and write/evidence controls remain those in
+`agents/_shared/dispatch-contract.md`; Main never serializes their derived graph
+into the specialist prompt.
 
 For 3.14.3 recovery only, `correction_exceptional` and
 `exceptional_correction_count` are legacy-readable migration inputs. Rebuild
@@ -201,31 +210,10 @@ field and its matching `stage.gate.release` event both exist, carry the same dec
 nonce, and pass the dual-record contract. An absent, stale, or mismatched half fails closed
 and blocks recovery; phase names or legacy status alone never release a gate.
 
-**Native Codex accounting overlay — conditional.** Apply this overlay only when
-a `phase.end` contains `usage.kind: codex_usage_delta`; a trace without that
-object remains on the legacy/Claude `total_tokens: N` contract above, which
-reports tokens and no USD. The selected Codex snapshot changes the value
-grammar and adds only these fields:
-
-```text
-usage_schema_version: 1|null
-usage_status: available|unavailable
-usage_reason_code: {collector code}|null
-usage_components: {allowlisted components}|null
-total_tokens: N|unavailable
-cost_status: available|unavailable
-cost_reason_code: {closed pricing code}|null
-cost_usd: decimal|null
-```
-
-The overlay never contains a root/session identifier, rollout path, raw rollout
-content, or session alias. See
-`plugins/team-harness/skills/pipeline/references/observability.md` for the only
-permitted checkpoint/delta shapes. A single unavailable, invalid, regressive,
-or conflicting native delta makes the Codex aggregate unavailable; do not retain
-a partial total. `reasoning_output_tokens` remains a reported component and is
-never added to `total_tokens` again. Do not apply this rule to an event stream
-without native `usage`.
+**Native Codex accounting overlay — conditional.** Its fields, privacy bounds,
+and aggregation semantics live only in
+`plugins/team-harness/skills/pipeline/references/observability.md`. This state
+schema stores that contract's current projection and does not restate it.
 
 Agent execution is recorded in the append-only trace, not duplicated into a
 lifecycle overlay in state. New agent events use the minimal envelope and an
@@ -337,11 +325,11 @@ per repository. Main maps a cleaner return of `failed` to `cleaner-failed` and
 `blocked` to `cleaner-blocked`; an authorized implementer return that fails or
 blocks maps to `handoff-failed` or `handoff-blocked`. These terminal non-pass
 states never alias `pending` or `pass` and block Freeze.
-They are terminal for that immutable attempt, not for the pipeline: a live
+They are terminal for that immutable candidate, not for the pipeline. Causal
 recovery preserves their hashed artifacts and events append-only, retains the
 same workspace, branch, commits, and valid edits, and may update the current
-evidence pointer only after an in-scope correction creates a new candidate and
-fresh attempt with attempt-qualified evidence paths. Only
+evidence pointer only after an in-scope correction creates a new candidate with
+a distinct causal identity and immutable evidence path. Only
 `phase/status: complete|aborted` closes the run.
 
 **`open_findings`** has one named reader — the Recover safety contract: on
@@ -495,11 +483,11 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `pricing_identity`, `cost` | conditional | native Codex branch only: exact provider/model and complete quote provenance |
 | `observation` | conditional | required for `agent.*`; concise fact about what started, remains running, or returned |
 | `agent_role`, `task` | optional | diagnostic labels; only the exact architect/design pair is interpreted as OpenSpec Gate-1 evidence |
-| `decision_ref` | conditional | consumed single-use authority nonce; the matching Gate-1 `stage.gate.release` nonce for an initial implementer/tester dispatch, or the correction/cleaner decision nonce for those decisions and later binding events |
+| `decision_ref` | conditional | durable semantic authority: the matching Gate-1 release nonce for work inside its intent/scope, or the applicable later semantic decision nonce; never an attempt allowance |
 | `correction_package` | conditional | required only on `correction.decision`; contains anchor, findings, scope, requirements, closure, and dispositions |
 | `correction_dispatch_reference` | conditional | required only on an authorized `correction.decision`; exact canonical `team_harness_dispatch_reference` from `agents/_shared/dispatch-contract.md` |
-| `cleaner_package` | conditional | required only on `cleaner.handoff.decision`; contains repository, worktree, anchor, findings, and eligibility evidence |
-| `correction_authority` | conditional | required only on `correction.decision`; `operator-live` is unbounded, while `gate1-autonomous` requires a recorded Gate-1 approval release and `autonomous_correction_count < 3` |
+| `cleaner_package` | conditional | legacy-only on `cleaner.handoff.decision`; new runs bind the immutable package through `causal_recovery` under existing Gate-1 authority |
+| `correction_authority` | conditional | legacy/current correction provenance; `gate1-autonomous` requires a recorded Gate-1 approval release and `operator-live` requires its live decision; counts never affect validity |
 | `convergence_counts` | optional | diagnostic counts derivable from the findings ledger; omission never blocks a correction round |
 | `verdict` | conditional | `pass`/`concerns`/`fail`/`partial-fail` |
 | `decision` | conditional | required for `stage.gate.release` and `correction.decision`; correction value is `authorize\|pause\|abort` |
@@ -510,13 +498,14 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 
 For implementation-or-later specialist liveness, `agent.sla.extra` is the
 durable lease identity `{attempt, attempt_token, liveness_action, deadline_at}`.
-A successful pre-spawn dispatch-reference verification starts the counted
-attempt; no intermediate readiness state exists.
+A successful pre-spawn dispatch-reference verification starts the attempt
+observation; no intermediate readiness state exists.
 A post-interrupt `agent.close.extra` repeats `attempt` and `attempt_token` and
 adds `owned_paths_changed`, `evidence_changed`, and the helper's closed
 `failure_kind`. Record declared relative path names only; never store partial
 file contents. Recovery consumes these fields and never restarts a lease from
-the recovery time.
+the recovery time. All ordinals are observability only. Routing follows
+`agents/_shared/coordinator-recovery.md`.
 
 **Never pretty-print** — one JSON object per line, append-only. In obsidian mode the same JSONL lives inside a ```` ```jsonl ```` fence; extract with `sed -n '/^```jsonl$/,/^```$/{/^```/d;p}'` before piping to `jq`.
 
@@ -715,10 +704,11 @@ For a non-`none` row, every named file must exist and be non-empty. When the
 expected coordinate names a section, its exact `## {name}` heading must occur
 once and its body before the next `##` heading (or EOF) must contain nonblank
 content. A different section in the same shared file does not satisfy the row.
-Only after all applicable file and section checks pass → proceed. Otherwise append
-`artifact.missing` (`action: retry`) and re-dispatch **exactly once** with an
-explicit "your artifact was not found" instruction. A second failure →
-`artifact.missing` (`action: escalate`), `status: blocked`. This is the
+Only after all applicable file and section checks pass → proceed. Otherwise
+append `artifact.missing` with the exact coordinate and apply causal recovery.
+Redispatch only after the objective or artifact path is verifiably corrected;
+if no distinct repair remains, record `action: escalate` and the exact missing
+condition in `status: blocked`. This is the
 `artifact-missing` failure kind (`agents/ref-pipeline.md § Failures`).
 
 The implementer row deliberately has no specialist-written artifact: Main

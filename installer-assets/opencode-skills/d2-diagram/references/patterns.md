@@ -687,7 +687,7 @@ reject: "Return 400 Bad Request" {class: error_terminal}
 route: "Route to Payment Provider" {class: process}
 charge: "Attempt Charge" {class: process}
 charge_check: "Charge succeeded?" {class: decision}
-retry: "Retry (max 3x)" {class: process}
+retry: "Retry after diagnosis" {class: process}
 retry_check: "Retries exhausted?" {class: decision}
 fail: "Return 402 Payment Failed" {class: error_terminal}
 record: "Record Transaction" {class: process}

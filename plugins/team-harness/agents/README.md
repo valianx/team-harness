@@ -76,7 +76,7 @@ failed direct predicate is reported to the operator rather than hidden behind a 
 
 Plus reference files (`ref-pipeline.md`, `ref-direct-modes.md`, `ref-special-flows.md`, `ref-intake-flows.md`, `ref-dispatch-machinery.md`) loaded on demand by `orchestrator`. They are not invocable subagents. `ref-pipeline.md` contains the gated contract that previously made the startup agent 20K+ words; its sections load only after explicit activation.
 
-Plus thirteen cross-cutting snippets in `_shared/` (not invocable agents), installed to `~/.claude/agents/_shared/`:
+Plus cross-cutting snippets in `_shared/` (not invocable agents), installed to `~/.claude/agents/_shared/`:
 
 - `_shared/gh-fallback.md` — single source-of-truth fallback patterns for graceful degradation when the `gh` CLI is unavailable. Consumed by `orchestrator.md`, `ref-special-flows.md`, and skills `issue.md`, `plan.md`, `design.md`, `define-ac.md`, `audit.md`, `review-pr.md` via cross-references.
 - `_shared/implementation-assembly.md` — the coordinator's pre-Freeze version/changelog assembly and complete-candidate commit.
@@ -84,6 +84,9 @@ Plus thirteen cross-cutting snippets in `_shared/` (not invocable agents), insta
 - `_shared/operational-rules.md` — cross-cutting voice, language register, git safety, and pipeline integrity rules. Referenced by all agent `## Voice` sections via `§ "Voice"` and `§ "Language register"`.
 - `_shared/operator-dialogue.md` — chat-surface contract: reply shape, length budgets, identifiers-follow-prose, act-then-report. Binds live replies only. Consumed by `orchestrator.md`.
 - `_shared/dispatch-contract.md` — single source of truth for dispatch prompt content, the pipeline specialist reference, and the two-halves scope rule. Coordinators and leaf specialists consume it by pointer; never restate it inline.
+- `_shared/coordinator-recovery.md` — single source of truth for causal post-failure recovery, progress preservation, and the conditions that may pause a pipeline. Attempts and corrections are observations only.
+- `_shared/coordinator-liveness.md` — single source of truth for SLA, probe, interruption, and declared-path audit mechanics; it delegates all routing to causal recovery.
+- `_shared/orchestrator-state.md` — canonical coordinator-owned state and event schema, including observational counters and legacy compatibility.
 - `_shared/gate-contract.md` — the dual-record STAGE-GATE release contract: bare-literal gate fields, the no-repair invariant, and the STOP-block templates. Consumed by `orchestrator.md`.
 - `_shared/plan-consolidation.md` — the plan-is-a-snapshot invariant: `01-plan.md` carries each canonical field's final, reconciled value, never a change log of how it got there. Consumed by `architect.md`, `plan-reviewer.md`, `qa-plan.md`, `qa.md`, `orchestrator.md`.
 - `_shared/ac-evidence.md` — canonical AC soundness, evidence-type, test-authoring, and acceptance-gate contract. Consumed by `qa-plan.md`, `tester.md`, `qa.md`, and `ref-pipeline.md`.

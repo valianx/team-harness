@@ -43,15 +43,15 @@ hashes, source pointers, helpers, seals, evidence, discovery scope, commands,
 and workspace writes exist only in the referenced immutable
 `team_harness_dispatch_capsule`; prompt-level copies are invalid.
 
-`decision_ref` is the single durable authority correlation, not a
-correction-only field. For an initial Gate-1 dispatch it is the consumed nonce
-on the matching `stage.gate.release`; for a correction it is the consumed nonce
-on `correction.decision`. Main verifies the appropriate durable event before
-spawn, so specialists use one correlation shape for both routes.
+`decision_ref` is the single durable authority correlation, not an attempt or
+retry token. It cites the matching `stage.gate.release` while work stays inside
+that released intent and scope; a later semantic or authority-changing decision
+uses its `correction.decision` nonce instead. Causal recovery never fabricates a
+new authority reference.
 
 Before spawn, Main verifies the exact reference, correlation tokens, capsule
-bytes, and durable authority event. The spawn starts the counted attempt; there
-is no intermediate readiness handshake. Before any repository read, the
+bytes, and durable authority event. The spawn records an attempt observation;
+there is no intermediate readiness handshake. Before any repository read, the
 specialist independently verifies the reference path, SHA-256, canonical
 capsule bytes, scope identity, and bounded correlation values, then proceeds
 directly with the capsule work.
@@ -60,8 +60,9 @@ A missing, stale, malformed, or mismatched reference/correlation closes as
 `dispatch-reference-invalid` with no repository work. Because Main already
 preflighted the same bytes, this result is a mechanical dispatch defect: Main
 may re-certify and redispatch the unchanged semantic scope without fresh
-authority or replacement-budget use. Silence uses the ordinary counted
-specialist liveness lease and never creates a separate start state.
+authority. Silence uses the ordinary specialist liveness lease and never
+creates a separate start state. All further routing comes from
+`agents/_shared/coordinator-recovery.md`, never an attempt count.
 
 The specialist takes every operational coordinate from the capsule, stays
 inside its role-specific ownership, authorizes each workspace write

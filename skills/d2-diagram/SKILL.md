@@ -285,7 +285,8 @@ d2 fmt diagram.d2
 d2 diagram.d2 diagram.svg
 ```
 
-Read the error output if compilation fails — D2 errors point to exact line numbers. Fix and retry. Max 3 attempts.
+Read the error output if compilation fails — D2 errors point to exact line
+numbers. Change the cause and retry; never repeat an unchanged failed action.
 
 ### Step 10: Quality check
 
@@ -512,7 +513,8 @@ If `d2 diagram.d2 output.svg` fails:
 1. Read the error output — D2 errors include the line number and a description
 2. Open `diagram.d2`, find the reported line, fix the issue
 3. Re-run `d2 fmt diagram.d2` first, then re-compile
-4. Max 3 fix attempts before reporting `status: failed` with the last error
+4. Report `status: failed` with the last error only when no verifiable causal
+   repair remains
 
 Common errors and fixes:
 

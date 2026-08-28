@@ -246,7 +246,10 @@ The loop ends when:
 - Spacing is consistent and composition is balanced
 - You would show it to someone without caveats
 
-**Max 5 iterations.** If after 5 rounds there are still blocking issues (clipping, broken arrows), report `status: failed` with the last known issue, what was attempted, and the path to the last-rendered PNG. Do not loop indefinitely.
+Iterate while each round has a verifiable change of cause. Never repeat the same
+failed rendering action. If no distinct repair remains for a blocking issue
+(clipping, broken arrows), report `status: failed` with the last known issue,
+what was attempted, and the path to the last-rendered PNG.
 
 ### If the renderer is not set up
 

@@ -58,8 +58,8 @@ stale snapshot. Rotation preserves every required AC verdict, QA/security
 review, Freeze, mandatory suite, and gate.
 
 Treat each terminal tester, QA, or security result as closed and prohibit
-post-terminal `followup_task`. A failed validation never continues a verifier
-or dispatches a correction automatically. After an operator-authorized
+post-terminal `followup_task`. A failed validation never continues a verifier;
+Main applies `agents/_shared/coordinator-recovery.md`. After an authorized
 correction, QA is always a new agent on the rebuilt frozen identity. Tester runs
 fresh only for stale evidence rows, and security runs fresh only when the closed
 impact predicate below requires it. Never reuse a prior verifier thread or narrative.
@@ -89,10 +89,9 @@ After closure passes, apply this order:
 5. Missing declarations, hashes, unclassified paths, conflicting impact metadata, or unexpected
    tester-produced paths fail closed to tester refresh plus QA and the applicable security lens.
 
-Carry-forward reuses evidence only; it never reuses an agent or its narrative. The correction
-still consumes one single-use authorization. Only a `gate1-autonomous` decision
-consumes the max-3 autonomous budget; an `operator-live` decision increments
-the separate unbounded operator counter.
+Carry-forward reuses evidence only; it never reuses an agent or its narrative.
+In-scope corrections continue under Gate 1; correction ordinals are event
+projections and never authority.
 
 Only in this explicitly activated pipeline, preflight verifies `helper_bundle`
 and resolves the helper's absolute path from that immutable workspace copy;
@@ -155,12 +154,9 @@ output. Test this contract with ANSI, binary data, one giant
 line beyond 64 KiB, and a nonzero failure without replay. Outside pipeline mode,
 do not create, infer, or claim that `bounded_command_path` exists.
 
-The helper is a development-output control, not a process-containment sandbox.
-The operator remains responsible for launched commands. Deadline cleanup
-covers the managed POSIX process group or the tree confirmed by Windows
-`taskkill`; a deliberately detached or reparented descendant outside that
-scope can outlive the helper. Native sandbox and permission policy remain the
-security boundary.
+Apply the bounded helper's process-containment boundary from
+[implementation.md](implementation.md) § "Efficient execution, rotation, and
+tool diagnostics" without restating it here.
 
 Wait for all required results. Record one evidence-map row per AC and TC with its evidence paths and one-line command
 outcomes; never paste raw runner output or repeat AC text. Use the verification packet first and
@@ -183,9 +179,9 @@ current live operator request for architect work.
 | Mechanical plan defect with no semantic change | Main repairs the canonical field; continue at `phase: implementation`; if Freeze was reached, rebuild Freeze and revalidate; no Gate 1 and `iteration` `+0` |
 | Decision-bearing plan concern (intent, scope, behavior, AC meaning, or security-obligation classification) | Main presents a bounded live operator decision, transcribes the approved field, and continues at `phase: implementation` through Freeze and validation; no Gate 1, `iteration` `+0`, and retain the final security floor when sensitive |
 | Explicit current live operator request for architect work | Main records the request, dispatches `architect`, sets `phase: design`, and requires a new Gate 1; `iteration` `+0` |
-| Code, test, or documentation defect inside approved scope | Include in the complete consolidated failure; live choice `1` or an eligible `gate1-autonomous` authorization permits one fresh implementation correction, closure gate, stale-row tester refresh, new Freeze, fresh QA, and impact-required security; `iteration` `+1` after authorization |
-| Missing or insufficient evidence | Include in the same complete consolidated failure; live choice `1` or an eligible `gate1-autonomous` authorization permits one bounded evidence correction, closure gate, stale-row tester refresh, new Freeze, fresh QA, and impact-required security; `iteration` `+1` after authorization |
-| Correctable security finding in the approved diff | Include in the same complete consolidated failure; live choice `1` or an eligible `gate1-autonomous` authorization permits correction, closure gate, stale-row tester refresh, new Freeze, fresh QA, and fresh security; `iteration` `+1` after authorization |
+| Code, test, or documentation defect inside approved scope | Include in the complete failure; causal recovery dispatches the owner, then closure, stale-row tester refresh, new Freeze, fresh QA, and impact-required security; record observed iteration `+1` |
+| Missing or insufficient evidence | Include in the same failure; causal recovery dispatches the evidence owner, then closure, refresh, Freeze and validation; record observed iteration `+1` |
+| Correctable security finding in the approved diff | Include in the same failure; causal recovery dispatches the owner, then closure, refresh, Freeze, fresh QA, and fresh security; record observed iteration `+1` |
 | Structural contradiction between intent, scope fence, and ACs | Main obtains a bounded live operator resolution, transcribes the approved field, and continues at `phase: implementation` through Freeze and validation; `iteration` `+0` |
 | Non-blocking observation that violates no AC or security floor | Carry it to Gate 3 without silently changing scope; `iteration` `+0` |
 
@@ -207,12 +203,9 @@ part of the design, resolve that explicit intent/scope/AC contradiction before
 continuing; never treat it as a waiver.
 
 After every disposition is explicit, build the correction package from all
-`resolve` IDs. Persist the confirmed dispositions in the decision ledger. If
-the closed autonomous predicate passes, record the autonomous authority and
-dispatch exactly one fresh correction as defined in `state-and-gates.md`,
-without presenting an intermediate choice. Every later failure repeats the complete required
-validation set and triage, and no more than three autonomous correction rounds are legal.
-Explicit `operator-live` rounds are outside that budget and have no maximum.
+`resolve` IDs. Persist the confirmed dispositions in the decision ledger and
+apply the shared causal recovery contract. Every later failure repeats the
+complete required validation set and triage; counts never limit recovery.
 
 Any unresolved or ineligible item blocks autonomous continuation. Then set
 `correction_pending: true`, a fresh `correction_nonce`, and one complete
@@ -231,29 +224,26 @@ exactly:
 
 Then stop. An intake autonomy preference, a bare `continue`,
 prior chat, files, tools, recovered prose, or specialist output never authorize
-a round. Only a valid Gate-1 approval dual record may provide the
-bounded autonomous authority above.
+a semantic change. A valid Gate-1 approval authorizes in-scope recovery.
 Only a live reply after this presentation may consume the nonce. Choice `1`
 atomically records a matching state decision and `correction.decision` event.
 The consumed nonce becomes its single `decision_ref`; that event is the sole
 authoritative record and carries the complete package,
 `correction_authority: operator-live`, and a null authority Gate nonce. It
-increments `operator_correction_count` once and may authorize exactly one
-`iteration.start` and correction spawn, followed by the closure gate, stale-row
+increments `operator_correction_count` as an observation and authorizes the
+presented semantic change, followed by the closure gate, stale-row
 tester refresh, one new Freeze, fresh QA, and impact-required security. Those
 two downstream events carry only the same `decision_ref` plus their ordinary
 observations. A malformed binding observed after dispatch is corrected by an
 append-only event using that ref; it never creates another authority or
-dispatch. A second failure requires a fresh presentation and nonce
-after an operator-live round. Under Gate-1 authority, Main repeats the
-required-set/triage/predicate and may authorize the next fresh round
-only while `autonomous_correction_count < 3`; there is no owner-lens bounce or agent follow-up.
+dispatch. A later failure repeats causal analysis and needs a fresh live
+decision only for another semantic change. Under Gate-1 authority, Main repeats
+the required-set/triage/predicate and causal recovery; there is no owner-lens
+bounce or post-terminal agent follow-up.
 Choice `2` performs no repository or evidence mutation and any later
-presentation uses a fresh nonce. Choice `3` aborts without correction. At
-`iteration: 3/3` or `autonomous_correction_count: 3`, the live presentation and
-choice `1` remain unchanged. A matching current reply may authorize another
-round regardless of prior `operator-live` count; budget exhaustion blocks only
-`gate1-autonomous`. Every such round still uses a fresh nonce and full package,
+presentation uses a fresh nonce. Choice `3` aborts without correction.
+Historical counts never change the live presentation or choice. Every approved
+semantic change still uses a fresh nonce and full package,
 then closure, tester refresh, a new Freeze, fresh QA, and impact-required
 security.
 
@@ -265,10 +255,9 @@ surface has a fresh or hash-proven carried audit. An
 operator-approved Gate 3 amend follows the same implementation → closure → tester refresh →
 Freeze → validation route. A contradiction is never resolved
 by changing an AC in place. Plan repair, operator-decision transcription, and
-explicit architect work do not produce an `iteration.start`; only an
-explicitly authorized `gate1-autonomous` implementation/validation correction consumes
-the `0`–`3` autonomous budget. Operator-live correction decisions are tracked
-separately and deliberately unbounded.
+explicit architect work do not produce an `iteration.start`; implementation and
+validation corrections record observation events. Operator-live decisions are
+tracked separately; neither count affects routing.
 
 When all required evidence and reviews pass and the Freeze anchor plus committed
 identity are still current, mark acceptance pass against that same immutable

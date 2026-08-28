@@ -2,9 +2,8 @@
 
 import { isDirectExecution } from "./cli-entrypoint.mjs";
 
-export const SPECIALIST_LIVENESS_SCHEMA_VERSION = 4;
+export const SPECIALIST_LIVENESS_SCHEMA_VERSION = 5;
 export const SPECIALIST_LIVENESS_GRACE_MS = 120_000;
-export const SPECIALIST_LIVENESS_MAX_ATTEMPTS = 2;
 
 export const SPECIALIST_SLA_MS = Object.freeze({
   implementer: 15 * 60_000,
@@ -46,7 +45,6 @@ function decision({
   action,
   deadlineAt = null,
   attempt = null,
-  replacementAttempt = null,
   continuationCount = null,
   failureKind = null,
   observation,
@@ -59,7 +57,6 @@ function decision({
     action,
     deadline_at: deadlineAt,
     attempt,
-    replacement_attempt: replacementAttempt,
     continuation_count: continuationCount,
     failure_kind: failureKind,
     observation,
@@ -112,10 +109,11 @@ export function evaluateSpecialistLiveness(input = {}) {
     ? null
     : (probeDeliveryStateValue ?? "unconfirmed");
   const sla = SPECIALIST_SLA_MS[role];
-  if (!Number.isInteger(sla) || ![1, 2].includes(attempt) || !TOKEN.test(attemptToken ?? "")
+  if (!Number.isInteger(sla) || !Number.isSafeInteger(attempt) || attempt < 1
+    || !TOKEN.test(attemptToken ?? "")
     || dispatchedAt === null || now === null || now < dispatchedAt || !STATUSES.has(agentStatus)
     || typeof ownedPathsChanged !== "boolean" || typeof evidenceChanged !== "boolean"
-    || !Number.isInteger(continuationCount) || continuationCount < 0 || continuationCount > 1
+    || !Number.isSafeInteger(continuationCount) || continuationCount < 0
     || (interruptionCause !== null && !INTERRUPTION_CAUSES.has(interruptionCause))
     || (interruptionCause === "specialist-probe-delivery-unconfirmed"
       && (probeSentAt === null || probeDeliveryState !== "unconfirmed"))
@@ -137,40 +135,16 @@ export function evaluateSpecialistLiveness(input = {}) {
   }
 
   if (agentStatus === "interrupted") {
-    if (ownedPathsChanged || evidenceChanged) {
-      if (interruptionCause === "specialist-probe-delivery-unconfirmed" && continuationCount === 0) {
-        return decision({
-          action: "resume",
-          attempt,
-          continuationCount: 1,
-          failureKind: interruptionCause,
-          observation: "The liveness probe had no delivery receipt and the interrupted specialist left declared progress; resume the same token-bound attempt once without consuming new correction authority.",
-        });
-      }
-      return decision({
-        verdict: "fail",
-        errorCode: "SPECIALIST_INTERRUPTED_WITH_PROGRESS",
-        action: "block",
-        attempt,
-        failureKind: "specialist-interrupted-with-progress",
-        observation: "The interrupted specialist left declared work or evidence; preserve it and block before any replacement.",
-      });
-    }
-    if (attempt < SPECIALIST_LIVENESS_MAX_ATTEMPTS) {
-      return decision({
-        action: "replace",
-        attempt,
-        replacementAttempt: attempt + 1,
-        observation: "The first interrupted attempt left no declared work or evidence; dispatch one fresh same-role replacement.",
-      });
-    }
     return decision({
-      verdict: "fail",
-      errorCode: "SPECIALIST_RETRY_EXHAUSTED",
-      action: "block",
+      action: "recover",
       attempt,
-      failureKind: "specialist-retry-exhausted",
-      observation: "The one allowed fresh same-role replacement also ended unresponsive without progress.",
+      continuationCount,
+      failureKind: ownedPathsChanged || evidenceChanged
+        ? "specialist-interrupted-with-progress"
+        : (interruptionCause ?? "specialist-unresponsive"),
+      observation: ownedPathsChanged || evidenceChanged
+        ? "The interrupted specialist left declared work or evidence; preserve it and enter causal recovery."
+        : "The interrupted specialist left no declared progress; enter causal recovery from the observed failure evidence.",
     });
   }
 
@@ -212,14 +186,14 @@ export function evaluateSpecialistLiveness(input = {}) {
         action: "wait",
         deadlineAt: iso(renewedDeadline),
         attempt,
-        observation: "A matching checkpoint renewed this attempt's lease exactly once.",
+        observation: "The latest matching checkpoint renews this attempt's lease.",
       });
     }
     return decision({
       action: "interrupt",
       attempt,
       failureKind: "specialist-unresponsive",
-      observation: "The single renewed lease expired; interrupt the attempt before auditing its declared paths.",
+      observation: "The renewed lease expired; interrupt the attempt before auditing its declared paths.",
     });
   }
 

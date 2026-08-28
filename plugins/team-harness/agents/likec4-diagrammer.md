@@ -182,7 +182,9 @@ Status remains `success` when the source was produced and validated. Add `render
 npx likec4 validate
 ```
 
-If errors are found, fix them and re-validate. **Max 3 fix cycles.** If still failing after 3 cycles, report `status: failed` with the last error output.
+If errors are found, fix them and re-validate while each cycle changes the
+diagnosed cause. Never repeat an unchanged failed action. Report
+`status: failed` with the last error only when no verifiable repair remains.
 
 ### Step 2 — Structural validation
 

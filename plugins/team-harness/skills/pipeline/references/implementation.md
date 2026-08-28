@@ -211,19 +211,16 @@ shards against it, and embeds the verified coordinates in the capsule.
 `DISPATCH_BINDING_STALE`, a missing/changed seal, or post-seal artifact drift
 blocks capsule creation; neither Main nor the specialist substitutes a digest.
 
-If an already sealed task exhausted exactly two clean implementer/tester
-attempts only because its capsule lacked required external evidence, Main may
-create one generation-2 evidence dispatch without changing the base seal or
-Gate 1. First persist a canonical `team_harness_packet_scope_insufficient`
-incident for the exact service, task shard, role, two exhausted attempts, and
-unchanged owned/evidence paths. Then invoke `bind-evidence-dispatch` with that
-artifact's path/hash and the verified external coordinates. Only a pass result
-creates a new task-local dispatch identity and resets that exact
-service+task+role package to `next_attempt: 1`; other packages, correction
-budgets, progress, seals, and historical attempts remain untouched. A second
-generation-2 identity, non-clean prior attempt, different failure code, or
-coordinate drift fails closed. Every fresh capsule derivation reruns
-`verify-evidence-dispatch` before it can return a verified dispatch reference.
+When a sealed task cannot proceed because its capsule lacks required external
+evidence, Main applies `agents/_shared/coordinator-recovery.md`. Persist the
+exact failure and declared-path audit, preserve any valid progress, then bind
+only the verified read-only evidence coordinates needed by the unchanged
+service, task shard, role, base seal, and Gate 1. The resulting task-local
+dispatch identity is immutable and content-addressed. It supersedes the prior
+identity only after `verify-evidence-dispatch` passes. Historical attempts stay
+observable and never need resetting; repeating the same failed causal identity
+is forbidden. Every fresh capsule derivation reruns
+`verify-evidence-dispatch` before returning a verified dispatch reference.
 
 For an already repaired legacy `sharded-v1` workspace whose original approved
 aggregate contained placeholder overlays, never overwrite the original Gate or
@@ -423,17 +420,24 @@ Do not invoke `quality-runner.mjs` before the replacement: its clean-tree
 precondition is a Freeze property and cannot be satisfied until an implementer
 completes and commits the production work.
 
-Under the same unused correction authority, Main may run each selected local
+Under the same unchanged semantic authority, Main may run each selected local
 command once through the capsule's `bounded-command.mjs` as a
 **non-authoritative dirty-tree diagnostic**. Record the exact tracked status and
 diff digest before and after every command; any command-caused mutation, new
 out-of-scope path, or ambiguous ownership blocks recovery. These receipts may
 inform the correction package but never count as readiness or Freeze quality
 evidence. Re-audit the same owned paths immediately before dispatch, then send
-one fresh implementer the canonical dispatch reference. Main neither edits,
+the implementer the canonical dispatch reference with a new causal recovery
+identity. Main neither edits,
 commits, stashes, nor discards the preserved diff. After the implementer commits
 a clean candidate, run the ordinary RED/GREEN transition, closure checks, and
 single `post_implementation` Freeze quality checkpoint.
+
+For an interrupted tester, the same causal handoff preserves only its declared
+test/evidence paths. Skip production readiness and Freeze diagnostics; the
+tester re-audits that scoped diff, resumes the same test-contract mode,
+and either commits its owned tests or returns the remaining blocker. Main never
+authors, commits, stashes, or discards the tester diff.
 
 Main then invokes `node <test-transition-path> --transition red` against that
 task baseline and current `HEAD` with `--output <coordinator evidence path>`.
@@ -476,8 +480,8 @@ to unrelated coverage, lint, format, build, or database commands. Green requires
 that same test binding, contract bytes, effective test command/runtime and
 version fingerprint, task baseline, and test blobs, with the red candidate ancestral to current
 `HEAD`; the green call uses its own `--output` path, and any mismatch or nonzero result returns to bounded implementation
-correction. Eligible `gate1-autonomous` authority consumes the max-3 autonomous
-budget; a fresh operator-live authorization remains available without a maximum. A task explicitly marked
+correction under the causal recovery contract. Correction and attempt counts
+remain append-only observations and never limit that recovery. A task explicitly marked
 `not-applicable` records that state and its plan-time reason without running the
 checkpoint.
 
@@ -496,13 +500,12 @@ autonomous decision, derive the canonical dispatch reference above. `repair-inde
 may add only missing `pending` rows; Main closes them before retrying. No
 `dispatch-reference-ready-before-authority` result means no nonce or consumed
 authority. Before spawn, re-certify the same scope identity. A mechanical
-transport/capsule repair with unchanged identity reuses the decision and
-consumes no replacement budget;
+transport/capsule repair with unchanged identity reuses the decision;
 identity drift requires a fresh consolidated package and decision.
 
 Test blobs are immutable only during their own active red-to-green transition.
-After that task closes and before final Freeze, a fresh tester may make
-one test-only correction when a previously green expectation contradicts the
+After that task closes and before final Freeze, a tester may make a test-only
+correction when a previously green expectation contradicts the
 same pinned OpenSpec intent. The correction must name the obsolete expectation,
 change no production path, and produce current focused/global evidence. Never
 change production behavior to satisfy a stale test; final Freeze, not a chain
@@ -716,9 +719,9 @@ candidate/manifest identity. Update the current state pointer only after the
 prior terminal attempt is durably bound in events; never overwrite or relabel
 its artifacts. Use fresh attempt-qualified evidence paths for every recovered
 record so no atomic output target can replace an earlier result.
-This live recovery increments the separate unbounded operator correction
-counter and does not consume the max-3 autonomous budget. It needs no new Gate 1 while intent and approved scope are
-unchanged; scope expansion still requires its explicit decision.
+This recovery records the appropriate correction observation. It needs no new
+Gate 1 while intent and approved scope are unchanged; scope expansion still
+requires its explicit decision.
 A selected-command, behavior, scope, protected-path, declared-tool, manifest,
 threshold, or metric failure cannot be waived or sent back to the cleaner.
 Infrastructure or unclassifiable failure blocks. A complete failure or cleaner
@@ -740,50 +743,33 @@ same workspace and branch; only a real change of intent or approved scope
 requires the applicable operator decision. Only the live operator may pause or
 abort the current pipeline.
 
-For one eligible package, Main persists a fresh `cleaner_handoff_nonce` and one
-complete `cleaner_handoff_package` containing the canonical repository,
-absolute worktree, cleanup commit/tree anchor, exact finding objects,
-eligibility result, and any ineligible reasons. It sets
-`cleaner_handoff_pending: true`, pauses, shows that exact scope, and presents
-exactly:
-
-```text
-1 — authorize one implementer pass
-2 — pause without changes
-3 — abort pipeline
-```
-
-Only choice `1` in a live reply to that presentation may consume the nonce and
-dispatch exactly one fresh V2 implementer. The consumed nonce becomes the
-single `decision_ref`; `cleaner.handoff.decision` is the sole authoritative
-record and carries the complete package, while
-`agent.cleaner-handoff.spawn` carries only that `decision_ref` plus ordinary
-dispatch observations.
-Gate-1 autonomy, ordinary approval, a generic `continue`, agent prose, files,
-or tools never authorize this handoff. It emits
-`cleaner.handoff.decision` and `agent.cleaner-handoff.spawn`, never
-`iteration.start` or `agent.correction.spawn`; `iteration` is unchanged and the
-max-3 autonomous validation-correction budget is untouched. The implementer gets
-one terminal attempt, runs every closure check, and stops—no feedback or
-automatic re-dispatch. A non-zero closure command must carry its exact command,
-exit code, and bounded diagnostic; a bare `exit 1` or missing diagnostic is
-`correction-incomplete`, never closure evidence. After the handoff closure
+For one eligible package, Main persists the complete immutable handoff package
+containing repository, absolute worktree, cleanup commit/tree anchor, exact
+findings, eligibility result, and closure checks. Because the package remains
+inside the released Gate-1 intent and scope, Main dispatches it under that
+existing authority and the causal recovery identity; it does not pause for a
+second authorization ceremony. The implementer runs every closure check. A
+non-zero closure command must carry its exact command, exit code, and bounded
+diagnostic; a bare `exit 1` or missing diagnostic is
+`correction-incomplete`, never closure evidence. Main preserves progress,
+classifies the cause, and may redispatch only after a verifiable causal change.
+After the handoff closure
 commands, Main proceeds to the single
 `post_implementation` Freeze quality run below; it never runs a separate
 focused quality subset that could conceal an omitted control. Main records the
 bounded result/hash and reruns hygiene without
 dispatching the cleaner again. Pass records `cleaner_evidence.status: handoff-pass` and proceeds
-to Freeze. Any remaining or new correctable finding consumes no development
-iteration but requires a new package, nonce, and live authorization before
-another fresh implementer; infrastructure failure blocks. Scope expansion must
-first receive its own explicit operator decision and still does not authorize
+to Freeze. Any remaining or new correctable finding receives a new immutable
+package and causal recovery identity; infrastructure failure pauses only when
+no verifiable recovery exists. Scope expansion must first receive its own
+explicit operator decision and still does not authorize
 the implementer pass.
 
 An implementer `failed` or `blocked` return maps to `handoff-failed` or
-`handoff-blocked` with its hashed terminal result and `decision_ref`. Neither
+`handoff-blocked` with its hashed terminal result and causal recovery identity. Neither
 state may run or pass the Freeze quality run, hygiene, or Freeze. Further
-work requires a new complete package, fresh nonce, presentation, and live
-authorization; it is never an automatic retry.
+work requires a new complete package and a verifiable causal change. It remains
+under the existing Gate-1 authority unless intent or approved scope changes.
 
 With no implementer package, persist the overreach-proof result/hash, cleaner
 commit, candidate identity, and `cleaner_evidence.status: pass`.
@@ -847,11 +833,12 @@ acceptance criterion merely to manufacture a pass.
 For an authorized correction, the implementer runs every package closure check
 and returns the actual result in `finding_resolutions`. Main verifies that every
 finding ID has one successful result, records it durably, and consolidates it
-into `02-implementation.md` before any Freeze rebuild. Missing or failed closure evidence is
-`failure_kind: correction-incomplete`: the consumed correction round remains consumed, no Freeze
-opens, and no validator is dispatched. Main consolidates the failed checks as the next package;
-an operator-live correction pauses and retains a fresh unbounded operator-live choice,
-while eligible autonomy may authorize another round only within its max-3 budget.
+into `02-implementation.md` before any Freeze rebuild. Missing or failed
+closure evidence is `failure_kind: correction-incomplete`: no Freeze opens and
+no validator is dispatched. Main preserves valid progress, consolidates the
+failed checks as the next package, and follows
+`agents/_shared/coordinator-recovery.md` without a numeric retry or correction
+ceiling.
 
 ## Post-Gate-1 plan-write boundary
 

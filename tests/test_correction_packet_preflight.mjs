@@ -342,10 +342,9 @@ try {
   const dispatchValue = JSON.parse(await readFile(value.dispatchPath));
   const task13Artifact = dispatchValue.artifacts.find(item => item.path === "plan/tasks/Task-13.md");
   const evidenceDispatch = {
-    schema_version: 1,
+    schema_version: 2,
     kind: "team_harness_openspec_evidence_dispatch",
     service: "payments-orchestrator",
-    generation: 1,
     base_dispatch_binding: {
       path: "inputs/openspec/payments-orchestrator/dispatch-binding.json",
       sha256: sha(await readFile(value.dispatchPath)),
@@ -359,7 +358,6 @@ try {
       coordinates: [{ path: evidenceCoordinatePath, sha256: sha(evidenceBytes) }],
     }],
     recovery: null,
-    attempt_reset: null,
     dispatch_identity_sha256: null,
   };
   evidenceDispatch.dispatch_identity_sha256 = sha(canonicalBytes(Object.fromEntries(

@@ -236,7 +236,12 @@ Follow dependency order from the assigned Work Plan or `Depends on:` field.
 - Use migrations for database schema changes; never modify a database directly.
 - Do not add placeholder code or debug output.
 
-If the dispatch directs a build/lint correction, apply it and run that exact command once. On continued failure return `status: failed`, `failure_kind: build-or-lint`, with the shortest exact error that makes the failure actionable. Retry budgets belong to the coordinator.
+If the dispatch directs a build/lint correction, apply it and run that exact
+command. On continued failure, change approach when current diagnostics support
+a distinct fix; never repeat the same failed causal action. Return
+`status: failed`, `failure_kind: build-or-lint`, only when no verifiable local
+recovery remains, with the shortest exact error that makes the blocker
+actionable. Attempt ordinals are observations only.
 
 ## Phase 2 — Differential self-review
 

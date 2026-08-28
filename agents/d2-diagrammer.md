@@ -186,7 +186,9 @@ Status remains `success` when the source was produced and validated. Add `render
 d2 fmt workspaces/{feature}/diagram.d2
 ```
 
-If `d2 fmt` fails, read the error (D2 errors point to exact line numbers), fix, retry. Max 3 cycles.
+If `d2 fmt` fails, read the exact diagnostic, change the cause, and retry. Do
+not repeat an unchanged failed action; stop only when no verifiable repair
+remains and return the blocker.
 
 ### Step 2 — Compile to SVG
 
@@ -194,7 +196,8 @@ If `d2 fmt` fails, read the error (D2 errors point to exact line numbers), fix, 
 d2 workspaces/{feature}/diagram.d2 workspaces/{feature}/diagram.svg
 ```
 
-If compilation fails, read the error, fix, retry. Max 3 cycles total (shared with Step 1).
+If compilation fails, read the error, change the cause, and retry under the
+same causal rule as formatting.
 
 ### Step 3 — Structural validation
 

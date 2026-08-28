@@ -25,10 +25,11 @@ Run every update command as its own tool call. Keep reads sandboxed. For a
 mutation whose declared target is outside the current materialized writable
 roots, request native escalation before its first execution; otherwise run it
 sandboxed first. If a sandboxed mutation returns `EROFS`, `EACCES`, `EPERM`, or
-the bridge helper's `CACHE_WRITE_PROTECTED`, retry the exact argv once with
+the bridge helper's `CACHE_WRITE_PROTECTED`, retry the exact argv with
 narrow escalation and `login:false`. A successful retry is authoritative and
 the initial sandbox denial is not `partial-convergence`. A rejected approval or
-failed retry is `partial-convergence` at that step. Never chain mutations,
+failed escalated action is `partial-convergence` at that step; never repeat that
+unchanged failed action. Never chain mutations,
 change argv between attempts, ask the operator to run the command, or add the
 plugin cache, agent directory, or whole Codex home to persistent writable
 roots. `manage_runtime.py ensure` has the additional live approval gate below
