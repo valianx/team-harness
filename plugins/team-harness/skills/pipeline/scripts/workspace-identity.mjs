@@ -3,7 +3,7 @@
 
 import { lstat, readFile, readdir, realpath } from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { isDirectExecution } from "./cli-entrypoint.mjs";
 
 export const WORKSPACE_IDENTITY_SCHEMA_VERSION = 1;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -182,7 +182,7 @@ export async function discoverWorkspaceIdentity({ searchRoot, slug, repositoryId
   return { status: matches.length === 0 ? "not-found" : "ambiguous", identity: null, candidates: matches.map(value => value.coordinator_root).sort() };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectExecution(import.meta.url)) {
   process.stderr.write("workspace-identity.mjs is a library helper; Team Harness supplies verified inputs.\n");
   process.exitCode = 2;
 }

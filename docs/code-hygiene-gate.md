@@ -1,7 +1,7 @@
 # Code-Hygiene Gate — Contract and Site Enumeration
 
 > Single source of truth for the Stage-2 code-hygiene contract: the canonical work-narration
-> pattern set, the fixed scan command, the operational definition of "source-code comment," and
+> categories, the deterministic helper, the operational definition of "source-code comment," and
 > the enumeration of every execution site that dispatches or consumes this contract. Sibling to
 > `docs/code-comments.md` (the authoring guide this gate enforces) and `docs/testing.md`
 > (the structural suite that pins the enumeration below).
@@ -15,15 +15,15 @@ state the producer contract (WHY-only comments, no work-narration, explained cap
 Until this gate existed, compliance depended entirely on the generator's own self-review — no downstream check ever
 re-verified it. This gate closes that loop with two complementary layers:
 
-- **Layer 1 — deterministic, mechanical, pre-verify.** A fixed `git diff` + `grep -E` scan that
+- **Layer 1 — deterministic, mechanical, pre-verify.** A versioned helper scan that
   the orchestrator runs once per task, before the parallel verify block opens. No judgment, no
   model call — a script decides.
 - **Layer 2 — judgment, holistic, in-verify.** `qa` (validate mode) audits the same diff for
   violations a mechanical scan cannot catch: over-cap functions without a documented exception,
   WHAT-restating comments, dead code, magic numbers.
 
-Both layers consume the same pattern set and the same operational definitions defined in this
-file — one source of truth, never two independently-maintained copies.
+The versioned pattern implementation lives only in `skills/pipeline/scripts/code-hygiene.mjs`;
+this document owns its meaning and lifecycle rather than copying its regular expressions.
 
 ---
 
@@ -53,81 +53,27 @@ references to `workspaces/` paths, pipeline phase/stage/step tokens used as narr
 issue-ID narration, session-context phrasing, and plan-artifact identifier tags (`AC-{n}`,
 `TC-{n}`, `SEC-{n}`).
 
-### 3.1 Fixed scan command (pinned, copy verbatim)
+### 3.1 Deterministic helper
 
-Both layers reference this exact command as the ground truth for "what counts as a violation."
-Run against `verification_base_ref` from `00-state.md`, scoped to the task's diff. Before
-invoking the pinned command, set `BASE_REF` to that exact state literal; the shell variable
-is an invocation alias, not a second source:
+Main resolves `code-hygiene.mjs` from the verified workspace helper bundle and invokes it once
+with five exact flag/value pairs: `--repo`, `--workspace`, `--base`, `--candidate`, and
+`--output`. `--base` is `verification_base_ref`; `--candidate` is the clean current HEAD; and
+`--output` is an authorized absolute evidence coordinate below the workspace.
 
-```bash
-code_hygiene_scan() {
-  local diff_file status
-  local -a pipeline_status
-  diff_file="$(mktemp)" || return 2
-  if ! git diff --unified=0 "${BASE_REF}"...HEAD -- . \
-    ':(exclude)*.md' ':(exclude)*.markdown' \
-    ':(exclude)*.rst' ':(exclude)*.txt' ':(exclude)*.adoc' \
-    >"${diff_file}"; then
-    rm -f "${diff_file}"
-    return 2
-  fi
-
-  set -o pipefail
-  grep -E '^\+' "${diff_file}" \
-  | grep -v -E '^\+\+\+' \
-  | grep -E '^\+[[:space:]]*(//|/\*|\*|#|<!--|--|;)' \
-  | grep -E \
-    -e 'workspaces/' \
-    -e 'Phase [0-9]' \
-    -e 'Stage [0-9]' \
-    -e 'Step [0-9]' \
-    -e 'STAGE-GATE' \
-    -e 'per Step' \
-    -e 'added for issue' \
-    -e 'issue #[0-9]' \
-    -e 'task-[0-9]' \
-    -e 'per operator instruction' \
-    -e 'in this run' \
-    -e 'workspace note' \
-    -e '[^A-Za-z]AC-[0-9]' \
-    -e '[^A-Za-z]TC-[0-9]' \
-    -e '[^A-Za-z]SEC-[0-9]'
-  pipeline_status=("${PIPESTATUS[@]}")
-  rm -f "${diff_file}"
-  for status in "${pipeline_status[@]}"; do
-    (( status >= 2 )) && return 2
-  done
-  (( pipeline_status[3] == 0 )) && return 0
-  return 1
-}
-code_hygiene_scan
-```
-
-**Pipe stages, in order:** (1) diff against base, prose extensions excluded via pathspec; (2)
-added lines only (`^+`); (3) drop the `+++` file-header line; (4) comment-leader lines only —
-this is the operational definition from § 2, mechanized; (5) the canonical work-narration
-alternation.
-
-**Exit-code contract.** The function exits `1` (no lines matched) on a clean diff, `0` (lines
-matched) on a violation, or `2`+ on a genuine error (failed diff, malformed regex, missing file).
-Treat exit `2`+ as an **escalation**, never a silent pass — a broken command must not be misread
-as "no violations found." The diff is materialized and checked before the filter pipeline runs;
-every `PIPESTATUS` entry is checked before the final grep's `0`/`1` is interpreted.
-
-**File:line resolution.** The pinned command above resolves WHICH lines violate the pattern set;
-resolving the exact `file:line` for the failure brief is a standard unified-diff line-tracking
-step layered on top (track the current file from each `+++ b/<file>` hunk header and the running
-`+`-side line counter from each `@@ -a,b +c,d @@` hunk header, incrementing once per matched `+`
-line). That resolution script is dispatch-time tooling, not a pinned literal — only the match
-command above is fixed and testable.
+The helper owns pattern versioning, prose exclusions, bounded Git access, file/line resolution,
+base ancestry, clean-tree and current-candidate checks, atomic evidence persistence, and terminal
+exit status. It always emits one bounded `team_harness_code_hygiene_receipt`; the referenced
+schema-v1 result binds repository, base/candidate SHA, diff SHA-256, scanned bytes, pattern
+version, and bounded `{path, line, pattern}` violations. Pass exits zero. A violation or any
+contract/runtime failure persists a fail-shaped result when the output coordinate is valid and
+exits nonzero; exit zero without the receipt and hash-matched result is never evidence.
 
 ---
 
 ## 4. Layer 1 — Phase 2.6 Code-Hygiene Scan (deterministic)
 
-**Owner:** `agents/ref-pipeline.md` — not a subagent dispatch, a Bash gate the orchestrator runs
-itself (same shape as the Phase 2-close scope check and the Phase 2.8 Freeze's build verification).
+**Owner:** Main — not a subagent dispatch. The helper and its result schema are the only
+mechanical implementation; coordinator prose never reconstructs the scan.
 
 **When:** between Phase 2.5 (Constraint Reconciliation) and Phase 2.7 (Test Authoring), for
 every `type` (`feature`/`fix`/`refactor`/`enhancement`/`hotfix`) — no skip condition beyond the
@@ -137,9 +83,9 @@ existing operator-declared fast-path mechanisms.
 
 | Result | Action |
 |---|---|
-| Clean (final `grep` exits `1`) | Emit a structural trace event only (`stage2.hygiene`, `verdict: pass`) — **never operator-facing prose**. Advance to Phase 2.7. |
-| Violations found (final `grep` exits `0`) | Emit `stage2.hygiene` (`verdict: fail`, `extra: {files, count}`). Write a `failure-brief.md` correction entry with `Blast radius: localized {file:line, ...}`. Re-dispatch `implementer` under the BOUNDED-PATCH contract (`agents/implementer.md § BOUNDED-PATCH contract`). Re-run the scan only; the verification packet does not exist yet. |
-| Command error (final `grep` exits `2`+, or `git diff` itself failed) | Escalate — do not advance and do not silently treat as clean. Surface to the operator. |
+| Receipt/result pass | Record `stage2.hygiene`, `verdict: pass`, its result path/SHA, then continue. |
+| `WORK_NARRATION_DETECTED` | Record the fail evidence and add one localized correction finding from its bounded locations. |
+| Any other fail, missing receipt, or hash mismatch | Block Freeze as infrastructure/contract failure; never reinterpret it as clean. |
 
 **Correction-round budget:** a hygiene violation consumes one implementation/validation
 correction round in the existing max-3 cap and returns through implementation → Freeze →
@@ -228,8 +174,7 @@ training reviewers to expect noise from this file).
 Two structural properties make this safe by construction:
 
 1. **This file is prose (`.md`).** Per § 2, prose-extension files are excluded from the Layer-1
-   scan entirely — the pattern alternation in § 3.1 lives inside a fenced `grep` command block,
-   and every line of that block starts with `grep`/`|`/`-e`, never a source-code comment leader.
+   scan entirely; the executable pattern set lives only in the helper source.
 2. **A test file is source code, not prose.** Any "bad-example"
    string the structural suite uses to validate the pattern set MUST be built via string
    concatenation (e.g. `"work" + "spaces/" + "foo.ts:12"`) rather than committed as a contiguous

@@ -125,7 +125,7 @@ async function fixture() {
   await writeFile(path.join(workspace, task9Path), task9Bytes);
   await writeFile(path.join(workspace, task13Path), task13Bytes);
   await writeFile(path.join(workspace, servicePlanPath), servicePlanBytes);
-  await writeFile(path.join(workspace, "plan", "invariants.md"), "# Invariants\n\n- I-1\n- I-10\n");
+  await writeFile(path.join(workspace, "plan", "invariants.md"), "# Invariants\n\n- **I-1:** first invariant\n- **I-10:** tenth invariant\n");
 
   const qualityBytes = Buffer.from("{\"commands\":{\"test\":[\"npm\",\"test\"]}}\n");
   const qualityPath = path.join(workspace, ".team-harness", "quality.json");
@@ -191,7 +191,7 @@ async function fixture() {
     aggregate_sha256: "d".repeat(64),
     service: "payments-orchestrator",
     task_ids: ["Task-13", "Task-9"],
-    test_contract_evidence: stateSummary(indexBytes, tasks, 2),
+    test_contract_evidence: stateSummary(indexBytes, tasks, 2, true),
     dispatch_request: {
       role: "implementer",
       mode: "implementation",
@@ -209,7 +209,7 @@ async function fixture() {
     bindingsVerifier: async () => ({ verdict: "pass", manifest: { bindings: [binding], evidence_repositories: [] } }),
     helperBundleVerifier: async () => ({
       verdict: "pass",
-      compatibility_epoch: "team-harness-pipeline-helper-api-v3",
+      compatibility_epoch: "team-harness-pipeline-helper-api-v4",
       bundle_identity_sha256: "a".repeat(64),
       helper_paths: {
         "bounded-command.mjs": boundedCommandPath,
@@ -218,19 +218,27 @@ async function fixture() {
       },
     }),
   };
-  return { root, workspace, indexPath, dispatchPath, input, dependencies, liveSource, intentSha };
+  return { root, workspace, repository, indexPath, dispatchPath, input, dependencies, binding, liveSource, intentSha };
 }
 
 const value = await fixture();
 try {
-  const incomplete = await preflightCorrectionPacket(value.input, value.dependencies);
-  assert.equal(incomplete.verdict, "repair");
-  assert.equal(incomplete.error_code, "TEST_CONTRACT_COVERAGE_INCOMPLETE");
-  assert.deepEqual(incomplete.missing_required_tasks, ["payments-orchestrator:Task-9"]);
-  assert.deepEqual(incomplete.task_ids, ["Task-9", "Task-13"]);
-  assert.equal(incomplete.task_intent_sha256, value.intentSha);
-  assert.equal(incomplete.source_coordinates[0].content_sha256, sha(Buffer.from(value.liveSource)));
-  assert.notEqual(incomplete.source_coordinates[0].content_sha256, incomplete.task_intent_sha256);
+  const unrelatedMissing = await preflightCorrectionPacket({
+    ...value.input,
+    task_ids: ["Task-13"],
+  }, value.dependencies);
+  assert.equal(unrelatedMissing.verdict, "pass", JSON.stringify(unrelatedMissing));
+  assert.deepEqual(unrelatedMissing.missing_required_tasks, ["payments-orchestrator:Task-9"]);
+  assert.deepEqual(unrelatedMissing.pending_required_tasks, ["payments-orchestrator:Task-9"]);
+  assert.deepEqual(unrelatedMissing.task_ids, ["Task-13"]);
+  assert.equal(unrelatedMissing.task_intent_sha256, value.intentSha);
+  assert.equal(unrelatedMissing.source_coordinates[0].content_sha256, sha(Buffer.from(value.liveSource)));
+  assert.notEqual(unrelatedMissing.source_coordinates[0].content_sha256, unrelatedMissing.task_intent_sha256);
+
+  const selectedMissing = await preflightCorrectionPacket(value.input, value.dependencies);
+  assert.equal(selectedMissing.verdict, "repair");
+  assert.equal(selectedMissing.error_code, "TEST_CONTRACT_TASK_PENDING");
+  assert.deepEqual(selectedMissing.pending_selected_tasks, ["payments-orchestrator:Task-9"]);
 
   const repaired = await repairTestContractCoverage(value.input, value.dependencies);
   assert.equal(repaired.verdict, "pass");
@@ -247,7 +255,7 @@ try {
   }, value.dependencies);
   assert.equal(pending.verdict, "repair");
   assert.equal(pending.error_code, "TEST_CONTRACT_TASK_PENDING");
-  assert.equal(pending.action, "complete-required-test-contracts-before-presentation");
+  assert.equal(pending.action, "run-preimplementation-tester-before-presentation");
   assert.deepEqual(pending.pending_required_tasks, ["payments-orchestrator:Task-9"]);
 
   const pretest = await certifyCorrectionPacket({
@@ -310,7 +318,7 @@ try {
     ...completeInput,
   }, value.dependencies);
   assert.equal(certified.verdict, "pass", JSON.stringify(certified));
-  assert.equal(certified.action, "dispatch-ready-before-authority");
+  assert.equal(certified.action, "dispatch-reference-ready-before-authority");
   assert.deepEqual(Object.keys(certified.dispatch_reference).sort(), [
     "kind", "path", "schema_version", "scope_identity_sha256", "sha256",
   ]);
@@ -325,6 +333,74 @@ try {
   assert.equal(capsule.openspec.task_shards.length, 2);
   assert.equal(capsule.openspec.source_coordinates[0].content_sha256, sha(Buffer.from(value.liveSource)));
   assert.notEqual(capsule.openspec.source_coordinates[0].content_sha256, capsule.openspec.task_intent_sha256);
+
+  const evidenceRepository = path.join(value.root, "payments-registry");
+  const evidenceCoordinatePath = "docs/route.json";
+  const evidenceBytes = Buffer.from("{\"provider\":\"psp-a\"}\n");
+  await mkdir(path.join(evidenceRepository, "docs"), { recursive: true });
+  await writeFile(path.join(evidenceRepository, evidenceCoordinatePath), evidenceBytes);
+  const dispatchValue = JSON.parse(await readFile(value.dispatchPath));
+  const task13Artifact = dispatchValue.artifacts.find(item => item.path === "plan/tasks/Task-13.md");
+  const evidenceDispatch = {
+    schema_version: 1,
+    kind: "team_harness_openspec_evidence_dispatch",
+    service: "payments-orchestrator",
+    generation: 1,
+    base_dispatch_binding: {
+      path: "inputs/openspec/payments-orchestrator/dispatch-binding.json",
+      sha256: sha(await readFile(value.dispatchPath)),
+    },
+    task_shard: { path: task13Artifact.path, sha256: task13Artifact.sha256 },
+    evidence_sources: [{
+      service: "payments-registry",
+      repository_root: evidenceRepository,
+      repository_identity: "payments-registry@test",
+      purpose: "routing contract",
+      coordinates: [{ path: evidenceCoordinatePath, sha256: sha(evidenceBytes) }],
+    }],
+    recovery: null,
+    attempt_reset: null,
+    dispatch_identity_sha256: null,
+  };
+  evidenceDispatch.dispatch_identity_sha256 = sha(canonicalBytes(Object.fromEntries(
+    Object.entries(evidenceDispatch).filter(([key]) => key !== "dispatch_identity_sha256"),
+  )));
+  const evidenceDispatchPath = "inputs/openspec/payments-orchestrator/Task-13-evidence.json";
+  const evidenceDispatchBytes = canonicalBytes(evidenceDispatch);
+  await writeFile(path.join(value.workspace, evidenceDispatchPath), evidenceDispatchBytes);
+  const evidenceDependencies = {
+    ...value.dependencies,
+    bindingsVerifier: async () => ({
+      verdict: "pass",
+      manifest: {
+        bindings: [value.binding],
+        evidence_repositories: [{
+          service: "payments-registry",
+          repository_root: evidenceRepository,
+          repository_identity: "payments-registry@test",
+        }],
+      },
+    }),
+  };
+  const evidenceCertified = await certifyCorrectionPacket({
+    ...completeInput,
+    task_ids: ["Task-13"],
+    dispatch_request: {
+      ...completeInput.dispatch_request,
+      evidence_dispatch_binding: {
+        path: evidenceDispatchPath,
+        sha256: sha(evidenceDispatchBytes),
+        dispatch_identity_sha256: evidenceDispatch.dispatch_identity_sha256,
+      },
+    },
+  }, evidenceDependencies);
+  assert.equal(evidenceCertified.verdict, "pass", JSON.stringify(evidenceCertified));
+  const evidenceCapsule = JSON.parse(await readFile(evidenceCertified.dispatch_reference.path));
+  assert.equal(evidenceCapsule.roots.evidence_roots["payments-registry"], evidenceRepository);
+  assert.deepEqual(evidenceCapsule.evidence_dispatch.sources[0].coordinates, [{
+    path: evidenceCoordinatePath,
+    sha256: sha(evidenceBytes),
+  }]);
 
   const ownerDerived = await certifyCorrectionPacket({
     ...completeInput,
@@ -405,7 +481,7 @@ try {
     decision_ref: "7715759dac17313518c4866ded2d0905",
   });
   assert.equal(verifiedReference.verdict, "pass");
-  assert.equal(verifiedReference.action, "ack-dispatch-ready");
+  assert.equal(verifiedReference.action, "dispatch-reference-verified");
   assert.equal(verifiedReference.attempt_token, "payments-contract-recovery-v4-a1");
   assert.equal(verifiedReference.decision_ref, "7715759dac17313518c4866ded2d0905");
   const mistypedReference = await verifyDispatchReference({
@@ -418,7 +494,7 @@ try {
     decision_ref: "7715759dac17313518c4866ded2d0905",
   });
   assert.equal(mistypedReference.verdict, "fail");
-  assert.equal(mistypedReference.action, "dispatch-reference-invalid-before-ready");
+  assert.equal(mistypedReference.action, "dispatch-reference-invalid");
   const malformedToken = await verifyDispatchReference({
     workspace: value.workspace,
     dispatch_reference: certified.dispatch_reference,
@@ -426,7 +502,7 @@ try {
     decision_ref: "7715759dac17313518c4866ded2d0905",
   });
   assert.equal(malformedToken.verdict, "fail");
-  assert.equal(malformedToken.action, "dispatch-reference-invalid-before-ready");
+  assert.equal(malformedToken.action, "dispatch-reference-invalid");
   const malformedDecision = await verifyDispatchReference({
     workspace: value.workspace,
     dispatch_reference: certified.dispatch_reference,
@@ -434,7 +510,7 @@ try {
     decision_ref: "wrong\ndecision",
   });
   assert.equal(malformedDecision.verdict, "fail");
-  assert.equal(malformedDecision.action, "dispatch-reference-invalid-before-ready");
+  assert.equal(malformedDecision.action, "dispatch-reference-invalid");
 
   const sealedDispatch = JSON.parse(await readFile(value.dispatchPath));
   await writeFile(value.dispatchPath, canonicalBytes({

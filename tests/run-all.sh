@@ -409,6 +409,7 @@ run_node_suite "specialist-liveness" "test_specialist_liveness.mjs" "node not fo
 run_node_suite "specialist-write-scope" "test_specialist_write_scope.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "correction-packet-preflight" "test_correction_packet_preflight.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "helper-bundle" "test_helper_bundle.mjs" "node not found — install Node.js to run this suite"
+run_node_suite "pipeline-helper-entrypoints" "test_pipeline_helper_entrypoints.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "openspec-design-e2e" "test_openspec_design_e2e.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "herdr-message" "test_herdr_message.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "resume-session-workspace" "test_resume_session_workspace.mjs" "node not found — install Node.js to run this suite"
@@ -432,13 +433,17 @@ echo "# Requires: node and git. Missing runtimes follow CI-required semantics."
 echo "############################################################"
 if ! command -v node >/dev/null 2>&1; then
     report_skip_or_fail "quality-runner" "node not found — install Node.js to run this suite"
+    report_skip_or_fail "code-hygiene" "node not found — install Node.js to run this suite"
 elif ! command -v git >/dev/null 2>&1; then
     report_skip_or_fail "quality-runner" "git not found — install Git to run this suite"
+    report_skip_or_fail "code-hygiene" "git not found — install Git to run this suite"
 elif node "$TESTS_DIR/test_quality_runner.mjs"; then
     echo "quality-runner: PASS"
+    run_node_suite "code-hygiene" "test_code_hygiene.mjs" "node not found — install Node.js to run this suite"
 else
     echo "quality-runner: FAIL"
     FAILED=$((FAILED + 1))
+    run_node_suite "code-hygiene" "test_code_hygiene.mjs" "node not found — install Node.js to run this suite"
 fi
 
 echo

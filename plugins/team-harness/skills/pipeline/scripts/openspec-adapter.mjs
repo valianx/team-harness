@@ -12,6 +12,8 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { isDirectExecution } from "./cli-entrypoint.mjs";
+
 import { runBoundedCommand } from "./bounded-command.mjs";
 
 export const OPENSPEC_ADAPTER_SCHEMA_VERSION = 2;
@@ -460,7 +462,7 @@ async function runCli() {
   return inspectRuntimeIntegration(options);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+if (isDirectExecution(import.meta.url)) {
   const output = await runCli().catch(() => cliError("unknown"));
   process.stdout.write(`${JSON.stringify(output)}\n`);
   if (!isOpenSpecAdapterResult(output) || !["ready", "provisionable", "provisioned", "declined"].includes(output.outcome)) process.exitCode = 1;

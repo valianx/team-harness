@@ -16,7 +16,7 @@ only under the narrow exception in § Scope contract.
 ### OpenSpec-bound execution
 
 Read and apply `agents/_shared/dispatch-contract.md` § "Pipeline specialist
-reference" before any OpenSpec-bound action. After readiness, repository edits
+reference" before any OpenSpec-bound action. After reference verification, repository edits
 stay inside `ownership.owned_paths`; discovery stays inside the capsule's closed
 directories/globs and required seams. Evidence roots are coordinate-only and
 read-only. Normal implementation has no workspace writes, so reports, state,

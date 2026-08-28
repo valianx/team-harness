@@ -347,8 +347,7 @@ One taxonomy for everything that can go wrong, so the budget question is answere
 | `failure_kind` | The observable cause | Owner | Budget | On exhaustion |
 |---|---|---|---|---|
 | `transport` | The `Task` call itself errored — the harness failed and no specialist result was ever produced | you | retry exactly once | STOP the phase; report the harness's **literal** error message, never paraphrased. No workaround that bypasses the specialist |
-| `specialist-start-unconfirmed` | An implementer/tester never returned `dispatch-ready` before its liveness lease expired | dispatch transport | apply only `agents/_shared/dispatch-contract.md` § "Pipeline specialist reference"; no attempt or replacement budget exists yet | clean audit pauses the same decision/reference without automatic redispatch; progress is a contract violation |
-| `specialist-unresponsive` | After `dispatch-ready`, an implementation-or-later specialist exceeded its role SLA and then returned neither a matching checkpoint ACK nor a terminal result before the deterministic liveness lease expired | counted native attempt | interrupt, audit only declared owned/evidence paths, then at most one fresh same-role replacement when the audit is clean | `status: blocked` as `specialist-interrupted-with-progress` when any declared path changed, or `specialist-retry-exhausted` after a clean second counted attempt; Main never performs the specialist work |
+| `specialist-unresponsive` | An implementation-or-later specialist exceeded its role SLA and then returned neither a matching checkpoint ACK nor a terminal result before the deterministic liveness lease expired | counted native attempt | interrupt, audit only declared owned/evidence paths, then at most one fresh same-role replacement when the audit is clean | `status: blocked` as `specialist-interrupted-with-progress` when any declared path changed, or `specialist-retry-exhausted` after a clean second counted attempt; Main never performs the specialist work |
 | `invalid-return` | A result came back, but a decision-bearing fact is absent or ambiguous after the coordinator has normalized any unambiguous formatting defect from the returned evidence | the specialist | re-dispatch once, naming the unresolved fact | STOP only when the fact remains ambiguous; never invent evidence or a result |
 | `stale-context` | A snapshot-bound result names a missing or different reviewed head/context identity than its dispatch | review coordinator | no retry against the old snapshot; recapture and re-dispatch under the owning freshness barrier | STOP without publishing if a fresh snapshot cannot be established |
 | `artifact-missing` | A required output **file** is absent, empty, or unparseable while the dispatch reported success | the owning specialist | re-dispatch once | STOP; never author the missing artifact yourself |
@@ -528,7 +527,7 @@ canonical `team_harness_dispatch_reference` defined in
 `agents/_shared/dispatch-contract.md`. The specialist prompt carries only that
 reference plus ordinary correlation. Read and apply
 `agents/_shared/dispatch-contract.md` § "Pipeline specialist reference" for
-readiness, attempt start, and pre-ready recovery. Autonomous
+pre-spawn verification, attempt start, and mechanical reference recovery. Autonomous
 authority carries the exact consumed Gate-1 nonce; operator-live carries null.
 It may not narrow to one finding, widen scope, or reuse an old nonce. After the
 bounded implementation/evidence work, require a recorded PASS for every package closure check
@@ -544,68 +543,8 @@ agent follow-up, or second dispatch is authorized by the prior decision.
 
 ### Wait heartbeat and bounded specialist liveness lease
 
-A runtime wait timeout before the role SLA is only a coordinator heartbeat: it
-returns control to Main and does not fail, stop, or otherwise change the
-specialist. In Codex, a `wait_agent` timeout proves neither failure nor terminal
-state. Resume the directed wait without inferring failure from one or more wait
-intervals.
-
-Track the phase SLA independently from the wait heartbeat and from dispatch
-time:
-
-| Phase | Agent | SLA |
-|---|---|---|
-| design | architect | 10 min |
-| implementation | implementer | 15 min |
-| implementation | tester | 10 min |
-| implementation | cleaner | 5 min |
-| validation | tester | 10 min |
-| validation | qa | 5 min |
-| validation | security | 10 min |
-| delivery | delivery | 5 min |
-
-The architect Design attempt keeps its existing operator-owned timeout: on SLA
-exceed, report once, append `agent.sla`, and keep waiting unless the live
-operator cancels it. For implementation, tester, cleaner, QA, security, and
-delivery attempts, evaluate the exact input with
-`skills/pipeline/scripts/specialist-liveness.mjs` (or its packaged projection).
-That helper is the only silence-to-action classifier:
-
-1. At the first role-SLA exceed, append `agent.sla`, send one native
-   `TH-LIVENESS-PROBE` carrying the attempt token, and grant exactly two minutes
-   for the matching `TH-LIVENESS-ACK` checkpoint. Native message acceptance is
-   `probe_delivery_state: unconfirmed` unless the tool exposes an explicit
-   delivery/read receipt; never promote acceptance to `confirmed`. The event's
-   `extra` records `attempt`, `attempt_token`, `liveness_action`, `deadline_at`,
-   `probe_delivery_state`, and an optional receipt-backed
-   `probe_delivered_at`; a matching ACK itself proves delivery and appends
-   another `agent.sla` with the same identity and renewed deadline.
-2. A matching bounded checkpoint renews the attempt lease exactly once for the
-   role SLA. A stale or mismatched token grants nothing. No second probe or
-   renewal exists.
-3. On an `interrupt` decision, call the native interrupt operation and confirm
-   terminal interruption. Only then inspect the capsule's declared owned
-   file paths and expected evidence paths read-only; do not inspect arbitrary
-   partial artifacts or dispatch a concurrent writer.
-4. Preserve the helper's `interruption_cause`. When delivery was unconfirmed
-   and the declared audit finds work or evidence, send exactly one
-   `TH-LIVENESS-RESUME` to the same thread and attempt token with the unchanged
-   dispatch reference and decision reference; this does not consume new correction
-   authority. A second such interruption, progress after confirmed delivery,
-   or operator cancellation blocks as `specialist-interrupted-with-progress`.
-   If no `dispatch-ready` was recorded, stop here and apply only
-   `agents/_shared/dispatch-contract.md` § "Pipeline specialist reference". After
-   readiness, a clean first counted attempt permits one fresh same-role replacement with
-   `fork_turns: none` and attempt `2`; a clean second attempt blocks as
-   `specialist-retry-exhausted`.
-
-The coordinator never implements, tests, cleans, validates, or prepares
-delivery as a local fallback. There are at most two attempts total and one
-same-thread transport continuation per attempt, so silence cannot create an
-indefinite relaunch loop. Persist the helper decision, delivery state,
-interruption cause, continuation count, and post-interrupt path audit in
-`agent.close.extra` before resume, replacement, or block; record only declared
-path names and booleans, never partial contents.
+Apply `agents/_shared/coordinator-liveness.md`. This reference owns no local
+wait, SLA, probe, interruption, continuation, or replacement variant.
 
 ## Context pruning
 
@@ -1373,15 +1312,12 @@ does not arbitrate post-implementation requirement changes.
 
 ### Implementation checkpoint — code-hygiene scan
 
-**Yours, not a dispatch.** Run after evidence authoring, the cleanup checkpoint (or its recorded not-applicable disposition), and the Freeze quality run, immediately before evidence is frozen. The fixed `git diff` + `grep -E` pipeline is pinned in `docs/code-hygiene-gate.md § 3.1` and run against `verification_base_ref` from state — never against a packet that does not exist yet. That file is the single source for this scan and for `qa`'s Layer-2 audit.
-
-| Result | Action |
-|---|---|
-| Clean | `stage2.hygiene` (`verdict: pass`). Advance in silence |
-| Violations | `stage2.hygiene` (`verdict: fail`, `extra: {files, count}`). Write a `failure-brief.md` entry with `Blast radius: localized {file:line}`. Re-dispatch `implementer` under BOUNDED-PATCH. Re-run the scan only — the packet has not been built yet; do not open `validation` |
-| Command error (grep ≥ 2, or `git diff` failed) | Escalate. `status: blocked`, surface the raw output. Never a silent pass |
-
-Shares the max-3 cap for implementation bounces. A clean scan is a trace event only, never prose.
+**Yours, not a dispatch.** After evidence authoring, cleanup disposition, and
+Freeze quality, invoke the verified workspace-bundle `code-hygiene.mjs` exactly
+as defined in `docs/code-hygiene-gate.md § 3.1`. Persist and hash-check its
+receipt/result, then apply only § 4's verdict table. That document and helper
+are the single contract; never reconstruct patterns, argv, or result handling
+here. A clean scan is a trace event only, never operator-facing prose.
 
 ### Implementation checkpoint — evidence authoring
 

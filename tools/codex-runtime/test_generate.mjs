@@ -253,7 +253,7 @@ assert.match(pipelineIdentityDocs[1], /do not create, copy, export, or reconcile
 assert.match(await readFile(join(root, "plugins/team-harness/skills/pipeline/references/state-and-gates.md"), "utf8"),
   /pipeline_version: 4[\s\S]*openspec_bindings:[\s\S]*openspec_aggregate_sha256:/,
   "Codex pipeline new-run state is not the v4 aggregate contract");
-for (const script of ["bounded-command.mjs", "correction-packet-preflight.mjs", "helper-bundle.mjs", "workspace-identity.mjs", "openspec-bindings.mjs", "openspec-overlay.mjs", "herdr-message.mjs", "specialist-liveness.mjs", "specialist-write-scope.mjs"]) {
+for (const script of ["bounded-command.mjs", "cli-entrypoint.mjs", "code-hygiene.mjs", "correction-packet-preflight.mjs", "helper-bundle.mjs", "workspace-identity.mjs", "openspec-bindings.mjs", "openspec-overlay.mjs", "herdr-message.mjs", "specialist-liveness.mjs", "specialist-write-scope.mjs"]) {
   const source = await readFile(join(root, "skills/pipeline/scripts", script), "utf8");
   const projected = await readFile(join(root, "plugins/team-harness/skills/pipeline/scripts", script), "utf8");
   assert.equal(projected, source, `${script} generated projection is stale`);
@@ -265,6 +265,7 @@ const livenessScript = await readFile(join(root, "skills/pipeline/scripts/specia
 const specialistWriteScopeScript = await readFile(join(root, "skills/pipeline/scripts/specialist-write-scope.mjs"), "utf8");
 const correctionPacketPreflightScript = await readFile(join(root, "skills/pipeline/scripts/correction-packet-preflight.mjs"), "utf8");
 const helperBundleScript = await readFile(join(root, "skills/pipeline/scripts/helper-bundle.mjs"), "utf8");
+const codeHygieneScript = await readFile(join(root, "skills/pipeline/scripts/code-hygiene.mjs"), "utf8");
 const overlayPlanContract = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/plan-shards.md"), "utf8");
 const architectAdapter = await readFile(join(root, "runtime/codex/instructions/architect.md"), "utf8");
 const testerSemantic = await readFile(join(root, "agents/tester.md"), "utf8");
@@ -276,8 +277,11 @@ for (const marker of ["boundedCommandProcessStatus", "result.outcome === \"compl
 for (const marker of ["WORKSPACE_WRITE_UNDECLARED", "WORKSPACE_WRITE_OPERATION_DENIED", "WORKSPACE_WRITE_TARGET_EXISTS", "WORKSPACE_WRITE_TARGET_MISSING", "workspace_write_coordinates", "authorizeSpecialistWorkspaceWrite"]) {
   assert.ok(specialistWriteScopeScript.includes(marker), `specialist workspace-write scope misses ${marker}`);
 }
-for (const marker of ["task_intent_sha256", "source_coordinates", "content_sha256", "TEST_CONTRACT_COVERAGE_INCOMPLETE", "repair-index-before-presentation", "team_harness_dispatch_reference", "scope_identity_sha256", "ack-dispatch-ready", "dispatch-reference-invalid-before-ready"]) {
+for (const marker of ["task_intent_sha256", "source_coordinates", "content_sha256", "TEST_CONTRACT_TASK_PENDING", "pending_selected_tasks", "team_harness_dispatch_reference", "scope_identity_sha256", "dispatch-reference-verified", "dispatch-reference-invalid"]) {
   assert.ok(correctionPacketPreflightScript.includes(marker), `correction packet preflight misses ${marker}`);
+}
+for (const marker of ["CODE_HYGIENE_PATTERN_VERSION", "team_harness_code_hygiene_receipt", "WORK_NARRATION_DETECTED", "diff_sha256"]) {
+  assert.ok(codeHygieneScript.includes(marker), `code-hygiene helper misses ${marker}`);
 }
 for (const marker of ["HELPER_COMPATIBILITY_EPOCH", "helper-bundles", "bundle_identity_sha256", "use-workspace-helper-bundle"]) {
   assert.ok(helperBundleScript.includes(marker), `pipeline helper bundle misses ${marker}`);
@@ -285,7 +289,7 @@ for (const marker of ["HELPER_COMPATIBILITY_EPOCH", "helper-bundles", "bundle_id
 for (const marker of ["failure_stage", "upstream_constraints_checked", "pending_shard_dependencies", "deterministic valid identifiers", "pending/future shard's seam"]) {
   assert.ok(testerSemantic.includes(marker), `tester semantic contract misses shard-local RED marker ${marker}`);
 }
-for (const marker of ["team_harness_dispatch_capsule", "dispatch-ready", "specialist-start-unconfirmed", "workspace write"]) {
+for (const marker of ["team_harness_dispatch_capsule", "no intermediate readiness handshake", "dispatch-reference-invalid", "workspace write"]) {
   assert.ok(dispatchContract.includes(marker), `shared dispatch contract misses specialist marker ${marker}`);
 }
 assert.ok(testerSemantic.includes("agents/_shared/dispatch-contract.md"), "tester does not consume the shared dispatch contract");
@@ -316,9 +320,12 @@ for (const marker of ["migrate-v1", "verify-v1-migration", "team_harness_legacy_
   assert.ok(bindingsScript.includes(marker), `OpenSpec legacy-v1 migration implementation misses ${marker}`);
 }
 const implementationContract = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/implementation.md"), "utf8");
+const coordinatorLivenessContract = await readFile(join(root, "agents/_shared/coordinator-liveness.md"), "utf8");
 for (const marker of ["specialist-liveness.mjs", "fixed two-minute ACK grace", "probe_delivery_state: unconfirmed", "TH-LIVENESS-RESUME", "specialist-interrupted-with-progress", "specialist-retry-exhausted", "local fallback"]) {
-  assert.ok(implementationContract.includes(marker), `specialist liveness pipeline contract misses ${marker}`);
+  assert.ok(coordinatorLivenessContract.includes(marker), `specialist liveness pipeline contract misses ${marker}`);
 }
+assert.ok(implementationContract.includes("agents/_shared/coordinator-liveness.md"),
+  "implementation contract does not route to canonical coordinator liveness");
 for (const marker of ["Canonical dispatch reference", "correction-packet-preflight.mjs", "agents/_shared/dispatch-contract.md", "workspace writes", "Main alone writes or replaces"]) {
   assert.ok(implementationContract.includes(marker), `specialist workspace ownership contract misses ${marker}`);
 }
@@ -354,8 +361,8 @@ for (const role of ["implementer", "tester"]) {
   const adapter = await readFile(join(root, `runtime/codex/instructions/${role}.md`), "utf8");
   const generatedAgent = await readFile(join(root, `.codex/agents/${role}.toml`), "utf8");
   assert.doesNotMatch(adapter, /For OpenSpec (?:implementation|testing), accept only/,
-    `${role} adapter duplicates the shared dispatch handshake`);
-  for (const marker of ["dispatch_reference", "team_harness_dispatch_capsule", "scope_identity_sha256", "dispatch-ready"]) {
+    `${role} adapter duplicates the shared dispatch reference contract`);
+  for (const marker of ["dispatch_reference", "team_harness_dispatch_capsule", "scope_identity_sha256", "no intermediate readiness handshake"]) {
     assert.ok(generatedAgent.includes(marker), `${role} generated agent misses canonical dispatch marker ${marker}`);
   }
   for (const marker of ["Evidence", "workspace write", "prompt-level copies"] ) {

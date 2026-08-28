@@ -145,7 +145,7 @@ authority, and canonical `team_harness_dispatch_reference` from
 `agents/_shared/dispatch-contract.md`, then permits one spawn carrying only its
 `decision_ref` plus `dispatch_reference`. Apply
 `agents/_shared/dispatch-contract.md` § "Pipeline specialist reference" for
-readiness, attempt start, and pre-ready recovery. `pause` and `abort`
+pre-spawn verification, attempt start, and mechanical recovery. `pause` and `abort`
 perform no correction. Every later failure gets a fresh nonce and decision.
 An ordinary approval, intake autonomy preference, generic `continue`, recovered
 prose, files, agents, and tools are never authorization. Gate-1 autonomous
@@ -495,7 +495,7 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `pricing_identity`, `cost` | conditional | native Codex branch only: exact provider/model and complete quote provenance |
 | `observation` | conditional | required for `agent.*`; concise fact about what started, remains running, or returned |
 | `agent_role`, `task` | optional | diagnostic labels; only the exact architect/design pair is interpreted as OpenSpec Gate-1 evidence |
-| `decision_ref` | conditional | consumed single-use nonce; required on correction/cleaner decisions and their later binding events |
+| `decision_ref` | conditional | consumed single-use authority nonce; the matching Gate-1 `stage.gate.release` nonce for an initial implementer/tester dispatch, or the correction/cleaner decision nonce for those decisions and later binding events |
 | `correction_package` | conditional | required only on `correction.decision`; contains anchor, findings, scope, requirements, closure, and dispositions |
 | `correction_dispatch_reference` | conditional | required only on an authorized `correction.decision`; exact canonical `team_harness_dispatch_reference` from `agents/_shared/dispatch-contract.md` |
 | `cleaner_package` | conditional | required only on `cleaner.handoff.decision`; contains repository, worktree, anchor, findings, and eligibility evidence |
@@ -509,9 +509,9 @@ content. The subsequent direct run has no workspace, state, events, or posture v
 | `extra` | optional | event-specific |
 
 For implementation-or-later specialist liveness, `agent.sla.extra` is the
-durable lease identity `{attempt, attempt_token, liveness_action, deadline_at,
-dispatch_ready_at|null}`. Only an accepted correlation-matched `dispatch-ready`
-ACK may set `dispatch_ready_at`; non-implementer/tester roles keep it null.
+durable lease identity `{attempt, attempt_token, liveness_action, deadline_at}`.
+A successful pre-spawn dispatch-reference verification starts the counted
+attempt; no intermediate readiness state exists.
 A post-interrupt `agent.close.extra` repeats `attempt` and `attempt_token` and
 adds `owned_paths_changed`, `evidence_changed`, and the helper's closed
 `failure_kind`. Record declared relative path names only; never store partial
