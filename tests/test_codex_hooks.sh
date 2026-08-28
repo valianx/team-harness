@@ -38,6 +38,20 @@ out="$(cd "$ROOT" && printf '%s' '{"tool_name":"Bash","tool_input":{"command":"g
 out="$(cd "$ROOT" && printf '%s' '{"tool_name":"Bash","tool_input":{"command":"gcloud compute instances create demo"}}' | bash "$ADAPTER" gcp-guard)"
 [ -z "$out" ] && pass || fail "unsupported gcp ask must be left to native Codex permissions"
 
+# gate-guard is force-only on Codex: deterministic history rewrites deny,
+# while ordinary pushes and pipeline-order decisions remain native.
+out="$(cd "$ROOT" && printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push --force-with-lease origin feature"}}' | bash "$ADAPTER" gate-guard)"
+[ "$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDecision')" = "deny" ] \
+  && pass || fail "force push must be denied by the Codex gate floor"
+out="$(cd "$ROOT" && printf '%s' '{"tool_name":"Bash","tool_input":{"command":"bash -c \"git push origin +HEAD:main\""}}' | bash "$ADAPTER" gate-guard)"
+[ "$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDecision')" = "deny" ] \
+  && pass || fail "wrapper-embedded plus-refspec push must be denied"
+out="$(cd "$ROOT" && printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin feature"}}' | bash "$ADAPTER" gate-guard)"
+[ -z "$out" ] && pass || fail "ordinary push must remain native"
+out="$(cd "$ROOT" && printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin feature; git push -f origin feature"}}' | bash "$ADAPTER" gate-guard)"
+[ "$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDecision')" = "deny" ] \
+  && pass || fail "a benign push must not hide a later force push"
+
 # A stale hook name must not suppress a later registered deny floor when a host
 # batches hook names in one launcher invocation.
 out="$(cd "$ROOT" && printf '%s' '{"tool_name":"Bash","tool_input":{"command":"rm -rf /"}}' | bash "$ADAPTER" unknown-hook policy-block)"
@@ -59,10 +73,8 @@ out="$(printf '%s' '{"tool_name":"Bash","tool_input":{}}' | bash "$batch_plugin/
 rm -rf "$batch_plugin"
 
 # Retired approval- and process-classifying hooks are not callable through the
-# launcher. gate-guard is unwired from the Codex chain (native permissions own
-# the outward floor); its bundle stays shipped as retained opt-in code and its
-# body is covered directly by tests/test_gate_guard.sh.
-for name in dev-guard gate-guard; do
+# launcher. Codex gate-guard remains callable only through its force-only mode.
+for name in dev-guard; do
   out="$(run_fixture "$name" pretool-destructive.json)"
   [ -z "$out" ] && pass || fail "retired $name adapter invocation must be silent"
 done
@@ -74,7 +86,7 @@ done
   && pass || fail "retained gate-guard bundle must ship in the Codex plugin"
 
 marker='DO_NOT_REFLECT_INPUT_7f3a'
-for name in policy-block gcp-guard; do
+for name in policy-block gcp-guard gate-guard; do
   out="$(cd "$ROOT" && printf '%s' "{invalid:$marker" | bash "$ADAPTER" "$name")"
   decision="$(printf '%s' "$out" | json_value 'd.hookSpecificOutput?.permissionDecision')"
   if [ "$decision" = "deny" ] && ! printf '%s' "$out" | grep -q "$marker"; then
@@ -109,10 +121,24 @@ const commands = Object.values(manifest.hooks)
 if (commands.length !== 2) process.exit(1);
 if (!commands.some(command => command.includes("policy-block"))) process.exit(1);
 if (!commands.some(command => command.includes("gcp-guard"))) process.exit(1);
-if (commands.some(command => /dev-guard|prepublish-guard|worktree-guard|gate-guard/.test(command))) process.exit(1);
+if (!commands.some(command => command.includes("gate-guard"))) process.exit(1);
+if (commands.some(command => /dev-guard|prepublish-guard|worktree-guard/.test(command))) process.exit(1);
 if (!commands.every(command => command.includes("plugin runtime missing"))) process.exit(1);
 NODE
 then pass; else fail "manifest must wire only deterministic deny hooks"; fi
+
+# Release-package parity: the distributed manifest and the update verifier must
+# name the same three deterministic floors. This catches a package that passes
+# source tests while making update convergence impossible after installation.
+if node - "$ROOT/plugins/team-harness/hooks/hooks.json" "$ROOT/plugins/team-harness/skills/update/SKILL.md" <<'NODE'
+const fs = require("node:fs");
+const manifest = fs.readFileSync(process.argv[2], "utf8");
+const contract = fs.readFileSync(process.argv[3], "utf8");
+for (const name of ["policy-block", "gcp-guard", "gate-guard"]) {
+  if (!manifest.includes(name) || !contract.includes(name)) process.exit(1);
+}
+NODE
+then pass; else fail "release hook manifest and update contract must remain aligned"; fi
 
 # Codex documents PLUGIN_ROOT for plugin hooks, but some supported hosts expose
 # only the Claude-compatible alias. Execute the literal manifest command in a
@@ -129,10 +155,7 @@ process.stdout.write(command);
 NODE
 )"
 
-# gate-guard is unwired from the Codex chain: the manifest carries no
-# gate-guard command, and a force push after ship is owned by native Codex
-# permissions. The retained gate-guard body (incl. the auto-ship literal) is
-# covered by tests/test_gate_guard.sh.
+# The Bash adapter batches gcp-guard with the Codex force-only gate-guard.
 if node - "$ROOT/plugins/team-harness/hooks/hooks.json" <<'NODE'
 const fs = require("node:fs");
 const manifest = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
@@ -140,9 +163,9 @@ const command = manifest.hooks.PreToolUse
   .flatMap(group => group.hooks || [])
   .map(hook => hook.command)
   .find(value => value.includes("gate-guard"));
-process.exit(command ? 1 : 0);
+process.exit(command ? 0 : 1);
 NODE
-then pass; else fail "manifest must not wire the unwired gate-guard"; fi
+then pass; else fail "manifest must wire the Codex force-push floor"; fi
 
 # A real node dir in PATH makes these cases exercise the actual hook run
 # (not the launcher's node-missing fail-closed deny) on hosts where node

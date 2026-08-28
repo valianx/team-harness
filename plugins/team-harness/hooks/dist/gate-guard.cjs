@@ -930,6 +930,28 @@ function evaluate(input, reader) {
     "gate-guard: outward action blocked \u2014 the resolved pipeline lane has not registered gate3_release: ship or auto-ship at STAGE-GATE-3. Complete STAGE-GATE-3 before pushing or opening the PR. See agents/_shared/gate-contract.md \xA7 Outward-action release floor."
   );
 }
+function evaluateCodexForcePushFloor(input) {
+  const rawCmd = typeof input.tool?.input?.["command"] === "string" ? input.tool.input["command"] : "";
+  if (!rawCmd) return none();
+  const analyzed = analyzeCommand(rawCmd);
+  let force = false;
+  for (const effective of analyzed.commands) {
+    const classified = classifyCoveredAction(effective);
+    if (classified?.binary !== "git" || classified.gitSubcommand?.toLowerCase() !== "push") {
+      continue;
+    }
+    if (classified.args.some(
+      ({ value }) => value.startsWith("+") || /^--force(?:$|=|-)/i.test(value) || /^-[^-]*f[^-]*$/i.test(value)
+    )) {
+      force = true;
+      break;
+    }
+  }
+  if (!force) return none();
+  return deny(
+    "gate-guard: force-push denied by the Codex deterministic floor; use a non-rewriting push or complete the operation outside Team Harness."
+  );
+}
 
 // bodies/prepublish-guard.ts
 var CONTROL_CHAR_RE = /[\x00-\x09\x0b-\x1f\x7f]/;
@@ -1103,9 +1125,18 @@ async function main() {
   const reader = makeReader();
   try {
     const normalized = inboundCC(raw);
-    const decision = evaluate(normalized, reader);
+    const decision = process.env.TEAM_HARNESS_CODEX_HOOK === "1" ? evaluateCodexForcePushFloor(normalized) : evaluate(normalized, reader);
     outboundCC(decision);
   } catch (err) {
+    if (process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
+      const fallback = {
+        decision: "deny",
+        reason: "gate-guard: force-push safety evaluation failed; execution denied.",
+        mutations: null
+      };
+      outboundCC(fallback);
+      return;
+    }
     if (err instanceof ShimRejectError) {
       const fallback = { decision: "none", reason: "", mutations: null };
       outboundCC(fallback);
@@ -1116,5 +1147,15 @@ async function main() {
   }
 }
 main().catch(() => {
+  if (process.env.TEAM_HARNESS_CODEX_HOOK === "1") {
+    try {
+      outboundCC({
+        decision: "deny",
+        reason: "gate-guard: force-push safety evaluation failed before completion; execution denied.",
+        mutations: null
+      });
+    } catch {
+    }
+  }
   process.exit(0);
 });
