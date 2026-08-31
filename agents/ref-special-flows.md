@@ -229,7 +229,10 @@ Two modes: `plan` (analysis only) and `plan-and-execute` (analysis + pipeline pe
 2. **MANDATORY — Query KG** — call `search_nodes` with 2-3 semantic queries. Write `00-knowledge-context.md` if results found.
 3. **Specify** — full SPECIFY as normal (codebase investigation, AC, scope). Update GitHub issue if `needs-specify: true`.
 4. **Design (planning mode)** — invoke `architect` in planning mode. Architect produces task breakdown in `01-planning.md`. **Does NOT produce `01-plan.md`** — that file belongs to design mode.
-5. **Validate sizing** — read `01-planning.md`. If any task has >20 AC or looks like a full feature, re-invoke architect to split. Max 1 retry.
+5. **Validate sizing** — read `01-planning.md`. If any task has >20 AC or looks
+   like a full feature, re-invoke architect with the exact failed sizing
+   predicate. Continue only with a materially changed split; pause with that
+   predicate if no verifiable decomposition remains.
 6. **Create tasks** — **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Detection probe" and § "Tier B — create an issue" and § "Tier A — list repo labels". Use the standard detection probe to set `has_gh`.
    - **gh available:** create one GitHub issue per task via `gh issue create` using **SDD issue template**. Labels from repo (`gh label list`), assignee `@me`, project board if exists. Comment on parent issue.
    - **gh unavailable, token + GitHub origin available:** use curl Tier B fallback to create issues and Tier A curl to read labels.
@@ -679,7 +682,10 @@ Reuse Multi-Task Orchestration Steps 1-6 exactly:
 
 #### Internal fix loop
 
-Each tester agent has its own fix loop (max 3 attempts). If a module fails after 3 internal attempts, it reports `status: failed`. The coordinator records it in `batch-progress.md` but does NOT re-launch automatically.
+Each tester agent owns its fix loop. It changes approach from current evidence
+and never repeats the same failed causal action. If no verifiable repair remains,
+it reports `status: failed` with the exact blocker; the coordinator applies the
+causal recovery policy instead of routing by an attempt count.
 
 #### Gap iteration (re-launched from Phase 3)
 
@@ -846,7 +852,9 @@ workspaces/
 
 ### Key rules
 
-- **80% branch coverage is non-negotiable** --- iterate until met or max 3 loops
+- **80% branch coverage is non-negotiable** --- iterate with a changed causal
+  approach until met, or return the exact unreachable branch/blocker when no
+  verifiable repair remains
 - Blocker tasks (Round 1) MUST complete before any module test task
 - Each module gets its own worktree --- no mixing
 - Coverage gate runs the ENTIRE test suite, not per-module
@@ -974,7 +982,12 @@ Options:
 2. Revise — {specific feedback} → documenter iterates on flagged pages
 ```
 
-If **revise**: feed the operator's feedback + QA findings back to the documenter for targeted page updates. Max 3 iteration rounds. After each iteration, re-run Phase 3 QA (structural + fidelity) on the updated pages only, then re-run the pre-gate assertions before re-presenting.
+If **revise**: feed the operator's feedback + QA findings back to the documenter
+for targeted page updates. After each materially changed revision, re-run Phase
+3 structural and fidelity QA on the updated pages, then run coverage,
+navigation, and cross-link checks across the complete topic folder and re-run
+the pre-gate assertions before re-presenting. Never repeat an unchanged failed
+revision.
 
 If **approve**: write `00-state.md` with `status: complete`.
 

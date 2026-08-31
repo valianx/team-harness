@@ -437,22 +437,49 @@ await use(async value => {
     repositoryIdentityReader: value.repositoryIdentityReader,
   });
   assert.equal(initial.verdict, "pass", JSON.stringify(initial));
-  assert.equal(initial.generation, 1);
-  assert.equal(initial.next_attempt, null);
+  assert.equal(initial.recovery_ref, null);
   const initialBinding = JSON.parse(await readFile(path.join(value.workspace, initial.evidence_dispatch_path), "utf8"));
+  assert.equal(initialBinding.schema_version, 2);
+  assert.equal(initial.evidence_dispatch_path.endsWith(`${initial.dispatch_identity_sha256}.json`), true);
   assert.deepEqual(
     initialBinding.evidence_sources[0].coordinates.map(item => item.path),
     coordinates.map(item => item.path).sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)),
   );
+  const legacyBinding = {
+    schema_version: 1,
+    kind: initialBinding.kind,
+    service: initialBinding.service,
+    generation: 1,
+    base_dispatch_binding: initialBinding.base_dispatch_binding,
+    task_shard: initialBinding.task_shard,
+    evidence_sources: initialBinding.evidence_sources,
+    recovery: null,
+    attempt_reset: null,
+    dispatch_identity_sha256: null,
+  };
+  legacyBinding.dispatch_identity_sha256 = hash(canonicalJsonBytes(Object.fromEntries(
+    Object.entries(legacyBinding).filter(([key]) => key !== "dispatch_identity_sha256"),
+  )));
+  const legacyPath = "inputs/openspec/transactions/evidence-dispatch/Task-1/generation-1.json";
+  const legacyBytes = canonicalJsonBytes(legacyBinding);
+  await mkdir(path.dirname(path.join(value.workspace, legacyPath)), { recursive: true });
+  await writeFile(path.join(value.workspace, legacyPath), legacyBytes);
+  const legacyVerified = await verifyOpenSpecEvidenceDispatch({
+    ...dispatch,
+    evidenceDispatchPath: legacyPath,
+    evidenceDispatchSha256: hash(legacyBytes),
+    repositoryIdentityReader: value.repositoryIdentityReader,
+  });
+  assert.equal(legacyVerified.verdict, "pass", JSON.stringify(legacyVerified));
   const recoveryEvidencePath = "evidence/transactions/packet-scope-insufficient.json";
   const recoveryEvidence = canonicalJsonBytes({
     schema_version: 1,
-    kind: "team_harness_packet_scope_insufficient",
+    kind: "team_harness_causal_recovery",
     service: "transactions",
     task_shard_path: "plan/openspec/transactions/tasks/Task-1.md",
     role: "tester",
-    error_code: "PACKET_SCOPE_INSUFFICIENT",
-    exhausted_attempts: 2,
+    failure_kind: "PACKET_SCOPE_INSUFFICIENT",
+    recovery_kind: "corrected-evidence-binding",
     owned_paths_changed: false,
     evidence_paths_changed: false,
   });
@@ -465,15 +492,48 @@ await use(async value => {
     recovery: {
       role: "tester",
       failure_code: "PACKET_SCOPE_INSUFFICIENT",
-      exhausted_attempts: 2,
       evidence_path: recoveryEvidencePath,
       evidence_sha256: hash(recoveryEvidence),
     },
     repositoryIdentityReader: value.repositoryIdentityReader,
   });
   assert.equal(bound.verdict, "pass", JSON.stringify(bound));
-  assert.equal(bound.generation, 2);
-  assert.equal(bound.next_attempt, 1);
+  assert.deepEqual(bound.recovery_ref, { path: recoveryEvidencePath, sha256: hash(recoveryEvidence) });
+  assert.notEqual(bound.dispatch_identity_sha256, initial.dispatch_identity_sha256);
+  const repeated = await bindOpenSpecEvidenceDispatch({
+    ...dispatch,
+    taskShardPath: "plan/openspec/transactions/tasks/Task-1.md",
+    evidenceCoordinates: coordinates,
+    recovery: {
+      role: "tester",
+      failure_code: "PACKET_SCOPE_INSUFFICIENT",
+      evidence_path: recoveryEvidencePath,
+      evidence_sha256: hash(recoveryEvidence),
+    },
+    repositoryIdentityReader: value.repositoryIdentityReader,
+  });
+  assert.equal(repeated.verdict, "pass", JSON.stringify(repeated));
+  assert.equal(repeated.changed, false);
+  assert.equal(repeated.dispatch_identity_sha256, bound.dispatch_identity_sha256);
+  const volatileEvidencePath = "evidence/transactions/packet-scope-insufficient-volatile.json";
+  const volatileEvidence = canonicalJsonBytes({
+    ...JSON.parse(recoveryEvidence.toString("utf8")),
+    observed_at: "2026-08-29T00:00:00Z",
+  });
+  await writeFile(path.join(value.workspace, volatileEvidencePath), volatileEvidence);
+  const volatile = await bindOpenSpecEvidenceDispatch({
+    ...dispatch,
+    taskShardPath: "plan/openspec/transactions/tasks/Task-1.md",
+    evidenceCoordinates: coordinates,
+    recovery: {
+      role: "tester",
+      failure_code: "PACKET_SCOPE_INSUFFICIENT",
+      evidence_path: volatileEvidencePath,
+      evidence_sha256: hash(volatileEvidence),
+    },
+    repositoryIdentityReader: value.repositoryIdentityReader,
+  });
+  assert.equal(volatile.error_code, "EVIDENCE_DISPATCH_INVALID");
   assert.deepEqual(await readFile(path.join(value.workspace, sealed.dispatch_binding_path)), sealBytes);
   const verified = await verifyOpenSpecEvidenceDispatch({
     ...dispatch,
@@ -488,7 +548,8 @@ await use(async value => {
     evidenceCoordinates: coordinates,
     repositoryIdentityReader: value.repositoryIdentityReader,
   });
-  assert.equal(rollback.error_code, "EVIDENCE_DISPATCH_STALE");
+  assert.equal(rollback.verdict, "pass", JSON.stringify(rollback));
+  assert.equal(rollback.evidence_dispatch_path, initial.evidence_dispatch_path);
   await writeFile(path.join(value.evidenceRepositories[0].repository_root, value.evidenceRelativePath), "changed evidence\n");
   const stale = await verifyOpenSpecEvidenceDispatch({
     ...dispatch,
@@ -497,7 +558,7 @@ await use(async value => {
     repositoryIdentityReader: value.repositoryIdentityReader,
   });
   assert.equal(stale.error_code, "EVIDENCE_SOURCE_STALE");
-  console.log("  [PASS] task-local evidence recovery pins read-only sources and resets only the corrected package");
+  console.log("  [PASS] task-local evidence recovery pins immutable read-only sources without retry generations");
 });
 
 await use(async value => {

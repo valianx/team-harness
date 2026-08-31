@@ -39,19 +39,13 @@ evaluate the exact attempt with the packaged
 2. When the helper returns `interrupt`, interrupt and confirm termination
    before auditing only capsule-declared owned and evidence paths. Never start
    a concurrent writer or inspect arbitrary partial artifacts.
-3. If delivery was unconfirmed and the audit finds declared progress, send one
-   `TH-LIVENESS-RESUME` to the same thread and token with the unchanged
-   dispatch/authority. Confirmed-delivery progress, a second continuation,
-   operator cancellation, or other progress interruption blocks as the
-   helper directs, including `specialist-interrupted-with-progress`.
-4. A clean first interruption permits one fresh same-role replacement with
-   `fork_turns: none`; a clean second interruption is
-   `specialist-retry-exhausted`. Main never performs the specialist role as a
-   local fallback.
+3. The helper returns `recover` after the declared-path audit. Preserve any
+   progress and apply `agents/_shared/coordinator-recovery.md`; liveness never
+   selects a resume, replacement, correction, or terminal pipeline route.
 
 Persist the helper decision and delivery state in `agent.sla.extra`, then the
 interruption cause, continuation count, and declared-path audit in
-`agent.close.extra` before resume, replacement, or block. Recovery reconstructs
+`agent.close.extra` before recovery. Recovery reconstructs
 those durable values and never restarts an expired lease. Attempt start and
 mechanical dispatch-reference repair are owned separately by
 `agents/_shared/dispatch-contract.md` § "Pipeline specialist reference".

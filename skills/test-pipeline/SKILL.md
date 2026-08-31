@@ -58,4 +58,6 @@ name: test-pipeline
 - Always invoke the `orchestrator` agent --- do NOT invoke agents directly
 - The orchestrator will analyze the service, decompose into modules, and dispatch tester agents in parallel
 - Output: `workspaces/test-pipeline/05-consolidation.md` (final quality report)
-- Coverage gate: **80% branch coverage service-wide is mandatory** --- pipeline iterates until met or max 3 loops
+- Coverage gate: **80% branch coverage service-wide is mandatory** --- iterate
+  with a materially changed causal approach until met, or return the exact
+  unreachable branch/blocker when no verifiable repair remains

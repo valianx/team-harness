@@ -4,6 +4,33 @@
 
 > Current route authority is `docs/pipeline-lanes.md`: exactly two live postures exist — `inline` (direct default, including explicitly chosen sensitive inline work and live ad-hoc tester/QA/security reviews) and `pipeline` (the canonical full v3 sequence). Legacy lane, express/full, fast/simple, and tier markers are migration history only and never select a route or bypass a gate.
 
+- **2026-08-28 — Causal recovery replaces retry and correction budgets.** Attempts,
+  interruptions, continuations, corrections, and iterations are unbounded
+  observations. No ordinal authorizes, denies, pauses, or closes work. After a
+  non-success, Main preserves progress and may dispatch again only with a
+  verifiably different causal identity; it pauses with the exact missing
+  condition only when no recovery is currently provable. Mechanical dispatch
+  defects are coordinator-owned and consume neither functional authority nor a
+  specialist allowance. The controls retained below are the exhaustive hard
+  floor; phase and role contracts reference their canonical owner instead of
+  restating them.
+
+  | Retained control | Why it remains hard | Canonical owner |
+  |---|---|---|
+  | Live authority for activation, semantic/scope changes, irreversible or outward effects | Prevents an agent, file, report, or stale chat from granting human authority; it constrains *what may change*, not how long agents may work | `agents/_shared/gate-contract.md`, runtime permission hooks |
+  | Immutable identity and freshness | Prevents work or verdicts from being applied to different source, evidence, branch, candidate, or Gate bytes | `agents/_shared/dispatch-contract.md`, Freeze/evidence helpers |
+  | Exclusive writer and bounded write ownership | Prevents concurrent corruption and specialist writes to coordinator- or sibling-owned artifacts while leaving read/reasoning scope free | `agents/_shared/dispatch-contract.md`, role tool grants |
+  | Deterministic preflight and artifact integrity | Makes hashes, helper paths, seals, and derived coordinates machine work; malformed mechanical inputs are repaired before repository work | packaged pipeline helpers |
+  | Acceptance, quality, and security evidence | Prevents autonomy from declaring success without proving the approved outcomes and required safety floor | `agents/_shared/ac-evidence.md`, quality/Freeze contracts |
+  | Liveness lease and terminal writer confirmation | Detects silent or abandoned writers before ownership is reassigned; expiry routes to recovery and never closes the pipeline | `agents/_shared/coordinator-liveness.md` |
+  | Append-only trace and observational ordinals | Enables recovery, diagnosis, and health alerts without turning telemetry into authority | `agents/_shared/orchestrator-state.md` |
+  | Transport/output/context bounds | Protect evidence integrity and force a resumable handoff when a channel cannot carry more data; they never cap findings or total recovery work | `agents/_shared/operator-dialogue.md`, bounded-output helpers |
+
+  Everything else is advisory or derived. In particular, retry counts,
+  correction counts, attempt generations, replacement allowances, repeated
+  cleaner handoff approvals, and ordinal-based terminal codes are not controls.
+  → `agents/_shared/coordinator-recovery.md`
+
 - **2026-08-03** — Pipeline planning is one architect-only pass. ACs are observable functional Given/When/Then outcomes; mandatory mechanisms and invariants are separate `TC-N` technical constraints. Automatic `qa-plan`, `plan-reviewer`, and security design-review dispatches are retired. Sensitive work carries the architect's security assessment and security TCs to the final adversarial audit. Each validation finding includes a deterministic closure check; correction closure must pass before Freeze, after which QA is fresh, tester refreshes stale requirement/evidence-path rows, and security reruns only when the fail-closed impact predicate requires it. This supersedes the still-active SEC-002 planning-review portions of the 2026-07-21 and 2026-07-27 entries below; their remaining final-audit and dispatch-scope rules continue. → `agents/architect.md`, `agents/ref-pipeline.md`, `agents/_shared/ac-evidence.md`, `plugins/team-harness/skills/pipeline/`
 - **2026-06-29** — `refreshManagedConfigKeys`: update writes only managed keys (`format_version`/`installed_version`/`updated_at`); operator keys preserved. → `cmd/install/opencode_config.go`
 - **2026-06-29** — `VERSION` asset: bare semver at `releases/latest/download/VERSION` (no GitHub API); best-effort pre-check. → `release.yml`

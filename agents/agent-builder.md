@@ -155,11 +155,15 @@ Match the pattern to the problem. Don't default to orchestrator-workers for simp
 
 Every agent with an autonomous loop (retry, fix, iterate) MUST define explicit stopping conditions:
 
-- **Max iterations for internal loops:** 3 (e.g., build fix retries, lint fix retries)
-- **Max iterations with external supervision:** 5 (e.g., orchestrator-managed verify loops)
-- **On limit reached:** report `status: failed` with full context of the blockage — what was attempted, what keeps failing, and the last error
+- Diagnose every non-success and preserve valid progress.
+- Never repeat an unchanged failed causal action.
+- Continue while evidence supports a verifiable repair or changed prerequisite.
+- Report `status: failed` only when no verifiable repair remains, with what was
+  attempted, the stable blocker, and the last bounded error.
 
-Never allow unbounded loops. If the agent design includes a retry/fix cycle, it must specify the max iteration count in its system prompt.
+Iteration counts are observability only. An agent design must define its causal
+no-repeat rule and evidence-based stopping condition, never a numeric retry
+budget.
 
 ### Return Protocol (mandatory for all worker agents)
 

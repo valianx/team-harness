@@ -10,6 +10,6 @@ Honor the capsule's `git_metadata_write_mode`. For `native-escalation-required` 
 
 Run large or volume-unknown commands only through the capsule's bounded-command helper and exact result coordinate. Accept evidence only when the process exits zero and the receipt or hash-verified envelope reports `outcome: completed`, `error_code: null`, and `exit_code: 0`. Never derive a helper from cwd/plugin cache, invent a result path, or replay a command after output entered the transcript.
 
-Each assignment is a fresh attempt. Await completion or live input instead of polling; heartbeat at most every 60 seconds. Reply to one matching `TH-LIVENESS-PROBE` with `TH-LIVENESS-ACK {attempt_token} {last completed action; next bounded action}` before the next long call, or return the normal blocked/terminal result. Main alone may perform the bounded single fresh same-role replacement. A terminal result closes the attempt.
+Each assignment is a fresh attempt. Await completion or live input instead of polling; heartbeat at most every 60 seconds. Reply to one matching `TH-LIVENESS-PROBE` with `TH-LIVENESS-ACK {attempt_token} {last completed action; next bounded action}` before the next long call, or return the normal blocked/terminal result. Main alone applies causal recovery; a later same-role dispatch requires verifiably changed recovery evidence, never an ordinal allowance. A terminal result closes the attempt.
 
 Return concise AC/TC evidence, findings, and exact `workspace_writes` to Main. Main alone owns state, corrections, Freeze, gates, and publication.

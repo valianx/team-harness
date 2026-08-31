@@ -113,7 +113,7 @@ function parseExecutionEvents(bytes) {
   return events;
 }
 
-/** Project correction budgets from their append-only authority events. */
+/** Project correction observations from their append-only authority events. */
 export async function reconcileCorrectionCounters({
   workspace,
   eventsPath = "00-execution-events.jsonl",
@@ -151,12 +151,6 @@ export async function reconcileCorrectionCounters({
     references.add(reference);
     if (authority === "gate1-autonomous") autonomous += 1;
     else operator += 1;
-  }
-  if (autonomous > 3) {
-    return correctionCounterResult("blocked", "AUTONOMOUS_CORRECTION_BUDGET_EXCEEDED", {
-      autonomous_correction_count: autonomous,
-      operator_correction_count: operator,
-    });
   }
   const details = { autonomous_correction_count: autonomous, operator_correction_count: operator };
   if (autonomousCorrectionCount === autonomous && operatorCorrectionCount === operator) {

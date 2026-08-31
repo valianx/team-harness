@@ -106,8 +106,12 @@ Merge locale fragments from parallel batches into final locale files, verify bui
   1. Read all `{namespace}.en.json` fragments → deep merge into single `en.json`
   2. Read all `{namespace}.es.json` fragments → deep merge into single `es.json`
   3. Delete fragment files (cleanup)
-  4. Run build command — if it fails, diagnose and fix (max 2 retries)
-  5. Write final `00-translation.md` report (Phase 5 format) with aggregated stats from all batches
+  4. Run the build command — if it fails, diagnose and change the cause; never
+     repeat the same failed action, rerun the build after every repair, and stop
+     with an actionable blocker when no verifiable repair remains
+  5. Only after a zero-exit build, write the successful final
+     `00-translation.md` report (Phase 5 format) with aggregated stats from all
+     batches; a blocked build never produces a success report
 
 ---
 

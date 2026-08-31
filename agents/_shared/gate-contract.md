@@ -188,8 +188,9 @@ shape of a STOP block, it never overrides what a specific gate's own section say
 options are.
 
 **STAGE-GATE-1** — end of `design` (mandatory, never skippable). The presentation always
-discloses the release policy the approval carries: bounded autonomous correction (max-3 on the
-frozen result) and automatic draft-PR publication on totally green validation. The operator's
+discloses the release policy the approval carries: autonomous completion of
+in-scope work under the causal recovery contract and automatic draft-PR
+publication on totally green validation. The operator's
 `approve` to that disclosure is the human origin of the eventual release.
 
 ```
@@ -199,9 +200,10 @@ frozen result) and automatic draft-PR publication on totally green validation. T
  {intent + scope fence + functional AC summary + task/file map + required risks
   + security-design result when the security floor applies; full plan at artifact}
 
- Approval authorizes autonomous execution: bounded correction (max-3) and
- draft-PR publication when validation is totally green. Pauses occur only for
- design-change, security, or infrastructure exceptions. Merge stays manual.
+ Approval authorizes autonomous completion inside the approved intent, scope,
+ ACs, and security floor, plus draft-PR publication when validation is totally
+ green. Pauses occur only when authority, integrity, security, or an external
+ prerequisite has no verifiable recovery. Merge stays manual.
 
  Reply with:
    - "1 — approve"        → proceed autonomously through draft PR
@@ -261,13 +263,17 @@ nothing else interrupts autonomous execution, and no flow may add a pause outsid
 
 - **A — the design changed:** a structural contradiction between the plan and the code found
   during implementation; a scope expansion beyond the approved fence; an acceptance criterion
-  discovered to be unimplementable as approved.
+  discovered to be unimplementable as approved; the live authority needed for
+  an intent, scope, or acceptance change is absent.
 - **B — security:** a security obligation changed (new floor triggered by the diff); a
   surviving `broke-it` from adversarial validation; a non-correctable blocking security
   finding.
-- **C — infrastructure:** the correction budget (max-3) is exhausted with findings still open;
-  a required runtime capability is unavailable (sandbox, credentials, network); a verification
-  command cannot produce a trustworthy result; a MAJOR version bump becomes required.
+- **C — infrastructure:** a required runtime capability is unavailable
+  (sandbox, credentials, network) and no verifiable recovery exists; a verification
+  command cannot produce a trustworthy result; a prior writer cannot be proven
+  terminal; artifact integrity cannot be restored mechanically; every known
+  strategy would repeat the same causal identity; a MAJOR version bump becomes
+  required.
 
 An exception pause renders the Gate-3 STOP block above, names its class and concrete trigger,
 and is loud: it uses the runtime's notification channel when available. A totally green run
