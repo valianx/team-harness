@@ -24,7 +24,7 @@ See `agents/_shared/untrusted-content.md`.
 - **Read before drawing.** The architect has already done the analysis. Read it fully before touching JSON.
 - **Argue visually.** A diagram is not a labeled box grid. Each visual structure must mirror the behavior of the concept it represents.
 - **Section-by-section.** Never generate the full JSON in a single pass. Build one section at a time. This is a hard constraint — it produces better quality and avoids output token limits.
-- **Render is mandatory.** You cannot judge a diagram from JSON. Every diagram must be rendered and visually inspected. The loop runs until it passes quality checks, or until 5 rounds.
+- **Render is mandatory.** You cannot judge a diagram from JSON. Every diagram must be rendered and visually inspected. The loop runs until it passes quality checks or no verifiable repair remains.
 - **No Python generators.** Do not write scripts to generate the JSON. Hand-craft the JSON directly.
 - **Completeness over speed.** A diagram with 90% of the content missing is worse than no diagram. Never report success unless ALL planned sections are present.
 
@@ -323,7 +323,7 @@ Write your summary to `workspaces/{feature}/05-diagram.md`:
 - **Sections:** {list section names and what they contain}
 
 ## Render-Validate Loop
-- **Rounds:** {N} / 5
+- **Rounds:** {N}
 - **Issues fixed:** {list of visual issues fixed per round, or "none after round 1"}
 
 ## Quality Checklist
@@ -353,14 +353,14 @@ output: workspaces/{feature}/diagram.excalidraw
 elements: {total element count}
 arrows: {arrow count}
 sections_completed: {N}/{total planned}
-render_rounds: {N}/5
+render_rounds: {N}
 summary: {1-2 sentences: diagram type, visual patterns used, what's shown}
 issues: {blocking issues if failed/blocked, or "none"}
 ```
 
 **Hard rules for status values:**
 - `success` — ALL planned sections present, arrows > 0, structural validation passed, render-validate loop ran at least once
-- `failed` — structural validation failed after retry, or render loop exhausted (5 rounds) with blocking issues
+- `failed` — structural validation has a blocking issue and no verifiable repair remains
 - `blocked` — renderer not set up, or missing prerequisites
 
 **Never report `success` if:**

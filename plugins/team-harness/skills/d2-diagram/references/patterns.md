@@ -687,8 +687,8 @@ reject: "Return 400 Bad Request" {class: error_terminal}
 route: "Route to Payment Provider" {class: process}
 charge: "Attempt Charge" {class: process}
 charge_check: "Charge succeeded?" {class: decision}
-retry: "Retry after diagnosis" {class: process}
-retry_check: "Retries exhausted?" {class: decision}
+retry: "Diagnose and repair cause" {class: process}
+retry_check: "Verifiable causal repair available?" {class: decision}
 fail: "Return 402 Payment Failed" {class: error_terminal}
 record: "Record Transaction" {class: process}
 notify: "Notify Merchant Webhook" {class: process}
@@ -703,8 +703,8 @@ charge -> charge_check
 charge_check -> record: "yes"
 charge_check -> retry: "no"
 retry -> retry_check
-retry_check -> charge: "no — retry"
-retry_check -> fail: "yes"
+retry_check -> charge: "yes — repaired"
+retry_check -> fail: "no"
 record -> notify
 notify -> success
 ```

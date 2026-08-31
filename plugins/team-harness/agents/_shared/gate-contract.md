@@ -263,13 +263,17 @@ nothing else interrupts autonomous execution, and no flow may add a pause outsid
 
 - **A — the design changed:** a structural contradiction between the plan and the code found
   during implementation; a scope expansion beyond the approved fence; an acceptance criterion
-  discovered to be unimplementable as approved.
+  discovered to be unimplementable as approved; the live authority needed for
+  an intent, scope, or acceptance change is absent.
 - **B — security:** a security obligation changed (new floor triggered by the diff); a
   surviving `broke-it` from adversarial validation; a non-correctable blocking security
   finding.
 - **C — infrastructure:** a required runtime capability is unavailable
   (sandbox, credentials, network) and no verifiable recovery exists; a verification
-  command cannot produce a trustworthy result; a MAJOR version bump becomes required.
+  command cannot produce a trustworthy result; a prior writer cannot be proven
+  terminal; artifact integrity cannot be restored mechanically; every known
+  strategy would repeat the same causal identity; a MAJOR version bump becomes
+  required.
 
 An exception pause renders the Gate-3 STOP block above, names its class and concrete trigger,
 and is loud: it uses the runtime's notification channel when available. A totally green run

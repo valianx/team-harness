@@ -148,7 +148,8 @@ and PR creation fails, record `blocked-pr-pending`; do not push again.
 
 ## 5. Report one merge-state snapshot
 
-When a PR number is known, query mergeability exactly once:
+When a PR number is known, query one terminal mergeability snapshot for the
+current evidence condition:
 
 ```bash
 gh pr view {pr-number} --json mergeable,mergeStateStatus,statusCheckRollup
@@ -162,9 +163,10 @@ operator-directed rebase only when needed; never execute it automatically.
 
 If that `gh pr view` invocation exits non-zero or omits the requested fields,
 record the failed snapshot observation from already-known PR coordinates and
-sanitize the error to one line. Do not poll or repeat unchanged transport; a
+sanitize the error to one line. Do not poll or repeat unchanged transport. A
 later query is legal only after a verifiable transport/permission change or an
-explicit need for a fresher snapshot:
+explicit need for a fresher snapshot, and its result supersedes the earlier
+observation:
 
 ```yaml
 pr_url: {known URL}
@@ -172,7 +174,7 @@ pr_number: {known number}
 mergeability: UNDETERMINED
 ci_snapshot: unavailable
 snapshot_status: query-failed
-snapshot_error: {sanitized one-line error}
+snapshot_error: {JSON-quoted YAML scalar, sanitized to one line and truncated to 512 UTF-8 bytes}
 ```
 
 The failed read does not wait, poll, reopen delivery, or prevent terminal

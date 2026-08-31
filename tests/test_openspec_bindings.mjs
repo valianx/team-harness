@@ -500,6 +500,40 @@ await use(async value => {
   assert.equal(bound.verdict, "pass", JSON.stringify(bound));
   assert.deepEqual(bound.recovery_ref, { path: recoveryEvidencePath, sha256: hash(recoveryEvidence) });
   assert.notEqual(bound.dispatch_identity_sha256, initial.dispatch_identity_sha256);
+  const repeated = await bindOpenSpecEvidenceDispatch({
+    ...dispatch,
+    taskShardPath: "plan/openspec/transactions/tasks/Task-1.md",
+    evidenceCoordinates: coordinates,
+    recovery: {
+      role: "tester",
+      failure_code: "PACKET_SCOPE_INSUFFICIENT",
+      evidence_path: recoveryEvidencePath,
+      evidence_sha256: hash(recoveryEvidence),
+    },
+    repositoryIdentityReader: value.repositoryIdentityReader,
+  });
+  assert.equal(repeated.verdict, "pass", JSON.stringify(repeated));
+  assert.equal(repeated.changed, false);
+  assert.equal(repeated.dispatch_identity_sha256, bound.dispatch_identity_sha256);
+  const volatileEvidencePath = "evidence/transactions/packet-scope-insufficient-volatile.json";
+  const volatileEvidence = canonicalJsonBytes({
+    ...JSON.parse(recoveryEvidence.toString("utf8")),
+    observed_at: "2026-08-29T00:00:00Z",
+  });
+  await writeFile(path.join(value.workspace, volatileEvidencePath), volatileEvidence);
+  const volatile = await bindOpenSpecEvidenceDispatch({
+    ...dispatch,
+    taskShardPath: "plan/openspec/transactions/tasks/Task-1.md",
+    evidenceCoordinates: coordinates,
+    recovery: {
+      role: "tester",
+      failure_code: "PACKET_SCOPE_INSUFFICIENT",
+      evidence_path: volatileEvidencePath,
+      evidence_sha256: hash(volatileEvidence),
+    },
+    repositoryIdentityReader: value.repositoryIdentityReader,
+  });
+  assert.equal(volatile.error_code, "EVIDENCE_DISPATCH_INVALID");
   assert.deepEqual(await readFile(path.join(value.workspace, sealed.dispatch_binding_path)), sealBytes);
   const verified = await verifyOpenSpecEvidenceDispatch({
     ...dispatch,

@@ -273,7 +273,7 @@ Write your summary to `workspaces/{feature}/05-diagram.md`:
 ## Validation
 - d2 fmt: {PASS/FAIL}
 - SVG compile: {PASS/FAIL}
-- Fix cycles: {N}/3
+- Fix cycles: {N}
 
 ## What the Diagram Shows
 {2-3 sentences describing what the diagram communicates}
@@ -300,14 +300,14 @@ svg: workspaces/{feature}/diagram.svg
 render: done | skipped   # obsidian mode only; omit in local mode
 diagram_type: {architecture|sequence|ER|class|flowchart}
 node_count: {N}
-validation_cycles: {N}/3
+validation_cycles: {N}
 summary: {1-2 sentences: diagram type, pattern used, what's shown}
 issues: {blocking issues if failed/blocked, or "none"}
 ```
 
 **Hard rules for status values:**
 - `success` — `d2 fmt` passes, SVG compiles, all components from analysis represented
-- `failed` — compilation failed after 3 fix cycles, or structural validation found missing components
+- `failed` — compilation or structural completeness has a blocking issue and no verifiable repair remains
 - `blocked` — `d2` CLI not installed, or missing prerequisites
 
 **If d2 is not installed:** report `status: blocked` with install instructions:

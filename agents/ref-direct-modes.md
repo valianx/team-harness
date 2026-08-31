@@ -790,8 +790,10 @@ For each module:
 
 **Gate per batch:** if any translator returns `status: failed`, read its report,
 diagnose, and re-invoke only that batch when evidence supports a materially
-different repair. Never repeat the same failed causal action. Other successful
-batches are not re-run.
+different repair or proves that a transient transport or permission condition
+changed. Never repeat an unchanged failed causal action. Other successful
+batches are not re-run. When no verifiable repair remains, report the exact
+batch blocker and stop; do not imply that every batch eventually succeeded.
 
 ### Step 5 — Merge + Build verify (sequential)
 

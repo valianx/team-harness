@@ -984,8 +984,10 @@ Options:
 
 If **revise**: feed the operator's feedback + QA findings back to the documenter
 for targeted page updates. After each materially changed revision, re-run Phase
-3 QA (structural + fidelity) on the updated pages only, then re-run the pre-gate
-assertions before re-presenting. Never repeat an unchanged failed revision.
+3 structural and fidelity QA on the updated pages, then run coverage,
+navigation, and cross-link checks across the complete topic folder and re-run
+the pre-gate assertions before re-presenting. Never repeat an unchanged failed
+revision.
 
 If **approve**: write `00-state.md` with `status: complete`.
 

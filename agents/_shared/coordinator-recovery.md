@@ -43,6 +43,15 @@ After any non-success Main:
 6. resumes or redispatches with a fresh correlation token, exclusive write
    ownership, unchanged semantic authority, and the required downstream checks.
 
+The failure evidence used by an OpenSpec evidence dispatch is canonical JSON
+with exactly these stable fields: `schema_version`, `kind`, `service`,
+`task_shard_path`, `role`, `failure_kind`, `recovery_kind`,
+`owned_paths_changed`, and `evidence_paths_changed`. Timestamps, correlation
+tokens, dispatch IDs, attempt ordinals, and free-form metadata are excluded.
+The canonical bytes are the `failure-evidence hash` used by the recovery
+identity, so the same incident remains the same identity while a changed cause
+or recovery kind produces a different one.
+
 The same causal recovery identity must not be dispatched again after it
 reproduces the same failure. Another dispatch is legal when current verifiable
 evidence proves a material change, such as a repaired runtime or adapter,

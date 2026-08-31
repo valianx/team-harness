@@ -1402,8 +1402,12 @@ explicit decision first and never implies implementer authorization.
 An implementer `failed` or `blocked` return maps to `handoff-failed` or
 `handoff-blocked` with its hashed terminal result and `decision_ref`. Neither
 state may run or pass the common quality checkpoint, hygiene, or Freeze. Further
-work requires a new complete package, fresh nonce, presentation, and live
-authorization; it is never an automatic retry.
+work preserves the package and progress, records a new causal recovery identity
+and fresh correlation token, and remains under the existing Gate-1 authority
+while intent and scope are unchanged. A new decision package, nonce,
+presentation, and live authorization are required only for a semantic, scope,
+or authority change. Redispatch is prohibited until verifiable evidence changes
+the failed causal identity.
 
 With no implementer package, persist the overreach-proof result and SHA-256,
 cleaner commit, candidate identity, and `cleaner_evidence.status: pass`.

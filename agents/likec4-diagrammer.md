@@ -263,7 +263,7 @@ Write your summary to `workspaces/{feature}/05-diagram.md`:
 ## Validation
 - CLI validate: {PASS/FAIL}
 - PNG export: {done/skipped}
-- Fix cycles: {N}/3
+- Fix cycles: {N}
 
 ## What the Diagram Shows
 {2-3 sentences describing what the diagram communicates}
@@ -288,14 +288,14 @@ failure_kind: {kind}   # mandatory when status is failed or blocked; omit on suc
 output: workspaces/{feature}/diagram.c4
 views: {list of view names}
 render: done | skipped   # obsidian mode only; omit in local mode
-validation_cycles: {N}/3
+validation_cycles: {N}
 summary: {1-2 sentences: pattern used, views created, what's shown}
 issues: {blocking issues if failed/blocked, or "none"}
 ```
 
 **Hard rules for status values:**
 - `success` — all planned views present, `npx likec4 validate` passes, all components from analysis represented
-- `failed` — validation failed after 3 fix cycles, or structural validation found missing components
+- `failed` — validation or structural completeness has a blocking issue and no verifiable repair remains
 - `blocked` — `npx likec4` not available, or missing prerequisites
 
 Do NOT repeat the full workspaces content in your final message. The orchestrator uses this status block to validate completeness.

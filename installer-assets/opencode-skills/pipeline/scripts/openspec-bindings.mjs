@@ -659,6 +659,29 @@ function validEvidenceRecovery(value) {
     && safeRelative(value.evidence_path) && SHA256.test(value.evidence_sha256 ?? ""));
 }
 
+function validCausalRecoveryIncident(value, recovery, service, taskShardPath) {
+  return exactlyKeys(value, [
+    "schema_version", "kind", "service", "task_shard_path", "role", "failure_kind",
+    "recovery_kind", "owned_paths_changed", "evidence_paths_changed",
+  ]) && value.schema_version === 1 && value.kind === "team_harness_causal_recovery"
+    && value.service === service && value.task_shard_path === taskShardPath
+    && value.role === recovery.role && value.failure_kind === recovery.failure_code
+    && safeString(value.recovery_kind, 256)
+    && typeof value.owned_paths_changed === "boolean"
+    && typeof value.evidence_paths_changed === "boolean";
+}
+
+function validLegacyRecoveryIncident(value, recovery, service, taskShardPath) {
+  return exactlyKeys(value, [
+    "schema_version", "kind", "service", "task_shard_path", "role", "error_code",
+    "exhausted_attempts", "owned_paths_changed", "evidence_paths_changed",
+  ]) && value.schema_version === 1 && value.kind === "team_harness_packet_scope_insufficient"
+    && value.service === service && value.task_shard_path === taskShardPath
+    && value.role === recovery.role && value.error_code === recovery.failure_code
+    && value.exhausted_attempts === 2 && value.owned_paths_changed === false
+    && value.evidence_paths_changed === false;
+}
+
 function validLegacyEvidenceRecovery(value) {
   return value === null || (exactlyKeys(value, [
     "role", "failure_code", "exhausted_attempts", "evidence_path", "evidence_sha256",
@@ -789,11 +812,9 @@ async function expectedOpenSpecEvidenceDispatch({
     let incident;
     try { incident = JSON.parse(recoveryEvidence.bytes.toString("utf8")); }
     catch { throw new Error("EVIDENCE_DISPATCH_INVALID"); }
-    const incidentFailure = incident?.failure_kind ?? incident?.error_code;
     if (incident === null || typeof incident !== "object" || Array.isArray(incident)
-      || !["team_harness_causal_recovery", "team_harness_packet_scope_insufficient"].includes(incident.kind)
-      || incident.service !== service || incident.task_shard_path !== taskShardPath || incident.role !== recovery.role
-      || incidentFailure !== recovery.failure_code
+      || (!validCausalRecoveryIncident(incident, recovery, service, taskShardPath)
+        && !validLegacyRecoveryIncident(incident, recovery, service, taskShardPath))
       || !canonicalJsonBytes(incident).equals(recoveryEvidence.bytes)) {
       throw new Error("EVIDENCE_DISPATCH_INVALID");
     }
