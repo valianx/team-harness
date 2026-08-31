@@ -405,6 +405,7 @@ run_node_suite "openspec-distribution" "test_openspec_distribution.mjs" "node no
 run_node_suite "openspec-recovery" "test_openspec_recovery.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "openspec-bindings" "test_openspec_bindings.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "openspec-events" "test_openspec_events.mjs" "node not found — install Node.js to run this suite"
+run_node_suite "pipeline-control-plane" "test_pipeline_control_plane.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "specialist-liveness" "test_specialist_liveness.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "specialist-write-scope" "test_specialist_write_scope.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "correction-packet-preflight" "test_correction_packet_preflight.mjs" "node not found — install Node.js to run this suite"

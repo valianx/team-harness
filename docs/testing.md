@@ -62,7 +62,7 @@ Everything below has inputs, outputs, and exit codes.
 | `test_opencode_agent_frontmatter.sh` | The same, for the opencode transform |
 | `test_security_scan.py` | Exact source allowlists for all four PR agents, optional Codex projection validation, read-only-tier Bash grants, hook injection patterns, secrets, and roster reachability |
 | `test_review_context.py` | PR security-selection reason enums plus snapshot mergeability classification, hash/freshness comparison, rendering, and conversation capture behavior |
-| `test_pipeline_control_plane.mjs` | Closed leases/results, canonical log append/replay, sole-authority projections, causal recovery, staged preflight, Freeze quality identity, capsule certification, and v1-v4 create-then-switch conversion |
+| `test_pipeline_control_plane.mjs` | Closed leases/results, actual Git scope reconciliation, Main-only mutation, safe specialist exports, canonical log replay/projections, causal recovery, Freeze quality, capsules, and v1-v4 conversion |
 | `test_specialist_liveness.mjs` | Bounded delivery/acknowledgement/terminality/progress facts and rejection of numeric routing inputs |
 | `test_permission_disjointness.py` | The permission-allowlist disjointness invariant (#18312 floor) |
 | `test_flow_event_schema_sync.py` | Cross-repo flow-event schema sync |

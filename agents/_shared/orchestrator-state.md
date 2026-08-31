@@ -18,6 +18,11 @@ valid log; it does not re-present a Gate or synthesize a decision.
 Main is the only log appender and projection writer. Specialists return a
 `result_envelope` through native terminal transport and never edit coordinator
 state, control events, Gate records, findings projections, or acceptance views.
+The Main-only `control-plane.mjs` is never materialized in a specialist helper
+bundle; capsules receive only `control-plane-specialist.mjs`, whose exports can
+validate leases/capsules and construct results but cannot append or project.
+Before accepting a result, Main compares its commit list and `changed_paths`
+with the real Git diff and dirty state since the lease's bound baseline commit.
 
 Current v5 execution rejects legacy writable release/state fields. A supported
 v1-v4 workspace must pass the one-shot converter before dispatch.

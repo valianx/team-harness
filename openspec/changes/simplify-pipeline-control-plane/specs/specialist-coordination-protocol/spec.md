@@ -58,7 +58,11 @@ be required.
 
 #### Scenario: A specialist completes work
 - **WHEN** its terminal result envelope validates against the active lease and immutable inputs
-- **THEN** Main accepts it once, appends the result event, and derives the next action
+- **THEN** Main verifies the actual Git diff, dirty state, and contiguous commits from the lease baseline, accepts it once, appends the result event, and derives the next action
+
+#### Scenario: A specialist omits an out-of-scope mutation from its result
+- **WHEN** the worktree diff contains a path absent from `changed_paths` or outside the lease
+- **THEN** Main rejects the result before appending acceptance, even when the envelope's self-reported paths are valid
 
 #### Scenario: Terminal chat delivery is interrupted
 - **WHEN** the runtime exposes durable terminal status for the same specialist session
@@ -78,6 +82,9 @@ MUST NOT grant scope, transfer ownership, choose a phase, approve a gate, alter
 authority, write coordinator projections, or direct another specialist to
 mutate. Main SHALL remain the only operator-facing coordinator and transition
 applier.
+The immutable specialist helper bundle SHALL omit Main's control-log and
+projection mutators and expose only non-authoritative lease/capsule validation
+and result construction primitives.
 
 #### Scenario: A specialist discovers an immutable dependency
 - **WHEN** the dependency is already inside the lease and can be identified by hash and path

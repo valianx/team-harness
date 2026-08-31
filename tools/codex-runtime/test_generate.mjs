@@ -12,8 +12,9 @@ const root = fileURLToPath(new URL("../..", import.meta.url));
 // The roster is imported rather than restated: a second copy is how a fixture starts
 // passing against a list the shipped code no longer has.
 const pipelineScripts = sharedPipelineScripts;
-assert.deepEqual([...PIPELINE_HELPERS].filter(name => name.endsWith(".mjs")).sort(), [...sharedPipelineScripts].sort(),
-  "workspace helper bundle roster diverges from packaged pipeline scripts");
+assert.deepEqual([...PIPELINE_HELPERS].filter(name => name.endsWith(".mjs")).sort(),
+  sharedPipelineScripts.filter(name => name !== "control-plane.mjs").sort(),
+  "specialist helper bundle must omit the Main-only control-plane mutator");
 assert.ok(PIPELINE_HELPERS.includes("openspec-policy.json"), "workspace helper bundle omits the OpenSpec policy dependency");
 
 async function makePipelineFixture() {
@@ -254,7 +255,7 @@ assert.match(canonicalOrchestratorState,
   "Codex pipeline state does not establish the v5 sole-authority contract");
 assert.match(pipelineStateReference, /only durable control authority[\s\S]*Main alone appends/,
   "pipeline state reference loses the v5 control-log ownership contract");
-for (const script of ["bounded-command.mjs", "cli-entrypoint.mjs", "code-hygiene.mjs", "control-plane.mjs", "correction-packet-preflight.mjs", "helper-bundle.mjs", "workspace-identity.mjs", "openspec-bindings.mjs", "openspec-overlay.mjs", "herdr-message.mjs", "specialist-liveness.mjs", "specialist-write-scope.mjs"]) {
+for (const script of ["bounded-command.mjs", "cli-entrypoint.mjs", "code-hygiene.mjs", "control-plane.mjs", "control-plane-specialist.mjs", "correction-packet-preflight.mjs", "helper-bundle.mjs", "workspace-identity.mjs", "openspec-bindings.mjs", "openspec-overlay.mjs", "herdr-message.mjs", "specialist-liveness.mjs", "specialist-write-scope.mjs"]) {
   const source = await readFile(join(root, "skills/pipeline/scripts", script), "utf8");
   const projected = await readFile(join(root, "plugins/team-harness/skills/pipeline/scripts", script), "utf8");
   assert.equal(projected, source, `${script} generated projection is stale`);

@@ -14,7 +14,7 @@ export const PIPELINE_HELPERS = Object.freeze([
   "cli-entrypoint.mjs",
   "code-hygiene.mjs",
   "commit-integrity.mjs",
-  "control-plane.mjs",
+  "control-plane-specialist.mjs",
   "correction-packet-preflight.mjs",
   "helper-bundle.mjs",
   "herdr-message.mjs",

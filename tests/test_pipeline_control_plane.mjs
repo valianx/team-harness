@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -8,6 +9,7 @@ import path from "node:path";
 
 import {
   CONTROL_PLANE_SCHEMA_VERSION,
+  acceptResultEnvelope,
   appendControlEvent,
   buildControlProjection,
   canonicalControlBytes,
@@ -19,6 +21,7 @@ import {
   certifyCapabilityCapsule,
   cleanerEligibility,
   decideCausalRecovery,
+  issueCapabilityLease,
   qualityRequirement,
   rebuildControlProjections,
   replayControlBytes,
@@ -32,6 +35,7 @@ import {
 
 const hash = value => createHash("sha256").update(value).digest("hex");
 const h = value => hash(Buffer.from(value));
+const git = (repository, ...args) => execFileSync("git", args, { cwd: repository, encoding: "utf8" }).trim();
 const temporary = await mkdtemp(path.join(tmpdir(), "th-control-plane-"));
 
 try {
@@ -42,20 +46,41 @@ try {
   await mkdir(path.join(worktree, "evidence"), { recursive: true });
   await mkdir(control, { recursive: true });
   await writeFile(path.join(worktree, "input.md"), "immutable\n");
-  await writeFile(path.join(worktree, "src", "change.mjs"), "export {};\n");
   await writeFile(path.join(worktree, "evidence", "test.txt"), "pass\n");
+  git(worktree, "init", "-q", "-b", "main");
+  git(worktree, "config", "user.name", "Team Harness Test");
+  git(worktree, "config", "user.email", "test@example.invalid");
+  git(worktree, "add", "input.md", "evidence/test.txt");
+  git(worktree, "commit", "-q", "-m", "base");
+  const baselineCommit = git(worktree, "rev-parse", "HEAD");
+  const authorityPayload = {
+    presentation_nonce: "gate-1-nonce", decision: "approve", intent_identity: h("intent"),
+    scope_identity: h("scope"), security_identity: h("security"),
+  };
+  const logPath = path.join(control, "control.jsonl");
+  assert.equal((await appendControlEvent({
+    log_path: logPath, type: "transition",
+    provenance: { actor: "main", authority_event_id: null },
+    payload: { phase: "implementation", status: "active" },
+  })).error_code, "CONTROL_WRITER_INVALID");
+  const authority = await appendControlEvent({
+    log_path: logPath, writer: "main", type: "operator_authority",
+    provenance: { actor: "main", authority_event_id: null }, payload: authorityPayload,
+  });
+  assert.equal(authority.ok, true);
 
   const leaseInput = {
     schema_version: CONTROL_PLANE_SCHEMA_VERSION,
     kind: "capability_lease",
     role: "implementer",
-    authority_event_id: h("authority"),
+    authority_event_id: authority.record.event_id,
     intent_identity: h("intent"),
     scope_identity: h("scope"),
     security_identity: h("security"),
     worktree,
     writable_paths: ["src"],
     immutable_inputs: [{ path: "input.md", sha256: h("immutable\n") }],
+    baseline_commit: baselineCommit,
     context_identity: h("context"),
     lifecycle: "active",
   };
@@ -75,6 +100,22 @@ try {
   await writeFile(path.join(worktree, "input.md"), "immutable\n");
   await symlink(temporary, path.join(worktree, "escape"));
   assert.equal((await createCapabilityLease({ ...leaseInput, writable_paths: ["escape/file"] })).error_code, "LEASE_PATH_INVALID");
+  await rm(path.join(worktree, "escape"));
+
+  const duplicateAuthority = await appendControlEvent({
+    log_path: logPath, writer: "main", type: "operator_authority",
+    provenance: { actor: "main", authority_event_id: null }, payload: authorityPayload,
+  });
+  assert.equal(duplicateAuthority.duplicate, true);
+  assert.equal(duplicateAuthority.record.event_id, authority.record.event_id);
+  assert.equal((await issueCapabilityLease({ log_path: logPath, lease })).error_code, "CONTROL_WRITER_INVALID");
+  const issued = await issueCapabilityLease({ log_path: logPath, lease, writer: "main" });
+  assert.equal(issued.record.sequence, 2);
+
+  await writeFile(path.join(worktree, "src", "change.mjs"), "export {};\n");
+  git(worktree, "add", "src/change.mjs");
+  git(worktree, "commit", "-q", "-m", "task");
+  const taskCommit = git(worktree, "rev-parse", "HEAD");
 
   const resultInput = {
     schema_version: CONTROL_PLANE_SCHEMA_VERSION,
@@ -84,7 +125,7 @@ try {
     changed_paths: ["src/change.mjs"],
     evidence_paths: ["evidence/test.txt"],
     artifacts: [{ path: "evidence/test.txt", sha256: h("pass\n") }],
-    commits: [h("commit")],
+    commits: [taskCommit],
     findings: [{
       id: "F-1", class: "correctness", severity: "low", state: "resolved",
       summary: "Covered by focused test", evidence_paths: ["evidence/test.txt"],
@@ -104,40 +145,11 @@ try {
   assert.equal((await createResultEnvelope({ ...resultInput, diagnostics: ["token=github_pat_0123456789abcdef"] }, { lease, currentSequence: 2 })).error_code, "RESULT_SCHEMA_INVALID");
   assert.equal((await createResultEnvelope(resultInput, { lease, currentSequence: 3 })).error_code, "RESULT_SEQUENCE_STALE");
 
-  const authorityPayload = {
-    presentation_nonce: "gate-1-nonce", decision: "approve", intent_identity: h("intent"),
-    scope_identity: h("scope"), security_identity: h("security"),
-  };
-  const logPath = path.join(control, "control.jsonl");
-  const authority = await appendControlEvent({
-    log_path: logPath, type: "operator_authority",
-    provenance: { actor: "main", authority_event_id: null }, payload: authorityPayload,
-  });
-  assert.equal(authority.ok, true);
-  const duplicateAuthority = await appendControlEvent({
-    log_path: logPath, type: "operator_authority",
-    provenance: { actor: "main", authority_event_id: null }, payload: authorityPayload,
-  });
-  assert.equal(duplicateAuthority.duplicate, true);
-  assert.equal(duplicateAuthority.record.event_id, authority.record.event_id);
-  const issued = await appendControlEvent({
-    log_path: logPath, type: "lease_issued",
-    provenance: { actor: "main", authority_event_id: authority.record.event_id },
-    payload: { lease },
-  });
-  assert.equal(issued.record.sequence, 2);
-  const acceptedResultInput = { ...resultInput, observed_control_sequence: 2 };
-  const acceptedResult = (await createResultEnvelope(acceptedResultInput, { lease, currentSequence: 2 })).value;
-  const accepted = await appendControlEvent({
-    log_path: logPath, type: "result_accepted",
-    provenance: { actor: "main", authority_event_id: authority.record.event_id },
-    payload: { result: acceptedResult },
-  });
+  assert.equal((await acceptResultEnvelope({ log_path: logPath, result })).error_code, "CONTROL_WRITER_INVALID");
+  const accepted = await acceptResultEnvelope({ log_path: logPath, result, writer: "main" });
   assert.equal(accepted.ok, true);
-  assert.equal((await appendControlEvent({
-    log_path: logPath, type: "result_accepted",
-    provenance: { actor: "main", authority_event_id: authority.record.event_id },
-    payload: { result: acceptedResult },
+  assert.equal((await acceptResultEnvelope({
+    log_path: logPath, result, writer: "main",
   })).duplicate, true);
   assert.equal((await appendControlEvent({
     log_path: logPath, type: "transition", writer: "specialist",
@@ -151,15 +163,16 @@ try {
   assert.equal(replay.records[1].previous_hash, replay.records[0].event_id);
   const projected = buildControlProjection(replay.records);
   assert.equal(projected.authority.decision, "approve");
-  assert.equal(projected.accepted_results[acceptedResult.result_id].status, "completed");
+  assert.equal(projected.accepted_results[result.result_id].status, "completed");
   assert.equal(projected.findings["F-1"].state, "resolved");
 
-  const projectionWrite = await rebuildControlProjections({ log_path: logPath, workspace });
+  assert.equal((await rebuildControlProjections({ log_path: logPath, workspace })).error_code, "CONTROL_WRITER_INVALID");
+  const projectionWrite = await rebuildControlProjections({ log_path: logPath, workspace, writer: "main" });
   assert.equal(projectionWrite.ok, true);
   const firstState = await readFile(path.join(workspace, "00-state.md"), "utf8");
   assert.match(firstState, /Projection only/);
   assert.match(await readFile(path.join(workspace, "reviews", "findings-ledger.md"), "utf8"), /F-1/);
-  assert.equal((await rebuildControlProjections({ log_path: logPath, workspace })).ok, true);
+  assert.equal((await rebuildControlProjections({ log_path: logPath, workspace, writer: "main" })).ok, true);
   assert.equal(await readFile(path.join(workspace, "00-state.md"), "utf8"), firstState);
 
   const bytes = await readFile(logPath);
@@ -211,6 +224,19 @@ try {
   assert.equal(capsule.ok, true);
   assert.deepEqual(Object.keys(capsule.capsule).sort(), ["capability_lease", "helper_bundle", "kind", "objective", "schema_version"]);
   assert.equal((await verifyCapabilityCapsule({ workspace, reference: capsule.reference })).ok, true);
+
+  await writeFile(path.join(worktree, "outside.txt"), "outside lease\n");
+  git(worktree, "add", "outside.txt");
+  git(worktree, "commit", "-q", "-m", "outside");
+  const outsideCommit = git(worktree, "rev-parse", "HEAD");
+  const omittedOutside = (await createResultEnvelope({
+    ...resultInput,
+    commits: [taskCommit, outsideCommit],
+    observed_control_sequence: 3,
+  }, { lease, currentSequence: 3 })).value;
+  assert.equal((await acceptResultEnvelope({
+    log_path: logPath, result: omittedOutside, writer: "main",
+  })).error_code, "RESULT_SCOPE_VIOLATION");
 
   const legacyWorkspace = path.join(temporary, "legacy-workspace");
   await mkdir(path.join(legacyWorkspace, "inputs"), { recursive: true });
