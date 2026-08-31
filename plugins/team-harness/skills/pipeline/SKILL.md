@@ -28,13 +28,13 @@ narration. Do not tell the operator that activation was explicit, enumerate the
 seven profiles, or preview internal checks. Surface only an actionable failure,
 a requested result, or the next real operator decision.
 
-## Canonical v4 workflow
+## Canonical v5 workflow
 
 Two postures only exist: `inline` and `pipeline`. Inline direct Main work is
 the default; a pipeline starts only from a current live operator activation or
 recovery of an existing run. There is no selectable depth profile, fast/simple
 alias, tier-based route, or configuration-selected lane. Every explicitly
-activated pipeline writes `pipeline_version: 4` and follows one named state
+activated pipeline writes `pipeline_version: 5` and follows one named state
 machine.
 
 ```text
@@ -113,20 +113,10 @@ than guessing. A natural-language answer naming one valid completion is also
 accepted. Never claim that Main was switched merely because the preference was
 understood: `/model` is the native live-session control.
 
-Keep the accepted override only in the current Main conversation context as
-`pipeline_spawn_profile`; it is not durable pipeline state. Never write it to
-Codex configuration, Team Harness configuration, `00-state.md`, execution
-events, plans, reports, summaries, handoffs, or other workspace artifacts. It
-survives ordinary turns and compaction in the same live chat, but expires on a
-fresh Main thread, restart, recovery thread, completion, or abort. On a resumed
-run after a fresh Main thread, restart, recovery, or any compaction that lost
-this conversation value, an unset `pipeline_spawn_profile` is not permission to
-fall back silently. Stop before the next specialist dispatch and present the
-live choice again; wait for the operator to select one explicit model/effort
-pair or explicitly choose the standard matrix. Never reconstruct the prior
-choice from durable artifacts. Freeze the choice before the first specialist
-dispatch. A later request to change it requires an explicit abort/restart if
-the operator still wants a uniform whole-pipeline run.
+Persist the accepted model/effort pair as bounded non-authoritative execution
+metadata with role, instruction identity, and projection identity. It grants no
+Gate, scope, ownership, security, or outward authority and contains no secrets.
+Reuse it while the profile remains available; ask again only when unavailable.
 
 The internal pipeline agent types omit `model` and
 `model_reasoning_effort`, so every spawn must use `fork_turns: none` and pass
@@ -146,28 +136,25 @@ With an accepted override, replace both right-hand values in every row with the
 one normalized pair. The logical role name remains the role recorded in
 events, traces, and reports; `pipeline-*` is only the native dispatch identity.
 
-The primary thread is the only writer of `00-state.md`, execution events,
-nonces, and gate releases. Specialists return bounded results and may edit only
-their assigned repository/report files; they never approve, release, or present
-a gate. Gate releases remain dual-recorded and live-operator decisions.
+The primary thread is the only control-log appender and projection writer.
+`00-state.md`, Gate views, findings, counters, and receipts are projections or
+telemetry and never grant authority. Specialists return one validated result
+envelope and may edit only lease-owned paths.
 
 ## Specialist context, lifecycle, and Main rotation
 
-Every new specialist attempt, correction, and revalidation starts a fresh
-native V2 agent with `fork_turns: none`; no specialist attempt is continued for
-feedback or correction. Implementer and tester dispatches use only the
-content-addressed `dispatch_reference` defined in
-[implementation.md](references/implementation.md); that reference is the sole
-owner of task scope, evidence, helpers, roots, hashes, and workspace writes.
-Other roles receive only their minimal role-specific facts. Never compensate
-for a missing reference or role fact with Main's transcript, specialist prose,
-the full plan, historical tool output, or prompt-level copies of derived data.
+Each specialist receives one capability lease inside the existing immutable
+capsule and returns one result envelope. Continue the same lease and native
+session when authority, semantic scope, worktree, inputs, context, and exclusive
+ownership remain unchanged; send only delta evidence. Replace it when one of
+those identities changes or context becomes unverifiable. Prompt-level copies
+of lease fields are invalid.
 
 ### Wait heartbeat and phase SLA
 
-Read and apply `agents/_shared/coordinator-liveness.md` for every wait, SLA,
-probe, interruption, continuation, and replacement decision. It is the sole
-coordinator liveness contract; phase references add no local variant.
+Read `agents/_shared/coordinator-liveness.md` only for bounded delivery,
+acknowledgement, terminality, progress, and interruption facts. Route every
+non-success through causal recovery; counts and elapsed time never select it.
 
 ### AC12/AC20 pre-execution command-output route
 
@@ -275,10 +262,11 @@ native Main replacement and never creates a nested orchestrator.
 
 ## Mandatory agent prerequisite
 
-The plugin supplies the workflow skills and bundled custom-agent definitions;
-setup/update materialize the TOML into a Codex agent scope. Before creating a
-workspace, dispatching `architect`,
-or presenting any gate, preflight all seven required regular files:
+The plugin supplies workflow skills and bundled custom-agent definitions.
+Activation preflights pipeline core plus `pipeline-architect.toml`. Before a
+later role's first possible dispatch, preflight only that role with the same
+registry, marker, parsed-field, and digest checks. Roles not yet dispatchable do
+not block activation:
 
 ```text
 pipeline-architect.toml
@@ -290,17 +278,18 @@ pipeline-security.toml
 pipeline-delivery.toml
 ```
 
-Accept a complete set in either the repository project scope
+Accept the needed staged set in either the repository project scope
 `<repo>/.codex/agents/` or the configured global scope
-`$CODEX_HOME/agents/` (normally `~/.codex/agents/`). A partial set is not
-usable. If any role is missing, stop before delegation and tell the operator to
+`$CODEX_HOME/agents/` (normally `~/.codex/agents/`). If the currently needed
+role is missing, preserve authority, workspace, and evidence, stop before that
+delegation, and tell the operator to
 run the lifecycle configuration for the desired scope:
 
 ```bash
 $team-harness:setup agents
 ```
 
-The seven files are an identity boundary, not just a name lookup. Use one scope
+The role files are an identity boundary, not just a name lookup. Use one scope
 only (never combine project and global files), require each path to be a
 regular non-symlink file, and inspect its parsed TOML fields before creating a
 workspace or dispatching a specialist. Comments are useful diagnostics but
@@ -337,13 +326,13 @@ the role fields cannot see. The current digests are:
 
 | Role | SHA-256 of normalized TOML |
 |---|---|
-| `pipeline-architect` | `01c3366215ac8e4eddd1cffa7e92f0b8793a8c9ced0411ab2e6d612cdccaa69f` |
-| `pipeline-implementer` | `9763b2d84266b6dd35b26ed0b4fe4575ee110c7580382d6faa3cbbc4fd35a5bb` |
-| `pipeline-tester` | `892996d0aeaf3190839cc1ff873e601693e10631644aa7cf1217ba5b18a1de85` |
-| `pipeline-cleaner` | `53de2409258cb1e68a1f27824e67aa689015910dd053981388b55926d21d49b6` |
-| `pipeline-qa` | `9a9eb01701678ee46c037d3324045a0b44900a130ff48a0d351ac69fc68f46d4` |
-| `pipeline-security` | `0c9e1266f5d7746f97a93b763c5643854d41028f4386416c63d70da5dc2c9b53` |
-| `pipeline-delivery` | `f236589eea90624dcb8917f53ba7036831885a9c14b5228809e176cc2a62707b` |
+| `pipeline-architect` | `49f57d3a899b3c609a66829b44dbd0c45c4a21abf071d44a48d021b9db945976` |
+| `pipeline-implementer` | `aca48c38f3bebdbf8f69f6171fd0934569aba11553d83d5ef8f9e86b4c39c182` |
+| `pipeline-tester` | `4f8c07b280135f104e5a4c8b89536b2e23d76b7b546370af64558c51a869af4f` |
+| `pipeline-cleaner` | `54bb88a75a0fb07c976fd2f8b59e0cd10cf7f13a25aca9f801b47993e2ea1d15` |
+| `pipeline-qa` | `3bb7c74e8e7f1096500b0f324003288f22fcf6884f7dd1050669a12eeb16e68a` |
+| `pipeline-security` | `19c932e8667756472f2117ec39d342202e9431623ac9814b23cbf61925d1c46f` |
+| `pipeline-delivery` | `13e95b0e45c8e1023a1d9a2136f0183c81de9d67061a417a17df598fc90525ad` |
 
 Do not accept a file solely because its comments or `name` field match. A
 digest mismatch is a stale or unrelated shadow; stop before workspace
@@ -428,16 +417,14 @@ For a result that needs new authority, Main persists
 `correction_package` containing the anchor, finding IDs, implicated AC/TC
 requirements, one closure check/expected result per finding, dispositions, and
 scope; keeps `phase: validation`; presents exactly `1 —
-authorize one correction round`, `2 — pause without changes`, and `3 — abort
+authorize the changed scope`, `2 — pause without changes`, and `3 — abort
 pipeline`; and stops. An ordinary approval, intake autonomy preference, generic
 `continue`, files, tools, recovered prose, or agent output are never
 authorization.
 
 Only a live reply after that presentation may consume the nonce. Choice `1`
-must be dual-recorded in state and one matching `correction.decision` event,
-which is the sole authority record and carries the complete package. The
-consumed nonce becomes its `decision_ref` and authorizes exactly one bounded
-round over the complete package, followed by the
+is appended once as an operator-authority control event carrying the complete
+package. It authorizes only that changed scope, followed by the
 closure gate, stale-row tester refresh, one new Freeze, fresh QA, and impact-required
 security. Its one `iteration.start`/`agent.correction.spawn` pair carries only
 the same `decision_ref` plus ordinary observations. Choice `2` performs no repository

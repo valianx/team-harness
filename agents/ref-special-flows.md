@@ -510,7 +510,7 @@ approvals remain independent.
 3. Every correctable `broke-it` result or incomplete changed-control coverage blocks delivery,
    returns to implementation, rebuilds Freeze, and receives a fresh delta audit.
 4. A non-security correctable finding remains governed by the ratchet (`agents/ref-pipeline.md §
-   "The ratchet"`): a sub-floor residual on unchanged surface after a prior correction round
+   "The ratchet"`): a sub-floor residual on unchanged surface after a prior validation pass
    records to the findings ledger instead of reopening implementation again.
 5. A genuinely structural contradiction is surfaced for an explicit operator design decision;
    it is never silently downgraded to a warning.

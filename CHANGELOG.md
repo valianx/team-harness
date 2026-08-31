@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The gated pipeline now uses a v5 hash-linked control log as its sole durable
+  authority, one capability lease per specialist capsule, and one validated
+  result envelope per return. Recovery is causal, role preflight and quality are
+  demand-driven, and supported v1-v4 workspaces convert once through a
+  create-then-switch transaction.
+
 ## [3.20.5] - 2026-08-25
 
 ### Fixed

@@ -93,6 +93,7 @@ export const sharedPipelineScripts = [
   "cli-entrypoint.mjs",
   "code-hygiene.mjs",
   "commit-integrity.mjs",
+  "control-plane.mjs",
   "correction-packet-preflight.mjs",
   "helper-bundle.mjs",
   "plan-contract.mjs",

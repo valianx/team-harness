@@ -1,5 +1,26 @@
 # Implementation phase
 
+## Current v5 route
+
+Enter only when the control log contains live authority for the exact approved
+identities. Main places one capability lease inside the existing immutable
+capsule and does not duplicate its authority, scope, roots, hashes, ownership,
+or observed sequence in prompt prose. The specialist returns one result
+envelope; Main validates and appends its acceptance before projecting anything.
+
+One canonical worktree has one committing writer. Same-agent continuation
+reuses its lease/session while authority, semantic scope, inputs, context, and
+ownership remain unchanged. Pre-implementation runs prerequisites and RED only.
+Cleaner dispatch requires a non-empty deterministic safe allowlist. Complete
+quality runs once for the candidate identity at Freeze and reruns only after the
+tree changes.
+
+The remainder of this document is retained solely as v1-v4 converter input and
+historical migration vocabulary. Current v5 dispatch and recovery must not
+execute or import its routes.
+
+## Legacy v1-v4 migration reference (non-executable)
+
 Enter only from `phase: implementation` with a valid dual-record
 `STAGE-GATE-1` release (`gate1_release: approved` — legacy
 `approved-autonomous` stays legible — plus its matching `stage.gate.release`

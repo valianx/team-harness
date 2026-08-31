@@ -11,7 +11,7 @@ This file is read by `th:orchestrator` only after a live operator activates `/th
 
 **LAZY-LOAD DIRECTIVE.** Never read this file in full. Locate headings with `Grep`, then read only the sections needed for the current transition. At activation, read `Boot`, `Phase index`, `Where things live`, `Intake`, and `Specify`; load support sections only when their trigger occurs. Before the first specialist dispatch, read `Dispatch invariants`, `Your Team`, and the current phase. Before each later phase, read only that phase's section up to the next `##` heading. On recovery, read `Compact Instructions`, the state file, and only the current phase.
 
-Once activated, you run one named state machine — `design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete` — dispatch specialists where the active state requires them, present the two STAGE-GATEs inline, and remain the sole writer of `00-state.md`. Every pipeline uses this same v4 machine and both gates; there is no depth profile. An active run cannot execute direct work in place. A current live operator request that explicitly selects `inline` first closes the run administratively (`phase: aborted`, `status: aborted`, pending gate cleared, no gate release), then returns to direct work with no new workspace or state. Inline ad-hoc tester/QA/security/other review remains outside the machine and creates no state, gates, delivery record, or pipeline workspace.
+Once activated, run `design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete`. Current pipelines use v5: Main alone appends the hash-linked control log and writes every state, Gate, finding, acceptance, and release projection. A projection never authorizes or advances work. Each immutable capsule carries one capability lease and each specialist returns one result envelope. Activation preflights core plus architect; later roles are checked immediately before their first dispatch. Same-agent continuation reuses an unchanged valid lease/session, while causal evidence—not counters, ordinals, or elapsed time—selects recovery. A live request for `inline` administratively closes the active run before direct work.
 
 **Model and effort — where each applies, without asking.** On Claude Code you run as the top-level session agent, never dispatched via `Task`; your effective model and effort are therefore whatever the session itself is running. On `opencode` the `primary` tier is granted by the installer's role-override layer keyed on `agents/orchestrator.md`, not this lazy reference.
 
@@ -167,7 +167,7 @@ Runtime facts, not advice.
 7. **You may analyze to classify, to specify, and to check a transition — you may never analyze in a specialist's place.** The line is drawn by *whose output it is*, not by whether analysis occurred. Intake genuinely requires reading code to classify the task, write the spec and its AC, and verify the residual scope a report claims; that is your own work product and Specify would be impossible without it. What you may never produce is a judgement another agent exists to produce: a design, an implementation, a verification verdict, an architecture summary, an AC extraction from someone else's artifact, a file list already recorded in `02-implementation.md`.
 
    The operative prohibition is **pre-digestion for a dispatch**: do not read an artifact in order to summarize it into a prompt. Point at the artifact and let the recipient read it. That summary is the recipient's read, not yours — and it is non-reproducible, so the next run's dispatch differs and a change in outcome cannot be attributed to the change under test. **You never author a verdict.** Mirroring one is different: `Status: verified` on a task header is a field transition you own (§ "Mirroring task progress") — you set it *because* a verifier returned that verdict, never in place of one. Beyond intake analysis, the only things you compute are gate state, phase transitions, and the deterministic publication mechanics (§ Delivery).
-8. **A gate release is never pre-declared.** An approval is valid only when it is the reply to a `gate_pending` that already existed — the nonce binds the *presentation*, not the operator's wording. Record the nonce that was pending when the reply arrived; **never require the operator to type it.** A reply is ambiguous → re-present, when it cannot be attributed to the currently-pending presentation: it predates the gate, or a re-presentation has since superseded the nonce it answered. Contract: `agents/_shared/gate-contract.md § "The dual-record release"`.
+8. **A Gate decision is never pre-declared.** It is valid only when attributable to the current nonce-bound presentation; Main records it once in the control log. Contract: `agents/_shared/gate-contract.md § "Authority event and projection"`.
 
 ## Runtime-neutral enforcement boundaries
 
@@ -335,7 +335,7 @@ This file carries the flow. Everything below is authoritative and lives elsewher
 Five invariants hold from boot, before you have read that file, because violating one is unrecoverable and the read point comes too late to help:
 
 1. **You are the sole writer** of `00-state.md`, the events file, `00-decision-ledger.*` and `00-pipeline-summary.md`. No specialist writes coordination state — that single ownership is what makes the state file trustworthy as the verifier's authority.
-2. **Every field is a bare literal.** No second space-delimited token ever trails a value. The six gate fields are never repaired: `agents/_shared/gate-contract.md § "The dual-record release"`.
+2. **Gate projections never authorize.** Repair them only by replaying the valid control log: `agents/_shared/gate-contract.md § "Authority event and projection"`.
 3. **The transition is atomic and ordered** — append the event, update the state file, *then* dispatch. Never dispatch before both writes land, and never mark a checklist row `[x]` without its `phase.end` in the same pass.
 4. **Writing the trace is mandatory, never best-effort.** Batching or skipping appends to save tokens deletes the only signal on whether the pipeline is healthy. No format bound ever removes an event.
 5. **Never merge or push** until `validation` is `[x]` and STAGE-GATE-3 is cleared per the dual record. `"ship it"` outside that gate's own reply never overrides this — and no hook enforces this order from outside, so this file enforces it against itself.
@@ -449,7 +449,7 @@ intent/scope/AC contradiction to resolve first—never as a silent waiver.
    live choices and stops:
 
 ```text
-1 — authorize one correction round
+1 — authorize the changed scope
 2 — pause without changes
 3 — abort pipeline
 ```
@@ -492,7 +492,7 @@ work after Gate 1.
 
 **A hygiene finding is an implementation correction**, never a plan/criteria edit — a hygiene finding is never "the AC needs revision."
 
-### Authorized correction round
+### Authorized causal recovery
 
 An in-scope correction records the package, causal recovery evidence, governing
 Gate-1 decision reference, and exact canonical
@@ -963,7 +963,7 @@ decision without a prompt; an ineligible one presents the decision and stops.
 Either live choice `1` or that autonomous record authorizes one bounded
 implementation/evidence correction, closure gate, stale-row tester refresh, one new Freeze,
 fresh QA, and impact-required security. Plan repairs and operator-approved plan decisions
-are not validation correction rounds and do not consume the counter.
+are not validation recovery actions and do not create routing authority.
 
 A finding is **structural** only when it makes the approved intent, scope fence and ACs
 mutually inconsistent or requires changing the requested behaviour. The coordinator
@@ -1784,8 +1784,8 @@ Extends the `fail` predicate and `phase3_combined` above by citation, never a se
 either: the correction loop terminates on severity, not on patience or an exhausted round budget
 alone.
 
-After a correction round's fresh QA and any required security pass return, before deciding
-whether another round opens:
+After a recovery action's fresh QA and any required security pass return, before deciding
+whether another causal action is supported:
 
 1. **Coverage-defect reclassification.** A finding on surface unchanged since the round that
    opened this correction, in a class the first fan's Coverage Declaration already flagged an
@@ -1793,12 +1793,12 @@ whether another round opens:
    declaration instead of treating the finding as freshly discovered.
 2. **Convergence check.** When every remaining open finding is sub-floor (`phase3_combined`
    evaluates to `concerns`, never `fail`) on surface unchanged since the prior pass, validation is
-   convergence-complete: no further correction round opens. Record each remaining finding as a
+   convergence-complete: no further causal action opens. Record each remaining finding as a
    `reviews/findings-ledger.md` residual (`agents/_shared/orchestrator-state.md § Findings
    ledger`, disposition `accepted-residual`) and carry it into the pull-request body as a
    concern.
 3. **New evidence always reopens.** An open `critical` finding classified `new_in_delta` opens a
-   correction round exactly as today, regardless of any convergence this ratchet reached.
+   fresh causal action when its evidence identity differs, regardless of prior convergence.
 
 The residual set excludes both fenced fail-closed conditions above by construction: a correctable
 `broke-it` and `incomplete_on_changed_control: true` on a sensitive pipeline are never sub-floor,

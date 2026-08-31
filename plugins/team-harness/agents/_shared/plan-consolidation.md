@@ -1,128 +1,22 @@
-# Plan consolidation invariant
-<!-- Single source of truth for the sharded plan-is-a-snapshot contract.
-     Consumed by: agents/{architect,plan-reviewer,qa-plan,qa,orchestrator}.md.
-     Edit here; agent files reference this file by section. -->
+# Plan and result consolidation (v5)
 
-## Invariant
+The approved OpenSpec execution contract defines task ownership, files,
+dependencies, invariants, constraints, quality commands, and required evidence.
+Main turns one ready execution item into one immutable capsule and capability
+lease; prompt prose cannot widen or duplicate those fields.
 
-The `sharded-v1` plan set defined by `docs/plan-shards.md` is a snapshot of the final,
-reconciled plan state — not a log of how the plan was reached. Each canonical field or fact
-appears exactly once in its owning artifact. When later input supersedes an earlier value,
-overwrite the smallest owning field or section; never append the new value beside the old one
-and never regenerate unrelated shards. Auxiliary deep-detail docs (`reviews/04-validation.md`,
-etc.) are permitted, but their final reconciled outcome must be reflected in the owning shard
-by detail or by reference.
+Main consolidates only validated, accepted result envelopes. Specialists edit
+only lease-owned paths and assigned OpenSpec checkboxes after their work closes.
+Coordinator state, Gate views, finding ledgers, acceptance views, and delivery
+state are projections owned by Main.
 
-The plan-review panel's outcomes live exclusively in `reviews/01-plan-review.md`. `01-plan.md` carries only the one-line `**Reviews:**` attestation pointing at that file.
+## Write-tool discipline
 
-**Single consolidating writer of the plan set (Stage 1).** The architect owns `01-plan.md` and `plan/**` during Stage 1. When a finding lands, it edits only the owning shard. `reviews/01-plan-review.md` remains a current snapshot: `§ Panel Rounds` retains one compact row per round; superseded finding bodies are replaced, not retained. Detailed history lives only in the execution-events file.
-
-**No forked root-level plan files.** Never create `01-plan-review.md`, `01-plan-ratification.md`, or any `01-plan-*.md` sibling in the ROOT of the workspace — every plan-stage panel outcome (ratification, plan review, security design-review) is written to the single canonical `reviews/01-plan-review.md` (closed list; no other review-outcome side-file is permitted).
-
-## Canonical-field set
-
-| Canonical field | Where it appears | Final-value owner |
-|---|---|---|
-| **Base branch** | `plan/delivery.md` | operator decision at STAGE-GATE-1, else `main` |
-| **Version bump (target version)** | `plan/delivery.md` | operator decision at STAGE-GATE-1, else architect default |
-
-The set above is the minimum mandated by this contract. Each agent may treat additional fields (target scope, PR count) as canonical, but base branch and version bump are the required two that every plan-writer/auditor must track.
-
-## No-forked-file prohibition
-
-No plan-stage agent may create a `01-plan-*.md` sibling file in the root of the workspace — `01-plan-review.md`, `01-plan-ratification.md`, `01-plan-v2.md`, or any variant. Every panel-stage **outcome** (plan ratification, plan review, security design-review) is written to the single canonical `reviews/01-plan-review.md` (closed list — no other side-file is permitted). `01-plan.md` retains only the `**Reviews:**` attestation line for these outcomes. Root-level side-files fragment the deliverable and defeat the snapshot invariant.
-
-This closes the set of panel *outcomes*, not the set of files under `reviews/`. A panel **input** authored by a non-panel agent gets its own file with its own single owner — `reviews/01-closure-rubric.md` (architect) and `reviews/01-ux-review.md` (ux-reviewer) are the two. Giving each author its own file is what keeps the panel's file free of foreign writers.
-
-## Section-ownership map
-
-| Section | File | Sole writer | Write mode |
-|---|---|---|---|
-| operator summary, classification, plan manifest, task status index | `01-plan.md` | architect | author; on amend, edit owning fields only |
-| decisions, services, assessments, file-level work plan | `plan/architecture.md` | architect | author; amend owning section only |
-| dependency and PR grouping, base and version | `plan/delivery.md` | architect | author; amend owning field only |
-| cross-project or multi-site invariants | `plan/invariants.md` | architect | author when needed; amend owning invariant only |
-| task scope, files, seams, notes, AC text and checkboxes | `plan/tasks/Task-N.md` | architect | one canonical shard per task; amend owning field only |
-| Closure rubric (ownership closure, provenance, removed-control) | `reviews/01-closure-rubric.md` | architect | author; rewrite in place on amend |
-| `## Plan Ratification` | `reviews/01-plan-review.md` | qa-plan (ratify-plan, explicit `/th:plan-review` only) | replace own section in place; surface any required plan/AC correction to `architect` — qa-plan never edits the plan body |
-| `## Plan Review` header + `## Summary` rules table + `## Findings` + `## Recommendation to orchestrator` + `**Combined verdict:**` | `reviews/01-plan-review.md` | plan-reviewer | append in place; replace any prior copy |
-| `## Panel Rounds` | `reviews/01-plan-review.md` | plan-reviewer | append exactly one compact row per round; never retain prior finding bodies |
-| `## Plan Review` sub-verdict `**Substance (qa):**` | `reviews/01-plan-review.md` | qa-plan (panel) | replace own labelled line in place |
-| `## Plan Review` sub-verdict `**Security design-review (security):**` | `reviews/01-plan-review.md` | security (panel) | replace own labelled line in place |
-| `## Security Design-Review` (top-level skeleton section, condition-gated) | `reviews/01-plan-review.md` | security (panel) | fill the skeleton's own `**Verdict:**` line in place; the worst-of combine reads the `## Plan Review` sub-verdict above, not this section |
-| `**Reviews:**` attestation line (plan title block) | `01-plan.md` | plan-reviewer | replace own labelled line in place, once per panel round |
-| AC checkboxes | `plan/tasks/Task-N.md` | qa (validate) | checkbox flip only; verdict remains in `reviews/04-validation.md` |
-| task `Status` cell | `01-plan.md` task index | orchestrator | field edit in place |
-| base/version changed by the operator at STAGE-GATE-1 | `plan/delivery.md` | orchestrator | overwrite owning fields in place |
+Write only lease-owned paths with the runtime's bounded edit tools. Preserve
+unrelated changes and never use coordinator files as a specialist output.
 
 ## Write-scope on the plan set (closed list)
 
-Every writer's permitted edit is enumerated below. A writer not listed has no write access to `01-plan.md` or `plan/**`; findings go to `reviews/01-plan-review.md`.
-
-| Writer | Permitted plan-set write | When |
-|---|---|---|
-| architect | all plan artifacts (author + smallest-shard refinement) | Stage 1, or a new design pass explicitly requested by the live operator after Gate 1 |
-| plan-reviewer | ONLY the `**Reviews:**` line in the title block (replace-in-place) | close of each panel round |
-| orchestrator | deterministic pre-Gate-1 format normalization (canonical index order, existing task routes, uniquely named heading levels, AC/TC literal grammar); mechanical canonical-field repairs that preserve every security obligation; canonical-field transcription of one bounded operator decision; and task-index status transitions | closed format normalization before Gate 1; all other repairs post-Gate-1; never dispatch `architect` automatically |
-| qa (validate) | ONLY AC checkbox flips in assigned task shards | Phase 3 |
-| delivery | task-index status to `merged` | Phase 4 |
-| ux-reviewer | AC additions in affected task shards, contiguous numbering — narrative stays in `reviews/01-ux-review.md` | Phase 1.7 (enrich, Stage 1, before ratification) |
-| qa-plan, security, tester, implementer, and everyone else | NONE | — |
-
-(Stage-2 `[CONSTRAINT-DISCOVERED]` annotations are placed in the affected task shard by the **orchestrator**, transcribing an implementer's status field; the implementer never writes the plan set.)
-
-Before Gate 1, the coordinator may run the deterministic format repair exactly
-once after failed validation. Its closed transformations are canonical index
-column order, existing task routes in the manifest, uniquely named required
-heading levels, and recognizable AC/TC delimiter, checkbox, and
-Given/When/Then casing. It applies all eligible transformations transactionally
-and cannot create missing content or change task values, counts, AC/TC prose,
-scope, decisions, architecture content, delivery, branches, or PR grouping. It
-records per-artifact before/after hashes and operations, reruns validation, and consumes no architect
-correction or iteration.
-
-After Gate 1, the coordinator is the only owner of canonical plan-field edits: it may
-repair a mechanical defect, transcribe a bounded resolution explicitly approved by the
-live operator, and perform the existing status transitions. Those edits continue at
-`phase: implementation` and do not create a new architect pass or automatic Gate 1.
-
-**Security-obligation boundary.** Any security-obligation change is never mechanical: it
-is decision-bearing and requires one bounded live operator decision. The coordinator
-transcribes that decision and continues `implementation → Freeze → fresh security audit →
-validation`; architect is prohibited unless the live operator separately and explicitly
-requests architect work; `iteration` delta: `0`. Only that request may set
-`phase: design` and open a new Gate 1.
-
-Specialists do not select a phase, edit canonical plan text, or dispatch the next agent;
-QA's checkbox-only mirror remains the existing validation exception. Only a fresh live
-operator request for architect work permits `phase: design` and a new Gate 1.
-
-## Final-result finding coordinates
-
-Tester, QA, security, and adversary findings that block acceptance use one
-coordinate set: `Cause`, `Files`, implicated `AC`, and `Correction`. A defect or
-coverage gap inside the approved scope returns to implementation; the
-coordinator reopens Freeze and requests a fresh audit of a sensitive delta.
-Only a structural contradiction between intent, scope, and AC requires an operator
-decision. That decision continues at `implementation` unless the live operator separately
-and explicitly requests architect work; only that request may open `design` and a new
-Gate 1. No validator rewrites an AC or edits coordination state to manufacture PASS.
-
-## Write-tool discipline (shared review files)
-
-On a review file that several agents write — today only `/th:plan-review`'s panel, which the
-pipeline no longer dispatches — use `Edit`, never `Write`, once the file exists, and anchor
-`old_string` to your own section. A whole-file `Write` destroys the other writers' sections; an
-unanchored edit corrupts one silently, which is worse because nothing surfaces it.
-
-Nothing checks this. `Edit` is granted by the agent's frontmatter `tools:` line, which is the only
-real control here; the anchoring half is self-applied. A prior revision named a coordinator-run
-header-survival check as its enforcer — that check was never defined in any file.
-
-## How to reference this file
-
-In your agent, add a one-line cross-reference at the relevant section:
-
-```
-**Plan consolidation invariant:** see `agents/_shared/plan-consolidation.md` § "Invariant" and § "Section-ownership map". No forked `01-plan-*.md` sibling in the workspace root; panel outputs live in `reviews/01-plan-review.md`.
-```
+Only the architect owns proposal, specs, design, and tasks before approval.
+After approval, assigned specialists may change only their task checkbox after
+the corresponding work closes; Main owns all projections.

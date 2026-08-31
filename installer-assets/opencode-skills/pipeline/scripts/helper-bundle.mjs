@@ -14,6 +14,7 @@ export const PIPELINE_HELPERS = Object.freeze([
   "cli-entrypoint.mjs",
   "code-hygiene.mjs",
   "commit-integrity.mjs",
+  "control-plane.mjs",
   "correction-packet-preflight.mjs",
   "helper-bundle.mjs",
   "herdr-message.mjs",
@@ -34,6 +35,7 @@ export const PIPELINE_HELPERS = Object.freeze([
   "workspace-identity.mjs",
   "workspace-preflight.mjs",
   "worktree-dependencies.mjs",
+  "openspec-policy.json",
 ]);
 
 const MAX_FILE_BYTES = 1024 * 1024;
@@ -190,7 +192,11 @@ export async function materializeHelperBundle(input = {}) {
     const sourceRoot = await canonicalSourceDirectory(input.source_root);
     const sourceFiles = [];
     for (const name of [...PIPELINE_HELPERS].sort()) {
-      const value = await regularFile(sourceRoot, path.join(sourceRoot, name), "SOURCE_HELPER_INVALID");
+      const sourcePath = name === "openspec-policy.json"
+        ? path.join(sourceRoot, "..", name)
+        : path.join(sourceRoot, name);
+      const sourceBoundary = name === "openspec-policy.json" ? path.dirname(sourceRoot) : sourceRoot;
+      const value = await regularFile(sourceBoundary, sourcePath, "SOURCE_HELPER_INVALID");
       sourceFiles.push({ name, bytes: value, sha256: hash(value), size: value.length });
     }
     const manifest = {

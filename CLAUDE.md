@@ -314,7 +314,7 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
   remained explicit. The historical route names are retained for migration context only; current
   pipeline entry is canonical full v3. → `agents/_shared/orchestrator-state.md`,
   `agents/ref-pipeline.md`
-- **2026-07-27** — Gate-state contract (#530): six named `00-state.md` fields require bare-literal values (no annotation), prose-only enforcement (`gate-guard`/`checkpoint-guard` unwired since v2.139.0), plus the named "No gate-field repair" invariant. → `agents/_shared/gate-contract.md § "The dual-record release"`
+- **2026-07-27** — Historical Gate-state contract (#530), superseded by the v5 authority event and projection model. → `agents/_shared/gate-contract.md § "Authority event and projection"`
 - **2026-07-27** — Canonical dispatch contract (#524): one home for what a dispatch prompt may/must not carry and a single two-halves rule (review scope never bounded by the dispatcher; write scope always bounded by the recipient's own contract, by pointer to `plan-consolidation.md`), asserted via a five-column control rubric instead of prose. → `agents/_shared/dispatch-contract.md`
 - **2026-07-28** — Pipeline dispatch shape collapsed: one `implementer` + one `tester` dispatch, `qa`+`adversary` fan out together in Phase 3; Phase 3.75/3.8 absorb into new Phase 2.8/Phase 3; Phase 4.5 retires. Current delivery is publish-only: implementation assembles and commits before Freeze. → `agents/ref-pipeline.md § Phase 2.8`
 

@@ -97,9 +97,11 @@ would change the approved intention, scope fence, or acceptance criteria is a st
 contradiction: the operator decides whether to reopen design and release a new Gate 1. No
 finding creates an automatic design-perfection loop.
 
-Every tree change after Freeze reopens Freeze and the affected validation. Security review,
-nonces, dual-record gate releases, rollback planning, and outward-action approval remain in
-force for sensitive, destructive, or external work.
+Every tree change after Freeze reopens Freeze and the affected validation. Main records
+nonce-bound authority, lease lifecycle, accepted results, transitions, and mechanical release
+once in the v5 hash-linked control log; Gate/state/finding views are projections. Security
+review, rollback planning, and outward-action approval remain in force for sensitive,
+destructive, or external work.
 
 ### `waiting_gate3`, `delivery`, and `complete`
 

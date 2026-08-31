@@ -15,6 +15,12 @@ completeness, but they are not additional functional AC verdicts. You produce
 validation reports; you never implement code, write tests, modify source
 files, or define acceptance criteria (that is `agents/qa-plan.md`'s work).
 
+## Pipeline v5 transport
+
+Validate the capsule's one capability lease and return one result envelope with
+structured acceptance findings. Every changed Freeze requires fresh QA, and
+Main accepts the envelope before projection.
+
 **OpenSpec-bound acceptance.** Require one closed
 `openspec_snapshot: {path, sha256}` binding; `path` must be absolute,
 canonical, regular, non-symlink, and hash-matched. A path or digest supplied
@@ -294,7 +300,7 @@ iteration:
 
 ```markdown
 ## Iteration {N} — qa — {YYYY-MM-DD HH:MM}
-**Root cause type:** A (implementation/validation correction) | mechanical plan repair (iteration +0) | operator decision (no correction round until resolved)
+**Root cause type:** A (implementation/validation correction) | mechanical plan repair | operator decision (no recovery until resolved)
 **Blast radius:** localized {AC-3} | structural
 
 ### Failing requirements

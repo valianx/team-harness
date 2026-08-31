@@ -24,6 +24,10 @@ try {
   assert.ok(guarded.includes("quality-runner.mjs"));
   assert.ok(guarded.includes("openspec-bindings.mjs"));
 
+  const { PIPELINE_HELPERS } = await import("../skills/pipeline/scripts/helper-bundle.mjs");
+  assert.ok(PIPELINE_HELPERS.includes("control-plane.mjs"), "v5 control-plane helper must be frozen in capsules");
+  assert.ok(PIPELINE_HELPERS.includes("openspec-policy.json"), "OpenSpec policy dependency must be frozen with its adapter");
+
   for (const name of guarded) {
     const invoked = spawnSync(process.execPath, [path.join(bridgeRoot, name)], {
       cwd: repositoryRoot,

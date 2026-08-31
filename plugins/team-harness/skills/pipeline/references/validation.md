@@ -1,5 +1,12 @@
 # Validation phase
 
+Current v5 validation preflights each role immediately before its first
+dispatch, sends one capability lease inside the immutable capsule, and accepts
+one result envelope through Main. Fresh QA is mandatory for every changed
+Freeze; security is fresh when impact is true or unknown. Full quality runs once
+per candidate identity. The legacy attempt/receipt wording below is migration
+context only and cannot route current execution.
+
 This reference applies only to an explicitly activated pipeline. Validate approved functional
 ACs and technical constraints against the actual frozen tree and diff. Delegate executable evidence to `tester`,
 criterion-by-criterion review to `qa`, and require `security` to perform a focused audit when the
@@ -217,7 +224,7 @@ the live decision; preserve the current `autonomous_correction_count` and
 exactly:
 
 ```text
-1 — authorize one correction round
+1 — authorize the changed scope
 2 — pause without changes
 3 — abort pipeline
 ```

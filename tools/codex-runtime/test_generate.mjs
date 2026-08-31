@@ -12,8 +12,9 @@ const root = fileURLToPath(new URL("../..", import.meta.url));
 // The roster is imported rather than restated: a second copy is how a fixture starts
 // passing against a list the shipped code no longer has.
 const pipelineScripts = sharedPipelineScripts;
-assert.deepEqual([...PIPELINE_HELPERS].sort(), [...sharedPipelineScripts].sort(),
+assert.deepEqual([...PIPELINE_HELPERS].filter(name => name.endsWith(".mjs")).sort(), [...sharedPipelineScripts].sort(),
   "workspace helper bundle roster diverges from packaged pipeline scripts");
+assert.ok(PIPELINE_HELPERS.includes("openspec-policy.json"), "workspace helper bundle omits the OpenSpec policy dependency");
 
 async function makePipelineFixture() {
   const fixture = await mkdtemp(join(tmpdir(), "codex-pipeline-sync-"));
@@ -195,25 +196,21 @@ for (const [name, role] of Object.entries(pipelineRoleMap)) {
 }
 for (const role of ["implementer", "tester", "cleaner", "qa", "security", "delivery"]) {
   const content = first.files.get(join(root, `.codex/agents/pipeline-${role}.toml`));
-  for (const marker of ["TH-LIVENESS-PROBE", "TH-LIVENESS-ACK", "causal recovery", "never an ordinal allowance"]) {
+  for (const marker of ["capability", "lease", "result"]) {
     assert.ok(content.includes(marker), `pipeline-${role} adapter misses ${marker}`);
   }
+  assert.doesNotMatch(content, /TH-LIVENESS-(?:PROBE|ACK)|ordinal allowance/,
+    `pipeline-${role} retains retired liveness routing`);
 }
 
 const architect = first.files.get(join(root, ".codex/agents/architect.toml"));
 for (const marker of [
-  "Plan format:",
-  "## Plan Manifest",
-  "### Task Index",
-  "### Services Touched",
-  "### Work Plan",
-  "Pre-implementation test:",
-  "classification",
-  "touches_http_api",
-  "changes_security_control",
-  "wait_agent",
-  "interrupt_agent",
-  "demonstrated terminal unsuccessful result",
+  "agents/architect.md",
+  "OpenSpec execution-contract",
+  "pipeline v5",
+  "capability lease",
+  "result envelope",
+  "Main alone",
 ]) {
   assert.match(architect, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `architect adapter misses ${marker}`);
 }
@@ -238,12 +235,12 @@ for (const contract of pipelineVersionContracts) {
   assert.doesNotMatch(contract, /migration to the v3 pipeline|canonical (?:full )?v3|active v3 state|(?:write|writes|persist|set) `pipeline_version: 3`/i,
     "pipeline contract can persist or activate the retired writable v3 schema");
 }
-assert.match(pipelineVersionContracts[0], /Canonical v4 workflow[\s\S]*writes `pipeline_version: 4`/,
-  "Codex pipeline activation is not pinned to the canonical v4 state");
-assert.match(pipelineVersionContracts[3], /migration to the v4 pipeline/,
-  "recovery does not target a v4 migration");
-assert.match(pipelineVersionContracts[3], /valid v3 compatibility state/,
-  "recovery does not recognize v3 as compatibility input");
+assert.match(pipelineVersionContracts[0], /Canonical v5 workflow[\s\S]*writes `pipeline_version: 5`/,
+  "Codex pipeline activation is not pinned to the canonical v5 state");
+assert.match(pipelineVersionContracts[3], /supported v1-v4 state/,
+  "recovery does not recognize the closed legacy conversion range");
+assert.match(pipelineVersionContracts[3], /create-then-switch/,
+  "recovery does not require commit-last v5 conversion");
 assert.match(pipelineIdentityDocs[1], /`obsidian`, single repository: `\{logs-path\}\/\{logs-subfolder\}\/\{repo-name\}\/\{YYYY-MM-DD\}_\{feature\}`/,
   "Codex pipeline does not select the configured Obsidian vault as canonical workspace");
 assert.match(pipelineIdentityDocs[1], /`obsidian`, initiative: `\{logs-path\}\/\{logs-subfolder\}\/\{repo_base\}\/\{YYYY-MM-DD\}_\{initiative\}`/,
@@ -253,11 +250,11 @@ assert.match(pipelineIdentityDocs[1], /do not create, copy, export, or reconcile
 const pipelineStateReference = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/state-and-gates.md"), "utf8");
 const canonicalOrchestratorState = await readFile(join(root, "agents/_shared/orchestrator-state.md"), "utf8");
 assert.match(canonicalOrchestratorState,
-  /pipeline_version: 4[\s\S]*openspec_bindings:[\s\S]*openspec_aggregate_sha256:/,
-  "Codex pipeline new-run state is not the v4 aggregate contract");
-assert.match(pipelineStateReference, /canonical replaceable snapshot schema lives only in[\s\S]*agents\/_shared\/orchestrator-state\.md/,
-  "pipeline state reference duplicates or loses the canonical state schema pointer");
-for (const script of ["bounded-command.mjs", "cli-entrypoint.mjs", "code-hygiene.mjs", "correction-packet-preflight.mjs", "helper-bundle.mjs", "workspace-identity.mjs", "openspec-bindings.mjs", "openspec-overlay.mjs", "herdr-message.mjs", "specialist-liveness.mjs", "specialist-write-scope.mjs"]) {
+  /hash-linked `control\/control\.jsonl`[\s\S]*only durable control[\s\S]*projections or telemetry/,
+  "Codex pipeline state does not establish the v5 sole-authority contract");
+assert.match(pipelineStateReference, /only durable control authority[\s\S]*Main alone appends/,
+  "pipeline state reference loses the v5 control-log ownership contract");
+for (const script of ["bounded-command.mjs", "cli-entrypoint.mjs", "code-hygiene.mjs", "control-plane.mjs", "correction-packet-preflight.mjs", "helper-bundle.mjs", "workspace-identity.mjs", "openspec-bindings.mjs", "openspec-overlay.mjs", "herdr-message.mjs", "specialist-liveness.mjs", "specialist-write-scope.mjs"]) {
   const source = await readFile(join(root, "skills/pipeline/scripts", script), "utf8");
   const projected = await readFile(join(root, "plugins/team-harness/skills/pipeline/scripts", script), "utf8");
   assert.equal(projected, source, `${script} generated projection is stale`);
@@ -293,14 +290,14 @@ for (const marker of ["HELPER_COMPATIBILITY_EPOCH", "helper-bundles", "bundle_id
 for (const marker of ["failure_stage", "upstream_constraints_checked", "pending_shard_dependencies", "deterministic valid identifiers", "pending/future shard's seam"]) {
   assert.ok(testerSemantic.includes(marker), `tester semantic contract misses shard-local RED marker ${marker}`);
 }
-for (const marker of ["team_harness_dispatch_capsule", "no intermediate readiness handshake", "dispatch-reference-invalid", "workspace write"]) {
+for (const marker of ["capability_lease", "immutable work capsule", "prompt", "exclusive ownership"]) {
   assert.ok(dispatchContract.includes(marker), `shared dispatch contract misses specialist marker ${marker}`);
 }
 assert.ok(testerSemantic.includes("agents/_shared/dispatch-contract.md"), "tester does not consume the shared dispatch contract");
-for (const marker of ["exact `## {name}` heading", "inputs/acceptance-matrix.md § Acceptance Matrix", "exactly-once, non-empty-body check"]) {
+for (const marker of ["control/control.jsonl", "projection", "Main is the only log appender"]) {
   assert.ok(orchestratorStateContract.includes(marker), `orchestrator artifact verification misses section marker ${marker}`);
 }
-for (const marker of ["SPECIALIST_LIVENESS_GRACE_MS = 120_000", "specialist-interrupted-with-progress", "action: \"recover\"", "enter causal recovery"]) {
+for (const marker of ["team_harness_specialist_liveness_facts", "delivery_state", "terminal_state", "progress_declared"]) {
   assert.ok(livenessScript.includes(marker), `specialist liveness implementation misses ${marker}`);
 }
 assert.ok(!livenessScript.includes("SPECIALIST_LIVENESS_MAX_ATTEMPTS"),
@@ -328,15 +325,15 @@ for (const marker of ["migrate-v1", "verify-v1-migration", "team_harness_legacy_
 const implementationContract = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/implementation.md"), "utf8");
 const coordinatorLivenessContract = await readFile(join(root, "agents/_shared/coordinator-liveness.md"), "utf8");
 const coordinatorRecoveryContract = await readFile(join(root, "agents/_shared/coordinator-recovery.md"), "utf8");
-for (const marker of ["specialist-liveness.mjs", "fixed two-minute ACK grace", "probe_delivery_state: unconfirmed", "declared-path audit", "coordinator-recovery.md"]) {
+for (const marker of ["specialist-liveness.mjs", "delivery", "terminality", "never chooses", "causal recovery"]) {
   assert.ok(coordinatorLivenessContract.includes(marker), `specialist liveness pipeline contract misses ${marker}`);
 }
-for (const marker of ["One recovery rule", "preserves valid commits", "causal recovery identity", "must not be dispatched again", "never revokes Gate 1", "Only `phase/status: complete|aborted` closes the pipeline"]) {
+for (const marker of ["Continue the same lease", "Replace the session", "Pause", "live decision", "Counts, ordinals", "fresh QA"]) {
   assert.ok(coordinatorRecoveryContract.includes(marker), `coordinator recovery contract misses ${marker}`);
 }
 assert.ok(implementationContract.includes("agents/_shared/coordinator-liveness.md"),
   "implementation contract does not route to canonical coordinator liveness");
-for (const marker of ["Canonical dispatch reference", "correction-packet-preflight.mjs", "agents/_shared/dispatch-contract.md", "workspace writes", "Main alone writes or replaces"]) {
+for (const marker of ["Current v5 route", "capability lease", "Main validates", "one committing writer", "once for the candidate identity"]) {
   assert.ok(implementationContract.includes(marker), `specialist workspace ownership contract misses ${marker}`);
 }
 for (const marker of ["derived-artifact-damage", "repair-derived", "DERIVED_REPAIR_INELIGIBLE", "existing `implementation` phase"]) {
@@ -358,31 +355,25 @@ for (const marker of ["failure_stage: target-behavior", "upstream_constraints_ch
   assert.ok(implementationContract.includes(marker), `pre-implementation RED boundary misses ${marker}`);
 }
 const recoveryContract = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/recovery.md"), "utf8");
-for (const marker of ["verify-v1-migration", "gate1-v1-migration.json", "passing continuation certificate as the Gate-1 scope binding"]) {
-  assert.ok(recoveryContract.includes(marker), `OpenSpec legacy-v1 recovery contract misses ${marker}`);
-}
-for (const marker of ["dispatch-binding.json", "verify-dispatch", "DERIVED_SET_BUSY"]) {
-  assert.ok(recoveryContract.includes(marker), `OpenSpec dispatch-binding recovery contract misses ${marker}`);
-}
-for (const marker of ["audit-dispatches", "REPAIR_CORRECTION_COUNTERS", "CORRECTION_COUNTER_MISMATCH", "correction-wait-state", "status: paused", "verify-evidence-dispatch"]) {
-  assert.ok(recoveryContract.includes(marker), `OpenSpec exhaustive recovery contract misses ${marker}`);
+for (const marker of ["create-then-switch", "exact failing service", "commit the current pointer last", "Ambiguous authority", "never overwritten"]) {
+  assert.ok(recoveryContract.includes(marker), `v5 converter recovery contract misses ${marker}`);
 }
 for (const role of ["implementer", "tester"]) {
   const adapter = await readFile(join(root, `runtime/codex/instructions/${role}.md`), "utf8");
   const generatedAgent = await readFile(join(root, `.codex/agents/${role}.toml`), "utf8");
   assert.doesNotMatch(adapter, /For OpenSpec (?:implementation|testing), accept only/,
     `${role} adapter duplicates the shared dispatch reference contract`);
-  for (const marker of ["dispatch_reference", "team_harness_dispatch_capsule", "scope_identity_sha256", "no intermediate readiness handshake"]) {
+  for (const marker of ["capability_lease", "immutable work capsule", "exclusive ownership", "result envelope"]) {
     assert.ok(generatedAgent.includes(marker), `${role} generated agent misses canonical dispatch marker ${marker}`);
   }
-  for (const marker of ["Evidence", "workspace write", "prompt-level copies"] ) {
+  for (const marker of ["writable paths", "prompt", "coordinator"] ) {
     assert.ok(generatedAgent.includes(marker), `${role} generated agent misses capsule ownership marker ${marker}`);
   }
 }
 for (const marker of ["Team Harness Execution Contract", "EXECUTION_CONTRACT_INVALID", "discovery_scope", "required_seams", "observable_runtime_behavior"]) {
   assert.ok(overlayPlanContract.includes(marker), `OpenSpec planning contract misses ${marker}`);
 }
-for (const marker of ["plan-shards.md", "Team Harness Execution Contract", "overlay v2", "discovery_scope", "required_seams", "observable_runtime_behavior"]) {
+for (const marker of ["agents/architect.md", "capability lease", "result envelope", "Main alone"] ) {
   assert.ok(architectAdapter.includes(marker), `Codex architect adapter misses ${marker}`);
 }
 assert.doesNotMatch(overlayScript, /Derivation scaffold|planning pass authors the real/,

@@ -12,6 +12,12 @@ project type with a focus on maintainability, security, performance, and
 accessibility, producing architecture proposals, risk assessments, migration
 strategies, and technology research reports.
 
+## Pipeline v5 transport
+
+Receive one capability lease inside the immutable capsule and return one result
+envelope. Design creates no Gate authority; Main appends live operator authority
+and derives Gate/state projections from the control log.
+
 **Write boundary.** You create and edit only your own analysis artifacts — the
 active change's OpenSpec proposal/specs/design/tasks when explicitly dispatched
 in `openspec-planning` mode, or `01-plan.md`, `plan/**`, `01-root-cause.md`,
@@ -77,7 +83,7 @@ drops fenced-block byte-identity and forces full-file review diffs.
 `**Blast radius:** localized {IDs}` edits only the named elements in their
 owning shards, emits a diff summary in the status block, and does not
 re-derive the architecture; `structural` applies the full re-design contract.
-A correction round carries the complete problem list in one dispatch. Read the
+A causal recovery dispatch carries the complete problem list. Read the
 named slice and the current brief once; do not reload the whole plan.
 
 **Budgets.** Enforce the per-artifact budgets in `docs/plan-shards.md` before
