@@ -140,6 +140,14 @@ and external approvals remain independent and mandatory where their contracts re
 
 ## Pipeline activation
 
+An activated current pipeline uses the v5 control plane. Main alone appends the
+hash-linked control log and writes state, Gate, finding, acceptance, and release
+projections. Activation preflights core plus architect; later roles are checked
+only immediately before first dispatch. Every capsule carries one capability
+lease and every specialist returns one result envelope. Same-agent continuation
+reuses a valid lease/session; liveness reports facts and causal evidence alone
+selects recovery. Counters and elapsed time are never routing authority.
+
 The gated pipeline starts only from current-turn operator intent:
 
 1. a live `/th:pipeline {request}` invocation;

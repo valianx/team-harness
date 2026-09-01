@@ -61,7 +61,8 @@ release and its auto-ship policy.
 
 The plan records the absolute worktree path, branch, and an immutable base
 commit before Gate 1. Physical creation happens only after a valid Gate-1
-dual-record and before any implementation dispatch. Main first performs the
+authority event exists in the v5 control log and before any implementation
+dispatch. Main first performs the
 read-only Rule-2 collision checks, verifies the base object, and proves the
 planned path is equal to or below one of the current native `writable_roots`.
 An escalated `git worktree add` can create a path that ordinary patch/edit

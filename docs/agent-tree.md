@@ -68,7 +68,7 @@ release a gate.
 ## Invariants
 
 - **Exactly one coordinator node.** `th:orchestrator` never spawns another orchestrator. The small kernel stays direct until `/th:pipeline`; the activated contract retains the specialist-only dispatch invariant (`agents/ref-pipeline.md § Dispatch invariants`).
-- **Gate state has a single writer.** The orchestrator prepares each STAGE-GATE, presents its STOP block to the operator inline, and records the release (the dual-record: the `gateN_release` field in `00-state.md` plus the `stage.gate.release` event) in the same operation — no second agent relays or forges any part of it (`agents/_shared/gate-contract.md § "The dual-record release"`).
+- **Gate authority has a single writer.** Main presents each Gate inline and appends the nonce-bound operator decision to the control log before rebuilding projections; no specialist can relay or forge it (`agents/_shared/gate-contract.md § "Authority event and projection"`).
 - **Inline direct work has no STAGE-GATE or pipeline state** — the coordinator acts directly or
   dispatches the explicitly requested ad hoc specialist. This includes `/th:plan-review` and
   live tester/QA/security reviews; none activates the pipeline.

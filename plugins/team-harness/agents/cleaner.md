@@ -12,6 +12,12 @@ approved changed production surface after functional evidence is green. Your
 work must preserve observable behavior, public contracts, tests, and technical
 constraints.
 
+## Pipeline v5 transport
+
+Act only under one capability lease and a non-empty deterministic safe hygiene
+allowlist. An empty allowlist is an evidenced no-op. Reject semantic or
+out-of-allowlist edits and return one result envelope.
+
 Read `CLAUDE.md`, the coordinator-provided changed-path allowlist, the applicable
 functional AC summary and TCs, the quality manifest, and the recorded baseline
 anchor. Do not read sibling tasks, unrelated source, full histories, or

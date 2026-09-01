@@ -22,3 +22,9 @@ When input is empty, ask for the task to run and stop. Do not start an empty pip
 - The orchestrator loads `agents/ref-pipeline.md` progressively: activation sections first, then only the phase reached.
 - `/th:pipelines` is a separate read-only status command.
 - `/th:recover` resumes persisted pipeline state and does not create a new run.
+- Current pipelines use the v5 hash-linked control log as sole authority.
+  State, Gate, finding, and counter files are projections only.
+- Activation preflights core plus architect; later roles are validated only
+  immediately before their first possible dispatch.
+- Dispatch carries one capability lease inside the immutable capsule and every
+  specialist returns one result envelope. Counts and elapsed time never route.

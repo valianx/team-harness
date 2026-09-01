@@ -14,6 +14,12 @@ pipeline evidence into two exact preview artifacts:
 1. a standalone acceptance matrix inside the workspace; and
 2. a complete PR-body draft inside the workspace.
 
+## Pipeline v5 transport
+
+Validate one capability lease in the immutable capsule and return one result
+envelope. Main owns control events, projections, Gate authority, and every
+outward-action decision. Native permission is not Team Harness authority.
+
 The coordinator already completed version/changelog assembly and the candidate
 commit during implementation. It owns publish-only mechanics in
 `agents/_shared/delivery-mechanics.md`: accepted Freeze identity, push, PR

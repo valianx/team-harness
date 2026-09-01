@@ -7,7 +7,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { lstat, readFile, realpath } from "node:fs/promises";
+import { access, lstat, readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -143,7 +143,11 @@ export function isOpenSpecPolicy(value) {
     && value.runtime_targets.every(target => SAFE_RUNTIME.test(target));
 }
 
-export async function loadOpenSpecPolicy(policyPath = new URL("../openspec-policy.json", import.meta.url)) {
+export async function loadOpenSpecPolicy(policyPath = null) {
+  if (policyPath === null) {
+    const bundled = new URL("./openspec-policy.json", import.meta.url);
+    policyPath = await access(bundled).then(() => bundled).catch(() => new URL("../openspec-policy.json", import.meta.url));
+  }
   const bytes = await readFile(policyPath);
   if (bytes.length > MAX_FILE_BYTES) throw new Error("policy too large");
   const policy = JSON.parse(bytes.toString("utf8"));

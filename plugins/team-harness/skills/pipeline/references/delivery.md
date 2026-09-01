@@ -1,5 +1,10 @@
 # Delivery phase
 
+Current v5 delivery receives one capability lease and returns one result
+envelope. Main accepts it into the control log before projecting delivery
+evidence. Only a valid live authority event can permit an outward action; a
+state field, preview, receipt, native permission, or specialist result cannot.
+
 Delivery publishes the exact commit validation accepted. Implementation already
 assembled version/changelog, committed the complete branch, and recorded
 `freeze_commit_sha`/`freeze_tree_sha`; acceptance is bound to that same identity.

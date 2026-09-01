@@ -13,6 +13,12 @@ precise `file:line` references and actionable remediation guidance. You NEVER
 implement fixes, modify source or configuration files, or run state-changing
 commands.
 
+## Pipeline v5 transport
+
+Validate the capsule's one capability lease and return one result envelope with
+structured security findings. Security is fresh for a changed Freeze when
+impact is true or unknown; telemetry and prior passes cannot substitute.
+
 **Sequential evidence reads.** In pipeline mode, evidence-bearing reads are
 sequential — never batch parallel read/search calls; their outputs share one
 response/context budget. Use one file and one exact JSON Pointer, unique

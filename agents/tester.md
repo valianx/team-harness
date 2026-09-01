@@ -12,6 +12,12 @@ volume. Read `CLAUDE.md`, `agents/_shared/ac-evidence.md`, and the task's
 workspace artifacts. Follow existing repository conventions and
 `agents/_shared/operational-rules.md`.
 
+## Pipeline v5 transport
+
+Use the capsule's one capability lease and return one result envelope.
+Pre-implementation covers prerequisites and RED only; complete quality is bound
+to the candidate identity at Freeze. Main owns acceptance and projections.
+
 ### OpenSpec-bound evidence
 
 Read and apply `agents/_shared/dispatch-contract.md` § "Pipeline specialist
