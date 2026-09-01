@@ -221,7 +221,7 @@ Two modes: `plan` (analysis only) and `plan-and-execute` (analysis + pipeline pe
 
 **Milestone build disambiguation.** A `type: plan` single-repo milestone build is a third, distinct consumer for `01-plan.md`. The architect writes the milestone decomposition INTO `01-plan.md` (Work Plan with milestones M0…MN). This is NOT `01-planning.md` (multi-task batch). See the milestone-build section below for the full contract.
 
-**`plan-and-execute` no longer spawns one orchestrator per task.** A prior revision had each task dispatched by `plan-and-execute` run as its own `th:orchestrator` instance, each witnessing its own STAGE-GATE-1/3 independently, tracked by a separate `th:leader` progress roster. That model required the coordinator to dispatch another coordinator, which the fused contract forbids absolutely, with no exception for this mode (`agents/ref-pipeline.md § "Dispatch invariants"` #2). `plan-and-execute` now feeds the SAME single-coordinator, single-plan model as § "Multi-Task Handling" above: the tasks `01-planning.md` broke out become `01-plan.md § Task List` rows, and one `th:orchestrator` runs Stage 1 → STAGE-GATE-1 → Stage 2 → Stage 3 → STAGE-GATE-3 once, over the whole set — never once per task.
+**`plan-and-execute` no longer spawns one orchestrator per task.** A prior revision had each task dispatched by `plan-and-execute` run as its own `th:orchestrator` instance, each witnessing its own STAGE-GATE-1/3 independently, tracked by a separate `th:leader` progress roster. That model required the coordinator to dispatch another coordinator, which the fused contract forbids absolutely, with no exception for this mode (`agents/ref-pipeline.md` #2). `plan-and-execute` now feeds the SAME single-coordinator, single-plan model as § "Multi-Task Handling" above: the tasks `01-planning.md` broke out become `01-plan.md § Task List` rows, and one `th:orchestrator` runs Stage 1 → STAGE-GATE-1 → Stage 2 → Stage 3 → STAGE-GATE-3 once, over the whole set — never once per task.
 
 ### Planning phase (both modes)
 
@@ -259,7 +259,7 @@ A milestone build is when one project is decomposed into milestones (M0…MN) an
 
 **Operator-authority invariant — the pipeline never divides a task.** A single task's plan and its implementation are NEVER autonomously divided by the pipeline — not into multiple delivery groups, not into multiple stage-cycles, not into multiple workspaces. Dividing a scope into multiple workspaces is the OPERATOR's responsibility and decision. If the architect or the coordinator judges a scope too large for one task, it SURFACES that judgment to the operator (a decision in `01-plan.md § Review Summary → ### Decisions for human review`, or a STAGE-GATE STOP) — the operator decides whether to split into multiple workspaces. No agent splits a task's plan or implementation on its own authority.
 
-**Reconciling clause — decomposition vs division.** This invariant governs DIVISION of a single task; it does NOT prohibit the coordinator's always-run decomposition analysis (`agents/ref-pipeline.md § "14–17"`). A scope that decomposes into genuinely-independent tasks is identified by that analysis and becomes N rows of the SAME `01-plan.md § Task List`, implemented in the coordinator's single Phase 2 dispatch and consolidated into one PR by default — that is not "dividing a task." Decomposition operates at the TASK-IDENTIFICATION axis (finding independent tasks up front, always run, autonomous); this invariant governs the DELIVERY axis (never fragment one already-identified task, never mint separate operator-facing workspaces without operator sign-off). The two are complementary, not in tension.
+**Reconciling clause — decomposition vs division.** This invariant governs DIVISION of a single task; it does NOT prohibit the coordinator's always-run decomposition analysis (`agents/ref-pipeline.md`). A scope that decomposes into genuinely-independent tasks is identified by that analysis and becomes N rows of the SAME `01-plan.md § Task List`, implemented in the coordinator's single Phase 2 dispatch and consolidated into one PR by default — that is not "dividing a task." Decomposition operates at the TASK-IDENTIFICATION axis (finding independent tasks up front, always run, autonomous); this invariant governs the DELIVERY axis (never fragment one already-identified task, never mint separate operator-facing workspaces without operator sign-off). The two are complementary, not in tension.
 
 **Third parallelism axis — intra-task execution-lane fan-out (distinct from both of the above).** The lane-decomposition mechanism (`agents/ref-pipeline.md § Phase 2 — Implementation → Intra-task execution-lane decomposition`) is a THIRD, narrower axis, distinct from both TASK-IDENTIFICATION (the decomposition analysis above) and the inter-task DAG scheduler (`Depends on:` rounds, `agents/ref-pipeline.md` Stage-2 scheduler): it fans out the EXECUTION of a SINGLE already-approved, already-undivided task into bounded parallel implementer lanes — one per architect-declared, file-disjoint seam — when the task's `Files:` count meets `LANE_DECOMPOSE_MIN_FILES` and its seams are genuinely disjoint. The DELIVERABLE (plan, commit set, PR) is never divided; only EXECUTION may fan out into bounded lanes, capped at `LANE_CAP` per task and `GLOBAL_ROUND_CONCURRENCY_CAP` per round — a task whose lanes fan out still ships as exactly one plan, one implementation record, one commit set, one PR. Full contract, caps, and the seam-not-disjoint fallback: `agents/ref-pipeline.md § Phase 2 — Implementation → Intra-task execution-lane decomposition` and `docs/parallel-batch-implementation.md § Intra-task lane fan-out`.
 
@@ -373,15 +373,15 @@ consolidated by a second agent. That mechanism — Multi-Task fan-out and its co
 retired (measured at 0.6% of runs, both instances operator overrides;
 `agents/ref-dispatch-machinery.md § "What left this file"`). The coordinator never dispatches
 another coordinator, including another copy of itself
-(`agents/ref-pipeline.md § "Dispatch invariants"` #2, absolute, no exception).
+(`agents/ref-pipeline.md` #2, absolute, no exception).
 
 **What replaces it: N tasks in ONE plan, ONE Phase 2 dispatch.** The always-run decomposition
-analysis (`agents/ref-pipeline.md § "14–17"`) identifies genuinely independent tasks up front; the
+analysis (`agents/ref-pipeline.md`) identifies genuinely independent tasks up front; the
 architect writes them as `01-plan.md § Task List` rows ordered by their `Depends on:` DAG, and
 Phase 2 is **exactly one `implementer` dispatch covering every task** — never one per task
-(`agents/ref-pipeline.md § "Scheduler — never one dispatch per task"`). Intra-task file-level
+(`agents/ref-pipeline.md`). Intra-task file-level
 parallelism, when a single task's own scope is large enough, uses
-`agents/ref-pipeline.md § "Intra-task lane decomposition"` — implementer lanes sharing ONE worktree
+`agents/ref-pipeline.md` — implementer lanes sharing ONE worktree
 and branch, consolidated by the coordinator as sole committer. One plan, one pipeline run, one PR
 by default (`Delivery Grouping: all-tasks-one-pr`).
 
@@ -509,8 +509,7 @@ approvals remain independent.
 2. Validation dispatches the conditional adversarial audit against the current Freeze anchor.
 3. Every correctable `broke-it` result or incomplete changed-control coverage blocks delivery,
    returns to implementation, rebuilds Freeze, and receives a fresh delta audit.
-4. A non-security correctable finding remains governed by the ratchet (`agents/ref-pipeline.md §
-   "The ratchet"`): a sub-floor residual on unchanged surface after a prior validation pass
+4. A non-security correctable finding remains governed by the ratchet (`agents/ref-pipeline.md`): a sub-floor residual on unchanged surface after a prior validation pass
    records to the findings ledger instead of reopening implementation again.
 5. A genuinely structural contradiction is surfaced for an explicit operator design decision;
    it is never silently downgraded to a warning.
@@ -1069,18 +1068,22 @@ Artifact verification is defined by each named direct flow and by the gated pipe
 explicit activation. Legacy profile markers do not change verification or create a Stage Gate.
 ## Plan Sketches — Per-Type Applicability
 
-This section defines which task types and tiers produce a classification block and `sketches/*` files. The canonical reference is `docs/plan-sketches.md § 7`.
+This section defines which task types and tiers derive design-surface hints and
+`sketches/*` files. The canonical reference is
+`docs/plan-sketches.md § 7`.
 
 | Type / Tier | Classification block? | Always-sketches (collapsed surfaces) | Conditional sketches (`sketches/*`) | sketch-guard.sh invoked? |
 |-------------|----------------------|-------------------------------------|----------------------------------------|--------------------------|
-| `feature` / `refactor` / `enhancement` | Yes — architect returns the block and mirrors it in `01-plan.md § Review Summary → ### Classification block`; coordinator transcribes `00-state.md` | Yes — functional-acceptance AC in `§ Task List`; non-functional notes in `§ Architecture` | Per booleans: the architect produces every triggered file | Yes, at STAGE-GATE-1 |
-| `fix` Tier 2-4 | Yes — architect returns the root-cause classification; coordinator transcribes `00-state.md`; defaults false unless fix touches a contract surface | Yes (minimum AC in `§ Task List`) | Rare — only if the fix modifies a contract surface (e.g., the fix adds an endpoint); booleans default false | Yes — no-op pass when all-false |
-| `fix` Tier 1 / `hotfix` | No architect → orchestrator records all-false block when it self-authors `01-plan.md` | Yes (minimum 4-line AC) | None (all-false by orchestrator self-author) | Yes — no-op pass (empty required set) |
+| `feature` / `refactor` / `enhancement` | Main derives hints from OpenSpec; an invoked architect may return them, never mirror them into `01-plan.md` | Yes — canonical OpenSpec acceptance and design | Per hints: an invoked architect produces every triggered file | Yes, at STAGE-GATE-1 |
+| `fix` Tier 2-4 | Main derives hints from OpenSpec; an invoked architect may return root-cause hints | Yes — canonical OpenSpec acceptance | Rare — only if the fix modifies a contract surface | Yes — no-op pass when no hint applies |
+| `fix` Tier 1 / `hotfix` | No architect; Main derives hints from bound OpenSpec | Yes — canonical OpenSpec acceptance | None when no hint applies | Yes — no-op pass (empty required set) |
 | direct inline implementation | **Exempt** — no pipeline artifacts | n/a | n/a | Not invoked (no `00-state.md`) |
 | `docs` flow (Tier ≥1) | Architect docs-research mode → coordinator records all-false block (docs do not touch product contracts) | Yes (minimum AC in `§ Task List`) | None | Yes — no-op pass |
 | Research / Spike | No — architect does not produce `01-plan.md` § Task List with per-task AC | n/a | n/a | Not invoked (research/spike have no STAGE-GATE-1) |
 
-**Recording contract for self-authored plans (fix Tier 1 / hotfix / docs):** when the orchestrator self-authors `01-plan.md` (including for `docs` flow), it MUST add the `### Classification block` subsection to `## Review Summary` with all nine design-classification booleans set to `false`. The coordinator, never the architect, transcribes that block into `00-state.md`; `sketch-guard.sh` then receives a valid state file at STAGE-GATE-1.
+**Recording contract:** Main projects validated sketch hints into `00-state.md`
+for `sketch-guard.sh`. The compact generated `01-plan.md` never carries a
+classification mirror, and no all-false plan block is fabricated.
 
 **Direct inline:** the coordinator performs only the requested bounded edit; no plan, sketch, or
 Stage Gate is created. A live operator-requested review remains ad hoc and does not activate the

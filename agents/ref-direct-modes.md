@@ -98,85 +98,26 @@ byte-identical and remain authoritative.
 
 ## Plan Review Mode (standalone audit of Stage 1 artifacts)
 
-**When invoked:** the user wants to re-audit a Stage 1 plan after a manual edit, or wants to audit a plan produced under a previous orchestrator run, without re-running the pipeline. Common trigger: developer hand-edits `01-plan.md` and wants to confirm the changes still satisfy the five plan-shape rules before continuing.
+This mode runs only from an explicit live operator request. Resolve the bound
+strict-valid OpenSpec change and its generated `01-plan.md`, then dispatch one
+`plan-reviewer`. No QA, security design panel, or review fan runs.
 
-**Routing:** the user invokes `/th:plan-review {feature-name}` (or `audit my plan`, `revisa el plan`, "is my plan compliant?"). Skill payload is `Direct Mode Task: plan-review` with `feature_name`.
+The reviewer checks canonical OpenSpec coherence and projection fidelity. It
+never edits either source, creates another plan, or releases Gate 1. Main may
+persist the single bounded result at `reviews/01-plan-review.md` and surfaces:
 
-**Explicit-only contract.** The normal pipeline does not run this panel or defer
-an offer. This direct mode is the sole `/th:plan-review` entry point and writes
-the canonical `reviews/01-plan-review.md` when the operator explicitly invokes
-it.
-
-**Security-sensitivity detection (summary):** security reviewer runs when `00-state.md` declares `security_sensitive: true`, OR when `docs/pipeline-lanes.md` § "2a. What counts as a sensitive path (type-agnostic)" — the single type-agnostic sensitivity authority, consumed here by reference and never re-derived independently — classifies the plan's declared scope as sensitive under its own path-pattern and content-based triggers, including its fail-closed rule (ambiguous or unresolved → sensitive), OR when the operator passes `--security`. When security is SKIPPED, that outcome is reachable only when that section itself classifies the plan non-sensitive under its own fail-closed rule — never under a narrower or divergent list local to this mode. The output shows an affirmative visible notice: `SKIPPED — the sensitivity authority classifies this plan non-sensitive ... re-run with --security`. Fail-closed principle: a false-positive (security runs when not needed) costs one extra agent run; a false-negative (security skipped when needed) is the risk this mode exists to prevent. See gating detail in `§ "Review Panel"` below.
-
-### Review Panel (three reviewers, one plan)
-
-The `plan-review` direct mode runs a panel of up to three reviewers that write their findings into a single `reviews/01-plan-review.md`. The dispatch order is fixed (earlier reviewers write before the final consolidator reads):
-
-1. **`qa-plan` (mode: `ratify-plan`)** — substance reviewer. Validates AC soundness and whether the Work Plan can satisfy each criterion. Writes `## Plan Ratification` to `reviews/01-plan-review.md` and its sub-verdict as the bold inline label `**Substance (qa):**` inside `## Plan Review`. Does not use a `###` heading for this label.
-2. **`security` (mode: `design-review`)** — design-security reviewer. **Conditional:** runs only when the task is security-sensitive. When run, writes its sub-verdict as the bold inline label `**Security design-review (security):**` followed by `clean` or `risks-found` inside `## Plan Review` of `reviews/01-plan-review.md`. Does NOT use a `###` heading.
-3. **`plan-reviewer` (shape audit, runs last)** — sole writer of the `## Plan Review` header and the `**Combined verdict:**` block, in `reviews/01-plan-review.md`. Reads the sub-verdicts written by (1) and (2) to produce the combined verdict. Runs LAST so it can read the other sub-verdicts. Creates the file with the full skeleton if it is still absent, and appends one row to `## Panel Rounds`.
-
-**Centralization contract:** the panel MUST NOT create any side-file additional to the single canonical `reviews/01-plan-review.md`. Zero OTHER parallel correction-files. All findings are written in-place into `reviews/01-plan-review.md`; `01-plan.md` stays clean (attestation line only). The consolidated `## Plan Review` section carries the three sub-verdicts as bold inline labels (`**Substance (qa):**`, `**Security design-review (security):**`, `**Combined verdict:**`) — never as `###` headings — so `## Plan Review` stays a single sliceable block from start to finish.
-
-**Gating of security reviewer (step 2):** determine security-sensitivity in this order:
-1. Read `00-state.md` (if it exists) and check for `security_sensitive: true`.
-2. If absent, resolve it directly from `docs/pipeline-lanes.md` § "2a. What counts as a sensitive path (type-agnostic)" — the single type-agnostic
-   sensitivity authority every consumer in this repo reads, never a restated or re-derived list
-   local to this mode. Apply its path-pattern triggers and its content-based triggers to the
-   plan's declared `### Services Touched` / `## Review Summary` / AC scope, **and its fail-closed
-   rule**: if a path or a change cannot be confidently matched to a trigger OR confidently
-   classified as clearly non-sensitive, treat it as sensitive. A prior revision of this file
-   restated its own path-glob and keyword list here, which let this mode diverge from that authority — in
-   particular by omitting `**/middleware/**` and the `auth`/`permission` substring clause, and by
-   carrying no fail-closed rule of its own. That divergence is retired; there is one authority.
-3. Operator override: if the operator passed `--security` flag or explicitly said "include security" / "incluí seguridad", treat as security-sensitive regardless of the above.
-
-**Process:**
-
-1. Glob `workspaces/{feature-name}/`. If the folder does not exist, return a friendly message asking the user to first run `/th:design` or to confirm the feature name.
-2. Confirm `01-plan.md` exists. If it is absent but `01-architecture.md` is present, prompt the user: "no `01-plan.md` — this looks like a legacy plan (pipeline_version 1) or an incomplete design. Run `/th:design {feature}` to produce the merged plan, or invoke `/th:plan-review` after the architect has emitted `01-plan.md`."
-3. Resolve the complete task-shard list from the manifest and invoke `qa-plan`
-   (mode: `ratify-plan`) with that full list. Wait for the consolidated status
-   block; feature-level ratification never samples an assigned subset.
-4. Determine security-sensitivity (per gating above). If security-sensitive, invoke `security` (mode: `design-review`) via Task tool. Wait for status block. This lens belongs only to the explicitly invoked plan review; the normal pipeline keeps planning architect-only and relies on final validation for its security specialist.
-5. Invoke `plan-reviewer` via Task tool (always runs last). Wait for status block. Read `verdict` and `findings` counts from the combined verdict it writes.
-6. Surface the combined verdict to the user (Output Discipline #186 — the combined verdict IS operator-facing; per-reviewer chatter is NOT). Direct mode does NOT emit a STAGE-GATE-1 STOP block.
-
-**Vacuous-success guard (explicit `plan-review` mode):** before surfacing the
-combined verdict, verify that the expected sub-verdict labels are present in
-`## Plan Review`:
-- `**Substance (qa):**` — always required (qa always runs in this explicitly
-  requested panel).
-- `**Security design-review (security):**` — required only when security ran (i.e., the task was determined security-sensitive). When security was skipped, absence of this label is expected and does not trigger the guard.
-If a required label is absent, the panel is incomplete — do NOT surface a pass combined verdict. Report `blocked` / panel incomplete to the operator and prompt for a re-run.
-
-**Scope note:** this guard applies only to the explicitly requested
-`plan-review` direct mode. Diagram modes (`/d2-diagram`, `/likec4-diagram`,
-`/excalidraw`) do NOT dispatch a qa/plan-review panel — the guard does not apply
-there.
-
-**Behaviour:**
-- Zero side-files additional to `reviews/01-plan-review.md`. All panel output is written in-place into that single canonical file. No agent creates a parallel review file, and no agent writes panel content into `01-plan.md`.
-- The consolidated `## Plan Review` section in `reviews/01-plan-review.md` is idempotent (preserve-in-place on subsequent invocations — upstream sub-verdicts are never overwritten by `plan-reviewer`).
-- Does not append `stage.gate` events to JSONL — there is no pipeline.
-- Inline fallback (nested-dispatch): if the Task tool is unavailable (nested context), run the panel reviewers sequentially inline using each agent's system-prompt file as the procedure spec — same order, same target file, same centralization contract.
-
-**Output:**
+```text
+Plan review: {pass | concerns | fail} — {one-line summary}
+Security specialist: not run — invoke /th:security for a separate security assessment.
+Report: workspaces/{feature-name}/reviews/01-plan-review.md
 ```
-Plan Review (direct mode): {feature-name}
-**Combined verdict:** {pass | concerns | fail}
-Substance (qa): {pass | concerns | fail}
-Security design-review: {clean | risks-found | SKIPPED — no security-sensitive path or keyword detected in the plan. If this plan touches auth/crypto/session/PII, re-run with --security}
-Shape (plan-reviewer): {pass | concerns | fail}
 
-{if any findings:}
-Top issues:
-  - {file:line — rule — short description}
-  ...
+The notice is mandatory: the single plan reviewer may report a security
+finding, but no dedicated security specialist or design panel ran. It is not a
+security pass and does not trigger another agent automatically.
 
-Full report: workspaces/{feature-name}/reviews/01-plan-review.md § Plan Review
-```
+When OpenSpec changes, regenerate `01-plan.md`; review again only after another
+explicit invocation. This direct mode creates no pipeline state or Gate event.
 
 ---
 
@@ -429,7 +370,7 @@ The review output is not persisted or previewed as trusted output after a detect
 
 ### Layer 4 — Mode-transition gate
 
-**Purpose (closes #251 mode-bleed):** Corrective language from the operator during an in-progress review NEVER auto-routes to the pipeline. This gate covers both the same-turn case and the fresh-turn re-entry case (see `agents/ref-pipeline.md § "11 — Intent routing"`'s `review_context` guard).
+**Purpose (closes #251 mode-bleed):** Corrective language from the operator during an in-progress review NEVER auto-routes to the pipeline. This gate covers both the same-turn case and the fresh-turn re-entry case (see `agents/ref-pipeline.md`'s `review_context` guard).
 
 **When this gate fires:** Any of these signals appear while a review session is active (i.e., `review_context` is set in `00-state.md`):
 - Corrective language directed at the PR under review: "debemos corregirlo", "hay que arreglarlo", "fix this", "fix X", "corrige X", "arréglalo", "corrígelo", "implementa el fix", "aplica los cambios".

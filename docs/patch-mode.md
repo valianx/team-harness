@@ -24,8 +24,7 @@ Validation reports one of these outcomes:
 | Observation that does not violate AC or the security floor | preserve for Gate 3 disposition | no |
 | Contradiction between intent, scope fence, and AC | operator decision | only after explicit decision |
 
-A row above always routes to its owner except when the ratchet (`agents/ref-pipeline.md § "The
-ratchet"`) converges it: a sub-floor finding on surface unchanged since the round that opened the
+A row above always routes to its owner except when the ratchet (`agents/ref-pipeline.md`) converges it: a sub-floor finding on surface unchanged since the round that opened the
 correction records to `reviews/findings-ledger.md` as a residual and ships as a pull-request
 concern instead of consuming another round. The two fail-closed security conditions are excluded
 from that residual by construction. Never rewrite an acceptance criterion to manufacture PASS. A structural contradiction is not a

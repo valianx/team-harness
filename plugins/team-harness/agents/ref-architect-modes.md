@@ -329,9 +329,9 @@ almost always `all-tasks-one-pr` (a split needs a closed-list reason), and per
 plan-reviewer Rule 8 the regression-test path appears in the task's `TC-N`
 block as `regression test exists at <TBD-Phase-2.0>` until the orchestrator
 mutates that one technical placeholder to the real path — functional ACs
-describe corrected behavior, never test existence. The Review Summary inherits
-the same classification block, all nine values, with the same fail-closed
-default and diff-grounded justification for `false` on a security-sensitive
-fix. Task shards cover confirming the mechanism, applying the correction, and
+describe corrected behavior, never test existence. The compact operator plan
+carries no classification block. Return optional design-surface hints for
+sketch selection only; Main derives post-Freeze security impact independently
+from the frozen changed surface. Task shards cover confirming the mechanism, applying the correction, and
 verifying the result — combined into as few tasks as the fix genuinely needs;
 `01-plan.md` is always produced for a `type: fix` dispatch.

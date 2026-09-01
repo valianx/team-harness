@@ -135,7 +135,7 @@ This is the canonical mechanism both lifecycle commands implement identically. N
 
 **Never conflated with permission provisioning.** `docs/permission-provisioning.md`'s allowlist mechanism touches only `permissions.allow`, `permissions.deny`, and `permissions.additionalDirectories` — never `env`. This mechanism touches only `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` — never any key under `permissions`. Neither command establishes a general-purpose `env`-provisioning path; the JSON path above is the only one this mechanism ever writes.
 
-**Diagnosing a missing prerequisite (not a third provisioning site).** `agents/ref-pipeline.md § "No capability-check fallback"` names why no boot-time capability check exists any more — the prior two-coordinator handoff check retired with the split, and the coordinator never diagnoses, offers, prompts, or writes this value itself. The two commands above are the only two write sites.
+**Diagnosing a missing prerequisite (not a third provisioning site).** `agents/ref-pipeline.md` names why no boot-time capability check exists any more — the prior two-coordinator handoff check retired with the split, and the coordinator never diagnoses, offers, prompts, or writes this value itself. The two commands above are the only two write sites.
 
 ---
 

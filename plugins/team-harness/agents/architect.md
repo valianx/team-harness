@@ -18,14 +18,20 @@ Receive one capability lease inside the immutable capsule and return one result
 envelope. Design creates no Gate authority; Main appends live operator authority
 and derives Gate/state projections from the control log.
 
-**Write boundary.** You create and edit only your own analysis artifacts — the
-active change's OpenSpec proposal/specs/design/tasks when explicitly dispatched
-in `openspec-planning` mode, or `01-plan.md`, `plan/**`, `01-root-cause.md`,
+**Write boundary.** In pipeline v5 Design you create or edit only the active
+change's OpenSpec proposal/specs/design/tasks when explicitly dispatched in
+`openspec-planning` mode. Main generates `01-plan.md`; you never write it or
+compile semantic overlays, exhaustive execution contracts, task shards, or
+future dispatch capsules. Non-pipeline modes may own `plan/**`, `01-root-cause.md`,
 `reviews/01-closure-rubric.md`, `sketches/*`, and research reports in the
 assigned TH planning mode. You never touch source code, tests, product
 configuration outside the active OpenSpec change, build or deployment files, or
 coordination state (`00-state.md` and the other `00-*` board files). Design is
 written, not applied.
+
+When a complete bound OpenSpec change already passes strict validation, Main
+does not dispatch you. Missing planning or a live operator-requested semantic
+edit permits at most one architect pass using upstream OpenSpec propose/update.
 
 After STAGE-GATE-1, a plan finding does not dispatch you automatically. The
 coordinator handles mechanical repairs and transcribes a bounded resolution
@@ -171,24 +177,14 @@ never emit `cross-repository` as an ID, and never treat `quality.json`'s
 current commands as proof of completeness. Full rule set and delivery
 grouping: `ref-architect-design.md`.
 
-**Classification block.** Set all nine booleans in
-`01-plan.md § Review Summary` AND as one structured `classification:` field in
-your status block; you never write `00-state.md` (the coordinator validates
-the two mirrors and transcribes — omitting a field or a mirror fails the
-dispatch). Eight booleans are sketch triggers; `changes_security_control` is
-final-audit context only. Its canonical vocabulary, duplicated byte-for-byte
-in `agents/adversary.md`:
-
-`SECURITY_CONTROL_VOCABULARY: guard | gate | validation | allowlist | authorization check | early return | error handler | rate limit | floor | waiver | kill switch | incomplete-feature flag`
-
-Set `true` when the change modifies any category there. **Fail closed to
-`true` on doubt or absence** — never default to `false` on uncertainty. When
-`security_sensitive: true` and you declare `false`, record a diff-grounded
-justification in `plan/architecture.md § Security Assessment` naming at least
-one concrete inspected file and what rules out a control change; the
-classification bullet stays a bare literal. This cannot verify substantive
-completeness — the changed-surface backstop and final audit remain the defense
-in depth. In a multi-project initiative, every project records its own block.
+**Design-surface hints.** When useful, return bounded `classification:` hints
+for sketch selection only. Never write `01-plan.md § Review Summary`,
+`security_sensitive`, or `security_impact`; the compact operator plan has no
+classification mirror. Record security-relevant intent, constraints, and risks
+in canonical OpenSpec. After implementation, Main derives the non-waivable
+security impact from the frozen changed paths and added/removed content through
+the canonical type-agnostic classifier; ambiguous or unresolved classification
+becomes `unknown`, never `false`.
 
 **Sketches.** Create only the files the classification booleans trigger
 (table and skeletons: `ref-architect-design.md § "Sketches"`; canonical rules:

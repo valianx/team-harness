@@ -167,7 +167,7 @@ The obsidian vault sits outside the current project's working tree, so every sub
 
 1. Compute `base = {logs-path}/{logs-subfolder}` normalized to POSIX (`C:\vault\Work` → `/c/vault/Work`) and anchor it with a leading `//` (a single leading slash anchors to the settings-source directory, not the filesystem root, and silently fails to match paths outside the cwd — upstream Claude Code issue #25137).
 2. **Resolved-value validation floor (before any rule is constructed).** Reject and abort provisioning — no gate, no rule written — when the resolved `base` is empty, `/`, the user home (`~`, `$HOME`, or its expanded form), a filesystem top-level directory (fewer than 2 path segments below root), or contains a `..` path-traversal segment or a glob metacharacter (`*`, `?`, `[`, `]`). Report a one-line reason (e.g. "Obsidian workspace path resolves to the filesystem root — provisioning aborted.") and continue to Step 3.5 without offering a gate. Full contract: `docs/permission-provisioning.md § Resolved-value validation floor`.
-3. **Already-present check (before any gate is shown).** Read `~/.claude/settings.json` (if present) and check whether `permissions.allow` already contains BOTH `Edit(//{base}/**)` and `Write(//{base}/**)`, the read-only allowlist set below, `permissions.additionalDirectories` already contains `//{base}`, AND `permissions.deny` already contains BOTH `Edit(//{base}/.git/**)` and `Write(//{base}/.git/**)` — identical detection to the orchestrator's own Intake permission-provisioning step (`agents/ref-pipeline.md § Intake` item 7, part (a)), so the two sites stay reconciled.
+3. **Already-present check (before any gate is shown).** Read `~/.claude/settings.json` (if present) and check whether `permissions.allow` already contains BOTH `Edit(//{base}/**)` and `Write(//{base}/**)`, the read-only allowlist set below, `permissions.additionalDirectories` already contains `//{base}`, AND `permissions.deny` already contains BOTH `Edit(//{base}/.git/**)` and `Write(//{base}/.git/**)` — identical detection to the pipeline activation permission-provisioning step (`plugins/team-harness/skills/pipeline/references/activation.md § Workspace and repository identity`), so the two sites stay reconciled.
    - **Already present → no gate, no write** (silent pass-through) — report the covering rule(s) and target file for audit visibility, then continue to Step 3.5:
      ```text
      Permission rules for the obsidian workspace are already present in ~/.claude/settings.json:
@@ -219,7 +219,7 @@ The obsidian vault sits outside the current project's working tree, so every sub
 
 This sub-step never adds a rule for an outward action (`git push`, `gh pr *`, any GitHub/ClickUp API write, any form of `gh api`) — the read-only allowlist set is disjoint from dev-guard's outward-action catalogue by construction (`docs/permission-provisioning.md § "Read-only allowlist — disjointness invariant"`, enforced by `tests/test_permission_disjointness.py`); the `Edit`/`Write`/`additionalDirectories` rules stay scoped strictly to the obsidian workspace base resolved in Step 3. Outward actions stay gated exclusively by `dev-guard` (CLAUDE.md).
 
-**Existing-install coverage.** This is a KEYS-once offer — an operator who already ran `/th:setup` before this sub-step existed, or who declined it here, is covered by a second, recurring offer at the orchestrator's own Intake (site B — detects a missing rule on every pipeline start in obsidian mode and re-offers it there). See `docs/permission-provisioning.md § Provisioning sites`.
+**Existing-install coverage.** This is a KEYS-once offer — an operator who already ran `/th:setup` before this sub-step existed, or who declined it here, is covered by a second, recurring offer during pipeline activation (site B — detects a missing rule on every pipeline start in obsidian mode and re-offers it there). See `plugins/team-harness/skills/pipeline/references/activation.md § Workspace and repository identity` and `docs/permission-provisioning.md § Provisioning sites`.
 
 ### 3b. Configure GitHub identity routes (gated)
 
@@ -484,7 +484,7 @@ Install python3 now for full skill coverage? [Y/n]
 
 ### 6c. Nested-lane capability confirmation — RETIRED
 
-**This step is retired.** It used to record the operator-confirmed `probe_result` a boot-time capability check consulted before spawning a second coordination agent as a nested subagent. The coordinator fusion removes that spawn entirely — `th:orchestrator` is the top-level session agent and never dispatches another coordinator, including a copy of itself (`agents/ref-pipeline.md § "No capability-check fallback"`) — so the check's own subject no longer exists. Nothing replaces it; this is a genuine loss of subject, not a transfer.
+**This step is retired.** It used to record the operator-confirmed `probe_result` a boot-time capability check consulted before spawning a second coordination agent as a nested subagent. The coordinator fusion removes that spawn entirely — `th:orchestrator` is the top-level session agent and never dispatches another coordinator, including a copy of itself (`agents/ref-pipeline.md`) — so the check's own subject no longer exists. Nothing replaces it; this is a genuine loss of subject, not a transfer.
 
 **On a targeted run (`/th:setup capability`):** report the retirement and write nothing:
 ```text

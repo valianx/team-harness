@@ -24,7 +24,7 @@ Retired route markers are compatibility data only; they do not select a posture 
 |---|---|
 | Named states, successors and what advances them | `agents/ref-pipeline.md` + `agents/_shared/orchestrator-state.md` |
 | Gate mechanics: dual record, STOP templates, ambiguous reply, nonce | `agents/_shared/gate-contract.md` |
-| Which specialist is called when, and what its return must contain | `agents/ref-pipeline.md § "Your Team"` |
+| Which specialist is called when, and what its return must contain | `agents/ref-pipeline.md` |
 | What a dispatch may and must not carry | `agents/_shared/dispatch-contract.md` |
 | Two-posture compatibility and legacy migration | `docs/pipeline-lanes.md` |
 | Intake: posture classification, bug metadata, provenance tiers | `agents/ref-intake-flows.md` |
@@ -72,7 +72,7 @@ pipeline panel; it runs only after an explicit `/th:plan-review` invocation.
 
 ## PR review
 
-Review of an existing GitHub PR is a standalone, snapshot-bound skill, never a coordinator-owned pipeline phase — `/th:review-pr` is the hard trigger (`agents/ref-pipeline.md § "11 — Intent routing"`). Its immutable gather, fail-closed lens selection, concise body/inline-thread split, and decision menu are defined once in `skills/review-pr/SKILL.md`. PR agents return inline under exact read-only capabilities; the coordinator persists fixed paths after strict tree comparison. Publication recaptures head, base, merge-base, and mergeability; any mismatch invalidates approval. The read-only and publish-gate contracts live in `agents/ref-direct-modes.md`. Not duplicated here.
+Review of an existing GitHub PR is a standalone, snapshot-bound skill, never a coordinator-owned pipeline phase — `/th:review-pr` is the hard trigger (`agents/ref-pipeline.md`). Its immutable gather, fail-closed lens selection, concise body/inline-thread split, and decision menu are defined once in `skills/review-pr/SKILL.md`. PR agents return inline under exact read-only capabilities; the coordinator persists fixed paths after strict tree comparison. Publication recaptures head, base, merge-base, and mergeability; any mismatch invalidates approval. The read-only and publish-gate contracts live in `agents/ref-direct-modes.md`. Not duplicated here.
 
 ## When `gh` is absent or unauthenticated
 

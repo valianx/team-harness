@@ -9,7 +9,7 @@ name: define-ac
 1. Extract the issue number
 2. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier A — read a single issue". Use `gh issue view {number} --json number,title,body,labels` when `has_gh=true`; curl fallback otherwise.
 3. If the issue cannot be fetched automatically, tell the user: "Issue #{number} could not be fetched automatically. Pasting the issue body as text also works — paste it below or paste the URL again."
-4. Pass to the `orchestrator` agent:
+4. Ask Main to create or update a coordinator-only OpenSpec change:
    ```
    Direct Mode Task:
    - Mode: define-ac
@@ -21,7 +21,7 @@ name: define-ac
 
 ## Mode 2 — Text description
 
-1. Pass to the `orchestrator` agent:
+1. Ask Main to create or update a coordinator-only OpenSpec change:
    ```
    Direct Mode Task:
    - Mode: define-ac
@@ -39,7 +39,7 @@ name: define-ac
 
 ## Important
 
-- **You read issues. The orchestrator does NOT** — it receives the data from you.
-- Always invoke the `orchestrator` agent — do NOT invoke agents directly
-- The orchestrator will route to the `qa-plan` agent in define-ac mode
-- Output: acceptance criteria in Given/When/Then format
+- **You read issues. Main does not refetch them** — pass the normalized source data.
+- Do not invoke a specialist or activate the gated pipeline.
+- Use the upstream OpenSpec propose/update workflow; canonical acceptance lives in delta specs.
+- Output: the change path and concise Given/When/Then scenario summary.

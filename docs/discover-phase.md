@@ -37,7 +37,7 @@ checkpoint. Retired route markers are migration data only; they never bypass the
 
 2. **Clear task (no marker) → brief framing gate (§3.2).** Restate, optionally ask clarifying questions, then confirm. Wait for the advance response.
 
-3. **Unclear task → Discover open (§4).** Stay conversational. Assist scope exploration and ask clarifying questions using only the coordinator's own capability. Do NOT dispatch any subagent (no architect, no qa-plan, no specifier). Remain until an advance response is received.
+3. **Unclear task → Discover open (§4).** Stay conversational. Assist scope exploration and ask clarifying questions using only the coordinator's own capability. Do NOT dispatch any subagent. Remain until an advance response is received.
 
 4. **Legacy marker → migration guidance.** `--fast`, `[TIER: N]`, Simple-Mode wording, and similar
    values are retired data. They do not bypass Discover or select a posture; if a live operator
@@ -184,7 +184,11 @@ a dispatch or gate release.
 
 ### HI-2 — Security floors are non-surveyable
 
-The survey **never writes `security_sensitive`**. That field is written by Classify (`agents/ref-pipeline.md § "13 — Classify"`), by the deterministic backstop that re-derives it from the diff, and by the fail-closed rule that force-sets it when classification cannot be reached.
+The survey **never writes `security_impact`**. After Freeze, Main derives it
+from the canonical type-agnostic changed-surface classifier referenced by
+`agents/ref-pipeline.md § Freeze and validation`. A complete negative receipt
+yields `false`; ambiguity or unresolved evidence yields `unknown` and
+therefore requires fresh security.
 
 The path-pattern auto-escalation is **input-independent** of every survey answer. Its result depends
 solely on the files and content being changed (`auth/**`, `middleware/**`, `api/**`, `db/**`,
@@ -196,7 +200,7 @@ Consequence: neither the advance signal nor any survey answer constitutes a waiv
 
 Every metadata answer is logged in `00-state.md § Current State` and in the execution trace.
 Survey data is coordination evidence only: the pipeline does not copy it into Delivery context or
-the PR body. It never alters `security_sensitive` or any gate status, and no publication artifact
+the PR body. It never alters `security_impact` or any gate status, and no publication artifact
 may imply that metadata waived a security decision.
 
 ### HI-5 — Recoverable post-compaction
@@ -267,7 +271,7 @@ traced sub-step only.
 
 Survey data remains in `00-state.md` and the execution trace for recovery and
 attribution. It is not product-change information and is never an automatic
-PR-body or Delivery input. `security_sensitive`, gate status, and all other
+PR-body or Delivery input. `security_impact`, gate status, and all other
 classification fields remain independent of the survey.
 
 ---
@@ -303,7 +307,9 @@ The `survey_scope_hint` captured in §5 above is passed to the architect regardl
 ### 10.3 Hard invariants
 
 - **HI-E2-1 — Prior, not order.** The seed is a strong prior for the architect, not a mandate. The architect evaluates alternatives the seed did not consider and dissents when the seeded approach is deficient.
-- **HI-E2-2 — No security fields from seed.** `security_sensitive` and all gate-status fields remain input-independent of seed content. HI-2 (§6) applies unchanged.
+- **HI-E2-2 — No security fields from seed.** `security_impact` and all
+  gate-status fields remain input-independent of seed content. HI-2 (§6)
+  applies unchanged.
 - **HI-E2-3 — No gate skipped.** `spec_seed_present: true` never changes the v3 state machine or
   either gate. It only supplies context to the single design pass; explicit `/th:plan-review`
   remains available independently.
@@ -386,7 +392,7 @@ The test is deterministic — it depends only on git metadata, never on director
 
 ## 12. Background research sweep (non-blocking, narrow trigger)
 
-The coordinator may launch a parallel haiku research fan-out during Discover when a genuine external knowledge gap is detected. This is the background research sweep in `agents/ref-pipeline.md § "Intake"`.
+The coordinator may launch a parallel haiku research fan-out during Discover when a genuine external knowledge gap is detected. This is the background research sweep in `agents/ref-pipeline.md`.
 
 ### 12.1 Trigger conditions (ALL must hold)
 

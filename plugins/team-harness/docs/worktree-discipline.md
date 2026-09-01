@@ -268,7 +268,7 @@ against. Each project may still use its own worktree, because each is a genuinel
 repository (proven by the repo-identity test, `agents/ref-dispatch-machinery.md § "Repo-identity
 verification"`) — Rules 1–5 apply to that worktree exactly as they do to any single-project run,
 with no lane-specific binding needed since nothing runs concurrently. Intra-task parallelism
-(`agents/ref-pipeline.md § "Intra-task lane decomposition"`) is a different mechanism entirely and
+(`agents/ref-pipeline.md`) is a different mechanism entirely and
 was never governed by this rule: its lanes share ONE worktree and branch, with the coordinator as
 sole committer of the consolidated result.
 
@@ -277,11 +277,11 @@ sole committer of the consolidated result.
 ## Rule 7 — Boot-time preflight sweep: the durable worktree reaper
 
 The **durable reaper** is this Rule 7's preflight sweep, run by `th:orchestrator` at Intake step
-1a (`agents/ref-pipeline.md § "Intake"`) — the first point in any later session that runs after a
+1a (`agents/ref-pipeline.md`) — the first point in any later session that runs after a
 previous session's PR could have merged.
 
 This rule is the **canonical, single source of truth** for the worktree-sweep safety predicate.
-`agents/ref-pipeline.md § "Intake"` references this rule by pointer and never re-derives or
+`agents/ref-pipeline.md` references this rule by pointer and never re-derives or
 duplicates the predicate, allow-list, or action/report table. A divergence is a defect.
 
 ### The safety predicate — four cumulative conditions
@@ -464,8 +464,8 @@ the sweep never runs against a repo other than the one it is currently evaluatin
 operator had confirmed, live, that the running Claude Code build supported the nested-subagent
 gate-messaging round-trip (M3), version-pinned and re-invalidated on drift. The coordinator
 fusion removes the spawn this cache gated — `th:orchestrator` is the top-level session agent and
-never dispatches another coordinator (`agents/ref-pipeline.md § "Dispatch invariants"` #2,
-`agents/ref-pipeline.md § "No capability-check fallback"`) — so there is no nested-subagent
+never dispatches another coordinator (`agents/ref-pipeline.md` #2,
+`agents/ref-pipeline.md`) — so there is no nested-subagent
 round-trip left to probe, no capability cache to consult, and no version-pin to invalidate.
 Nothing replaces this mechanism; the retirement is a genuine loss of subject.
 

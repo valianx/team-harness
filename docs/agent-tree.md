@@ -11,9 +11,9 @@ th:orchestrator  ── top-level session agent · the operator's single point o
 │    the same operation · sole writer of 00-state.md and its coordination trace.
 │
 ├─ dispatches pipeline specialists (leaf agents — no further orchestration):
-│    Design                     architect · security (design-review when sensitive)
-│    Implementation             tester · implementer · cleaner
-│    Validation                 qa · adversary (when the security floor applies)
+│    Design                     architect (only when OpenSpec is missing or edited)
+│    Implementation             implementer · tester/cleaner (when predicates apply)
+│    Validation                 qa · security (when impact is true or unknown)
 │    Delivery                   delivery
 │    UI / diagrams (triggered) ux-reviewer · diagrammer · d2-diagrammer ·
 │                               likec4-diagrammer · documenter
@@ -23,7 +23,7 @@ th:orchestrator  ── top-level session agent · the operator's single point o
      research      researcher (fan-out) · code-researcher · research-consolidator ·
                    architect (research mode)
      docs          documenter
-     other         mentor · init-project (bootstrap) · translator · qa-plan (define-ac)
+     other         mentor · init-project (bootstrap) · translator
      direct fix    coordinator when eligible (no pipeline state or specialist dispatch)
 
 meta (outside any pipeline run):  agent-builder  ── authors new agents and skills
@@ -47,14 +47,13 @@ release a gate.
 |---|---|---|---|
 | `th:orchestrator` | lightweight direct coordination; gated execution after activation | — (top-level session agent) | Yes, only during an active pipeline |
 | `architect` | analysis | orchestrator (or research/design direct mode) | No |
-| `qa-plan` | analysis | orchestrator (define-ac direct; explicit plan-review only) | No |
 | `plan-reviewer` | analysis | orchestrator (explicit `/th:plan-review` only) | No |
 | `implementer` | implementation | orchestrator after Gate 1 | No |
 | `tester` | implementation | orchestrator | No |
 | `cleaner` | implementation | orchestrator after green evidence, before Freeze | No |
 | `qa` | implementation | orchestrator | No |
-| `security` | design review | orchestrator when `security_sensitive` | No |
-| `adversary` | validation | orchestrator when the security floor applies | No |
+| `security` | validation or explicit direct review | orchestrator when frozen-candidate impact is true/unknown, or when explicitly requested | No |
+| `adversary` | explicit ad hoc review | orchestrator only when the live operator requests that separate adversarial lens | No |
 | `delivery` | delivery | orchestrator | No |
 | `reviewer` / `reviewer-consolidator` | delivery | orchestrator | No |
 | `ux-reviewer` | analysis + implementation | orchestrator (frontend scope) | No |

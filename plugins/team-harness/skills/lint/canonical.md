@@ -98,21 +98,29 @@ name: lint
 
 ## Check 5 — orchestrator coherence
 
-Cross-reference the orchestrator's team table against actual agent files.
+Cross-reference the canonical roster against actual agent files.
 
-1. **Read `agents/ref-pipeline.md § Your Team`** and extract the team table
-2. **List all `.md` files in `agents/`** (excluding `orchestrator.md` and `ref-*.md` reference files)
+1. **Read `agents/README.md § Roster`** and extract each `Agent`, `Tools
+   (allowlist)`, and `Role` row.
+2. **List all `.md` files in `agents/`** excluding `README.md`,
+   `ref-*.md`, and `_shared/`.
 3. **Cross-check:**
-   - For each agent in the team table → verify a corresponding `.md` file exists in `agents/`
-   - For each agent `.md` file (excluding orchestrator.md, ref-*.md) → verify it appears in either the team table OR its "Standalone agents" note
-   - Report: agents in table but missing file, agents with file but not in table/standalone note
-4. **Workspace-doc conflicts:** Extract the `Workspace doc` column from the team table. Check for duplicate output files (two agents writing to the same workspace doc). Report any duplicates.
-5. **Direct modes coherence:** Read `agents/orchestrator.md § Direct routing`. For each specialist named there, verify it exists as a file in `agents/`.
+   - every roster agent has exactly one matching `agents/{agent}.md`;
+   - every listed agent file appears exactly once in the roster;
+   - no retired agent name remains in either surface.
+4. **Workspace-output conflicts:** Extract declared report/output paths from
+   each agent contract. Report two agents that claim exclusive ownership of the
+   same path; do not infer paths from a removed roster column.
+5. **Direct modes coherence:** Read `agents/orchestrator.md § Direct routing`.
+   For each specialist named there, verify it exists in the roster and as a
+   file.
 
 Result:
-- **PASS** if all cross-references are consistent and no workspace doc conflicts
-- **WARN** if agents exist as files but aren't referenced (could be legitimate standalone agents)
-- **FAIL** if team table references a non-existent agent, or workspace doc output conflict exists
+- **PASS** if roster, files, direct routes, and exclusive outputs agree.
+- **WARN** if a contract names a shared output but does not define bounded
+  section ownership.
+- **FAIL** for a missing/duplicate/retired roster entry, missing agent file,
+  nonexistent direct-route specialist, or conflicting exclusive output owner.
 
 ---
 name: lint
@@ -121,7 +129,11 @@ name: lint
 
 Analyze agent definitions for contradictions and overlap.
 
-1. **Role boundary check:** For each agent, extract its "NEVER" statements (e.g., "NEVER writes code", "NEVER modify files"). Cross-check against the orchestrator's team table `Writes code` column. Report contradictions (e.g., agent says "NEVER writes code" but orchestrator marks it as "Yes" for writes code).
+1. **Role boundary check:** For each agent, extract its "NEVER" statements
+   (for example, "NEVER writes code" or "NEVER modify files"). Cross-check
+   them against the `Tools (allowlist)` and `Role` columns in
+   `agents/README.md § Roster` plus the agent's declared write scope. Report
+   any contradiction; do not depend on a removed `Writes code` column.
 2. **Workspace-doc write conflicts:** For each agent, search for the workspace doc filename it writes to (from `## Session Documentation` section or output references). Verify no two agents write to the same file. Report conflicts.
 
 Result:
@@ -171,7 +183,6 @@ Canonical matrix (must match exactly):
 | `pr-review-security` | sonnet | high |
 | `reviewer-consolidator` | sonnet | medium |
 | `qa` | opus | xhigh |
-| `qa-plan` | sonnet | high |
 | `gcp-cost-analyzer` | opus | high |
 | `init-project` | haiku | medium |
 | `implementer` | sonnet | high |

@@ -55,11 +55,12 @@ ui-wireframe — the zero-dependency, text-only rule stands for the other 8 sket
 
 ## 2. Classification Schema
 
-The architect returns a bounded **classification block** of yes/no facts in its status block and
-mirrors it in `01-plan.md § Review Summary → ### Classification block`. The **coordinator**
-validates and transcribes those values into `00-state.md § Current State`; the architect and every
-other specialist are forbidden to write coordination state. The state file is the verifier's
-authority and the plan is the human-facing mirror.
+Main derives bounded design-surface hints from canonical OpenSpec. When an
+architect is required for missing or operator-requested planning, its returned
+`classification:` may supply those hints; it never writes `01-plan.md` or
+security impact. Main validates and projects the hints into `00-state.md`;
+specialists never write coordination state. The compact operator plan has no
+classification mirror.
 
 ### The eight booleans
 
@@ -88,10 +89,10 @@ authority and the plan is the human-facing mirror.
 ```
 
 The verifier reads these with strict line-token parsing (exact line tokens, no fuzzy matching).
-`00-state.md` is the **verifier's authority**. `01-plan.md § Review Summary → ### Classification
-block` is the **human-facing mirror** — it repeats the same values so the operator sees them at
-STAGE-GATE-1. Only the coordinator writes the state block; a specialist finding a mismatch
-returns it for correction rather than editing `00-state.md`.
+`00-state.md` is the sketch guard's derived input. Only Main writes it; a
+specialist finding a mismatch returns it for correction rather than editing
+state. These design-surface hints select sketches only and never determine the
+post-Freeze security floor.
 
 ---
 
@@ -222,11 +223,11 @@ block and the diff signal. The check is `concerns`-severity
 
 | Phase | Who | Action |
 |-------|-----|--------|
-| `design` | architect | Produces the required `sketches/*` files and returns the classification block; the coordinator transcribes it into each project's `00-state.md` (including all-false) |
+| `design` | Main; architect only when OpenSpec authorship is required | Derives sketch hints from OpenSpec; an invoked architect may produce triggered `sketches/*` and return hints, which Main validates before projecting state |
 | `waiting_gate1` | orchestrator + operator | Invokes `sketch-guard.sh`, shows missing-sketch concerns and the sketch pointers in the concise Gate 1 summary |
 | `implementation` | implementer + tester | Reads every triggered sketch before writing code or evidence and records `sketches_read` in its status block |
-| `validation` | qa (+ adversary when the security floor applies) | Reads the triggered sketches and checks the delivered surface against the corresponding contracts |
-| Explicit `/th:plan-review` | qa-plan / plan-reviewer / security when requested | May inspect sketch completeness as part of the operator-requested review; never runs automatically |
+| `validation` | qa (+ security when frozen-candidate impact is true or unknown) | Reads the triggered sketches and checks the delivered surface against the corresponding contracts |
+| Explicit `/th:plan-review` | plan-reviewer | May inspect canonical OpenSpec and projection fidelity as part of the operator-requested review; never runs automatically |
 | Pipeline-attached entry skills | `/th:review-pr`, `/th:validate` | When an active pipeline workspace is supplied, run `sketch-guard.sh` as a prerequisite probe and read triggered sketch files before the consuming pass; standalone inline reviews do not create a sketch set |
 
 ---
@@ -235,8 +236,8 @@ block and the diff signal. The check is `concerns`-severity
 
 | Type / severity metadata | Classification block produced? | Always-sketches | Conditional sketches | Verifier runs? |
 |-------------|-------------------------------|-----------------|---------------------|---------------|
-| `feature` / `refactor` / `enhancement` | Yes (architect returns; coordinator transcribes) | yes (collapsed surfaces) | per booleans | Yes, at STAGE-GATE-1 |
-| `fix` severity 2–4 (metadata) | Yes (architect root-cause mode returns; coordinator transcribes) | yes (AC in § Task List) | only if the fix touches a contract surface (rare); booleans default false | Yes, at STAGE-GATE-1 |
+| `feature` / `refactor` / `enhancement` | Main derives hints from OpenSpec; invoked architect may return them | yes (collapsed surfaces) | per hints | Yes, at STAGE-GATE-1 |
+| `fix` severity 2–4 (metadata) | Main derives hints from OpenSpec; invoked architect may return them | yes (canonical OpenSpec acceptance) | only if the fix touches a contract surface | Yes, at STAGE-GATE-1 |
 | `fix` severity 1 / `hotfix` | Minimal design may be coordinator-authored only where the canonical flow permits; coordinator still owns state | yes (minimum AC) | none (all false unless architect returns otherwise) | Yes, at STAGE-GATE-1 |
 | `docs` request in pipeline posture | architect docs research → orchestrator records all-false block (docs do not touch product contracts) | yes | none | Yes — no-op pass |
 

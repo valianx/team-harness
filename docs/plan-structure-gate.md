@@ -1,12 +1,13 @@
 # Plan-Structure Gate — Historical Contract and Site Enumeration
 
-> **[SUPERSEDED — canonical v3/two-posture contract]** This document is retained as migration
+> **[SUPERSEDED — canonical v5/two-posture contract]** This document is retained as migration
 > and plan-quality reference material. The automatic `plan_structure` scan, Phase 1.5a state,
 > event, dispatch, bounce loop, and gate authority described below are retired. Current `pipeline`
 > runs use the canonical `design → waiting_gate1 → implementation → validation → waiting_gate3 →
 > delivery → complete` machine; `inline` direct work creates no workspace, state, events, or gates.
-> Use `docs/plan-shards.md`, the architect/QA contracts, and explicit `/th:plan-review` for current
-> plan quality. Nothing in this historical file releases a gate or authorizes a dispatch.
+> Current Design uses strict-valid canonical OpenSpec plus a compact generated `01-plan.md`.
+> Explicit `/th:plan-review` uses the surviving `plan-reviewer` only. Nothing in this historical
+> file releases a gate or authorizes a dispatch.
 >
 > Historical source for the former Stage-1 deterministic plan-structure contract: the canonical
 > Layer-1 check set, the `plan_structure: pass|fail` verdict, and the enumeration of every
@@ -96,12 +97,11 @@ one normal design correction and no automatic structure loop.
 
 ## 3. Layer 2 — `qa-plan` judgment scope (historical, non-gating)
 
-> **Retired automatic path:** `qa-plan` is dispatched only by an explicit `/th:plan-review`;
-> it no longer waits on a `plan_structure: pass` event or participates in an automatic loop.
+> **Fully retired role:** the behavior below is historical only. Current
+> `/th:plan-review` does not dispatch this role.
 
 **Historical owner:** `agents/qa-plan.md`, `mode: ratify-plan`, once dispatched after the former
-Layer 1 returned `plan_structure: pass`. Current `qa-plan` dispatch requires explicit
-`/th:plan-review` and does not consume that event.
+Layer 1 returned `plan_structure: pass`. No current dispatch consumes that event.
 
 **What it audits (requires judgment; NOT expressible as a fixed check):**
 

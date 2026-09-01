@@ -5,7 +5,7 @@ The pipeline SHALL execute complete quality verification exactly once per
 `candidate_tree`, at Freeze, as a single `quality-runner` invocation covering
 the union of declared manifest commands and required plan checks. Before
 implementation, it MAY check only prerequisites whose absence prevents
-authorized work and the per-task red condition. Preflight MUST NOT execute the
+authorized work and the risk-required independent red condition. Preflight MUST NOT execute the
 complete candidate quality set or create a second quality verdict. A changed
 tree requires a fresh Freeze run; an unchanged tree never re-runs.
 
@@ -22,11 +22,28 @@ tree requires a fresh Freeze run; an unchanged tree never re-runs.
 - **THEN** Freeze verification runs exactly once against that new tree
 
 ### Requirement: Surviving checks keep their subjects
-The per-task red-to-green test contract SHALL survive. Cleaner overreach proof
-SHALL remain a Freeze postcondition only when cleanup ran. Cleaner SHALL be
-dispatched only when deterministic hygiene analysis identifies at least one
-behavior-preserving change inside existing production paths; an empty eligible
-set SHALL be an evidenced no-op with no specialist dispatch.
+The ordinary path SHALL let the authorized implementer author or update tests
+with production work and SHALL rely on one complete candidate-bound quality run
+at Freeze. A separate pre-implementation tester and red-to-green contract SHALL
+be required only when a deterministic risk predicate identifies at least one of:
+bug reproduction independence, migration/data safety, public contract or
+compatibility change, security-control change, or an explicit operator request.
+The predicate and result SHALL be recorded before implementation; absence of a
+matched condition MUST NOT spawn a tester.
+
+Cleaner overreach proof SHALL remain a Freeze postcondition only when cleanup
+ran. Cleaner SHALL be dispatched only when deterministic hygiene analysis
+identifies at least one behavior-preserving change inside existing production
+paths; an empty eligible set SHALL be an evidenced no-op with no specialist
+dispatch.
+
+#### Scenario: Ordinary implementation needs tests
+- **WHEN** no independent-test risk condition matches
+- **THEN** the implementer authors the required tests and production change in one bounded lease and Freeze runs the complete quality set once
+
+#### Scenario: Independent test authorship protects a named risk
+- **WHEN** the recorded predicate matches bug reproduction, migration/data safety, public compatibility, security control, or an explicit operator request
+- **THEN** one fresh tester establishes the bounded pre-implementation contract before the implementer starts
 
 #### Scenario: Hygiene finds no eligible cleanup
 - **WHEN** deterministic analysis returns an empty behavior-preserving allowlist

@@ -136,7 +136,7 @@ All commands run from the repo root.
 - **Two-tier document classification.** Operator-facing vs agentic. `docs/conventions.md § Document classification`.
 - **Status-block return protocol.** Agents finish with a compact status block; the orchestrator gates on it without re-reading full workspaces.
 - **Installer always overwrites embedded files.** Direct edits to `~/.claude/agents/*.md` are replaced on every install. Hash-match files are skipped. `docs/conventions.md` has the full contract.
-- **Session-scoped config override whitelist** — overridable (chat → `00-state.md` only): `logs-mode`, `logs-path`, `logs-subfolder`, `clickup.workspace_id`. Excluded → /th:setup: MCP URL, context7, model, effort — `model` stays excluded even under the separate session model override. See `agents/ref-pipeline.md § "11 — Intent routing"`.
+- **Session-scoped config override whitelist** — overridable (chat → `00-state.md` only): `logs-mode`, `logs-path`, `logs-subfolder`, `clickup.workspace_id`. Excluded → /th:setup: MCP URL, context7, model, effort — `model` stays excluded even under the separate session model override. See `agents/ref-pipeline.md`.
 - **Chat-settable persistent key — `language`** — ISO 639-1 in `.team-harness.json`; not in override whitelist. Write needs persistence marker + Y/n gate; without it → session-override only.
 - **Single config file — `~/.claude/.team-harness.json`.** Skills MUST NOT create their own config files; use namespaced keys. Every write is a merge, never a partial payload. `docs/conventions.md`.
 - **Cross-platform first.** All scripts and agents must work on Windows, macOS, and Linux.
@@ -149,7 +149,14 @@ All commands run from the repo root.
   `docs/observability.md`.
 - **Documentation freshness via Context7.** Verify third-party APIs before generating code. Mandatory triggers: `docs/context7-usage.md §2`.
 - **Bug-fix flow is tier-driven, not type-driven.** `bug_tier` sets root-cause depth and regression-evidence obligations inside an activated pipeline; the security floor is derived from the diff and is type-agnostic. `agents/ref-special-flows.md § Bug-fix Flow`.
-- **Validation security floor.** `adversary` runs once over the frozen final diff when the derived security floor applies, alongside `qa`; sensitive plans also retain the design-time `security` review. Findings that are correctable in scope return to implementation and revalidate the delta, unless the ratchet records a sub-floor residual on unchanged surface after a prior correction round — the two fail-closed security conditions are excluded from that residual by construction. `agents/ref-pipeline.md § "Validation"` and `§ "The ratchet"`, `docs/dev-mode.md § Security Floor Non-Waivability`.
+- **Validation security floor.** Main derives impact from the frozen final diff
+  with the canonical type-agnostic classifier. True or unknown impact dispatches
+  one fresh `security` specialist alongside the fresh QA verifier; false is
+  permitted only from a complete classifier receipt. Correctable findings
+  return to implementation and revalidate the changed candidate. No automatic
+  design-security panel or `adversary` pipeline dispatch remains.
+  `agents/ref-pipeline.md § Freeze and validation`,
+  `docs/pipeline-lanes.md § 2a`.
 - **Code hygiene — one deterministic floor, then ordinary findings.** A pinned pre-verify scan bounces work-narration comments in committed files and blocks on its own. Everything else `qa`'s `## Code Hygiene` audit finds is reported as a finding with severity and rides the same floor as every other finding — there is no separate `code_hygiene` gate conjunction. Pattern set: `docs/code-hygiene-gate.md`.
 - **Patch mode + selective verifier re-run.** Full contract: `docs/patch-mode.md`.
 - **Suite-run evidence.** Append-only, per-feature record of a verification-command run against a concrete tree state, so a downstream link can cite it instead of re-running. Canonical contract: `docs/suite-evidence.md`.
@@ -167,7 +174,7 @@ All commands run from the repo root.
   these are hard routers the lane never absorbs. A security dimension is not one of them: it
   stops the lane for a live choice whose in-lane option raises the required lens set instead of
   ejecting the task. `docs/pipeline-lanes.md`.
-- **Plan review is explicit only.** `/th:plan-review` may dispatch `qa-plan`, `security` when relevant, and `plan-reviewer` as a standalone direct mode. No plan-review panel, ratification loop, approach checkpoint, or post-approval offer runs automatically in the pipeline. `skills/plan-review/SKILL.md`; `agents/ref-direct-modes.md`.
+- **Plan review is explicit only.** `/th:plan-review` dispatches one read-only `plan-reviewer` over canonical OpenSpec and `01-plan.md` projection fidelity. No plan-review panel, security design fan, ratification loop, approach checkpoint, or post-approval offer runs automatically in the pipeline. `skills/plan-review/SKILL.md`; `agents/ref-direct-modes.md`.
 - **Coordination state has one writer.** Only `orchestrator` writes `00-state.md`, the execution trace, the decision ledger, and the pipeline summary. Specialists return status blocks and artifact pointers; they never edit coordination state. `agents/_shared/orchestrator-state.md`.
 - **Gate UX is concise and numeric.** Gate 1 displays `1 approve`, `3 edit`, `4 reject` — every approval preauthorizes through the draft PR (`release_policy: auto-ship`). Gate 3 STOPs only on a closed-list exception, displaying `1 ship`, `2 amend`, `3 abort`; a green run records a mechanical `auto-ship` release citing the Gate-1 event. A number alone is accepted for a decision; edit/reject require `N: detail`. Dual record and live Gate-1 approval remain mandatory. `agents/_shared/gate-contract.md`.
 - **Discover phase + intake survey + spec co-authoring.** Depth DIAL, not a stage switch; security floors non-surveyable. `docs/discover-phase.md`, `docs/spec-coauthoring.md`.
@@ -240,7 +247,7 @@ Agents in this repo routinely read content they did not author — web pages (We
 
 This prompt-level floor remains binding independently of the active runtime's permission and approval model.
 
-**Threat model — honest-developer disposition, not an adversarial boundary.** TH's guards, gates, and floors support catching rationalization, haste, and drift on the readable path — they are NOT a security boundary against an active adversary. A gate that does the WRONG thing on a plain, readable input is always an in-scope defect; only the obfuscation-evasion residual of string-matching gates is documented, not chased. This disposition never licenses skipping a real in-scope finding, weakening a floor, or waiving `security`/`adversary` dispatch. Full statement: `docs/dev-mode.md § "Threat model — honest-developer disposition"`.
+**Threat model — honest-developer disposition, not an adversarial boundary.** TH's guards, gates, and floors support catching rationalization, haste, and drift on the readable path — they are NOT a security boundary against an active adversary. A gate that does the WRONG thing on a plain, readable input is always an in-scope defect; only the obfuscation-evasion residual of string-matching gates is documented, not chased. This disposition never licenses skipping a real in-scope finding, weakening a floor, or waiving an impact-required `security` dispatch. Full statement: `docs/dev-mode.md § "Threat model — honest-developer disposition"`.
 
 ---
 
@@ -316,12 +323,19 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
   `agents/ref-pipeline.md`
 - **2026-07-27** — Historical Gate-state contract (#530), superseded by the v5 authority event and projection model. → `agents/_shared/gate-contract.md § "Authority event and projection"`
 - **2026-07-27** — Canonical dispatch contract (#524): one home for what a dispatch prompt may/must not carry and a single two-halves rule (review scope never bounded by the dispatcher; write scope always bounded by the recipient's own contract, by pointer to `plan-consolidation.md`), asserted via a five-column control rubric instead of prose. → `agents/_shared/dispatch-contract.md`
-- **2026-07-28** — Pipeline dispatch shape collapsed: one `implementer` + one `tester` dispatch, `qa`+`adversary` fan out together in Phase 3; Phase 3.75/3.8 absorb into new Phase 2.8/Phase 3; Phase 4.5 retires. Current delivery is publish-only: implementation assembles and commits before Freeze. → `agents/ref-pipeline.md § Phase 2.8`
+- **2026-09-01** — Pipeline Design reuses strict-valid OpenSpec and emits only
+  a compact operator projection. Validation uses one fresh QA verifier plus
+  conditional `tester`, `cleaner`, and fail-closed `security`; automatic
+  design panels, `qa-plan`, and pipeline `adversary` dispatch are retired.
+  → `agents/ref-pipeline.md`, `docs/pipeline-v5-migration.md`
+- **2026-07-28 (superseded 2026-09-01)** — Historical dispatch shape used one
+  `implementer` + one `tester` and a `qa`+`adversary` Phase-3 fan.
+  Retained for provenance only.
 
 ## 9. Patterns & Conventions
 <!-- Updated in the reviewed implementation tree when a feature establishes a durable pattern. Empty at init. -->
 > Full history: see `docs/patterns.md`. Recent entries below.
-- **Suite-run evidence ledger** (#532): append-only `docs/suite-evidence.md`-defined per-feature registry, one row per verification-command run; `tree_anchor` reused literally from `docs/verification-packet.md § 2`; strict full-tree-anchor equality (never a "relevant files" heuristic) decides skip-vs-rerun; closed writer list. → `docs/suite-evidence.md`, `agents/ref-pipeline.md § "Implementation checkpoint — Freeze"`
+- **Suite-run evidence ledger** (#532): append-only `docs/suite-evidence.md`-defined per-feature registry, one row per verification-command run; `tree_anchor` reused literally from `docs/verification-packet.md § 2`; strict full-tree-anchor equality (never a "relevant files" heuristic) decides skip-vs-rerun; closed writer list. → `docs/suite-evidence.md`, `agents/ref-pipeline.md`
 - **Shared-review-file write discipline** (#527): on a review file several agents write, use `Edit` rather than `Write` once it exists and anchor `old_string` to your own section. The `tools:` grant is the only enforcement; the header-survival check a prior revision named was never defined. → `agents/_shared/plan-consolidation.md`
 - **Publish-only delivery**: `agents/_shared/implementation-assembly.md` owns version/changelog and the complete pre-Freeze commit; `agents/delivery.md` prepares PR prose; `agents/_shared/delivery-mechanics.md` verifies the validated commit/tree, pushes, and creates the draft PR without tests or branch mutation. → `agents/_shared/delivery-mechanics.md`
 

@@ -9,7 +9,12 @@ color: cyan
 
 This file is read on-demand by `th:orchestrator` during Intake and Classify. It is NOT part of the coordinator's core system prompt.
 
-**LAZY-LOAD DIRECTIVE — consumers read only the section they need.** Do NOT read this entire file on every invocation. Each section below is triggered by its own condition in `agents/ref-pipeline.md § Intake` (a 1-2 line trigger + pointer replaces the full body at the original site) — locate the top-level section heading for the active trigger and read only that section. Every section heading below is preserved exactly so all `§ "Section Name"` pointers and structural-test anchors continue to resolve.
+**LAZY-LOAD DIRECTIVE — consumers read only the section they need.** Do NOT
+read this entire file on every invocation. Each section below is triggered by
+its own condition in direct routing or `agents/ref-pipeline.md § Design`;
+locate the top-level section heading for the active trigger and read only that
+section. Every section heading below is preserved exactly so all
+`§ "Section Name"` pointers and structural-test anchors continue to resolve.
 
 ---
 
@@ -28,7 +33,8 @@ Locate the needed section by heading; do not read this file in full.
 
 ## Milestone Continuity
 
-Triggered from `agents/ref-pipeline.md § Intake` (the workspace-folder step), before composing a fresh `docs_root`.
+Triggered from `agents/ref-pipeline.md § Design` (the workspace-resolution
+step), before composing a fresh `docs_root`.
 
 **Milestone-continuity detect-and-continue (multi-milestone `type: plan` builds only).** Before composing a fresh `docs_root`, run this check: if the incoming task is a milestone execution (e.g., "implement M0", "build M2") that belongs to an existing plan, detect the plan workspace by identity and resume the SAME plan workspace instead of creating a new top-level sibling.
 
@@ -57,7 +63,8 @@ This reuses the #283/#285 identity-keyed-resolution pattern: the plan workspace 
 
 ## Initiative Create-or-Join
 
-Triggered from `agents/ref-pipeline.md § Intake` (the workspace-folder step), only when `initiative` is non-null in `00-state.md`.
+Triggered from `agents/ref-pipeline.md § Design` (the workspace-resolution
+step), only after the live operator confirms a non-null `initiative`.
 
 **CONDITIONAL — Initiative create-or-join (only when `initiative` is non-null in `00-state.md`).** If `initiative == null`, this step is a complete no-op — skip silently. Otherwise:
 
@@ -89,7 +96,8 @@ Branch-at-Design is the current git branch if already on a feature branch, or `�
 
 ## Initiative Detection and Confirm
 
-Triggered from `agents/ref-pipeline.md § Intake` (the Discover-disposition step), during Discover, after framing and before the intake survey.
+Triggered from `agents/ref-pipeline.md § Design` before workspace binding,
+after request framing and before initiative create-or-join.
 
 **Initiative detection + confirm (runs during Discover, after framing, before the intake survey).**
 
@@ -121,7 +129,7 @@ Then WAIT. Do NOT auto-advance. Do NOT set `initiative` or create any folder bef
 
 ## Language and English-Learning Intent Handling
 
-Triggered from `agents/ref-pipeline.md § "11 — Intent routing"`, when the intent matches a `language-set` or `english-learning-set` row. The startup kernel's direct-routing table stays in `agents/orchestrator.md`.
+Triggered from `agents/ref-pipeline.md`, when the intent matches a `language-set` or `english-learning-set` row. The startup kernel's direct-routing table stays in `agents/orchestrator.md`.
 
 **Language-set intent handling.** When the intent matches a `language-set` row:
 
@@ -152,7 +160,7 @@ Triggered from `agents/ref-pipeline.md § "11 — Intent routing"`, when the int
 
 ## ClickUp Conversational Intents
 
-Triggered from `agents/ref-pipeline.md § "11 — Intent routing"`, when the utterance contains a ClickUp task identifier.
+Triggered from `agents/ref-pipeline.md`, when the utterance contains a ClickUp task identifier.
 
 **ClickUp conversational intents (MCP-direct, no pipeline).**
 
@@ -175,7 +183,7 @@ intent — pipeline routing applies).
 | "cambia/cambiá el estado de task \<id\|name\> a \<status\>" / "set state of task \<id\|name\> to \<status\>" / "set status of task \<id\|name\> to \<status\>" | `clickup_update_task` | Before calling `clickup_update_task`, render a preview block showing the target task id and the new status value, then wait for explicit operator approval (edit/cancel vocabulary as in `skills/clickup/SKILL.md § "Comment preview gate"`). Pass status verbatim from operator (no enum validation — see Status pass-through note). |
 | "cerrame/cierra/close task \<id\|name\>" / "close task \<id\|name\>" | `clickup_update_task` | Before calling `clickup_update_task`, confirm with the operator: "Set task \<id\> to closed — proceed? [Y/n]". Default status `closed`. If MCP rejects, prompt operator for the workspace's actual closed-status name. |
 | "marca/marcá task \<id\|name\> como \<state\>" / "mark task \<id\|name\> as \<state\>" | `clickup_update_task` | Before calling `clickup_update_task`, render a preview block showing the target task id and the new state, then wait for explicit operator approval. Pass `<state>` verbatim. |
-| "rutea/ruteá task \<id\|name\> al pipeline" / "route task \<id\|name\> to pipeline" / "open task \<id\|name\> in the pipeline" | none (delegation) | Equivalent to `/th:clickup task <id>`. Run the skill's `task <id>` flow inline, then route the handoff payload back into `agents/ref-pipeline.md § "13 — Classify"` as the gated pipeline. Record `clickup_task_id` (the routed `<id>`) and `clickup_task_url` (`https://app.clickup.com/t/<id>`) in `00-state.md § Current State` at intake, so Phase 5 can post the mandatory functional closing comment even after compaction/recovery. |
+| "rutea/ruteá task \<id\|name\> al pipeline" / "route task \<id\|name\> to pipeline" / "open task \<id\|name\> in the pipeline" | none (delegation) | Equivalent to `/th:clickup task <id>`. Run the skill's `task <id>` flow inline, then route the handoff payload back into `agents/ref-pipeline.md` as the gated pipeline. Record `clickup_task_id` (the routed `<id>`) and `clickup_task_url` (`https://app.clickup.com/t/<id>`) in `00-state.md § Current State` at intake, so Phase 5 can post the mandatory functional closing comment even after compaction/recovery. |
 | "muestra/mostrá task \<id\|name\>" / "show task \<id\|name\>" | `clickup_get_task` | Read-only; print summary. |
 
 **Name-vs-ID resolution.** When the operator references a task by name (not ID):
@@ -199,7 +207,7 @@ status name. No hardcoded enum.
 
 ## Lane Classification
 
-Triggered from `agents/ref-pipeline.md § "13 — Classify"` for every development task.
+Triggered from `agents/ref-pipeline.md` for every development task.
 
 **Two postures only:** `inline` and `pipeline`. There is no selectable depth profile,
 fast/simple alias, tier-based route, or configuration-selected lane. A pipeline starts only
@@ -275,7 +283,7 @@ examples accepts a legacy marker as activation or routing.
 Do not create a state file or workspace merely to record a tier.
 ## Root-Cause Provenance Tiers
 
-Triggered from `agents/ref-pipeline.md § "Design"`, only for a `type: fix` dispatch at
+Triggered from `agents/ref-pipeline.md`, only for a `type: fix` dispatch at
 Tier 2-4 (a `root-cause` architect mode dispatch in the pipeline) where a candidate
 root-cause artifact already exists — prior `/th:research-code` output from this run, a spec-seed
 prior citing `file:line`, or a linked investigation from an issue/comment.

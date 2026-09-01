@@ -29,14 +29,13 @@ reviewer narrative.
 ### Requirement: Ratchet termination ends correction on evidence, not patience
 The ratchet SHALL govern the complete reasoning-lens finding set and require the
 deterministic quality conjunctions green. Zero open critical/high findings and
-neither named security-floor condition SHALL be convergence-complete. Remaining
+a passing impact-required security result SHALL be convergence-complete. Remaining
 sub-floor findings SHALL become projected residuals and PR-body concerns and
 MUST NOT create another correction package. Blocking findings remain blocking
 regardless of how many corrections occurred.
 
-The named security conditions remain a correctable `broke-it` inside approved
-scope and a `could-not-break` with `incomplete_on_changed_control: true` on a
-sensitive pipeline. A blocking finding MAY trigger correction under existing
+An in-scope critical/high security finding or incomplete security coverage
+remains correctable. A blocking finding MAY trigger correction under existing
 Gate-1 authority only when a different safe causal action exists. Counts and
 labels such as `round`, `max-3`, or `N/3` MUST NOT select the route.
 
@@ -44,8 +43,8 @@ labels such as `round`, `max-3`, or `N/3` MUST NOT select the route.
 - **WHEN** validation reports only medium-and-below findings and deterministic conjunctions are green
 - **THEN** validation completes, auto-ship proceeds, and the findings ship as projected residual concerns
 
-#### Scenario: A correctable broke-it survives
-- **WHEN** validation reports a correctable `broke-it` or incomplete changed-control condition
+#### Scenario: A correctable security blocker survives
+- **WHEN** validation reports a correctable critical/high security finding or incomplete changed-surface coverage
 - **THEN** validation remains failed and Main applies causal recovery without consulting a count
 
 #### Scenario: The same correction strategy already failed
@@ -68,18 +67,41 @@ be duplicated as authority or required mutable state.
 
 ## ADDED Requirements
 
-### Requirement: Revalidation is derived from changed evidence impact
-After correction closure, tester evidence SHALL refresh only when requirement
-text, exact command/arguments, or a declared dependency path/blob changes. QA
-SHALL run fresh over every functional AC on a new Freeze. Security SHALL run
-fresh only when a security finding, protected invariant, security-relevant
-constraint, attack-surface path, or unknown impact changed; otherwise its prior
-result MAY carry by exact audited identity.
+### Requirement: Validation lenses are derived from risk and changed evidence
+Every new Freeze SHALL receive one fresh independent verifier that evaluates the
+canonical OpenSpec scenarios against the candidate-bound quality receipt and
+changed behavior. This ordinary verifier SHALL own the combined evidence audit
+and semantic acceptance verdict; a second QA agent MUST NOT duplicate that
+ordinary verdict.
+
+A separate tester SHALL run only when the independent-test predicate matches bug
+reproduction, migration/data safety, public contract or compatibility change,
+security-control change, stale independently-authored evidence, or an explicit
+operator request. Main SHALL derive security impact from the frozen candidate
+through the canonical type-agnostic classifier over changed paths and every
+touched line, including removals. Its closed receipt SHALL be the only input to
+validation lens selection. Complete negative evidence yields false; binary,
+unscannable, malformed, missing, or otherwise unresolved evidence yields
+unknown. Security SHALL run fresh for true or unknown impact; otherwise its
+prior result MAY carry only by exact audited identity. `qa-plan` SHALL NOT
+exist as a dispatchable role, plan-review lens, or acceptance-definition owner.
+
+#### Scenario: Ordinary candidate reaches Freeze
+- **WHEN** quality is green and no dedicated tester or security predicate matches
+- **THEN** one fresh verifier evaluates evidence and canonical scenarios without another QA, tester, or plan-review dispatch
+
+#### Scenario: Independent test authorship is required
+- **WHEN** the recorded risk predicate requires a separate tester
+- **THEN** tester evidence is produced or refreshed independently and the final verifier consumes its immutable receipt
 
 #### Scenario: A correction changes one test dependency
 - **WHEN** one evidence row becomes stale and other declared dependencies remain byte-identical
-- **THEN** tester refreshes that evidence, QA validates the new Freeze, and unchanged evidence is carried by identity
+- **THEN** the risk-required tester refreshes that evidence, the independent verifier validates the new Freeze, and unchanged evidence is carried by identity
 
 #### Scenario: Security impact is unknown
-- **WHEN** the final delta cannot prove its security-relevant paths unchanged
+- **WHEN** the frozen changed-surface classifier is ambiguous or unresolved
 - **THEN** a fresh security lens is required before validation can close
+
+#### Scenario: An obsolete qa-plan route remains
+- **WHEN** a skill, roster, projection, test, or document exposes `qa-plan` as a current role
+- **THEN** validation of the shipped agent surface fails until that current route is removed or explicitly historical

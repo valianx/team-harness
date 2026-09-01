@@ -1,8 +1,9 @@
 # Verification Packet — Canonical Contract
 
 This document is the **single source of truth** for `00-verify-packet.md`, a pipeline-only,
-shared build-once-read-many artifact that Phase-3 verifiers (`qa`, conditional `adversary`,
-`ux-reviewer` validate) read first instead of independently re-reading the full workspace
+shared build-once-read-many artifact that validation roles (`qa`, conditional
+`security`, risk-required `tester`, and applicable `ux-reviewer`) read first
+instead of independently re-reading the full workspace
 document set. Inline work and live ad hoc tester/QA/security reviews never create or require a
 verification packet; they return bounded evidence in chat unless the operator explicitly asks for
 a separate artifact. Agent files reference this contract by pointer — the schema itself lives
@@ -12,7 +13,7 @@ only here (multi-site invariant, `01-plan.md`).
 86K/run) because each verifier re-read the same workspace narrative independently, with no
 shared-read mechanism across separate agent contexts. The packet applies the same
 build-once-read-many shape already used for `00-knowledge-context.md`
-(`agents/ref-pipeline.md § "Intake"`) to the Stage-2 verify block.
+(`agents/ref-pipeline.md`) to the Stage-2 verify block.
 
 ---
 
@@ -20,8 +21,9 @@ build-once-read-many shape already used for `00-knowledge-context.md`
 
 **Who:** the orchestrator, never a leaf agent.
 
-**When:** Phase 2.8 Freeze — after tester authoring, hygiene, build, lint, and frozen-diff
-creation succeed, before Phase 3 is launched. See `agents/ref-pipeline.md § Phase 2.8`.
+**When:** Freeze — after implementation, hygiene, and candidate assembly
+succeed, before validation roles launch. See
+`agents/ref-pipeline.md § Freeze and validation`.
 
 **Where:** `{docs_root}/00-verify-packet.md` — one file per task, overwritten in place on
 every rebuild. **Never create a `00-verify-packet-v2.md` sibling** — the `Packet version`

@@ -14,23 +14,25 @@ workspace artifacts. Follow existing repository conventions and
 
 ## Pipeline v5 transport
 
-Use the capsule's one capability lease and return one result envelope.
-Pre-implementation covers prerequisites and RED only; complete quality is bound
-to the candidate identity at Freeze. Main owns acceptance and projections.
+Use one just-in-time capability lease and return one result envelope. In the
+pipeline this role exists only when the recorded independent-test predicate
+names bug reproduction, migration/data safety, public compatibility,
+security-control change, stale independently-authored evidence, or an explicit
+operator request. There is no universal RED dispatch. Complete quality is
+bound to the candidate identity at Freeze; Main owns acceptance and projections.
 
 ### OpenSpec-bound evidence
 
-Read and apply `agents/_shared/dispatch-contract.md` § "Pipeline specialist
-reference" before any OpenSpec-bound action. After reference verification, repository test
-edits stay inside capsule ownership, evidence roots remain coordinate-only and
-read-only, and every workspace write requires the capsule's exact write-scope
-authorization. No role name implies report ownership. Task-intent identity is
-never a source-content digest.
+Read pinned canonical OpenSpec scenarios from immutable lease references.
+Repository test edits stay inside lease ownership, evidence roots remain
+coordinate-only and read-only, and every workspace write requires exact
+write-scope authorization. `01-plan.md`, TH prose, and task-intent identities
+never substitute for canonical acceptance.
 
 Use TH artifacts for routing and evidence controls, never as paraphrased
 behavioral intent. OpenSpec validation is supplemental; executable evidence
 remains yours and cannot release a gate or select pipeline state. Evidence
-reads remain sequential and bounded to the capsule's exact pointer, anchor, or
+reads remain sequential and bounded to the lease's exact pointer, anchor, or
 file coordinate.
 The exact `--output` flag is mandatory; a positional result path is
 `ARGUMENT_INVALID`. Accept evidence only when the CLI process status is zero
