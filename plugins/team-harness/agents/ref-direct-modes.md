@@ -108,8 +108,13 @@ persist the single bounded result at `reviews/01-plan-review.md` and surfaces:
 
 ```text
 Plan review: {pass | concerns | fail} — {one-line summary}
+Security specialist: not run — invoke /th:security for a separate security assessment.
 Report: workspaces/{feature-name}/reviews/01-plan-review.md
 ```
+
+The notice is mandatory: the single plan reviewer may report a security
+finding, but no dedicated security specialist or design panel ran. It is not a
+security pass and does not trigger another agent automatically.
 
 When OpenSpec changes, regenerate `01-plan.md`; review again only after another
 explicit invocation. This direct mode creates no pipeline state or Gate event.

@@ -31,6 +31,7 @@ import {
   replayControlBytes,
   replayControlLog,
   requiredPreflightRoles,
+  securityImpactFromFloor,
   verifyCapabilityCapsule,
   validateCapabilityLease,
   validateExecutionProfile,
@@ -239,12 +240,29 @@ try {
     { task_id: "1.1", role: "implementer", worktree, writable_paths: ["src"], immutable_inputs: [] },
     { task_id: "1.2", role: "tester", worktree, writable_paths: ["evidence"], immutable_inputs: [] },
   ]).error_code, "BATCH_OWNER_MISMATCH");
+  const nonSensitiveFloor = {
+    applies: false, reason: null, categories: [], ambiguous: false, unscannable_paths: [],
+  };
+  const ambiguousFloor = {
+    applies: true, reason: "unscannable content in 1 path(s)", categories: [],
+    ambiguous: true, unscannable_paths: ["assets/blob.bin"],
+  };
+  assert.deepEqual(securityImpactFromFloor(nonSensitiveFloor), {
+    ok: true, security_impact: false, error_code: null,
+  });
+  assert.deepEqual(securityImpactFromFloor(ambiguousFloor), {
+    ok: true, security_impact: "unknown", error_code: null,
+  });
   assert.deepEqual(validationRequirements({
-    candidate_changed: true, independent_test_required: false, security_impact: false,
+    candidate_changed: true, independent_test_required: false, security_floor: nonSensitiveFloor,
   }), { ok: true, verifier: true, tester: false, security: false, error_code: null });
   assert.deepEqual(validationRequirements({
-    candidate_changed: true, independent_test_required: true, security_impact: "unknown",
+    candidate_changed: true, independent_test_required: true, security_floor: ambiguousFloor,
   }), { ok: true, verifier: true, tester: true, security: true, error_code: null });
+  assert.deepEqual(validationRequirements({
+    candidate_changed: true, independent_test_required: false,
+    security_floor: { applies: false, reason: null, categories: [], ambiguous: true, unscannable_paths: [] },
+  }), { ok: false, verifier: false, tester: false, security: true, error_code: "VALIDATION_RISK_INVALID" });
   assert.deepEqual(qualityRequirement({ candidate_identity: h("candidate"), last_quality_identity: null, phase: "pre-implementation" }), {
     run: false, scope: "prerequisites-only", error_code: null,
   });
@@ -260,6 +278,12 @@ try {
     links: ["openspec/changes/small-change/proposal.md"],
   });
   assert.equal(operatorPlan.ok, true);
+  assert.deepEqual(buildOperatorPlanMarkdown({
+    change: "small-change", openspec_identity: h("openspec"),
+    outcome: "api_key=abcdefgh12345678",
+    included_scope: [], excluded_scope: [], approach: "No secret persistence.",
+    work_batches: [], risks: [], decisions: [], preserved_behavior: [], links: [],
+  }), { ok: false, markdown: null, identity: null, error_code: "OPERATOR_PLAN_INPUT_INVALID" });
   const operatorPlanInput = {
     change: "small-change", openspec_identity: h("openspec"),
     outcome: "The operator can observe the requested behavior.",

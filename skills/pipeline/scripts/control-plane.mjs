@@ -434,17 +434,45 @@ export function deriveCoherentBatch(tasks) {
   };
 }
 
-/** Select the smallest independent validation set for one candidate identity. */
-export function validationRequirements({ candidate_changed: candidateChanged, independent_test_required: independentTestRequired, security_impact: securityImpact }) {
-  if (typeof candidateChanged !== "boolean" || typeof independentTestRequired !== "boolean"
-    || ![true, false, "unknown"].includes(securityImpact)) {
-    return { ok: false, verifier: false, tester: false, security: false, error_code: "VALIDATION_RISK_INVALID" };
+const SECURITY_FLOOR_KEYS = ["applies", "reason", "categories", "ambiguous", "unscannable_paths"];
+
+/** Convert the canonical diff-floor classifier receipt into the validation impact vocabulary. */
+export function securityImpactFromFloor(value) {
+  const valid = exactKeys(value, SECURITY_FLOOR_KEYS)
+    && typeof value.applies === "boolean"
+    && (value.reason === null || boundedString(value.reason, 4096))
+    && Array.isArray(value.categories) && value.categories.length <= 16
+    && value.categories.every(category => boundedString(category, 256))
+    && typeof value.ambiguous === "boolean"
+    && Array.isArray(value.unscannable_paths) && value.unscannable_paths.length <= 32
+    && value.unscannable_paths.every(safeRelative)
+    && value.applies === (value.ambiguous || value.categories.length > 0)
+    && (value.applies ? value.reason !== null : value.reason === null);
+  if (!valid) return { ok: false, security_impact: "unknown", error_code: "SECURITY_FLOOR_INVALID" };
+  return {
+    ok: true,
+    security_impact: value.ambiguous ? "unknown" : value.applies,
+    error_code: null,
+  };
+}
+
+/** Select the smallest independent validation set from the canonical diff-floor receipt. */
+export function validationRequirements({ candidate_changed: candidateChanged, independent_test_required: independentTestRequired, security_floor: securityFloor }) {
+  const impact = securityImpactFromFloor(securityFloor);
+  if (typeof candidateChanged !== "boolean" || typeof independentTestRequired !== "boolean" || !impact.ok) {
+    return {
+      ok: false,
+      verifier: false,
+      tester: false,
+      security: candidateChanged === true,
+      error_code: "VALIDATION_RISK_INVALID",
+    };
   }
   return {
     ok: true,
     verifier: candidateChanged,
     tester: candidateChanged && independentTestRequired,
-    security: candidateChanged && securityImpact !== false,
+    security: candidateChanged && impact.security_impact !== false,
     error_code: null,
   };
 }
@@ -483,7 +511,8 @@ export function buildOperatorPlanMarkdown(input) {
     || !SHA256.test(input.openspec_identity ?? "") || !boundedString(input.outcome, 4096)
     || !boundedString(input.approach, 4096)
     || !arrayKeys.every(key => Array.isArray(input[key]) && input[key].length <= MAX_ARRAY_ITEMS
-      && input[key].every(value => boundedString(value, 1024)))) {
+      && input[key].every(value => boundedString(value, 1024)))
+    || SECRET.test(JSON.stringify(input))) {
     return { ok: false, markdown: null, identity: null, error_code: "OPERATOR_PLAN_INPUT_INVALID" };
   }
   const identity = controlIdentity(input);

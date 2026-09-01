@@ -255,8 +255,10 @@ it is NEVER written to `security_sensitive`, `security_gate_status`, or any gate
 
 The following security mechanisms run **input-independent** and are NOT waivable:
 
-- **HI-2 (discover-phase.md §3):** the security floor non-waivability invariant. No disposition signal can bypass the security gate. The gate fires whenever `security_sensitive: true` is set, regardless of session state.
-- **Derived security floor (`docs/pipeline-lanes.md § "2a. What counts as a sensitive path (type-agnostic)"`):** sets `security_sensitive: true` from the paths a change touches and the security-relevant content it adds or removes. It runs on the diff, not on session state, and it is type-agnostic — a bug fix gets no floor a feature would not get, and vice versa. On a sensitive task the non-waivable specialist floor is the final `adversary` audit within Phase 3, using the architect's security assessment and security-relevant TCs as claims to invert; code-level audit is delegated to PR review, referred to generically (not dependent on any specific configured tool).
+- **HI-2 (security floor non-waivability):** no disposition signal, plan
+  field, or specialist return can bypass the security gate. Main classifies the
+  frozen candidate immediately before validation.
+- **Derived security floor (`docs/pipeline-lanes.md § "2a. What counts as a sensitive path (type-agnostic)"`):** the canonical classifier scans changed paths and every touched line, additions and removals alike. A complete negative receipt yields `false`; binary, unreadable, malformed, or otherwise unresolved evidence yields `unknown`. True or unknown impact requires one fresh `security` audit alongside QA. The pipeline no longer dispatches `adversary` automatically.
 
 ---
 
@@ -319,9 +321,9 @@ A gate or floor that does the WRONG thing on a plain, readable, non-obfuscated i
 
 Only that obfuscation-evasion residual of string-matching gates is a documented, disclosed limitation — not chased through pipeline iterations, and outside this threat model — recorded honestly where it lives.
 
-A limitation qualifies as "documented, not chased" only when it is BOTH (a) disclosed in-place where it lives, AND (b) scoped out through a legitimate mechanism — the architectural-inevitability limit for the string-matching-gate case is the canonical example. (A previously-tracked second example, the mid-iteration classification-timing gap in the retired per-task Phase-3 security dispatch, is addressed by the Pre-Delivery Security Audit's positional design: `adversary` reviews the consolidated final diff once per delivery group when `security_floor_applies` holds, so a control introduced by any patch iteration on a sensitive task is reviewed regardless of which iteration introduced it. This coverage is scoped to `security_floor_applies == true`, not classification-independent — code-level review on a non-sensitive task is delegated to PR review — `agents/ref-pipeline.md`.) Cross-ref: this file's "Residual static-resolution limits" section.
+A limitation qualifies as "documented, not chased" only when it is BOTH (a) disclosed in-place where it lives, AND (b) scoped out through a legitimate mechanism — the architectural-inevitability limit for the string-matching-gate case is the canonical example. The former mid-iteration classification gap is closed by classifying the consolidated frozen candidate immediately before validation and mapping ambiguous evidence to `unknown`; true or unknown impact receives a fresh `security` audit. Cross-ref: this file's "Residual static-resolution limits" section and `agents/ref-pipeline.md § Freeze and validation`.
 
-This disposition is narrowly scoped to the residual class described above. It does NOT license skipping any real in-scope finding, does NOT weaken or waive any floor, and does NOT change when the final `adversary` dispatch runs — the final security floor stays non-waivable when its impact predicate applies.
+This disposition is narrowly scoped to the residual class described above. It does NOT license skipping any real in-scope finding, does NOT weaken or waive any floor, and does NOT suppress the fresh `security` dispatch required for true or unknown impact.
 
 ---
 

@@ -22,6 +22,19 @@ feature slug. Preserve unrelated/untracked files. Resolve one canonical
 worktree per repository and ensure no other active lease owns it for writes.
 Initialize `control/control.jsonl` only through the control-plane helper.
 
+Before creating a fresh workspace, load only the applicable sections of
+`agents/ref-intake-flows.md`: `Milestone Continuity` for a named plan
+milestone; `Initiative Detection and Confirm` before binding an initiative;
+and `Initiative Create-or-Join` after the live confirmation. These
+coordinator-owned intake decisions run without architect or validation-panel
+dispatch and must finish before OpenSpec/workspace identity is pinned.
+
+For a workspace outside the repository root, apply
+`docs/permission-provisioning.md` before the first write: perform its
+already-present check, show the exact bounded allow/deny/additional-directory
+delta, and require the documented live confirmation. Do not reproduce or widen
+the canonical read-only command allowlist here.
+
 If current state is v5, replay its valid prefix and rebuild projections. If it
 is a supported v1-v4 workspace, invoke the one-shot create-then-switch converter
 before current dispatch. Mixed writable schemas, ambiguous authority, invalid

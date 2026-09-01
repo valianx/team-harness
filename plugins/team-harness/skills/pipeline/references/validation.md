@@ -15,10 +15,13 @@ the frozen commit/tree, and the quality receipt are immutable inputs.
    checks the quality receipt, relevant evidence, changed behavior, and every
    assigned canonical OpenSpec scenario. It owns the ordinary semantic verdict;
    do not add another QA, plan reviewer, or acceptance panel.
-4. Compare security-relevant paths, constraints, findings, protected
-   invariants, and audit identities. Dispatch fresh security when impact is true
-   or unknown. Carry a prior pass only when every audited blob and classified
-   input is byte-identical and impact is proven false.
+4. Run the canonical type-agnostic floor classifier over the frozen changed
+   paths and every touched line, including removals. Pass its closed receipt to
+   `securityImpactFromFloor`/`validationRequirements`; do not accept a
+   plan-, specialist-, or caller-authored boolean. Binary, malformed, missing,
+   or otherwise unresolved evidence yields `unknown`. Dispatch fresh security
+   for true or unknown impact. Carry a prior pass only when every audited blob
+   is byte-identical and a complete receipt proves false.
 
 All dispatched roles use a just-in-time capability lease and return one result
 envelope. They never edit state, Gates, findings projections, OpenSpec, or

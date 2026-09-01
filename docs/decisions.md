@@ -4,6 +4,17 @@
 
 > Current route authority is `docs/pipeline-lanes.md`: exactly two live postures exist — `inline` (direct default, including explicitly chosen sensitive inline work and live ad-hoc tester/QA/security reviews) and `pipeline` (the canonical full v3 sequence). Legacy lane, express/full, fast/simple, and tier markers are migration history only and never select a route or bypass a gate.
 
+- **2026-09-01 — Frozen-candidate security replaces the pipeline adversary
+  dispatch.** Main derives impact from the canonical type-agnostic classifier
+  after Freeze. True or unknown impact dispatches one fresh `security`
+  specialist alongside the single QA verifier; a false result requires a
+  complete classifier receipt. Automatic design-security panels and pipeline
+  `adversary` dispatch are retired, while explicit ad hoc adversary review
+  remains available. This supersedes the current-dispatch portions of the
+  2026-07-19, 2026-07-20, 2026-07-21, 2026-07-28, and 2026-08-03 entries below.
+  → `agents/ref-pipeline.md § Freeze and validation`,
+  `docs/pipeline-lanes.md § 2a`
+
 - **2026-08-28 — Causal recovery replaces retry and correction budgets.** Attempts,
   interruptions, continuations, corrections, and iterations are unbounded
   observations. No ordinal authorizes, denies, pauses, or closes work. After a

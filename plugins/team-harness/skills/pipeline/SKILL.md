@@ -62,7 +62,9 @@ it while available. Native sandbox and approval policy remain unchanged.
 4. Reject manual or stale projection content. Gate 1 consumes only a projection
    whose recorded identity matches the current strict-valid OpenSpec identity.
    An optional `/th:plan-review` is separate and dispatches one surviving
-   `plan-reviewer`; it is never automatic and never releases Gate 1.
+   `plan-reviewer`; it is never automatic and never releases Gate 1. Its
+   operator result explicitly states that no dedicated security specialist ran
+   and points to `/th:security` for that separate assessment.
 5. Present Gate 1 and stop. Only a live reply bound to that presentation may
    append the `operator_authority` event and enter implementation.
 

@@ -74,10 +74,10 @@ Every committed artefact is in English: `README.md`, all files under `docs/`, `a
 
 **Scope of the configured language.** Chat responses and operator-facing-tier workspace doc prose follow the operator's resolved language. Agentic-tier workspace doc prose and every committed artefact (repo files, KG nodes, commits, PR bodies, docs) stay in English regardless of the resolved language. This scope rule is unchanged by the `language` feature.
 
-**Documented exceptions** (the two surviving surfaces that render or route in the operator's resolved language, not a hardcoded language):
+**Documented exception** (the surviving surface that renders in the operator's
+resolved language, not a hardcoded language):
 
 - **`agents/orchestrator.md` live chat.** The coordinator replies in the operator's resolved language, determined by the 4-level precedence chain above — never a hardcoded language. For the current operator this resolves to Spanish; that is one operator's instance, not the rule.
-- **`agents/ref-pipeline.md` (under `## Intake`) table.** The table matches intent patterns in the operator's resolved language so the operator's own phrasing routes correctly. Illustrative patterns in the table may show Spanish alongside English as the current operator's instance — the table is not restricted to a fixed pair of languages.
 
 No other committed artefact carries a language exception. `agents/security.md`, `agents/reviewer.md`, and `agents/adversary.md` report bodies — and their `reviews/04-security.md`, `reviews/04-adversary.md` outputs — are English; see § Operator-Supplied Content Boundary below.
 
@@ -87,7 +87,11 @@ No other committed artefact carries a language exception. `agents/security.md`, 
 
 ## Operator-Supplied Content Boundary (§7.4)
 
-Outside the operator-facing tier and the two §7.3 exceptions (orchestrator live chat, intent-routing table), the agent never composes prose in the operator's language — it composes English. Within the operator-facing tier and the two exceptions, the agent composes in the operator's resolved language. Whatever content the operator supplies in their own language, the agent preserves verbatim.
+Outside the operator-facing tier and the §7.3 live-chat exception, the agent
+never composes prose in the operator's language — it composes English. Within
+the operator-facing tier and live chat, the agent composes in the operator's
+resolved language. Whatever content the operator supplies in their own
+language, the agent preserves verbatim.
 
 | What | Who composes it | Language |
 |---|---|---|
@@ -148,7 +152,7 @@ Before opening a PR that adds or modifies operator-facing copy, walk through thi
 - [ ] No first-person personality or anthropomorphic framing.
 - [ ] Dev-natural verbs (`plan`, `implement`, `PR`, `validate`, `recover`) in operator-visible status blocks, STOP-block templates, install prompts, error messages, skill help text.
 - [ ] Phase numbers and gate identifiers appear only in contributor surfaces (CLAUDE.md, `agents/*.md` instructional sections, workspace doc templates). Exception: `/th:pipelines` and `/trace` output, and STAGE-GATE-{1,2,3} STOP-block header identifiers.
-- [ ] All committed copy is in English. Exception: `agents/ref-pipeline.md` (under `## Intake`) table, which routes in the operator's resolved language (live chat is not committed copy — see §7.3).
+- [ ] All committed copy is in English. Live chat is not committed copy; see §7.3.
 - [ ] If the change documents how to invoke the system, the example uses `@th:orchestrator <natural-language>` as the primary path; slash commands are positioned as optional shortcuts.
 
 No suite enforces these rules mechanically — voice is a human-judgement property and the presence-based checks that once claimed to cover a subset of it were retired (README.md § "What gets a test"). The checklist above is the standard; review is what applies it.

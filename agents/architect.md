@@ -177,24 +177,14 @@ never emit `cross-repository` as an ID, and never treat `quality.json`'s
 current commands as proof of completeness. Full rule set and delivery
 grouping: `ref-architect-design.md`.
 
-**Classification block.** Set all nine booleans in
-`01-plan.md § Review Summary` AND as one structured `classification:` field in
-your status block; you never write `00-state.md` (the coordinator validates
-the two mirrors and transcribes — omitting a field or a mirror fails the
-dispatch). Eight booleans are sketch triggers; `changes_security_control` is
-final-audit context only. Its canonical vocabulary, duplicated byte-for-byte
-in `agents/adversary.md`:
-
-`SECURITY_CONTROL_VOCABULARY: guard | gate | validation | allowlist | authorization check | early return | error handler | rate limit | floor | waiver | kill switch | incomplete-feature flag`
-
-Set `true` when the change modifies any category there. **Fail closed to
-`true` on doubt or absence** — never default to `false` on uncertainty. When
-`security_sensitive: true` and you declare `false`, record a diff-grounded
-justification in `plan/architecture.md § Security Assessment` naming at least
-one concrete inspected file and what rules out a control change; the
-classification bullet stays a bare literal. This cannot verify substantive
-completeness — the changed-surface backstop and final audit remain the defense
-in depth. In a multi-project initiative, every project records its own block.
+**Design-surface hints.** When useful, return bounded `classification:` hints
+for sketch selection only. Never write `01-plan.md § Review Summary`,
+`security_sensitive`, or `security_impact`; the compact operator plan has no
+classification mirror. Record security-relevant intent, constraints, and risks
+in canonical OpenSpec. After implementation, Main derives the non-waivable
+security impact from the frozen changed paths and added/removed content through
+the canonical type-agnostic classifier; ambiguous or unresolved classification
+becomes `unknown`, never `false`.
 
 **Sketches.** Create only the files the classification booleans trigger
 (table and skeletons: `ref-architect-design.md § "Sketches"`; canonical rules:

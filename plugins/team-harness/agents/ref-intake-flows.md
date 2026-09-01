@@ -9,7 +9,12 @@ color: cyan
 
 This file is read on-demand by `th:orchestrator` during Intake and Classify. It is NOT part of the coordinator's core system prompt.
 
-**LAZY-LOAD DIRECTIVE — consumers read only the section they need.** Do NOT read this entire file on every invocation. Each section below is triggered by its own condition in `agents/ref-pipeline.md § Intake` (a 1-2 line trigger + pointer replaces the full body at the original site) — locate the top-level section heading for the active trigger and read only that section. Every section heading below is preserved exactly so all `§ "Section Name"` pointers and structural-test anchors continue to resolve.
+**LAZY-LOAD DIRECTIVE — consumers read only the section they need.** Do NOT
+read this entire file on every invocation. Each section below is triggered by
+its own condition in direct routing or `agents/ref-pipeline.md § Design`;
+locate the top-level section heading for the active trigger and read only that
+section. Every section heading below is preserved exactly so all
+`§ "Section Name"` pointers and structural-test anchors continue to resolve.
 
 ---
 
@@ -28,7 +33,8 @@ Locate the needed section by heading; do not read this file in full.
 
 ## Milestone Continuity
 
-Triggered from `agents/ref-pipeline.md § Intake` (the workspace-folder step), before composing a fresh `docs_root`.
+Triggered from `agents/ref-pipeline.md § Design` (the workspace-resolution
+step), before composing a fresh `docs_root`.
 
 **Milestone-continuity detect-and-continue (multi-milestone `type: plan` builds only).** Before composing a fresh `docs_root`, run this check: if the incoming task is a milestone execution (e.g., "implement M0", "build M2") that belongs to an existing plan, detect the plan workspace by identity and resume the SAME plan workspace instead of creating a new top-level sibling.
 
@@ -57,7 +63,8 @@ This reuses the #283/#285 identity-keyed-resolution pattern: the plan workspace 
 
 ## Initiative Create-or-Join
 
-Triggered from `agents/ref-pipeline.md § Intake` (the workspace-folder step), only when `initiative` is non-null in `00-state.md`.
+Triggered from `agents/ref-pipeline.md § Design` (the workspace-resolution
+step), only after the live operator confirms a non-null `initiative`.
 
 **CONDITIONAL — Initiative create-or-join (only when `initiative` is non-null in `00-state.md`).** If `initiative == null`, this step is a complete no-op — skip silently. Otherwise:
 
@@ -89,7 +96,8 @@ Branch-at-Design is the current git branch if already on a feature branch, or `�
 
 ## Initiative Detection and Confirm
 
-Triggered from `agents/ref-pipeline.md § Intake` (the Discover-disposition step), during Discover, after framing and before the intake survey.
+Triggered from `agents/ref-pipeline.md § Design` before workspace binding,
+after request framing and before initiative create-or-join.
 
 **Initiative detection + confirm (runs during Discover, after framing, before the intake survey).**
 

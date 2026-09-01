@@ -1,6 +1,10 @@
-# Adversary Cost Model
+# Adversary Cost Model (historical pipeline shape)
 
-> Measurement assumptions for the conditional validation-checkpoint `adversary` audit. This document describes the current one-audit-per-delivery-group design, not the retired per-task/per-round model.
+> Historical measurement assumptions for the former conditional
+> validation-checkpoint `adversary` audit. Pipeline v5 now derives security
+> impact from the frozen candidate and dispatches one fresh `security`
+> specialist for true or unknown impact. The `adversary` agent remains
+> available only as an explicitly requested ad hoc lens.
 
 ## Measured baseline
 
@@ -13,9 +17,9 @@ Two security-saturated runs from 2026-07-17/18 provide the historical anchor:
 
 Blended baseline: approximately **1.52M tokens per run**, **8 dispatches**, and **190K tokens per dispatch**. These runs predate the current delivery-group audit shape and are retained only as a comparison anchor.
 
-## Current dispatch shape
+## Retired dispatch shape
 
-The current pipeline dispatches `adversary`:
+Before pipeline v5, the pipeline dispatched `adversary`:
 
 - once over the consolidated frozen delivery diff when `security_floor_applies`;
 - once more for each operator-requested `amend` cycle that later resumes delivery
@@ -24,9 +28,9 @@ The current pipeline dispatches `adversary`:
 - never for an abandoned or still-pending amend cycle;
 - never on a non-sensitive run.
 
-This removes dispatch-count multiplication by task and verifier round. The
-remaining count is one initial audit plus one re-audit for each amend cycle that
-actually resumes delivery, not one for every requested amend.
+That shape removed dispatch-count multiplication by task and verifier round.
+It is retained below only as historical cost evidence and is not a current
+pipeline contract.
 
 ## Static context reduction
 

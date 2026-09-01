@@ -29,12 +29,19 @@ The report must distinguish a functional defect, a security finding, a structura
 and an editorial concern. It must include file/section pointers and a concise verdict. A plan
 review never edits the plan and never releases either pipeline gate.
 
+This single-reviewer mode does not dispatch the dedicated `security`
+specialist. Always make that omission visible in the operator result:
+`Security specialist: not run — invoke /th:security for a separate security
+assessment.` This notice is not a security pass and does not add an automatic
+panel.
+
 ## Output
 
 Print the combined `pass|concerns|fail` verdict and the artifact pointer:
 
 ```text
 Plan review: {pass|concerns|fail} — {one-line finding summary}
+Security specialist: not run — invoke /th:security for a separate security assessment.
 Report: workspaces/{feature-name}/reviews/01-plan-review.md
 ```
 

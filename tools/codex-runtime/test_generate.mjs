@@ -415,6 +415,16 @@ const explicitPlanReview = await readFile(join(root, "skills/plan-review/SKILL.m
 assert.match(explicitPlanReview, /exactly one surviving `plan-reviewer`/);
 assert.doesNotMatch(explicitPlanReview, /qa-plan/);
 assert.match(explicitPlanReview, /does not define acceptance, run a security\s+design panel/);
+assert.match(explicitPlanReview, /Security specialist: not run/);
+
+const pipelineContract = await readFile(join(root, "agents/ref-pipeline.md"), "utf8");
+assert.match(pipelineContract, /^## Failures$/m);
+assert.match(pipelineContract, /\| `transport` \| Native dispatch\/message transport failed/);
+const lintContract = await readFile(join(root, "skills/lint/SKILL.md"), "utf8");
+assert.match(lintContract, /agents\/README\.md § Roster/);
+assert.doesNotMatch(lintContract, /agents\/ref-pipeline\.md.*§ Your Team/);
+const intakeContract = await readFile(join(root, "agents/ref-intake-flows.md"), "utf8");
+assert.doesNotMatch(intakeContract, /agents\/ref-pipeline\.md.*§ Intake/);
 
 const opusOtherFixture = await makeFixture();
 try {

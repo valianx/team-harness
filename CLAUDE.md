@@ -149,7 +149,14 @@ All commands run from the repo root.
   `docs/observability.md`.
 - **Documentation freshness via Context7.** Verify third-party APIs before generating code. Mandatory triggers: `docs/context7-usage.md §2`.
 - **Bug-fix flow is tier-driven, not type-driven.** `bug_tier` sets root-cause depth and regression-evidence obligations inside an activated pipeline; the security floor is derived from the diff and is type-agnostic. `agents/ref-special-flows.md § Bug-fix Flow`.
-- **Validation security floor.** `adversary` runs once over the frozen final diff when the derived security floor applies, alongside `qa`; sensitive plans also retain the design-time `security` review. Findings that are correctable in scope return to implementation and revalidate the delta, unless the ratchet records a sub-floor residual on unchanged surface after a prior correction round — the two fail-closed security conditions are excluded from that residual by construction. `agents/ref-pipeline.md` and `§ "The ratchet"`, `docs/dev-mode.md § Security Floor Non-Waivability`.
+- **Validation security floor.** Main derives impact from the frozen final diff
+  with the canonical type-agnostic classifier. True or unknown impact dispatches
+  one fresh `security` specialist alongside the fresh QA verifier; false is
+  permitted only from a complete classifier receipt. Correctable findings
+  return to implementation and revalidate the changed candidate. No automatic
+  design-security panel or `adversary` pipeline dispatch remains.
+  `agents/ref-pipeline.md § Freeze and validation`,
+  `docs/pipeline-lanes.md § 2a`.
 - **Code hygiene — one deterministic floor, then ordinary findings.** A pinned pre-verify scan bounces work-narration comments in committed files and blocks on its own. Everything else `qa`'s `## Code Hygiene` audit finds is reported as a finding with severity and rides the same floor as every other finding — there is no separate `code_hygiene` gate conjunction. Pattern set: `docs/code-hygiene-gate.md`.
 - **Patch mode + selective verifier re-run.** Full contract: `docs/patch-mode.md`.
 - **Suite-run evidence.** Append-only, per-feature record of a verification-command run against a concrete tree state, so a downstream link can cite it instead of re-running. Canonical contract: `docs/suite-evidence.md`.
@@ -240,7 +247,7 @@ Agents in this repo routinely read content they did not author — web pages (We
 
 This prompt-level floor remains binding independently of the active runtime's permission and approval model.
 
-**Threat model — honest-developer disposition, not an adversarial boundary.** TH's guards, gates, and floors support catching rationalization, haste, and drift on the readable path — they are NOT a security boundary against an active adversary. A gate that does the WRONG thing on a plain, readable input is always an in-scope defect; only the obfuscation-evasion residual of string-matching gates is documented, not chased. This disposition never licenses skipping a real in-scope finding, weakening a floor, or waiving `security`/`adversary` dispatch. Full statement: `docs/dev-mode.md § "Threat model — honest-developer disposition"`.
+**Threat model — honest-developer disposition, not an adversarial boundary.** TH's guards, gates, and floors support catching rationalization, haste, and drift on the readable path — they are NOT a security boundary against an active adversary. A gate that does the WRONG thing on a plain, readable input is always an in-scope defect; only the obfuscation-evasion residual of string-matching gates is documented, not chased. This disposition never licenses skipping a real in-scope finding, weakening a floor, or waiving an impact-required `security` dispatch. Full statement: `docs/dev-mode.md § "Threat model — honest-developer disposition"`.
 
 ---
 
@@ -316,7 +323,14 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
   `agents/ref-pipeline.md`
 - **2026-07-27** — Historical Gate-state contract (#530), superseded by the v5 authority event and projection model. → `agents/_shared/gate-contract.md § "Authority event and projection"`
 - **2026-07-27** — Canonical dispatch contract (#524): one home for what a dispatch prompt may/must not carry and a single two-halves rule (review scope never bounded by the dispatcher; write scope always bounded by the recipient's own contract, by pointer to `plan-consolidation.md`), asserted via a five-column control rubric instead of prose. → `agents/_shared/dispatch-contract.md`
-- **2026-07-28** — Pipeline dispatch shape collapsed: one `implementer` + one `tester` dispatch, `qa`+`adversary` fan out together in Phase 3; Phase 3.75/3.8 absorb into new Phase 2.8/Phase 3; Phase 4.5 retires. Current delivery is publish-only: implementation assembles and commits before Freeze. → `agents/ref-pipeline.md § Phase 2.8`
+- **2026-09-01** — Pipeline Design reuses strict-valid OpenSpec and emits only
+  a compact operator projection. Validation uses one fresh QA verifier plus
+  conditional `tester`, `cleaner`, and fail-closed `security`; automatic
+  design panels, `qa-plan`, and pipeline `adversary` dispatch are retired.
+  → `agents/ref-pipeline.md`, `docs/pipeline-v5-migration.md`
+- **2026-07-28 (superseded 2026-09-01)** — Historical dispatch shape used one
+  `implementer` + one `tester` and a `qa`+`adversary` Phase-3 fan.
+  Retained for provenance only.
 
 ## 9. Patterns & Conventions
 <!-- Updated in the reviewed implementation tree when a feature establishes a durable pattern. Empty at init. -->

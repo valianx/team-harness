@@ -14,6 +14,7 @@ color: cyan
 - [Implementation](#implementation)
 - [Freeze and validation](#freeze-and-validation)
 - [Gates and delivery](#gates-and-delivery)
+- [Failures](#failures)
 - [Recovery and legacy state](#recovery-and-legacy-state)
 - [Retained safety floors](#retained-safety-floors)
 
@@ -60,7 +61,13 @@ OpenSpec is the only semantic planning source. Bind the repository change root
 separately from the workspace root and require proposal, delta specs, design,
 and tasks.
 
-1. Validate the pipeline core and replay/convert the workspace.
+1. Resolve the workspace and validate the pipeline core. Before creating a new
+   workspace, load only the applicable sections of
+   `agents/ref-intake-flows.md`: milestone continuity for a named plan
+   milestone, initiative detection/confirmation before binding an initiative,
+   and initiative create-or-join after confirmation. These are Main-owned
+   intake decisions and dispatch no design specialist. Then replay/convert the
+   selected workspace.
 2. If the complete bound change passes strict validation, use it directly and
    do not dispatch architect.
 3. If planning is missing or the live operator requests a semantic update,
@@ -81,7 +88,9 @@ Nobody edits it manually.
 There is no automatic design review panel. The former planning-QA role is not
 dispatchable. An
 explicit `/th:plan-review` dispatches one surviving read-only `plan-reviewer`
-over canonical OpenSpec and projection fidelity. It creates no Gate authority.
+over canonical OpenSpec and projection fidelity. It creates no Gate authority
+and reports that no dedicated security specialist ran, with `/th:security` as
+the explicit follow-up when the operator wants that separate assessment.
 
 ## Implementation
 
@@ -127,6 +136,15 @@ tokens, and tool calls never route.
 After implementation closes, assemble one committed candidate and compute its
 immutable identity.
 
+Main derives security impact from the frozen candidate through the canonical
+type-agnostic floor classifier in
+`skills/verify/scripts/review-fan.mjs`, whose categories are owned by
+`docs/pipeline-lanes.md § 2a`. Added and removed lines both count. Binary,
+unscannable, malformed, missing, or otherwise unresolved classification yields
+`unknown`, never `false`. The closed classifier receipt is the only input to
+`securityImpactFromFloor` and `validationRequirements`; specialists and
+`01-plan.md` never author or waive it.
+
 1. Run the complete deterministic quality set exactly once for that candidate.
    Reuse its receipt until the tree changes.
 2. Refresh a separate tester only when its risk predicate applies and declared
@@ -134,10 +152,9 @@ immutable identity.
 3. Dispatch one fresh independent QA verifier for every changed Freeze. It owns
    the combined quality/evidence audit and semantic verdict against canonical
    OpenSpec. Do not add another QA or plan reviewer for the ordinary verdict.
-4. Dispatch fresh security when a security finding, protected invariant,
-   security-relevant constraint, attack-surface path, or unknown impact changed.
-   Otherwise carry a prior pass only by exact audited identity and unchanged
-   blobs.
+4. Dispatch fresh security when the canonical classifier reports true or
+   unknown impact. Otherwise carry a prior pass only by exact audited identity
+   and unchanged blobs.
 
 Main consolidates structured findings into the log and projects the ledger.
 Green deterministic quality plus zero open critical/high findings and a passing
@@ -165,6 +182,31 @@ and exact accepted identity.
 
 Delivery must not change the candidate or rerun tests. Any tree mismatch returns
 to implementation → Freeze → validation.
+
+## Failures
+
+Classify observable cause and owner, then apply
+`agents/_shared/coordinator-recovery.md`. Failure kinds carry no retry or
+correction budget.
+
+| `failure_kind` | Observable cause | Recovery owner |
+|---|---|---|
+| `transport` | Native dispatch/message transport failed before useful work | Main repairs or waits for the runtime condition |
+| `specialist-unresponsive` | The liveness lease expired without a terminal result | Main terminates/audits and preserves progress |
+| `invalid-return` | A decision-bearing fact remains ambiguous after safe normalization | the same role under a clarified objective |
+| `stale-context` | Result identity differs from the frozen dispatch identity | Main re-establishes freshness before a new verifier |
+| `artifact-missing` | Required evidence is absent, empty, or invalid | Main if coordinator-owned; otherwise the owning role |
+| `execution-failed` | Bounded execution failed for another concrete cause | the owner of the failing work or prerequisite |
+| `verification-negative` | A verifier found a real defect | implementer/tester, followed by required revalidation |
+| `correction-incomplete` | Deterministic closure checks did not all pass | implementer/tester; Freeze remains closed |
+| `build-or-lint` | Freeze quality returned nonzero | implementer after bounded diagnosis |
+| `contradiction` | Resolution changes intent, scope, acceptance, or security meaning | operator |
+| `reclassification-needed` | Work requires a different approved semantic route | operator |
+
+`execution-failed` is residual, never the default. Normalize an unambiguous
+formatting omission from evidence Main can verify, but never invent success,
+evidence, or a decision-bearing cause. Scope expansion remains
+decision-bearing because execution cannot supply operator authority.
 
 ## Recovery and legacy state
 
