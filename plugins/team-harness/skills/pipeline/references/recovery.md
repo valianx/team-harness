@@ -15,8 +15,9 @@ security authority, or outward effect.
 
 Liveness supplies delivery, acknowledgement, terminality, progress, and
 interruption facts only. Counts, ordinals, elapsed time, tokens, tool calls, and
-telemetry never select a route. A changed candidate receives fresh QA and fresh
-security when impact is true or unknown.
+telemetry never select a route. A changed candidate receives one fresh
+independent verifier; a separate tester is risk-derived, and security is fresh
+when impact is true or unknown.
 
 For a supported v1-v4 workspace, run create-then-switch conversion. Validate
 historical authority, bindings, immutable inputs, dirty progress, original Gate,

@@ -12,7 +12,9 @@ its logical role, live authority, semantic scope, canonical worktree, writable
 paths, immutable inputs, context identity, and lifecycle state. Main SHALL be
 the only lease issuer and SHALL prevent overlapping committing ownership in one
 canonical worktree. Read-only specialists MAY inspect overlapping immutable
-inputs without acquiring mutable ownership.
+inputs without acquiring mutable ownership. Main SHALL derive the lease just in
+time for one coherent dependency-ready worktree batch and MUST NOT require an
+exhaustive future task graph or Design-authored execution contract.
 
 #### Scenario: Two writers share one worktree
 - **WHEN** both specialists can mutate files or Git metadata in the same canonical worktree
@@ -25,6 +27,14 @@ inputs without acquiring mutable ownership.
 #### Scenario: A lease contains an unsafe mutable path
 - **WHEN** a writable path is outside the canonical worktree, resolves through a symlink, overlaps another committing owner, or is absent from approved scope
 - **THEN** dispatch fails before the specialist can mutate files or Git metadata
+
+#### Scenario: Several approved tasks share one worktree and owner
+- **WHEN** dependency-ready OpenSpec tasks can be completed coherently by one implementer without transferring ownership
+- **THEN** Main issues one batch lease instead of one fresh implementer lease per documentary task shard
+
+#### Scenario: Later task details are not yet known
+- **WHEN** a future task has not reached its dependency boundary
+- **THEN** its exact writable files, seams, commands, and evidence coordinates are absent from the current lease and do not block Gate 1 or current work
 
 ### Requirement: Valid same-agent work continues without a new handshake
 Main SHALL reuse the existing specialist session and capability lease when role,
@@ -40,7 +50,7 @@ lens is required. Numeric counts alone MUST NOT force rotation.
 
 #### Scenario: QA evaluates a changed Freeze
 - **WHEN** correction changes the frozen candidate identity
-- **THEN** Main starts a fresh QA lens bound to that candidate
+- **THEN** Main starts a fresh independent verifier bound to that candidate and adds security only when impact requires it
 
 #### Scenario: Context integrity is lost
 - **WHEN** retained specialist context cannot be verified
@@ -58,11 +68,7 @@ be required.
 
 #### Scenario: A specialist completes work
 - **WHEN** its terminal result envelope validates against the active lease and immutable inputs
-- **THEN** Main verifies the actual Git diff, dirty state, and contiguous commits from the lease baseline, accepts it once, appends the result event, and derives the next action
-
-#### Scenario: A specialist omits an out-of-scope mutation from its result
-- **WHEN** the worktree diff contains a path absent from `changed_paths` or outside the lease
-- **THEN** Main rejects the result before appending acceptance, even when the envelope's self-reported paths are valid
+- **THEN** Main accepts it once, appends the result event, and derives the next action
 
 #### Scenario: Terminal chat delivery is interrupted
 - **WHEN** the runtime exposes durable terminal status for the same specialist session
@@ -82,9 +88,6 @@ MUST NOT grant scope, transfer ownership, choose a phase, approve a gate, alter
 authority, write coordinator projections, or direct another specialist to
 mutate. Main SHALL remain the only operator-facing coordinator and transition
 applier.
-The immutable specialist helper bundle SHALL omit Main's control-log and
-projection mutators and expose only non-authoritative lease/capsule validation
-and result construction primitives.
 
 #### Scenario: A specialist discovers an immutable dependency
 - **WHEN** the dependency is already inside the lease and can be identified by hash and path

@@ -24,7 +24,7 @@ currencies. Both primitive schemas SHALL be closed and versioned.
 ### Requirement: One append-only log owns control state
 One coordinator-owned append-only control log SHALL be the durable source for
 operator authority, capability-lease lifecycle, accepted results, pipeline
-transitions, and mechanical release. `00-state.md`, findings ledgers, counters,
+transitions, and mechanical release. `00-state.md`, `01-plan.md`, findings ledgers, counters,
 and other human-readable views SHALL be rebuildable projections or telemetry and
 MUST NOT independently authorize, pause, rotate, or advance work.
 
@@ -35,6 +35,10 @@ MUST NOT independently authorize, pause, rotate, or advance work.
 #### Scenario: A projection is stale
 - **WHEN** a projection disagrees with a valid control log
 - **THEN** recovery rebuilds the projection from the log and does not re-present the gate or alter the legal route
+
+#### Scenario: An operator plan disagrees with canonical OpenSpec
+- **WHEN** generated `01-plan.md` names a different semantic value or source identity
+- **THEN** it is regenerated from pinned OpenSpec and cannot release Gate 1 as an independent plan
 
 #### Scenario: Required authority is absent
 - **WHEN** the control log lacks a valid event for a protected action

@@ -28,7 +28,7 @@ Every workspace doc is either **operator-facing** or **agentic**. The operator's
 | `reviews/04-*.md`, `reviews/01-ux-review.md` | agentic | Each agent's current fixed structure; no two-tier obligation | qa / security / adversary / reviewer / ux-reviewer |
 | `02-implementation.md`, `03-testing.md`, `02-regression-test.md`, `02-documentation.md`, `02-gcp-infra.md` | agentic | Each agent's current fixed structure; no two-tier obligation | implementer / tester / documenter / gcp-infra |
 | `00-state.md`, `00-execution-events.*`, `00-pipeline-summary.md`, `00-knowledge-context.md`, `failure-brief.md`, verify packets | agentic | Already agentic (unchanged) | orchestrator / verifiers |
-| `research/00-research.md`, `research/00-audit.md`, `01-planning.md`, `00-acceptance-criteria.md` | agentic | Each agent's current fixed structure; no two-tier obligation | architect / qa-plan |
+| `research/00-research.md`, `research/00-audit.md`, `01-planning.md` | agentic | Each agent's current fixed structure; no two-tier obligation | architect |
 | Vault pages produced by `documenter`, `00-teaching-pack-*.md` | operator-deliverable | Own contracts (docs flow / mentor); outside the two-tier mandate | documenter / mentor |
 
 Consequence: the old universal mandate ("every workspace doc gets `## Review Summary` then `## Technical Detail`") is rescoped. Operator-facing docs keep their intrinsic templates (which already carry a `## Review Summary`-equivalent where it matters). Agentic docs use whatever compact, structured format their own agent already defines — no two-tier obligation. STOP blocks and the status-block return protocol are unaffected — they are already agentic/operator-facing by design.

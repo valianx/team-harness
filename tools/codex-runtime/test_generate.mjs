@@ -207,11 +207,12 @@ for (const role of ["implementer", "tester", "cleaner", "qa", "security", "deliv
 const architect = first.files.get(join(root, ".codex/agents/architect.toml"));
 for (const marker of [
   "agents/architect.md",
-  "OpenSpec execution-contract",
   "pipeline v5",
-  "capability lease",
+  "just-in-time capability",
+  "lease",
   "result envelope",
-  "Main alone",
+  "upstream OpenSpec propose/update",
+  "Never write `01-plan.md`",
 ]) {
   assert.match(architect, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `architect adapter misses ${marker}`);
 }
@@ -236,18 +237,16 @@ for (const contract of pipelineVersionContracts) {
   assert.doesNotMatch(contract, /migration to the v3 pipeline|canonical (?:full )?v3|active v3 state|(?:write|writes|persist|set) `pipeline_version: 3`/i,
     "pipeline contract can persist or activate the retired writable v3 schema");
 }
-assert.match(pipelineVersionContracts[0], /Canonical v5 workflow[\s\S]*writes `pipeline_version: 5`/,
-  "Codex pipeline activation is not pinned to the canonical v5 state");
+assert.match(pipelineVersionContracts[0], /only current machine[\s\S]*design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete/,
+  "Codex pipeline activation is not pinned to the canonical v5 state machine");
 assert.match(pipelineVersionContracts[3], /supported v1-v4 state/,
   "recovery does not recognize the closed legacy conversion range");
 assert.match(pipelineVersionContracts[3], /create-then-switch/,
   "recovery does not require commit-last v5 conversion");
-assert.match(pipelineIdentityDocs[1], /`obsidian`, single repository: `\{logs-path\}\/\{logs-subfolder\}\/\{repo-name\}\/\{YYYY-MM-DD\}_\{feature\}`/,
-  "Codex pipeline does not select the configured Obsidian vault as canonical workspace");
-assert.match(pipelineIdentityDocs[1], /`obsidian`, initiative: `\{logs-path\}\/\{logs-subfolder\}\/\{repo_base\}\/\{YYYY-MM-DD\}_\{initiative\}`/,
-  "Codex pipeline does not use the canonical dated initiative identity");
-assert.match(pipelineIdentityDocs[1], /do not create, copy, export, or reconcile\s+a local `workspaces\/` duplicate/,
-  "Codex pipeline does not prohibit an Obsidian/local duplicate");
+assert.match(pipelineIdentityDocs[1], /Choose the configured repository or Obsidian workspace root/,
+  "Codex pipeline does not honor the configured workspace root");
+assert.match(pipelineIdentityDocs[1], /Bind the repository's OpenSpec change root separately from the workspace root/,
+  "Codex pipeline conflates canonical OpenSpec and workspace projections");
 const pipelineStateReference = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/state-and-gates.md"), "utf8");
 const canonicalOrchestratorState = await readFile(join(root, "agents/_shared/orchestrator-state.md"), "utf8");
 assert.match(canonicalOrchestratorState,
@@ -268,7 +267,6 @@ const specialistWriteScopeScript = await readFile(join(root, "skills/pipeline/sc
 const correctionPacketPreflightScript = await readFile(join(root, "skills/pipeline/scripts/correction-packet-preflight.mjs"), "utf8");
 const helperBundleScript = await readFile(join(root, "skills/pipeline/scripts/helper-bundle.mjs"), "utf8");
 const codeHygieneScript = await readFile(join(root, "skills/pipeline/scripts/code-hygiene.mjs"), "utf8");
-const overlayPlanContract = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/plan-shards.md"), "utf8");
 const architectAdapter = await readFile(join(root, "runtime/codex/instructions/architect.md"), "utf8");
 const testerSemantic = await readFile(join(root, "agents/tester.md"), "utf8");
 const dispatchContract = await readFile(join(root, "agents/_shared/dispatch-contract.md"), "utf8");
@@ -288,13 +286,14 @@ for (const marker of ["CODE_HYGIENE_PATTERN_VERSION", "team_harness_code_hygiene
 for (const marker of ["HELPER_COMPATIBILITY_EPOCH", "helper-bundles", "bundle_identity_sha256", "use-workspace-helper-bundle"]) {
   assert.ok(helperBundleScript.includes(marker), `pipeline helper bundle misses ${marker}`);
 }
-for (const marker of ["failure_stage", "upstream_constraints_checked", "pending_shard_dependencies", "deterministic valid identifiers", "pending/future shard's seam"]) {
-  assert.ok(testerSemantic.includes(marker), `tester semantic contract misses shard-local RED marker ${marker}`);
+for (const marker of ["independent-test predicate", "There is no universal RED dispatch", "canonical OpenSpec scenarios"]) {
+  assert.ok(testerSemantic.includes(marker), `tester semantic contract misses risk-derived marker ${marker}`);
 }
-for (const marker of ["capability_lease", "immutable work capsule", "prompt", "exclusive ownership"]) {
+for (const marker of ["capability_lease", "immediately before", "Native dispatch", "exclusive ownership"]) {
   assert.ok(dispatchContract.includes(marker), `shared dispatch contract misses specialist marker ${marker}`);
 }
-assert.ok(testerSemantic.includes("agents/_shared/dispatch-contract.md"), "tester does not consume the shared dispatch contract");
+assert.doesNotMatch(testerSemantic, /Pre-implementation covers prerequisites and RED/,
+  "tester retained the universal pre-implementation RED route");
 for (const marker of ["control/control.jsonl", "projection", "Main is the only log appender"]) {
   assert.ok(orchestratorStateContract.includes(marker), `orchestrator artifact verification misses section marker ${marker}`);
 }
@@ -332,29 +331,12 @@ for (const marker of ["specialist-liveness.mjs", "delivery", "terminality", "nev
 for (const marker of ["Continue the same lease", "Replace the session", "Pause", "live decision", "Counts, ordinals", "fresh QA"]) {
   assert.ok(coordinatorRecoveryContract.includes(marker), `coordinator recovery contract misses ${marker}`);
 }
-assert.ok(implementationContract.includes("agents/_shared/coordinator-liveness.md"),
-  "implementation contract does not route to canonical coordinator liveness");
-for (const marker of ["Current v5 route", "capability lease", "Main validates", "one committing writer", "once for the candidate identity"]) {
+for (const marker of ["Just-in-time batching", "capability_lease", "one committing writer", "independentTestRequirement", "cleanerEligibility"]) {
   assert.ok(implementationContract.includes(marker), `specialist workspace ownership contract misses ${marker}`);
 }
-for (const marker of ["derived-artifact-damage", "repair-derived", "DERIVED_REPAIR_INELIGIBLE", "existing `implementation` phase"]) {
-  assert.ok(implementationContract.includes(marker), `OpenSpec implementation repair contract misses ${marker}`);
-}
-for (const marker of ["seal-dispatch", "permanent seal", "DERIVED_SET_BUSY", "DISPATCH_BINDING_STALE", "Never audit only the currently requested service"]) {
-  assert.ok(implementationContract.includes(marker), `OpenSpec immutable dispatch contract misses ${marker}`);
-}
-for (const marker of ["audit-dispatches", "read-only evidence coordinates", "Evidence roots", "task-local", "coordinator-recovery.md", "verify-evidence-dispatch"]) {
-  assert.ok(implementationContract.includes(marker), `OpenSpec cross-repository evidence contract misses ${marker}`);
-}
-for (const marker of ["migrate-v1", "gate1-v1-migration.json", "original Gate plus migration continuation identity"]) {
-  assert.ok(implementationContract.includes(marker), `OpenSpec legacy-v1 implementation contract misses ${marker}`);
-}
-for (const marker of ["freshness is binding-local", "empty service authorization", "task IDs from one service never satisfy another"]) {
-  assert.ok(implementationContract.includes(marker), `OpenSpec per-binding implementation freshness contract misses ${marker}`);
-}
-for (const marker of ["failure_stage: target-behavior", "upstream_constraints_checked", "pending_shard_dependencies: []", "fixtures passed every existing validator", "future shard"]) {
-  assert.ok(implementationContract.includes(marker), `pre-implementation RED boundary misses ${marker}`);
-}
+assert.doesNotMatch(implementationContract, /repair-derived|seal-dispatch|permanent seal|execution_items/,
+  "current implementation route retains a legacy overlay, seal, or universal RED hot path");
+assert.match(implementationContract, /no universal RED/);
 const recoveryContract = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/recovery.md"), "utf8");
 for (const marker of ["create-then-switch", "exact failing service", "commit the current pointer last", "Ambiguous authority", "never overwritten"]) {
   assert.ok(recoveryContract.includes(marker), `v5 converter recovery contract misses ${marker}`);
@@ -364,17 +346,14 @@ for (const role of ["implementer", "tester"]) {
   const generatedAgent = await readFile(join(root, `.codex/agents/${role}.toml`), "utf8");
   assert.doesNotMatch(adapter, /For OpenSpec (?:implementation|testing), accept only/,
     `${role} adapter duplicates the shared dispatch reference contract`);
-  for (const marker of ["capability_lease", "immutable work capsule", "exclusive ownership", "result envelope"]) {
+  for (const marker of ["capability_lease", "coherent batch", "exclusive ownership", "result envelope"]) {
     assert.ok(generatedAgent.includes(marker), `${role} generated agent misses canonical dispatch marker ${marker}`);
   }
-  for (const marker of ["writable paths", "prompt", "coordinator"] ) {
-    assert.ok(generatedAgent.includes(marker), `${role} generated agent misses capsule ownership marker ${marker}`);
+  for (const marker of ["writable paths", "Native dispatch", "coordinator"] ) {
+    assert.ok(generatedAgent.includes(marker), `${role} generated agent misses lease ownership marker ${marker}`);
   }
 }
-for (const marker of ["Team Harness Execution Contract", "EXECUTION_CONTRACT_INVALID", "discovery_scope", "required_seams", "observable_runtime_behavior"]) {
-  assert.ok(overlayPlanContract.includes(marker), `OpenSpec planning contract misses ${marker}`);
-}
-for (const marker of ["agents/architect.md", "capability lease", "result envelope", "Main alone"] ) {
+for (const marker of ["agents/architect.md", "just-in-time capability", "result envelope", "OpenSpec propose/update"] ) {
   assert.ok(architectAdapter.includes(marker), `Codex architect adapter misses ${marker}`);
 }
 assert.doesNotMatch(overlayScript, /Derivation scaffold|planning pass authors the real/,
@@ -404,17 +383,8 @@ const standardPipelineMatrix = {
   delivery: ["pipeline-delivery", "gpt-5.6-luna", "max"],
 };
 for (const [role, [agentType, model, effort]] of Object.entries(standardPipelineMatrix)) {
-  const row = `| \`${role}\` | \`${agentType}\` | \`${model}\` | \`${effort}\` |`;
+  const row = `| ${role} | ${agentType} | ${model} / ${effort} |`;
   assert.ok(pipelineIdentityDocs[0].includes(row), `${role} standard pipeline projection is stale`);
-}
-for (const name of Object.keys(pipelineRoleMap)) {
-  const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
-  const normalized = content.replace(/\r\n?/g, "\n");
-  const digest = createHash("sha256").update(normalized).digest("hex");
-  const row = new RegExp("\\\\|\\s+`?" + name + "`?\\s+\\|\\s+`" + digest + "`\\s+\\|");
-  for (const document of pipelineIdentityDocs) {
-    assert.match(document, row, `${name} digest allowlist is stale`);
-  }
 }
 
 const roster = first.files.get(join(root, ".codex/README.md"));
@@ -438,6 +408,13 @@ assert.match(roster, /\| `reviewer-consolidator` \| `sonnet` \| `medium` \| `gpt
 assert.match(roster, /\| `researcher` \| `haiku` \| `medium` \| `gpt-5\.6-luna` \| `max` \| not shipped in Codex beta \|/);
 assert.match(roster, /\| `orchestrator` \| `opus` \| `high` \| `gpt-5\.6-sol` \| `xhigh` \| Main via `init` \/ `pipeline` skills \|/);
 assert.match(roster, /\| `agent-builder` \| `opus` \| `xhigh` \| `gpt-5\.6-sol` \| `xhigh` \| not shipped in Codex beta \|/);
+assert.doesNotMatch(roster, /qa-plan/, "generated Codex roster exposes the removed planning-QA role");
+await assert.rejects(readFile(join(root, "agents/qa-plan.md")), /ENOENT/);
+await assert.rejects(readFile(join(root, "plugins/team-harness/agents/qa-plan.md")), /ENOENT/);
+const explicitPlanReview = await readFile(join(root, "skills/plan-review/SKILL.md"), "utf8");
+assert.match(explicitPlanReview, /exactly one surviving `plan-reviewer`/);
+assert.doesNotMatch(explicitPlanReview, /qa-plan/);
+assert.match(explicitPlanReview, /does not define acceptance, run a security\s+design panel/);
 
 const opusOtherFixture = await makeFixture();
 try {

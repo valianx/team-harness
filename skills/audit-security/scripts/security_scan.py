@@ -75,7 +75,7 @@ CODEX_AGENTS_DIR = REPO_ROOT / ".codex" / "agents"
 # A read-only agent gaining Bash is a trust-boundary regression, which is why
 # the list is declared rather than derived.
 READ_ONLY_AGENTS = {
-    "architect", "security", "qa", "qa-plan", "reviewer",
+    "architect", "security", "qa", "reviewer",
     "plan-reviewer", "mentor", "adversary", "pr-review-qa",
     "pr-review-security", "reviewer-consolidator",
 }
@@ -97,7 +97,7 @@ NO_MUTATION_AGENTS = set(PR_REVIEW_AGENT_TOOLS)
 EXPECTED_AGENTS = [
     "orchestrator", "architect", "agent-builder", "security", "reviewer",
     "reviewer-consolidator", "pr-review-qa", "pr-review-security",
-    "qa", "qa-plan", "gcp-cost-analyzer", "gcp-infra", "init-project", "implementer", "tester",
+    "qa", "gcp-cost-analyzer", "gcp-infra", "init-project", "implementer", "tester",
     "plan-reviewer", "diagrammer", "documenter", "likec4-diagrammer",
     "d2-diagrammer", "translator", "delivery", "mentor",
     "researcher", "research-consolidator", "code-researcher", "adversary", "ux-reviewer",

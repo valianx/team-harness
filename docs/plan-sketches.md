@@ -226,7 +226,7 @@ block and the diff signal. The check is `concerns`-severity
 | `waiting_gate1` | orchestrator + operator | Invokes `sketch-guard.sh`, shows missing-sketch concerns and the sketch pointers in the concise Gate 1 summary |
 | `implementation` | implementer + tester | Reads every triggered sketch before writing code or evidence and records `sketches_read` in its status block |
 | `validation` | qa (+ adversary when the security floor applies) | Reads the triggered sketches and checks the delivered surface against the corresponding contracts |
-| Explicit `/th:plan-review` | qa-plan / plan-reviewer / security when requested | May inspect sketch completeness as part of the operator-requested review; never runs automatically |
+| Explicit `/th:plan-review` | plan-reviewer | May inspect canonical OpenSpec and projection fidelity as part of the operator-requested review; never runs automatically |
 | Pipeline-attached entry skills | `/th:review-pr`, `/th:validate` | When an active pipeline workspace is supplied, run `sketch-guard.sh` as a prerequisite probe and read triggered sketch files before the consuming pass; standalone inline reviews do not create a sketch set |
 
 ---

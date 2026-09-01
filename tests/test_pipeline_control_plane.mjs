@@ -12,6 +12,7 @@ import {
   acceptResultEnvelope,
   appendControlEvent,
   buildControlProjection,
+  buildOperatorPlanMarkdown,
   canonicalControlBytes,
   controlIdentity,
   createCapabilityLease,
@@ -21,7 +22,10 @@ import {
   certifyCapabilityCapsule,
   cleanerEligibility,
   decideCausalRecovery,
+  deriveCoherentBatch,
   issueCapabilityLease,
+  independentTestRequirement,
+  operatorPlanFresh,
   qualityRequirement,
   rebuildControlProjections,
   replayControlBytes,
@@ -30,6 +34,7 @@ import {
   verifyCapabilityCapsule,
   validateCapabilityLease,
   validateExecutionProfile,
+  validationRequirements,
   validateResultEnvelope,
 } from "../skills/pipeline/scripts/control-plane.mjs";
 
@@ -202,7 +207,10 @@ try {
   assert.equal(decideCausalRecovery({ ...recoveryFacts, safe_action_identity: h("failed") }).route, "pause");
   assert.equal(decideCausalRecovery({ ...recoveryFacts, attempt: 2 }).error_code, "RECOVERY_EVIDENCE_INVALID");
 
-  assert.deepEqual(requiredPreflightRoles({ phase: "activation", next_role: null }), ["core", "architect"]);
+  assert.deepEqual(requiredPreflightRoles({ phase: "activation", next_role: null }), ["core"]);
+  assert.deepEqual(requiredPreflightRoles({ phase: "design", next_role: null, openspec_ready: true }), []);
+  assert.deepEqual(requiredPreflightRoles({ phase: "design", next_role: null, openspec_ready: false }), ["architect"]);
+  assert.deepEqual(requiredPreflightRoles({ phase: "design", next_role: null, openspec_ready: true, semantic_update: true }), ["architect"]);
   assert.deepEqual(requiredPreflightRoles({ phase: "dispatch", next_role: "security" }), ["security"]);
   assert.equal(validateExecutionProfile({
     role: "security", model: "gpt-5.6-sol", effort: "xhigh",
@@ -212,8 +220,59 @@ try {
     violations: [{ path: "src/a.mjs", pattern: "format", semantic: false }], safe_patterns: ["format"],
   }).dispatch, true);
   assert.equal(cleanerEligibility({ violations: [], safe_patterns: ["format"] }).dispatch, false);
-  assert.equal(qualityRequirement({ candidate_identity: h("candidate"), last_quality_identity: null, phase: "pre-implementation" }).scope, "prerequisites-and-red");
+  assert.deepEqual(independentTestRequirement({
+    bug_reproduction: false, migration_or_data_safety: false, public_compatibility: false,
+    security_control: false, stale_independent_evidence: false, operator_requested: false,
+  }), { dispatch: false, reasons: [], error_code: null });
+  assert.deepEqual(independentTestRequirement({
+    bug_reproduction: true, migration_or_data_safety: false, public_compatibility: true,
+    security_control: false, stale_independent_evidence: false, operator_requested: false,
+  }).reasons, ["bug_reproduction", "public_compatibility"]);
+  assert.equal(independentTestRequirement({ bug_reproduction: true }).error_code, "TEST_RISK_INVALID");
+  const coherentBatch = deriveCoherentBatch([
+    { task_id: "1.1", role: "implementer", worktree, writable_paths: ["src"], immutable_inputs: [{ path: "input.md", sha256: h("immutable\n") }] },
+    { task_id: "1.2", role: "implementer", worktree, writable_paths: ["evidence"], immutable_inputs: [{ path: "input.md", sha256: h("immutable\n") }] },
+  ]);
+  assert.equal(coherentBatch.ok, true);
+  assert.deepEqual(coherentBatch.batch.task_ids, ["1.1", "1.2"]);
+  assert.equal(deriveCoherentBatch([
+    { task_id: "1.1", role: "implementer", worktree, writable_paths: ["src"], immutable_inputs: [] },
+    { task_id: "1.2", role: "tester", worktree, writable_paths: ["evidence"], immutable_inputs: [] },
+  ]).error_code, "BATCH_OWNER_MISMATCH");
+  assert.deepEqual(validationRequirements({
+    candidate_changed: true, independent_test_required: false, security_impact: false,
+  }), { ok: true, verifier: true, tester: false, security: false, error_code: null });
+  assert.deepEqual(validationRequirements({
+    candidate_changed: true, independent_test_required: true, security_impact: "unknown",
+  }), { ok: true, verifier: true, tester: true, security: true, error_code: null });
+  assert.deepEqual(qualityRequirement({ candidate_identity: h("candidate"), last_quality_identity: null, phase: "pre-implementation" }), {
+    run: false, scope: "prerequisites-only", error_code: null,
+  });
   assert.equal(qualityRequirement({ candidate_identity: h("candidate"), last_quality_identity: h("candidate"), phase: "freeze" }).run, false);
+
+  const operatorPlan = buildOperatorPlanMarkdown({
+    change: "small-change", openspec_identity: h("openspec"),
+    outcome: "The operator can observe the requested behavior.",
+    included_scope: ["src"], excluded_scope: ["release automation"],
+    approach: "Implement the strict-valid OpenSpec change in one coherent batch.",
+    work_batches: ["Implementation and owned tests"], risks: ["Public compatibility"],
+    decisions: ["Keep Gate 1"], preserved_behavior: ["Native permissions"],
+    links: ["openspec/changes/small-change/proposal.md"],
+  });
+  assert.equal(operatorPlan.ok, true);
+  const operatorPlanInput = {
+    change: "small-change", openspec_identity: h("openspec"),
+    outcome: "The operator can observe the requested behavior.",
+    included_scope: ["src"], excluded_scope: ["release automation"],
+    approach: "Implement the strict-valid OpenSpec change in one coherent batch.",
+    work_batches: ["Implementation and owned tests"], risks: ["Public compatibility"],
+    decisions: ["Keep Gate 1"], preserved_behavior: ["Native permissions"],
+    links: ["openspec/changes/small-change/proposal.md"],
+  };
+  assert.equal(operatorPlanFresh({ markdown: operatorPlan.markdown, input: operatorPlanInput }), true);
+  assert.equal(operatorPlanFresh({ markdown: `${operatorPlan.markdown}\nmanual semantic edit\n`, input: operatorPlanInput }), false);
+  assert.equal(operatorPlanFresh({ markdown: operatorPlan.markdown, input: { ...operatorPlanInput, openspec_identity: h("changed") } }), false);
+  assert.doesNotMatch(operatorPlan.markdown, /Acceptance Criteria|Technical Constraints|capability_lease/);
 
   const capsule = await certifyCapabilityCapsule({
     workspace,

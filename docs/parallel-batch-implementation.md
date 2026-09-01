@@ -26,7 +26,7 @@ This document covers ONE parallelism mechanism: an operator-authorized batch of 
 
 | Mechanism | Axis | Unit of fan-out | Gate | Canonical source |
 |---|---|---|---|---|
-| Inter-task DAG scheduler | tasks within one plan | the base dispatch carries every non-decomposed task, in `Depends on:` order | none | `agents/ref-pipeline.md § "Scheduler — never one dispatch per task"` |
+| Inter-task DAG scheduler | tasks within one plan | the base dispatch carries every non-decomposed task, in `Depends on:` order | none | `agents/ref-pipeline.md` |
 | ~~Parallel Multi-Project Dispatch~~ — **RETIRED** | projects within one initiative | — | — | Retired with the coordinator fusion: fanning out per-project lanes required the coordinator to dispatch a copy of itself. Successor: serial, `agents/ref-dispatch-machinery.md § "Multi-project sequencing"` |
 | Batch Implementation (this document) | independent items across an operator-authorized batch | one implementer per item, own worktree | operator authorization + the 5 preconditions in `## When this applies` | this document |
 | **Intra-task lane decomposition** | **files WITHIN one already-approved task** | **one implementer lane per architect-declared, file-disjoint seam** | **`Lane-decomposable: yes` in `01-plan.md` AND `Files:` count ≥ `LANE_DECOMPOSE_MIN_FILES` (8) AND ≥2 disjoint seams** | `agents/ref-pipeline.md § Phase 2 — Implementation → Intra-task execution-lane decomposition` |

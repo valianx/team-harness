@@ -275,7 +275,7 @@ presented. The renderer reads these fields and events but never edits them.
 Validation findings are classified and routed as follows:
 
 - in-scope code, test, or documentation defect → implementation executor, unless the ratchet
-  (`agents/ref-pipeline.md § "The ratchet"`) records it as a sub-floor findings-ledger residual on
+  (`agents/ref-pipeline.md`) records it as a sub-floor findings-ledger residual on
   unchanged surface after a prior correction round;
 - missing evidence → tester;
 - correctable security finding → implementation plus delta audit;
@@ -451,7 +451,7 @@ Full template and section-ownership map: `agents/ref-dispatch-machinery.md § "o
 
 **No parallel coordinator fan-out exists.** The coordinator fusion retires the multi-task
 fan-out with its consolidator and the parallel multi-project dispatch that spawned one
-orchestrator instance per project — `agents/ref-pipeline.md § "Dispatch invariants"` #2 forbids
+orchestrator instance per project — `agents/ref-pipeline.md` #2 forbids
 dispatching any coordinator, including another copy of itself, with no exception clause, and
 `agents/ref-dispatch-machinery.md § "Multi-project sequencing"` names serial execution as the
 derived consequence of that invariant, not an independent policy. One project runs to completion
@@ -500,7 +500,7 @@ The following event types appear in `00-execution-events` in addition to the cor
 | `stage2.hygiene` | When the code-hygiene scan completes (deterministic, orchestrator-run — see `docs/code-hygiene-gate.md § Layer 1`) | `verdict` (`pass`/`fail`), `extra.files` (int, on `fail`), `extra.count` (int, on `fail`) |
 | `checkpoint.confirmed` | When `th:orchestrator` obtains — or fails to obtain — the operator's live confirmation of the functional-clarity artifact at Discover Boundary B1, before dispatching `architect` (`docs/reasoning-checkpoint.md § "Attribution and failure direction"`) | `provenance` (`operator-live`/`inferred`), the confirmatory text (named exception to the Free-text field bound, see below) |
 
-Note: `checkpoint.confirmed` is written exclusively by `th:orchestrator`, on the same file it already initializes at Intake (`agents/ref-pipeline.md § "Intake"`). On a later `/th:recover`, the same agent reads and verifies the event but never repairs it.
+Note: `checkpoint.confirmed` is written exclusively by `th:orchestrator`, on the same file it already initializes at Intake (`agents/ref-pipeline.md`). On a later `/th:recover`, the same agent reads and verifies the event but never repairs it.
 
 Note: `gate` (human checkpoint) is distinct from `gate.pass` / `gate.fail` (automated agent-to-agent gates). The latter fire when the orchestrator evaluates a plan-review or acceptance-gate result without pausing for human input; the former fires when execution is suspended pending operator approval.
 

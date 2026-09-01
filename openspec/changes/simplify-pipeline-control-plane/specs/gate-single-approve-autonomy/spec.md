@@ -5,8 +5,12 @@ The Gate-1 presentation SHALL offer exactly one approval option (`1 approve`,
 plus `3: detail` edit and `4: reason` reject). It MUST disclose the active
 release policy, and approval MUST append one authority event to the canonical
 control log containing the consumed presentation nonce, approved intent/scope,
-security floor, and `release_policy: auto-ship`. Any release field rendered in
-`00-state.md` SHALL be derived and MUST NOT act as a second authority record.
+security floor, pinned canonical OpenSpec identity, and `release_policy:
+auto-ship`. The presentation SHALL use the compact generated `01-plan.md` for
+operator readability and link canonical OpenSpec for detail; the projection
+MUST NOT replace or extend the approved semantic source. Any release field
+rendered in `00-state.md` SHALL be derived and MUST NOT act as a second
+authority record.
 
 #### Scenario: Operator approves a plan
 - **WHEN** the operator replies `1` to a Gate-1 presentation that disclosed the auto-ship policy
@@ -15,6 +19,10 @@ security floor, and `release_policy: auto-ship`. Any release field rendered in
 #### Scenario: Historical state is recovered
 - **WHEN** the v5 converter reads a valid persisted `gate1_release: approved-autonomous` and matching legacy release event
 - **THEN** it records their equivalent current authority once and never emits that legacy value in new records
+
+#### Scenario: The compact plan is stale
+- **WHEN** `01-plan.md` does not bind the current validated OpenSpec identity
+- **THEN** Gate 1 remains unreleased until Main regenerates the projection from canonical artifacts
 
 ### Requirement: Post-approval execution is autonomous until the draft PR
 After Gate-1 approval, the pipeline SHALL run implementation, validation,

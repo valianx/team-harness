@@ -396,7 +396,7 @@ assert_allow "B2 both conditions satisfied" "$TMP" "$IMPLEMENTER_PAYLOAD"
 rm -rf "$TMP"
 
 # ---------------------------------------------------------------------------
-# Case 17 — ALLOW: B2 armed, skip marker fast_mode=true (per qa-plan note 2)
+# Case 17 — ALLOW: B2 armed, skip marker fast_mode=true (legacy note 2)
 # ---------------------------------------------------------------------------
 echo
 echo "=== ALLOW: B2 boundary armed, skip marker fast_mode=true ==="
@@ -412,7 +412,7 @@ assert_allow "B2 boundary + fast_mode: true (skip marker honored)" "$TMP" "$IMPL
 rm -rf "$TMP"
 
 # ---------------------------------------------------------------------------
-# Case 18 — ALLOW: B2 armed, skip marker discover_state=bypassed (per qa-plan note 2)
+# Case 18 — ALLOW: B2 armed, skip marker discover_state=bypassed (legacy note 2)
 # ---------------------------------------------------------------------------
 echo
 echo "=== ALLOW: B2 boundary armed, skip marker discover_state=bypassed ==="
@@ -508,7 +508,7 @@ assert_allow "B1 armed + th:implementer dispatch (regression guard: Case 8 prese
 rm -rf "$TMP"
 
 # ---------------------------------------------------------------------------
-# Case 24 — B3 armed, skip marker fast_mode=true (per qa-plan note 2)
+# Case 24 — B3 armed, skip marker fast_mode=true (legacy note 2)
 # ---------------------------------------------------------------------------
 echo
 echo "=== ALLOW: B3 boundary armed, skip marker fast_mode=true ==="

@@ -373,11 +373,80 @@ export function validateExecutionProfile(value) {
     && SHA256.test(value.projection_identity ?? "") && !SECRET.test(JSON.stringify(value));
 }
 
-/** Activation checks core+architect; later roles are checked immediately before dispatch. */
-export function requiredPreflightRoles({ phase, next_role: nextRole }) {
-  if (phase === "activation") return ["core", "architect"];
+/** Activation checks only the pipeline core; architect is demand-driven. */
+export function requiredPreflightRoles({ phase, next_role: nextRole, openspec_ready: openspecReady = false, semantic_update: semanticUpdate = false }) {
+  if (phase === "activation") return ["core"];
+  if (phase === "design" && (!openspecReady || semanticUpdate)) return ["architect"];
   if (phase === "dispatch" && SAFE_ID.test(nextRole ?? "")) return [nextRole];
   return [];
+}
+
+const INDEPENDENT_TEST_KEYS = [
+  "bug_reproduction", "migration_or_data_safety", "public_compatibility",
+  "security_control", "stale_independent_evidence", "operator_requested",
+];
+
+/** A separate tester exists only for one closed, recorded risk predicate. */
+export function independentTestRequirement(input) {
+  if (!exactKeys(input, INDEPENDENT_TEST_KEYS)
+    || !INDEPENDENT_TEST_KEYS.every(key => typeof input[key] === "boolean")) {
+    return { dispatch: false, reasons: [], error_code: "TEST_RISK_INVALID" };
+  }
+  const reasons = INDEPENDENT_TEST_KEYS.filter(key => input[key]);
+  return { dispatch: reasons.length > 0, reasons, error_code: null };
+}
+
+const BATCH_TASK_KEYS = ["task_id", "role", "worktree", "writable_paths", "immutable_inputs"];
+
+/** Consolidate dependency-ready same-owner tasks without predicting later work. */
+export function deriveCoherentBatch(tasks) {
+  if (!Array.isArray(tasks) || tasks.length === 0 || tasks.length > MAX_ARRAY_ITEMS
+    || !tasks.every(task => exactKeys(task, BATCH_TASK_KEYS) && SAFE_ID.test(task.task_id ?? "")
+      && SAFE_ID.test(task.role ?? "") && typeof task.worktree === "string" && path.isAbsolute(task.worktree)
+      && Array.isArray(task.writable_paths) && task.writable_paths.every(safeRelative)
+      && Array.isArray(task.immutable_inputs) && task.immutable_inputs.every(validReference))) {
+    return { ok: false, batch: null, error_code: "BATCH_INPUT_INVALID" };
+  }
+  const [first] = tasks;
+  if (!tasks.every(task => task.role === first.role && task.worktree === first.worktree)) {
+    return { ok: false, batch: null, error_code: "BATCH_OWNER_MISMATCH" };
+  }
+  if (new Set(tasks.map(task => task.task_id)).size !== tasks.length) {
+    return { ok: false, batch: null, error_code: "BATCH_TASK_DUPLICATE" };
+  }
+  const references = new Map();
+  for (const task of tasks) {
+    for (const reference of task.immutable_inputs) {
+      if (references.has(reference.path) && references.get(reference.path) !== reference.sha256) {
+        return { ok: false, batch: null, error_code: "BATCH_INPUT_CONFLICT" };
+      }
+      references.set(reference.path, reference.sha256);
+    }
+  }
+  return {
+    ok: true,
+    batch: {
+      task_ids: tasks.map(task => task.task_id), role: first.role, worktree: first.worktree,
+      writable_paths: [...new Set(tasks.flatMap(task => task.writable_paths))].sort(),
+      immutable_inputs: [...references].map(([inputPath, sha256]) => ({ path: inputPath, sha256 })),
+    },
+    error_code: null,
+  };
+}
+
+/** Select the smallest independent validation set for one candidate identity. */
+export function validationRequirements({ candidate_changed: candidateChanged, independent_test_required: independentTestRequired, security_impact: securityImpact }) {
+  if (typeof candidateChanged !== "boolean" || typeof independentTestRequired !== "boolean"
+    || ![true, false, "unknown"].includes(securityImpact)) {
+    return { ok: false, verifier: false, tester: false, security: false, error_code: "VALIDATION_RISK_INVALID" };
+  }
+  return {
+    ok: true,
+    verifier: candidateChanged,
+    tester: candidateChanged && independentTestRequired,
+    security: candidateChanged && securityImpact !== false,
+    error_code: null,
+  };
 }
 
 /** Cleaner receives only a deterministic non-empty allowlist from hygiene evidence. */
@@ -394,8 +463,51 @@ export function cleanerEligibility({ violations, safe_patterns: safePatterns }) 
 export function qualityRequirement({ candidate_identity: candidateIdentity, last_quality_identity: lastIdentity, phase }) {
   if (!SHA256.test(candidateIdentity ?? "") || (lastIdentity !== null && !SHA256.test(lastIdentity))
     || !["pre-implementation", "freeze"].includes(phase)) return { run: false, scope: null, error_code: "QUALITY_IDENTITY_INVALID" };
-  if (phase === "pre-implementation") return { run: true, scope: "prerequisites-and-red", error_code: null };
+  if (phase === "pre-implementation") return { run: false, scope: "prerequisites-only", error_code: null };
   return { run: candidateIdentity !== lastIdentity, scope: "complete-freeze-quality", error_code: null };
+}
+
+const OPERATOR_PLAN_KEYS = [
+  "change", "openspec_identity", "outcome", "included_scope", "excluded_scope",
+  "approach", "work_batches", "risks", "decisions", "preserved_behavior", "links",
+];
+
+function markdownList(values, empty = "None.") {
+  return values.length === 0 ? empty : values.map(value => `- ${value}`).join("\n");
+}
+
+/** Build the read-only operator projection without copying ACs, TCs, or dispatch detail. */
+export function buildOperatorPlanMarkdown(input) {
+  const arrayKeys = OPERATOR_PLAN_KEYS.filter(key => !["change", "openspec_identity", "outcome", "approach"].includes(key));
+  if (!exactKeys(input, OPERATOR_PLAN_KEYS) || !SAFE_ID.test(input.change ?? "")
+    || !SHA256.test(input.openspec_identity ?? "") || !boundedString(input.outcome, 4096)
+    || !boundedString(input.approach, 4096)
+    || !arrayKeys.every(key => Array.isArray(input[key]) && input[key].length <= MAX_ARRAY_ITEMS
+      && input[key].every(value => boundedString(value, 1024)))) {
+    return { ok: false, markdown: null, identity: null, error_code: "OPERATOR_PLAN_INPUT_INVALID" };
+  }
+  const identity = controlIdentity(input);
+  const markdown = `# Work plan — ${input.change}\n\n`
+    + `> Generated projection. Read-only; canonical semantics live in OpenSpec.\n\n`
+    + `**OpenSpec identity:** \`${input.openspec_identity}\`\n`
+    + `**Projection identity:** \`${identity}\`\n\n`
+    + `## Observable outcome\n\n${input.outcome}\n\n`
+    + `## Scope\n\n### Included\n\n${markdownList(input.included_scope)}\n\n`
+    + `### Excluded\n\n${markdownList(input.excluded_scope)}\n\n`
+    + `## Approach\n\n${input.approach}\n\n`
+    + `## Coherent work batches\n\n${markdownList(input.work_batches)}\n\n`
+    + `## Material risks\n\n${markdownList(input.risks)}\n\n`
+    + `## Decisions\n\n${markdownList(input.decisions)}\n\n`
+    + `## Preserved behavior\n\n${markdownList(input.preserved_behavior)}\n\n`
+    + `## Canonical links\n\n${markdownList(input.links)}\n`;
+  return { ok: true, markdown, identity, error_code: null };
+}
+
+/** Gate 1 consumes only a projection pinned to the current strict-valid OpenSpec identity. */
+export function operatorPlanFresh({ markdown, input }) {
+  if (!boundedString(markdown, 64 * 1024)) return false;
+  const expected = buildOperatorPlanMarkdown(input);
+  return expected.ok && markdown === expected.markdown;
 }
 
 export async function issueCapabilityLease({ log_path: logPath, lease, writer }) {

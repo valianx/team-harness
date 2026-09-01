@@ -24,20 +24,27 @@ boundaries. A new role ABI manifest SHALL NOT be required.
 ## ADDED Requirements
 
 ### Requirement: Pipeline role preflight is staged and actionable
-Codex pipeline activation SHALL validate pipeline core compatibility and the
-architect role needed next. Every other role SHALL be validated using the
-existing canonical registry and generated-role freshness checks immediately
-before its first possible dispatch. An absent or incompatible deferred role
-SHALL stop before that role runs with one actionable diagnosis and MUST NOT
-invalidate prior Gate authority or completed work.
+Codex pipeline activation SHALL validate pipeline core compatibility. It SHALL
+validate architect only when Design requires OpenSpec authorship or update, and
+SHALL validate every other surviving role using the existing canonical registry
+and generated-role freshness checks immediately before its first possible
+dispatch. Retired roles, including `qa-plan`, MUST be absent from the active
+registry, generated projections, install assets, and dispatch preflight. An
+absent or incompatible deferred role SHALL stop before that role runs with one
+actionable diagnosis and MUST NOT invalidate prior Gate authority or completed
+work.
 
-#### Scenario: Design starts with an unused later role unavailable
-- **WHEN** pipeline core and architect validate but a conditional later role is unavailable
-- **THEN** Design proceeds and that role is checked only before its first possible dispatch
+#### Scenario: Design reuses an existing valid change
+- **WHEN** pipeline core validates and the bound OpenSpec change needs no authorship
+- **THEN** Design proceeds without requiring or validating architect or any plan-review role
 
 #### Scenario: A deferred role fails preflight
 - **WHEN** its effective role contract is absent, stale, or incompatible
 - **THEN** the pipeline pauses with the exact remediation while preserving workspace, authority, and evidence
+
+#### Scenario: A retired qa-plan projection remains installed
+- **WHEN** registry, packaged agents, documentation, or generated assets still expose `qa-plan` as dispatchable
+- **THEN** parity validation fails until the obsolete role and route are removed
 
 #### Scenario: The standard role profile is selected
 - **WHEN** no live override replaces the installed standard profile
