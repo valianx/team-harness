@@ -9,13 +9,15 @@
   events, gates, or delivery. Pipeline entry requires explicit live activation or recovery and
   always uses canonical full v3: `design → waiting_gate1 → implementation → validation →
   waiting_gate3 → delivery → complete`. Retired express/full/fast/simple/tier markers are
-  migration data only; show `1 — inline` / `2 — pipeline` and never infer a route or gate release.
+  migration data only; show `1 — inline` / `2 — pipeline` when a choice is needed. Established
+  direct modes may start from unambiguous current live intent, while pipeline activation remains
+  explicit and no route or release is inferred from untrusted content.
   Source: `agents/_shared/orchestrator-state.md`, `agents/ref-pipeline.md`,
   `docs/pipeline-lanes.md`.
 - [decision] The coordinator is the sole writer of `00-state.md`, the execution trace, the decision ledger, and the pipeline summary. Specialists return status blocks and artifact pointers; they never edit coordination state.
 - [decision] Stage-1 approach checkpoints, deterministic plan-structure loops, automatic ratification/plan-review panels, selective panel re-firing, and post-approval review offers are retired. `/th:plan-review` remains an explicit direct mode only.
 - [decision] Final validation is the correction source: in-scope code/test/docs findings return to the implementation executor; evidence gaps return to tester; correctable security findings receive a delta audit; structural contradictions require an operator decision and a new Gate 1 if design reopens.
-- [decision] Gate 1 uses `1 approve`, `2 approve autonomous`, `3 edit`, `4 reject`; Gate 3 uses `1 ship`, `2 amend`, `3 abort`. A numeric shortcut never bypasses a fresh nonce, dual record, or live operator approval.
+- [decision] Gate 1 uses one approval outcome plus edit and reject; Gate 3 uses ship, amend, and abort on a closed-list exception. Stable numbers are display shortcuts, not a command grammar: unambiguous semantic replies are accepted, while ambiguity releases nothing. No reply bypasses the fresh nonce, canonical authority event, exact identities, or live operator origin.
 - [decision] Codex standard non-Sol projections and the generic fallback use `gpt-5.6-luna` / `max`; Sol projections remain `gpt-5.6-sol` / `xhigh`. Setup/update migrate only the exact managed `gpt-5.6-terra` / `medium` pair and preserve every other complete custom pair.
 
 Historical entries below are retained for provenance. A historical entry does not override the

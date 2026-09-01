@@ -86,7 +86,9 @@ When the operator asks for details for one pipeline, show the pending gate's sta
 - Gate 3 (exception pause only): `1 ship`, `2 amend`, `3 abort`.
 
 These are display shortcuts only. The coordinator verifies the live reply, current nonce, and
-dual-record release. This renderer never accepts or records a gate decision.
+authority event. An unambiguous semantic equivalent is accepted by the active coordinator, and a
+natural-language amend or reject reply may carry its detail without a numeric prefix. Ambiguity
+releases nothing. This renderer never accepts or records a gate decision.
 
 ## Feature details
 

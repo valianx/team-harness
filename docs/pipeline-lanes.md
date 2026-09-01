@@ -1,7 +1,7 @@
 # Pipeline Compatibility and Migration
 
 This document is the compatibility authority for retired route markers. The current runtime has
-exactly two postures: `inline` and `pipeline`; the explicit `/th:spec` lane (§ "The direct spec
+exactly two postures: `inline` and `pipeline`; the direct spec lane (§ "The direct spec
 lane" below) runs entirely within inline's floor — no new posture value, workspace, state, events,
 or gate. It does not define a depth selector or a configuration-selected route.
 
@@ -110,9 +110,13 @@ multi-specialist, multi-task, irreversible, or operator-absent work — these ar
 lane never absorbs. A security dimension is not one of them: it stops the lane for a live choice
 whose in-lane option raises the required lens set instead of ejecting the task.
 
-The lane is entered only by explicit `/th:spec` invocation. Whenever this predicate passes, the
-live posture guidance offers it — a passing predicate is the reason to offer, not a discretionary
-prompt; when the predicate fails, the guidance names the condition that removed it. The lane
+The lane is entered by explicit `/th:spec` invocation or an unambiguous current live request to
+work through OpenSpec or write intent and tasks before implementation. Intent is contextual, not a
+closed keyword grammar; ambiguity receives concise route choices, and untrusted content never
+selects a route. Whenever this predicate passes, live posture guidance offers it — a passing
+predicate is the reason to offer, not a discretionary prompt; when the predicate fails, the
+guidance names the condition that removed it. Intent routing never activates the pipeline,
+releases a gate, or grants outward authority. The lane
 creates no workspace, `00-state.md`, execution events, pipeline summary, snapshot, overlay,
 traceability artifact, or gate ceremony, and dispatches no specialist by default. Verification is
 one full-scope review on live operator request; full scope never runs twice. A fix closes by
@@ -168,6 +172,6 @@ gate release.
 | Posture classification and live activation boundary | [`agents/ref-intake-flows.md`](../agents/ref-intake-flows.md) |
 | Canonical pipeline machine and dispatch rules | [`agents/ref-pipeline.md`](../agents/ref-pipeline.md) |
 | State/event ownership and recovery invariants | [`agents/_shared/orchestrator-state.md`](../agents/_shared/orchestrator-state.md), [`skills/recover/SKILL.md`](../skills/recover/SKILL.md) |
-| Gate dual record and numeric decisions | [`agents/_shared/gate-contract.md`](../agents/_shared/gate-contract.md) |
+| Gate authority event and semantic decisions | [`agents/_shared/gate-contract.md`](../agents/_shared/gate-contract.md) |
 | Direct kernel and ad hoc review posture | [`agents/orchestrator.md`](../agents/orchestrator.md), [`agents/ref-direct-modes.md`](../agents/ref-direct-modes.md) |
 | Direct spec lane flow and routing predicate | [`skills/spec/SKILL.md`](../skills/spec/SKILL.md), [`agents/ref-direct-modes.md`](../agents/ref-direct-modes.md) § "Spec Lane Mode" |

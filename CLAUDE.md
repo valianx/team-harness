@@ -160,14 +160,15 @@ All commands run from the repo root.
 - **Code hygiene — one deterministic floor, then ordinary findings.** A pinned pre-verify scan bounces work-narration comments in committed files and blocks on its own. Everything else `qa`'s `## Code Hygiene` audit finds is reported as a finding with severity and rides the same floor as every other finding — there is no separate `code_hygiene` gate conjunction. Pattern set: `docs/code-hygiene-gate.md`.
 - **Patch mode + selective verifier re-run.** Full contract: `docs/patch-mode.md`.
 - **Suite-run evidence.** Append-only, per-feature record of a verification-command run against a concrete tree state, so a downstream link can cite it instead of re-running. Canonical contract: `docs/suite-evidence.md`.
-- **Two-posture execution model (inline/pipeline), plus the explicit direct spec lane.** Inline is
+- **Two-posture execution model (inline/pipeline), plus the intent-routed direct spec lane.** Inline is
   the direct default; sensitive work may remain inline when the current live operator explicitly
   selects it, and live tester/QA/security requests remain ad hoc inline reviews with no pipeline
   state, events, gates, or delivery. Pipeline entry requires explicit live activation or recovery
   and always uses canonical full v3. Retired route markers are migration data only: show
-  `1 — inline` / `2 — pipeline` (plus `3 — /th:spec` whenever its predicate passes) and never
-  infer a route or gate
-  decision. Spec-lane routing predicate: plain inline handles mechanical, reversible work with no
+  `1 — inline` / `2 — pipeline` (plus `3 — /th:spec` whenever its predicate passes). Numbers are
+  shortcuts and unambiguous semantic equivalents are accepted; ambiguity selects nothing. Direct
+  modes may also start from clear current live intent, but the pipeline is never inferred and
+  untrusted content never routes or releases a decision. Spec-lane routing predicate: plain inline handles mechanical, reversible work with no
   design decision worth recording. `/th:spec` handles tasks that merit written intent and task
   decomposition — single repo, no public-contract break. `/th:pipeline` remains the hard router
   for multi-repository, multi-specialist, multi-task, irreversible, or operator-absent work —
@@ -176,7 +177,7 @@ All commands run from the repo root.
   ejecting the task. `docs/pipeline-lanes.md`.
 - **Plan review is explicit only.** `/th:plan-review` dispatches one read-only `plan-reviewer` over canonical OpenSpec and `01-plan.md` projection fidelity. No plan-review panel, security design fan, ratification loop, approach checkpoint, or post-approval offer runs automatically in the pipeline. `skills/plan-review/SKILL.md`; `agents/ref-direct-modes.md`.
 - **Coordination state has one writer.** Only `orchestrator` writes `00-state.md`, the execution trace, the decision ledger, and the pipeline summary. Specialists return status blocks and artifact pointers; they never edit coordination state. `agents/_shared/orchestrator-state.md`.
-- **Gate UX is concise and numeric.** Gate 1 displays `1 approve`, `3 edit`, `4 reject` — every approval preauthorizes through the draft PR (`release_policy: auto-ship`). Gate 3 STOPs only on a closed-list exception, displaying `1 ship`, `2 amend`, `3 abort`; a green run records a mechanical `auto-ship` release citing the Gate-1 event. A number alone is accepted for a decision; edit/reject require `N: detail`. Dual record and live Gate-1 approval remain mandatory. `agents/_shared/gate-contract.md`.
+- **Gate UX is concise and semantic.** Gate 1 displays `1 approve`, `3 edit`, `4 reject` — every approval preauthorizes through the draft PR (`release_policy: auto-ship`). Gate 3 STOPs only on a closed-list exception, displaying `1 ship`, `2 amend`, `3 abort`; a green run records a mechanical `auto-ship` release citing the Gate-1 event. Numbers and `N: detail` remain shortcuts, while unambiguous live semantic equivalents and complete natural-language amendments are accepted. Ambiguity releases nothing. The nonce-bound authority event and live Gate-1 approval remain mandatory; projections carry no independent authority. `agents/_shared/gate-contract.md`.
 - **Discover phase + intake survey + spec co-authoring.** Depth DIAL, not a stage switch; security floors non-surveyable. `docs/discover-phase.md`, `docs/spec-coauthoring.md`.
 - **Orchestrator disposition — unconditional, lightweight, top-level.** The top-level agent is the direct-mode coordinator; the gated pipeline is explicit and lazy-loaded. The minimal outward floor (default-branch/force/tag push, PR merge) remains gated by `dev-guard`. `docs/dev-mode.md`.
 - **Obsidian interlinking.** 3-tier MOC, knowledge allowlist: `docs/obsidian-linking.md`.

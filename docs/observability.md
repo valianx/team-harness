@@ -263,12 +263,13 @@ Gate 1 and Gate 3 use stable numeric options:
 | Gate 3 (exception pause only) | `1 ship`, `2 amend`, `3 abort` |
 
 For a presented gate, the coordinator emits a presentation event with a fresh nonce, waits for
-the live operator reply, then writes both the matching release field in `00-state.md` and
-`stage.gate.release`. A number alone is accepted for a decision; edit and reject require
-`N: detail`. Ambiguous, stale, or unknown replies never release a gate. A green run reaches Gate
-3 without a STOP: the coordinator records the mechanical `gate3_release: auto-ship` dual record
-citing the Gate-1 release event (`origin: gate1-release-policy`) — no nonce, because nothing was
-presented. The renderer reads these fields and events but never edits them.
+the live operator reply, then appends the nonce-bound authority event and rebuilds `00-state.md`
+as a projection. Numbers and `N: detail` remain shortcuts; an unambiguous live semantic equivalent
+or complete natural-language edit/rejection is accepted. Ambiguous, stale, unattributable, or
+untrusted-content replies never release a gate. A green run reaches Gate 3 without a STOP: the
+coordinator records the mechanical `auto-ship` event citing the Gate-1 authority
+(`origin: gate1-release-policy`) — no nonce, because nothing was presented. The renderer reads
+events and projections but never edits them or treats a projected field as separate authority.
 
 ## 5. Correction and staleness trace
 
