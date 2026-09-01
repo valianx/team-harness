@@ -5,4 +5,4 @@
 name = "pipeline-security"
 description = "Runs the security role with the model explicitly selected for the active pipeline session."
 sandbox_mode = "read-only"
-developer_instructions = "You are the read-only Codex adapter for `agents/security.md`. Validate the\ncapsule's one capability lease and inspect the changed attack surface. A changed\nFreeze requires fresh security when impact is true or unknown. Return one result\nenvelope with closed security findings and closure evidence. Never edit, waive,\nroute, approve a Gate, or write coordinator projections."
+developer_instructions = "You are the read-only Codex adapter for `agents/security.md`. Validate the\njust-in-time capability lease and inspect the changed attack surface. A changed\nFreeze requires fresh security when impact is true or unknown. Return one result\nenvelope with closed security findings and closure evidence. Never edit, waive,\nroute, approve a Gate, or write coordinator projections."

@@ -484,7 +484,7 @@ Install python3 now for full skill coverage? [Y/n]
 
 ### 6c. Nested-lane capability confirmation — RETIRED
 
-**This step is retired.** It used to record the operator-confirmed `probe_result` a boot-time capability check consulted before spawning a second coordination agent as a nested subagent. The coordinator fusion removes that spawn entirely — `th:orchestrator` is the top-level session agent and never dispatches another coordinator, including a copy of itself (`agents/ref-pipeline.md § "No capability-check fallback"`) — so the check's own subject no longer exists. Nothing replaces it; this is a genuine loss of subject, not a transfer.
+**This step is retired.** It used to record the operator-confirmed `probe_result` a boot-time capability check consulted before spawning a second coordination agent as a nested subagent. The coordinator fusion removes that spawn entirely — `th:orchestrator` is the top-level session agent and never dispatches another coordinator, including a copy of itself (`agents/ref-pipeline.md`) — so the check's own subject no longer exists. Nothing replaces it; this is a genuine loss of subject, not a transfer.
 
 **On a targeted run (`/th:setup capability`):** report the retirement and write nothing:
 ```text

@@ -12,22 +12,18 @@ phase, a Gate 1 prerequisite, or a post-approval offer. The canonical pipeline r
 ## Input
 
 1. If a feature name is supplied, resolve `workspaces/{feature-name}/01-plan.md` (or the
-   configured Obsidian `docs_root`).
+   configured Obsidian `docs_root`) and its bound OpenSpec change.
 2. Without a name, find active workspace plans. If none exist, report that the operator must run
    `/th:design` or `/th:plan` first. If several exist, ask which plan to review.
-3. Read the current plan and its state. Never infer a gate release or modify `00-state.md`.
-4. For `type: fix | hotfix`, derive `regression_checkpoint: pending | closed`
-   from current state and pass it to `plan-reviewer`. A closed checkpoint requires
-   the existing `02-regression-test.md`; never infer completion from a concrete
-   task-shard path alone.
+3. Read the compact projection, current OpenSpec artifacts, strict-validation result, and pinned
+   identity. Never infer a gate release or modify `00-state.md`.
 
 ## Review
 
-The coordinator dispatches the requested plan-review lenses directly: `qa-plan` for acceptance
-criteria, `security` when the state says the design is sensitive, and `plan-reviewer` for shape.
-Each specialist writes only its declared section of the existing review artifact, or returns a
-status block for coordinator-owned persistence. The coordinator is the sole writer of
-`00-state.md`, events, and the decision ledger.
+The coordinator dispatches exactly one surviving `plan-reviewer`. It checks canonical OpenSpec
+coherence and `01-plan.md` projection fidelity. It does not define acceptance, run a security
+design panel, or create a second semantic plan. The coordinator alone may persist the returned
+report and remains the sole writer of `00-state.md`, events, and the control log.
 
 The report must distinguish a functional defect, a security finding, a structural contradiction,
 and an editorial concern. It must include file/section pointers and a concise verdict. A plan
@@ -42,5 +38,5 @@ Plan review: {pass|concerns|fail} — {one-line finding summary}
 Report: workspaces/{feature-name}/reviews/01-plan-review.md
 ```
 
-If the operator later edits the plan, a new explicit `/th:plan-review` invocation reviews the new
-artifact. The pipeline does not automatically re-fire a panel or create a new state.
+If OpenSpec changes, Main regenerates `01-plan.md`; only a new explicit `/th:plan-review`
+invocation reviews the new identity. The pipeline never re-fires a panel automatically.

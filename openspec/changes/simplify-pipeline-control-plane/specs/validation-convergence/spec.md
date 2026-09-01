@@ -68,18 +68,38 @@ be duplicated as authority or required mutable state.
 
 ## ADDED Requirements
 
-### Requirement: Revalidation is derived from changed evidence impact
-After correction closure, tester evidence SHALL refresh only when requirement
-text, exact command/arguments, or a declared dependency path/blob changes. QA
-SHALL run fresh over every functional AC on a new Freeze. Security SHALL run
-fresh only when a security finding, protected invariant, security-relevant
-constraint, attack-surface path, or unknown impact changed; otherwise its prior
-result MAY carry by exact audited identity.
+### Requirement: Validation lenses are derived from risk and changed evidence
+Every new Freeze SHALL receive one fresh independent verifier that evaluates the
+canonical OpenSpec scenarios against the candidate-bound quality receipt and
+changed behavior. This ordinary verifier SHALL own the combined evidence audit
+and semantic acceptance verdict; a second QA agent MUST NOT duplicate that
+ordinary verdict.
+
+A separate tester SHALL run only when the independent-test predicate matches bug
+reproduction, migration/data safety, public contract or compatibility change,
+security-control change, stale independently-authored evidence, or an explicit
+operator request. Security SHALL run fresh only when a security finding,
+protected invariant, security-relevant constraint, attack-surface path, or
+unknown impact changed; otherwise its prior result MAY carry by exact audited
+identity. `qa-plan` SHALL NOT exist as a dispatchable role, plan-review lens, or
+acceptance-definition owner.
+
+#### Scenario: Ordinary candidate reaches Freeze
+- **WHEN** quality is green and no dedicated tester or security predicate matches
+- **THEN** one fresh verifier evaluates evidence and canonical scenarios without another QA, tester, or plan-review dispatch
+
+#### Scenario: Independent test authorship is required
+- **WHEN** the recorded risk predicate requires a separate tester
+- **THEN** tester evidence is produced or refreshed independently and the final verifier consumes its immutable receipt
 
 #### Scenario: A correction changes one test dependency
 - **WHEN** one evidence row becomes stale and other declared dependencies remain byte-identical
-- **THEN** tester refreshes that evidence, QA validates the new Freeze, and unchanged evidence is carried by identity
+- **THEN** the risk-required tester refreshes that evidence, the independent verifier validates the new Freeze, and unchanged evidence is carried by identity
 
 #### Scenario: Security impact is unknown
 - **WHEN** the final delta cannot prove its security-relevant paths unchanged
 - **THEN** a fresh security lens is required before validation can close
+
+#### Scenario: An obsolete qa-plan route remains
+- **WHEN** a skill, roster, projection, test, or document exposes `qa-plan` as a current role
+- **THEN** validation of the shipped agent surface fails until that current route is removed or explicitly historical

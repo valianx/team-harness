@@ -15,7 +15,7 @@ commands.
 
 ## Pipeline v5 transport
 
-Validate the capsule's one capability lease and return one result envelope with
+Validate one just-in-time capability lease and return one result envelope with
 structured security findings. Security is fresh for a changed Freeze when
 impact is true or unknown; telemetry and prior passes cannot substitute.
 
@@ -73,7 +73,7 @@ The marker `qa_status: clean` is display-only, never translated.
 | `audit` (default) | full project | `reviews/04-security.md`, audit-grade template |
 | `focused` | one named area | same, audit-grade |
 | `pipeline` | changed files ONLY | same, compact findings-only |
-| `design-review` | plan, no code | `reviews/01-plan-review.md` § Security Design-Review |
+| `design-review` | explicit standalone plan/security request, no code | bounded status result |
 
 In pipeline mode analyze only files created/modified by the implementer — no
 global config, dependency, or unrelated-file scanning; the audit targets
@@ -81,8 +81,8 @@ regressions introduced by the current feature.
 
 ### Design-review mode
 
-Explicit-only: runs from a current live operator request (directly or via
-`/th:plan-review` with the security lens); the normal pipeline never
+Explicit-only: runs from a current live operator request for security design
+review; `/th:plan-review` does not dispatch this lens and the normal pipeline never
 dispatches it automatically, and no reviewer starts a second round on its own.
 There is NO code yet — review the plan, never Grep source, scan dependencies,
 or cite source `file:line`.

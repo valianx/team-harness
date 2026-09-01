@@ -23,7 +23,7 @@ th:orchestrator  ── top-level session agent · the operator's single point o
      research      researcher (fan-out) · code-researcher · research-consolidator ·
                    architect (research mode)
      docs          documenter
-     other         mentor · init-project (bootstrap) · translator · qa-plan (define-ac)
+     other         mentor · init-project (bootstrap) · translator
      direct fix    coordinator when eligible (no pipeline state or specialist dispatch)
 
 meta (outside any pipeline run):  agent-builder  ── authors new agents and skills
@@ -47,7 +47,6 @@ release a gate.
 |---|---|---|---|
 | `th:orchestrator` | lightweight direct coordination; gated execution after activation | — (top-level session agent) | Yes, only during an active pipeline |
 | `architect` | analysis | orchestrator (or research/design direct mode) | No |
-| `qa-plan` | analysis | orchestrator (define-ac direct; explicit plan-review only) | No |
 | `plan-reviewer` | analysis | orchestrator (explicit `/th:plan-review` only) | No |
 | `implementer` | implementation | orchestrator after Gate 1 | No |
 | `tester` | implementation | orchestrator | No |

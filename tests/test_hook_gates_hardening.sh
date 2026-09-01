@@ -66,7 +66,7 @@ make_tmp() {
 # Assertion helpers
 # ---------------------------------------------------------------------------
 
-# assert_exact_deny — qa-plan C-1: assert the EXACT permissionDecision field value.
+# assert_exact_deny — legacy contract C-1: assert the EXACT permissionDecision field value.
 # A malformed deny JSON (wrong field name/value) is treated as non-blocking → silent allow.
 # The full hookSpecificOutput shape must be well-formed.
 assert_exact_deny() {

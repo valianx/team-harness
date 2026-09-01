@@ -171,7 +171,6 @@ Canonical matrix (must match exactly):
 | `pr-review-security` | sonnet | high |
 | `reviewer-consolidator` | sonnet | medium |
 | `qa` | opus | xhigh |
-| `qa-plan` | sonnet | high |
 | `gcp-cost-analyzer` | opus | high |
 | `init-project` | haiku | medium |
 | `implementer` | sonnet | high |

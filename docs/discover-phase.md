@@ -37,7 +37,7 @@ checkpoint. Retired route markers are migration data only; they never bypass the
 
 2. **Clear task (no marker) → brief framing gate (§3.2).** Restate, optionally ask clarifying questions, then confirm. Wait for the advance response.
 
-3. **Unclear task → Discover open (§4).** Stay conversational. Assist scope exploration and ask clarifying questions using only the coordinator's own capability. Do NOT dispatch any subagent (no architect, no qa-plan, no specifier). Remain until an advance response is received.
+3. **Unclear task → Discover open (§4).** Stay conversational. Assist scope exploration and ask clarifying questions using only the coordinator's own capability. Do NOT dispatch any subagent. Remain until an advance response is received.
 
 4. **Legacy marker → migration guidance.** `--fast`, `[TIER: N]`, Simple-Mode wording, and similar
    values are retired data. They do not bypass Discover or select a posture; if a live operator
@@ -184,7 +184,7 @@ a dispatch or gate release.
 
 ### HI-2 — Security floors are non-surveyable
 
-The survey **never writes `security_sensitive`**. That field is written by Classify (`agents/ref-pipeline.md § "13 — Classify"`), by the deterministic backstop that re-derives it from the diff, and by the fail-closed rule that force-sets it when classification cannot be reached.
+The survey **never writes `security_sensitive`**. That field is written by Classify (`agents/ref-pipeline.md`), by the deterministic backstop that re-derives it from the diff, and by the fail-closed rule that force-sets it when classification cannot be reached.
 
 The path-pattern auto-escalation is **input-independent** of every survey answer. Its result depends
 solely on the files and content being changed (`auth/**`, `middleware/**`, `api/**`, `db/**`,
@@ -386,7 +386,7 @@ The test is deterministic — it depends only on git metadata, never on director
 
 ## 12. Background research sweep (non-blocking, narrow trigger)
 
-The coordinator may launch a parallel haiku research fan-out during Discover when a genuine external knowledge gap is detected. This is the background research sweep in `agents/ref-pipeline.md § "Intake"`.
+The coordinator may launch a parallel haiku research fan-out during Discover when a genuine external knowledge gap is detected. This is the background research sweep in `agents/ref-pipeline.md`.
 
 ### 12.1 Trigger conditions (ALL must hold)
 

@@ -53,8 +53,8 @@ actors/flows, rules and examples, errors, unchanged behavior, non-goals, and
 human decisions. Generated architecture, delivery/dependency, conditional
 invariant, and task/AC shards hold the technical realization. Roles resolve
 only the shards their decision needs. It also writes
-plan sketches when the change touches those surfaces. `qa-plan` and `plan-reviewer` are available
-only through an explicit `/th:plan-review`; their panel output stays in
+plan sketches when the change touches those surfaces. `plan-reviewer` is available
+only through an explicit `/th:plan-review`; its bounded output stays in
 `reviews/01-plan-review.md` and never creates an automatic pipeline state.
 
 `th:orchestrator` runs Discover first, asks for an explicit advance, then dispatches one
@@ -87,7 +87,7 @@ manifest record a plan-time not-applicable reason. This is an implementation che
 phase or gate. The coordinator then dispatches the approved implementation work and evidence pass.
 Tester, QA, and the applicable security lens inspect the resulting tree. A code, test, or
 documentation defect inside scope returns to the implementation executor and the affected
-validation delta is rerun, unless the ratchet (`agents/ref-pipeline.md § "The ratchet"`) records a
+validation delta is rerun, unless the ratchet (`agents/ref-pipeline.md`) records a
 sub-floor finding on unchanged surface as a findings-ledger residual instead — that residual ships
 as a pull-request concern rather than consuming another round. Missing evidence returns to
 tester. A correctable security
@@ -197,7 +197,7 @@ Each row is a real failure mode encountered and patched. See [`docs/knowledge.md
 
 ## What ships
 
-- **Agents.** 29 agents. The coordination agent — `orchestrator` (top-level session agent) — plus the specialists: `architect`, `implementer`, `tester`, `cleaner`, `qa`, `qa-plan`, `pr-review-qa`, `plan-reviewer`, `delivery`, `reviewer`, `reviewer-consolidator`, `pr-review-security`, `security`, `ux-reviewer`, `diagrammer`, `likec4-diagrammer`, `d2-diagrammer`, `documenter`, `translator`, `gcp-cost-analyzer`, `gcp-infra`, `init-project`, `agent-builder`, `mentor`, `researcher`, `research-consolidator`, `code-researcher`, `adversary`. How they relate at runtime: [`docs/agent-tree.md`](./agent-tree.md). Full roster, model tier (opus / sonnet / haiku), and effort matrix: [`agents/README.md`](../agents/README.md).
+- **Agents.** 28 agents. The coordination agent — `orchestrator` (top-level session agent) — plus the specialists: `architect`, `implementer`, `tester`, `cleaner`, `qa`, `pr-review-qa`, `plan-reviewer`, `delivery`, `reviewer`, `reviewer-consolidator`, `pr-review-security`, `security`, `ux-reviewer`, `diagrammer`, `likec4-diagrammer`, `d2-diagrammer`, `documenter`, `translator`, `gcp-cost-analyzer`, `gcp-infra`, `init-project`, `agent-builder`, `mentor`, `researcher`, `research-consolidator`, `code-researcher`, `adversary`. How they relate at runtime: [`docs/agent-tree.md`](./agent-tree.md). Full roster, model tier (opus / sonnet / haiku), and effort matrix: [`agents/README.md`](../agents/README.md).
 - **Skills** (slash commands). `/th:pipeline` explicitly activates the gated flow; most others route through the direct kernel. Standalone utilities include `/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:update`, and `/th:background`. Common routed entries include `/th:design`, `/th:plan`, `/th:recover`, `/th:deliver`, `/th:review-pr`, and `/th:issue`. `/th:background` launches a background `claude -p` headless session for eligible long-running tasks — it does not route through `th:orchestrator`.
 - **Hooks.** Registered boundary hooks are intentionally narrow: `policy-block` blocks catastrophic recursive deletion and provider-shaped credentials; `dev-guard` gates Git/GitHub/ClickUp outward actions; `gcp-guard` classifies mutating gcloud verbs. Additional retained hook bodies may be unwired; `.claude-plugin/hooks.json` is the authority. Notification scripts are optional. Full catalog: [`hooks/README.md`](../hooks/README.md).
 - **External Memory MCP** server. Semantic memory across projects. The server (`context-harness-mcp` or any MCP-compatible service) lives outside this repo. Reference: [`docs/kg-content-policy.md`](./kg-content-policy.md).

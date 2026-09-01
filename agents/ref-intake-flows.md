@@ -121,7 +121,7 @@ Then WAIT. Do NOT auto-advance. Do NOT set `initiative` or create any folder bef
 
 ## Language and English-Learning Intent Handling
 
-Triggered from `agents/ref-pipeline.md § "11 — Intent routing"`, when the intent matches a `language-set` or `english-learning-set` row. The startup kernel's direct-routing table stays in `agents/orchestrator.md`.
+Triggered from `agents/ref-pipeline.md`, when the intent matches a `language-set` or `english-learning-set` row. The startup kernel's direct-routing table stays in `agents/orchestrator.md`.
 
 **Language-set intent handling.** When the intent matches a `language-set` row:
 
@@ -152,7 +152,7 @@ Triggered from `agents/ref-pipeline.md § "11 — Intent routing"`, when the int
 
 ## ClickUp Conversational Intents
 
-Triggered from `agents/ref-pipeline.md § "11 — Intent routing"`, when the utterance contains a ClickUp task identifier.
+Triggered from `agents/ref-pipeline.md`, when the utterance contains a ClickUp task identifier.
 
 **ClickUp conversational intents (MCP-direct, no pipeline).**
 
@@ -175,7 +175,7 @@ intent — pipeline routing applies).
 | "cambia/cambiá el estado de task \<id\|name\> a \<status\>" / "set state of task \<id\|name\> to \<status\>" / "set status of task \<id\|name\> to \<status\>" | `clickup_update_task` | Before calling `clickup_update_task`, render a preview block showing the target task id and the new status value, then wait for explicit operator approval (edit/cancel vocabulary as in `skills/clickup/SKILL.md § "Comment preview gate"`). Pass status verbatim from operator (no enum validation — see Status pass-through note). |
 | "cerrame/cierra/close task \<id\|name\>" / "close task \<id\|name\>" | `clickup_update_task` | Before calling `clickup_update_task`, confirm with the operator: "Set task \<id\> to closed — proceed? [Y/n]". Default status `closed`. If MCP rejects, prompt operator for the workspace's actual closed-status name. |
 | "marca/marcá task \<id\|name\> como \<state\>" / "mark task \<id\|name\> as \<state\>" | `clickup_update_task` | Before calling `clickup_update_task`, render a preview block showing the target task id and the new state, then wait for explicit operator approval. Pass `<state>` verbatim. |
-| "rutea/ruteá task \<id\|name\> al pipeline" / "route task \<id\|name\> to pipeline" / "open task \<id\|name\> in the pipeline" | none (delegation) | Equivalent to `/th:clickup task <id>`. Run the skill's `task <id>` flow inline, then route the handoff payload back into `agents/ref-pipeline.md § "13 — Classify"` as the gated pipeline. Record `clickup_task_id` (the routed `<id>`) and `clickup_task_url` (`https://app.clickup.com/t/<id>`) in `00-state.md § Current State` at intake, so Phase 5 can post the mandatory functional closing comment even after compaction/recovery. |
+| "rutea/ruteá task \<id\|name\> al pipeline" / "route task \<id\|name\> to pipeline" / "open task \<id\|name\> in the pipeline" | none (delegation) | Equivalent to `/th:clickup task <id>`. Run the skill's `task <id>` flow inline, then route the handoff payload back into `agents/ref-pipeline.md` as the gated pipeline. Record `clickup_task_id` (the routed `<id>`) and `clickup_task_url` (`https://app.clickup.com/t/<id>`) in `00-state.md § Current State` at intake, so Phase 5 can post the mandatory functional closing comment even after compaction/recovery. |
 | "muestra/mostrá task \<id\|name\>" / "show task \<id\|name\>" | `clickup_get_task` | Read-only; print summary. |
 
 **Name-vs-ID resolution.** When the operator references a task by name (not ID):
@@ -199,7 +199,7 @@ status name. No hardcoded enum.
 
 ## Lane Classification
 
-Triggered from `agents/ref-pipeline.md § "13 — Classify"` for every development task.
+Triggered from `agents/ref-pipeline.md` for every development task.
 
 **Two postures only:** `inline` and `pipeline`. There is no selectable depth profile,
 fast/simple alias, tier-based route, or configuration-selected lane. A pipeline starts only
@@ -275,7 +275,7 @@ examples accepts a legacy marker as activation or routing.
 Do not create a state file or workspace merely to record a tier.
 ## Root-Cause Provenance Tiers
 
-Triggered from `agents/ref-pipeline.md § "Design"`, only for a `type: fix` dispatch at
+Triggered from `agents/ref-pipeline.md`, only for a `type: fix` dispatch at
 Tier 2-4 (a `root-cause` architect mode dispatch in the pipeline) where a candidate
 root-cause artifact already exists — prior `/th:research-code` output from this run, a spec-seed
 prior citing `file:line`, or a linked investigation from an issue/comment.

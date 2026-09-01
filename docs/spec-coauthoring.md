@@ -87,9 +87,9 @@ The v3 pipeline has one `design` state followed by `waiting_gate1`. The former
 Stage-1 panel re-firing, and post-approval review offer are retired. They must not be represented
 as states, checklist rows, events, or automatic dispatches.
 
-`/th:plan-review` remains a standalone, explicit operator flow. When invoked, it may dispatch
-`qa-plan`, `security` where applicable, and `plan-reviewer`; it writes the review artifact without
-changing the pipeline state machine. A seed never skips or releases Gate 1.
+`/th:plan-review` remains a standalone, explicit operator flow. When invoked, it dispatches one
+read-only `plan-reviewer` over canonical OpenSpec and projection fidelity; Main may write the
+review artifact without changing the pipeline state machine. A seed never skips or releases Gate 1.
 
 ## 6. Recovery and trace
 

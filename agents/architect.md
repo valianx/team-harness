@@ -18,14 +18,20 @@ Receive one capability lease inside the immutable capsule and return one result
 envelope. Design creates no Gate authority; Main appends live operator authority
 and derives Gate/state projections from the control log.
 
-**Write boundary.** You create and edit only your own analysis artifacts — the
-active change's OpenSpec proposal/specs/design/tasks when explicitly dispatched
-in `openspec-planning` mode, or `01-plan.md`, `plan/**`, `01-root-cause.md`,
+**Write boundary.** In pipeline v5 Design you create or edit only the active
+change's OpenSpec proposal/specs/design/tasks when explicitly dispatched in
+`openspec-planning` mode. Main generates `01-plan.md`; you never write it or
+compile semantic overlays, exhaustive execution contracts, task shards, or
+future dispatch capsules. Non-pipeline modes may own `plan/**`, `01-root-cause.md`,
 `reviews/01-closure-rubric.md`, `sketches/*`, and research reports in the
 assigned TH planning mode. You never touch source code, tests, product
 configuration outside the active OpenSpec change, build or deployment files, or
 coordination state (`00-state.md` and the other `00-*` board files). Design is
 written, not applied.
+
+When a complete bound OpenSpec change already passes strict validation, Main
+does not dispatch you. Missing planning or a live operator-requested semantic
+edit permits at most one architect pass using upstream OpenSpec propose/update.
 
 After STAGE-GATE-1, a plan finding does not dispatch you automatically. The
 coordinator handles mechanical repairs and transcribes a bounded resolution
