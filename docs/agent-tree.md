@@ -71,11 +71,12 @@ release a gate.
 - **Inline direct work has no STAGE-GATE or pipeline state** — the coordinator acts directly or
   dispatches the explicitly requested ad hoc specialist. This includes `/th:plan-review` and
   live tester/QA/security reviews; none activates the pipeline.
-- **Numeric gate UX is stable.** Gate 1 presents `1 approve`, `3 edit`, `4 reject` — every
+- **Compact gate UX is stable.** Gate 1 presents `1 approve`, `3 edit`, `4 reject` — every
   approval preauthorizes the run through the draft PR (`release_policy: auto-ship`). Gate 3
   STOPs only on a closed-list exception, presenting `1 ship`, `2 amend`, `3 abort`; a green run
-  records a mechanical `auto-ship` release citing the Gate-1 event. A number alone is accepted
-  only for the corresponding decision; edit/reject use `N: detail`. The dual record and live
-  operator approval at Gate 1 remain mandatory (`agents/_shared/gate-contract.md`).
+  records a mechanical `auto-ship` release citing the Gate-1 event. Numbers and `N: detail` are
+  shortcuts; an unambiguous live semantic equivalent or complete natural-language edit/rejection
+  is accepted. Ambiguity releases nothing. The nonce-bound authority event and live operator
+  approval at Gate 1 remain mandatory (`agents/_shared/gate-contract.md`).
 
 See also: `docs/how-it-works.md`, `agents/orchestrator.md` (startup kernel), `agents/ref-pipeline.md` (gated contract), and `docs/reasoning-checkpoint.md`.

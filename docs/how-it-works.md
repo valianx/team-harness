@@ -72,8 +72,9 @@ plan carries the architect's security assessment and security TCs to the final a
 validation; planning itself dispatches no security reviewer.
 
 At **STAGE-GATE-1**, the operator sees a short summary and an artifact pointer. The stable
-options are `1 approve`, `3 edit`, `4 reject`; a number alone is enough for the decision, while
-`3: detail` and `4: reason` carry edits or rejection context. Every approval preauthorizes the
+options are `1 approve`, `3 edit`, `4 reject`; numbers and prefixed forms remain shortcuts, while
+an unambiguous live semantic equivalent or a complete natural-language edit/rejection is also
+accepted. Missing detail or ambiguity releases nothing and receives a narrow clarification. Every approval preauthorizes the
 run through the draft PR (`release_policy: auto-ship`) — Gate 3 pauses again only on a
 closed-list exception; a green run releases mechanically, citing the Gate-1 event.
 

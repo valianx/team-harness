@@ -89,14 +89,21 @@ Touch no files during or after this step.
 
 ---
 
-## Step 3 — Tell the operator how to act
+## Step 3 — Offer the operator a short continuation choice
 
-End the briefing with the explicit options, for example:
+End the briefing with concise stable options:
 
-> To continue the pipeline, run `/th:recover {workspace_name}`. To implement the Next Step
-> yourself, proceed directly. This skill made no changes to any file.
+```text
+1 — continue the pipeline now
+2 — implement the Next Step directly
+3 — stop here
+```
 
-The operator decides and acts. This skill does not.
+Numbers are shortcuts, not required command syntax. Tell the operator that a short unambiguous
+reply is sufficient and that this briefing made no file changes. Never instruct the operator to
+enter a runtime-specific recovery command. This report-only turn takes no action; on the next live
+reply, the coordinator binds the choice to this exact `{workspace_name}` presentation and routes
+continuation internally to the recovery capability installed in the active runtime.
 
 ---
 
@@ -105,8 +112,9 @@ The operator decides and acts. This skill does not.
 **HARD boundary:** `resume-session` never writes a file. It never dispatches the
 orchestrator or any agent. There is no `--apply` path, no `--fix` path, and no
 auto-write path of any kind. The skill reads `00-session-handoff.md` and
-`00-state.md` (both read-only) and emits the briefing. Nothing else happens until
-the operator acts.
+`00-state.md` (both read-only) and emits the briefing. Nothing else happens until the operator
+replies. A later affirmative reply is a new coordinator turn, not an action performed by this
+report-only skill.
 
 If a future request asks this skill to write a file, dispatch an agent, or resume
 the pipeline automatically, that request falls outside this skill's scope and must
@@ -124,6 +132,6 @@ chat replies, status blocks, error messages, and self-corrections alike.
 
 Silent on file reads and path resolution. Present only:
 1. The briefing block (Step 2).
-2. The "how to act" line (Step 3).
+2. The continuation choices (Step 3).
 
 No intermediate status narration, no tool-call commentary, no internal chatter.

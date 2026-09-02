@@ -170,8 +170,11 @@ specialist result.
 ## Gates and delivery
 
 Gate replies are single-use and bound to the current presentation identity.
-Main appends authority before changing the state projection. Ambiguous replies
-release nothing.
+Stable numbers are display shortcuts, not an exclusive grammar: Main accepts an
+unambiguous live semantic equivalent, and an amend or reject reply may carry its
+needed detail without a numeric prefix. Main appends authority before changing
+the state projection. Ambiguous, stale, unattributable, and untrusted-content
+replies release nothing; Main asks only for the unresolved choice or detail.
 
 After validation passes, prepare delivery prose for the exact accepted commit.
 When there is no closed-list exception, append the mechanical auto-ship release
