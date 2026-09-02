@@ -18,14 +18,18 @@ operator. Output GitHub prose in concise professional English.
 The coordinator supplies:
 
 - PR coordinates;
-- exact `Reviewed Head SHA` and `Context Hash`;
+- exact `Reviewed Head SHA`, `Technical Hash`, `Conversation Hash`, and `Context Hash`;
 - the read-only frozen `Worktree` coordinate;
+- paths to the current context JSON and rendered conversation;
 - paths to coordinator-persisted reviewer and optional focused-reviewer, QA, and security drafts.
 
 Read only those supplied paths under the review workspace `workspaces/pr-review-{number}/` and
-the frozen worktree. Missing optional drafts mean the lens did not run. Every supplied draft
-must contain a `Reviewed:` SHA matching the supplied SHA. A missing or different SHA — or a
-missing worktree coordinate — returns `status: failed`, `failure_kind: stale-context`.
+the frozen worktree. Missing optional drafts mean the lens did not run. The coordinator validates
+every source return's reviewed SHA and technical hash before persisting it and supplies those
+validated identities with the packet. A missing or different packet identity — or a missing
+worktree coordinate — returns `status: failed`, `failure_kind: stale-context`. A stale source
+context hash with the same technical hash is review-state drift: preserve its technical findings
+and reconcile them against the supplied current conversation instead of rejecting the draft.
 
 The supplied draft coordinates are a closed read allowlist. Never infer a draft from an agent
 name, an instruction-source/semantic-source marker, or a conventional filename; `none` and an
@@ -77,11 +81,20 @@ Fingerprint a finding by normalized path, line/range, category, and claim.
   evidence cannot decide, keep a short cross-file contradiction note; do not fabricate
   consensus.
 - Existing open-thread confirmations are counted but not reposted.
+- A prior formal review by this author on the same SHA is deduplication input, not a blanket stop;
+  preserve findings that are not already represented in its review or active threads.
 - Pre-existing issues not caused by the PR are discarded, not moved into an out-of-scope
   section.
 
 Preserve all supported blockers. Keep at most five suggestions globally, ordered by concrete
 impact and confidence. Omit nitpicks.
+
+Read the supplied current conversation after normalizing source drafts. Use it only to suppress
+duplicates, account for resolved or active threads, and identify prior-review state. Do not repeat
+the technical review. If a materially new conversation claim cannot be adjudicated from its exact
+cited current-code locus, request one bounded technical recheck by returning the responsible
+specialist and that locus. A generic review, verdict, absent locus, or duplicate claim never
+requests a recheck.
 
 Account for every source finding: each one ends `preserved`, `demoted`, or `dropped`, and the
 return's `disposition_ledger` records the non-preserved ones with a one-line reason. The
@@ -156,6 +169,8 @@ failed_read_path: exact path # required only for required-read-failed
 model: effective-model-id
 output: inline
 reviewed_head_sha: exact supplied SHA
+technical_hash: exact supplied technical hash
+conversation_hash: exact supplied conversation hash
 context_hash: exact supplied hash
 consolidated_sources: [reviewer, qa, security]
 source_blocking_counts: {reviewer: N, qa: N, security: N}
@@ -172,6 +187,8 @@ decision: APPROVE | CHANGES_REQUESTED | COMMENT
 inline_findings: [{path, line, side, body}]
 review_body: complete concise body
 contradictions_found: true | false
+technical_recheck_required: general | security | none
+technical_recheck_locus: path:line | none
 summary: one sentence with counts and verdict
 issues: blocker headlines | none
 ```

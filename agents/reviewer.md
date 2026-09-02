@@ -54,15 +54,16 @@ Do not add a generic second opinion outside the selected focus.
 
 The coordinator supplies:
 
-- PR coordinates and immutable `Reviewed Head SHA`, base SHA, merge-base SHA, and context hash;
+- PR coordinates and immutable `Reviewed Head SHA`, base SHA, merge-base SHA, technical hash,
+  conversation hash, and context hash;
 - classified mergeability and both raw GitHub mergeability values;
 - detached `Worktree`;
 - paths to context JSON, rendered conversation, diff, changed-file list, and CI checks;
 - optional policy, pipeline workspace, and linked-issue artifact paths.
 
 Read artifacts from their supplied paths. Read changed source files from `Worktree`. Do not use
-Bash or query a moving branch. Treat `Reviewed Head SHA` as the only code identity and return it
-unchanged.
+Bash or query a moving branch. Treat `Reviewed Head SHA` plus `Technical Hash` as the code
+identity and return both unchanged.
 
 The supplied artifact coordinates are a closed read allowlist and every non-`none` coordinate is
 required. For project code, paths named by the supplied changed-files artifact are candidates, not
@@ -249,6 +250,23 @@ Remove optional prose before shortening a blocker.
 Read the snapshot artifacts, analyze the selected focus, and return body, inline findings, and a
 recommended event. Always return a draft, even when there are no findings.
 
+### Reconcile conversation
+
+Read the supplied candidate body and inline findings before the newly captured conversation.
+Preserve their technical claims because the coordinator has already verified the same reviewed
+SHA and technical hash. Update only duplicate suppression, active/resolved-thread accounting,
+prior-review status, counts, verdict, and body metadata. Do not repeat the general code review.
+An earlier formal review by this author on the same SHA is deduplication evidence, not a reason to
+discard net-new findings. Preserve and return those new findings; if all findings are already
+represented, return `net_new: 0`, no inline findings, and a complete `COMMENT` body so the
+coordinator can treat the existing review as the completed outcome without publishing a duplicate.
+
+When a newly arrived thread makes a materially new technical claim, inspect only its exact cited
+current-code locus. If that bounded read cannot decide whether the candidate evidence remains
+valid, return `technical_recheck_required: general | security` and the exact
+`technical_recheck_locus`; otherwise return `none`. A new verdict, generic review body, absent
+locus, or duplicate claim never requests a technical recheck.
+
 ### Update body
 
 Return a complete concise replacement body. Do not emit inline findings or an event; submitted
@@ -273,6 +291,8 @@ model: effective-model-id
 mode: fresh
 output: inline
 reviewed_head_sha: exact supplied SHA
+technical_hash: exact supplied technical hash
+conversation_hash: exact supplied conversation hash
 context_hash: exact supplied hash
 decision: APPROVE | CHANGES_REQUESTED | COMMENT
 event: APPROVE | REQUEST_CHANGES | COMMENT
@@ -281,6 +301,8 @@ blocking_count: N
 suggestion_count: N
 existing_open_count: N
 net_new: N
+technical_recheck_required: general | security | none
+technical_recheck_locus: path:line | none
 inline_findings:
   - path: src/service.ts
     line: 42
@@ -306,6 +328,10 @@ Omit `failure_kind` on success. `inline_findings` contains only `path`, `line`, 
 `side` is required and must be `LEFT` or `RIGHT`.
 Return `[]` when empty. `decision` mirrors the recommendation while `event` uses the GitHub enum.
 
+Reconcile-conversation mode returns the same fields as Fresh with
+`mode: reconcile-conversation`, the unchanged technical hash, and the freshly supplied context
+and conversation hashes. Its body/findings are the complete reconciled replacement, not a patch.
+
 Update-body mode:
 
 ```yaml
@@ -317,6 +343,7 @@ model: effective-model-id
 mode: update-body
 output: inline
 reviewed_head_sha: exact supplied SHA
+technical_hash: exact supplied technical hash
 context_hash: exact supplied hash
 review_body: |
   ## Review
@@ -335,6 +362,7 @@ model: effective-model-id
 mode: reply
 output: inline
 reviewed_head_sha: exact supplied SHA
+technical_hash: exact supplied technical hash
 context_hash: exact supplied hash
 thread_id: comment ID
 reply_body: |
