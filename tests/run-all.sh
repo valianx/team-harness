@@ -103,6 +103,20 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 3i: every active OpenSpec change stays in scope"
+echo "############################################################"
+if [ -n "$PY" ] && $PY "$TESTS_DIR/test_openspec_scope.py"; then
+    echo "openspec-scope: PASS"
+elif [ -z "$PY" ]; then
+    echo "openspec-scope: FAIL (Python 3 not found)"
+    FAILED=$((FAILED + 1))
+else
+    echo "openspec-scope: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 echo "# Suite 3h: no contract restates a helper's classification"
 echo "############################################################"
 if [ -n "$PY" ] && $PY "$TESTS_DIR/test_retired_phrases.py"; then

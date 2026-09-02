@@ -67,6 +67,7 @@ Everything below has inputs, outputs, and exit codes.
 | `test_permission_disjointness.py` | The permission-allowlist disjointness invariant (#18312 floor) |
 | `test_flow_event_schema_sync.py` | Cross-repo flow-event schema sync |
 | `test_lane_marker_identity.py` | Lane-marker byte identity |
+| `test_openspec_scope.py` | Every active OpenSpec change against the repository-owned rules in `openspec/config.yaml` — a non-empty delta, a declared capability, proposal words, task items, requirement ceiling, and the presence of the real-run baseline |
 | `test_design_oversize_behavioral.sh` | The design requirement-count ceiling — an oversize delta is decided from the canonical delta and `openspec/config.yaml` alone, with no workspace, identity, or gate input or output |
 | `test_retired_phrases.py` | The closed retired-phrase list behind `/th:lint` Check 12 — a contract that restates a helper's flags, decision procedure, or attempt ordinals, plus the shrink-only exemption map |
 | `test_authoring_budgets.py` | Advisory word/line/contents health signals, plus the shrink-only word ceilings recorded in `tests/fixtures/authoring-baseline.json`. Two things fail: a contents link pointing to no real heading, and a ceiling violation — a file over its ceiling, or a ceiling left more than 2% above a file's current count |
