@@ -9,12 +9,14 @@
 - [x] 2.1 Re-run the reference scan over `agents/**` and `skills/**` (excluding `scripts/`) for the eleven helpers and record zero hits in the PR body; abort the deletion of any helper that gains a hit.
 - [x] 2.2 Delete the eleven `skills/pipeline/scripts/*.mjs` files and their `plugins/team-harness/skills/pipeline/scripts/` mirrors.
 - [x] 2.3 Delete `tests/test_openspec_bindings.mjs`, `test_openspec_overlay.mjs`, `test_openspec_snapshot.mjs`, `test_openspec_adapter.mjs`, `test_openspec_recovery.mjs`, `test_openspec_design_e2e.mjs`, `test_correction_packet_preflight.mjs`, `test_plan_contract.mjs`, `test_helper_bundle.mjs`, `test_specialist_write_scope.mjs`; remove their `tests/run-all.sh` lines; update `test_pipeline_helper_entrypoints.mjs` to the surviving entrypoints.
+- [x] 2.4 Repoint `cmd/install/manifest_registry_test.go` at a surviving pipeline script so the opencode manifest test does not require a deleted file.
 
 ## 3. Remove the converter
 
 - [x] 3.1 Delete `convertLegacyWorkspace` and its helpers from `control-plane.mjs`; add the administrative close for a workspace without `control/control.jsonl`.
 - [x] 3.2 Replace `agents/ref-pipeline.md § Recovery and legacy state` with the single v5 recovery paragraph and the inline-or-fresh offer; remove the converter sentence from `agents/_shared/orchestrator-state.md`.
 - [x] 3.3 Update the converter test cases to assert the administrative close.
+- [x] 3.4 Refuse a symlinked `control/` path or events file in the administrative close and cover both cases in the control-plane test.
 
 ## 4. Reconcile specs and docs
 
