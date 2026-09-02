@@ -9,7 +9,7 @@
 - [x] 2.1 Implement the versioned Codex update convergence entry point with validated old/new snapshot identities, ordered domain execution, one receipt, and no workspace or persistent approval state.
 - [x] 2.2 Implement the already-current fast path so it performs no domain writes, avoids unconditional feature enablement and agent synchronization, and verifies all declared postconditions in the same pass.
 - [x] 2.3 Implement automatic repair and postcondition verification for bridge, native settings, required features, agents, MCP expectations, and hooks while preserving operator-owned values and unmanaged conflicts.
-- [x] 2.4 Implement runtime `pending-approval` classification and an invocation-scoped authorization flag that applies only the recomputed persistent runtime delta after live approval.
+- [x] 2.4 Implement runtime `pending-approval` classification and an invocation-scoped, snapshot-bound approval fingerprint that applies only the recomputed persistent runtime delta after live approval.
 - [x] 2.5 Implement partial-convergence receipts and rerun behavior that identify the failed domain, preserve completed idempotent work, skip current domains, and return the standard Team Harness update invocation as recovery.
 
 ## 3. Codex Update Contract
@@ -31,3 +31,4 @@
 - [x] 5.2 Bound native output while the child is running and validate closed feature, MCP, domain, pending-decision, and receipt schemas.
 - [x] 5.3 Bind runtime authorization to the exact redacted pending delta and constrain escalated retries to the receipt's single failed domain.
 - [x] 5.4 Re-read bridge and config postconditions and add regression coverage for tampered snapshots, oversized output, nested receipt fields, and stale approval fingerprints.
+- [x] 5.5 Close reviewed residuals by attesting helpers before import, binding approvals to the executable snapshot digest, rejecting raw relative binaries, and enforcing the deadline after native pipes close.

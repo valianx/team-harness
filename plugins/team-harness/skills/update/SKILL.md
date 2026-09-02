@@ -93,7 +93,8 @@ python3 NEW_PLUGIN/skills/update/scripts/converge.py --old-plugin OLD_PLUGIN --o
 ```
 
 This is the only post-install call before operator input. It validates and
-bridges the running snapshot path, ensures native Team Harness settings,
+bridges the running snapshot path, attests every imported helper before
+execution, ensures native Team Harness settings,
 classifies the persistent runtime profile, enables only missing multi-agent
 features, synchronizes agents only when stale, inspects MCP registrations
 without replacing them, validates that the exact hook manifest contains only

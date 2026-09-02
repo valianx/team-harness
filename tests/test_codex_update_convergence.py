@@ -109,7 +109,13 @@ class ConvergenceFixture(unittest.TestCase):
         if authorize_runtime:
             helpers = CONVERGE.load_helpers(self.plugin)
             state = helpers["runtime"].classify()
-            approval = CONVERGE.runtime_pending_decision(state, PLUGIN_VERSION)["approvalFingerprint"]
+            approval = CONVERGE.runtime_pending_decision(
+                state,
+                PLUGIN_VERSION,
+                old_plugin=self.plugin,
+                new_plugin=self.plugin,
+                snapshot_digest=CONVERGE.snapshot_identity(self.plugin),
+            )["approvalFingerprint"]
         receipt = CONVERGE.run_convergence(self.args(runtime_approval=approval), native_runner=native)
         return CONVERGE.validate_receipt(receipt)
 
@@ -150,6 +156,11 @@ class ConvergenceFixture(unittest.TestCase):
         self.assertEqual(receipt["domains"]["features"]["changed"], ["multi_agent"])
         self.assertEqual(native.calls.count((CODEX_BIN, "features", "enable", "multi_agent")), 1)
         self.assertEqual(native.calls.count((CODEX_BIN, "features", "list")), 2)
+        parsed = CONVERGE.parse_features(
+            "multi_agent                            under development  true\n"
+            "multi_agent_v2                         stable             true\n"
+        )
+        self.assertTrue(parsed["multi_agent"])
 
     def test_partial_failure_preserves_completed_work_and_rerun_resumes(self) -> None:
         failing = FakeCodex(features={"multi_agent": False, "multi_agent_v2": True})
@@ -180,8 +191,8 @@ class ConvergenceFixture(unittest.TestCase):
         hooks.unlink()
         hooks.symlink_to(target)
         unsafe = self.converge(FakeCodex())
-        self.assertEqual(unsafe["failedDomain"], "hooks")
-        self.assertEqual(unsafe["domains"]["hooks"]["errorCode"], "SNAPSHOT_COMPONENT_SYMLINK")
+        self.assertEqual(unsafe["failedDomain"], "preflight")
+        self.assertEqual(unsafe["domains"]["bridge"]["errorCode"], "SNAPSHOT_COMPONENT_SYMLINK")
 
     def test_protected_config_target_requests_exact_retry_escalation(self) -> None:
         self.codex_home.chmod(stat.S_IRUSR | stat.S_IXUSR)
@@ -221,8 +232,8 @@ class ConvergenceFixture(unittest.TestCase):
         hooks.rename(real_hooks)
         hooks.symlink_to(real_hooks, target_is_directory=True)
         linked = self.converge(FakeCodex())
-        self.assertEqual(linked["failedDomain"], "hooks")
-        self.assertEqual(linked["domains"]["hooks"]["errorCode"], "SNAPSHOT_COMPONENT_SYMLINK")
+        self.assertEqual(linked["failedDomain"], "preflight")
+        self.assertEqual(linked["domains"]["bridge"]["errorCode"], "SNAPSHOT_COMPONENT_SYMLINK")
 
         hooks.unlink()
         real_hooks.rename(hooks)
@@ -271,6 +282,45 @@ class ConvergenceFixture(unittest.TestCase):
         receipt = self.converge(native, authorize_runtime=True)
         self.assertEqual(receipt["failedDomain"], "mcp")
         self.assertEqual(receipt["domains"]["mcp"]["errorCode"], "MCP_LIST_INVALID")
+
+    def test_helper_integrity_is_verified_before_import(self) -> None:
+        helper = self.plugin / "skills/setup/scripts/manage_agents.py"
+        helper.write_text(helper.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+        receipt = self.converge(FakeCodex())
+        self.assertEqual(receipt["failedDomain"], "preflight")
+        self.assertEqual(receipt["domains"]["bridge"]["errorCode"], "HELPER_IDENTITY_MISMATCH")
+
+    def test_relative_codex_binary_is_rejected_before_execution(self) -> None:
+        args = self.args()
+        args.codex_bin = "true"
+        receipt = CONVERGE.validate_receipt(CONVERGE.run_convergence(args, native_runner=FakeCodex()))
+        self.assertEqual(receipt["failedDomain"], "preflight")
+        self.assertEqual(receipt["domains"]["bridge"]["errorCode"], "CODEX_BINARY_INVALID")
+
+    def test_runtime_approval_is_bound_to_snapshot_content(self) -> None:
+        pending = self.converge(FakeCodex())
+        approval = pending["pendingDecision"]["approvalFingerprint"]
+        converger = self.plugin / "skills/update/scripts/converge.py"
+        converger.write_text(converger.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+        receipt = CONVERGE.validate_receipt(CONVERGE.run_convergence(
+            self.args(runtime_approval=approval),
+            native_runner=FakeCodex(),
+        ))
+        self.assertEqual(receipt["failedDomain"], "runtime")
+        self.assertEqual(receipt["domains"]["runtime"]["errorCode"], "RUNTIME_APPROVAL_MISMATCH")
+
+    def test_native_timeout_survives_early_pipe_close(self) -> None:
+        previous = CONVERGE.NATIVE_TIMEOUT_SECONDS
+        CONVERGE.NATIVE_TIMEOUT_SECONDS = 0.1
+        try:
+            with self.assertRaisesRegex(CONVERGE.ConvergenceError, "NATIVE_COMMAND_TIMEOUT"):
+                CONVERGE.run_native([
+                    sys.executable,
+                    "-c",
+                    "import os,time; os.close(1); os.close(2); time.sleep(2)",
+                ])
+        finally:
+            CONVERGE.NATIVE_TIMEOUT_SECONDS = previous
 
     def test_existing_helper_clis_remain_compatible(self) -> None:
         env = os.environ.copy()

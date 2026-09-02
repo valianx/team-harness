@@ -28,6 +28,7 @@ DOMAIN_NAMES = ("bridge", "config", "runtime", "features", "agents", "mcp", "hoo
 OVERALL_STATUSES = {"current", "converged", "pending-approval", "partial-convergence"}
 RECOVERY_INVOCATION = "$team-harness:update"
 MAX_NATIVE_OUTPUT = 256 * 1024
+NATIVE_TIMEOUT_SECONDS = 30
 MAX_HOOK_MANIFEST = 64 * 1024
 MAX_RECEIPT_BYTES = 128 * 1024
 MAX_LIST_ITEMS = 128
@@ -43,6 +44,12 @@ HOOK_DIGESTS = {
     "hooks/dist/policy-block.cjs": "1970f768289b7d6fc375dc882671f4740d0499bdf81feffd756224ba1ddf809d",
     "hooks/dist/gcp-guard.cjs": "1016604dbb885fa5dd58410c33a068f0c1979a3b2bc7a6b7da54b9c7268c8acc",
     "hooks/dist/gate-guard.cjs": "405d76c700ec7f225fd7935d16946fea16064a76b7b06b0951b33ab81006aa52",
+}
+HELPER_DIGESTS = {
+    "skills/update/scripts/bridge_snapshot.py": "bb2a8c751cd5fb5609e701cf2f72f43f553d93f06d5f74b089a0eb45cc983ead",
+    "skills/setup/scripts/manage_config.py": "49175207918335c7323deeb0cb38a6253c78b6595cd724c6b15e1c5ae46f4d31",
+    "skills/setup/scripts/manage_runtime.py": "b96d3b25a82a039020954869e47b96001b6c957ae6578723f74f386c6a53f774",
+    "skills/setup/scripts/manage_agents.py": "a70921b53baeab04c69cc377fbfc019f62ce000596fee3b06e90cc38acf71843",
 }
 
 
@@ -91,13 +98,16 @@ def assert_regular_chain(path: Path, root: Path, *, directory: bool = False) -> 
 
 
 def validate_codex_binary(value: str) -> Path:
-    binary = lexical_path(value)
+    raw = Path(value)
+    if not raw.is_absolute() or ".." in raw.parts or any(ord(char) < 32 for char in value):
+        raise ConvergenceError("CODEX_BINARY_INVALID")
+    binary = Path(os.path.abspath(value))
     try:
         resolved = binary.resolve(strict=True)
         mode = resolved.stat().st_mode
     except OSError as exc:
         raise ConvergenceError("CODEX_BINARY_INVALID") from exc
-    if not binary.is_absolute() or not stat.S_ISREG(mode) or mode & 0o111 == 0:
+    if binary != resolved or not stat.S_ISREG(mode) or mode & 0o111 == 0:
         raise ConvergenceError("CODEX_BINARY_INVALID")
     return resolved
 
@@ -122,6 +132,14 @@ def stop_process(process: subprocess.Popen[bytes]) -> None:
             pass
 
 
+def terminate_process(process: subprocess.Popen[bytes]) -> None:
+    stop_process(process)
+    try:
+        process.wait(timeout=1)
+    except subprocess.TimeoutExpired:
+        pass
+
+
 def close_process_streams(process: subprocess.Popen[bytes], streams: selectors.BaseSelector) -> None:
     streams.close()
     if process.stdout is not None:
@@ -135,6 +153,7 @@ def run_native(argv: list[str]) -> str:
     try:
         process = subprocess.Popen(
             argv,
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             env=safe_native_env(),
@@ -151,12 +170,11 @@ def run_native(argv: list[str]) -> str:
     streams.register(process.stdout, selectors.EVENT_READ, "stdout")
     streams.register(process.stderr, selectors.EVENT_READ, "stderr")
     captured = {"stdout": bytearray(), "stderr": bytearray()}
-    deadline = time.monotonic() + 30
+    deadline = time.monotonic() + NATIVE_TIMEOUT_SECONDS
     while streams.get_map():
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            stop_process(process)
-            process.wait()
+            terminate_process(process)
             close_process_streams(process, streams)
             raise ConvergenceError("NATIVE_COMMAND_TIMEOUT")
         for key, _ in streams.select(min(remaining, 0.25)):
@@ -166,11 +184,20 @@ def run_native(argv: list[str]) -> str:
                 continue
             captured[key.data].extend(chunk)
             if sum(len(value) for value in captured.values()) > MAX_NATIVE_OUTPUT:
-                stop_process(process)
-                process.wait()
+                terminate_process(process)
                 close_process_streams(process, streams)
                 raise ConvergenceError("NATIVE_COMMAND_OUTPUT_TOO_LARGE")
-    return_code = process.wait()
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        terminate_process(process)
+        close_process_streams(process, streams)
+        raise ConvergenceError("NATIVE_COMMAND_TIMEOUT")
+    try:
+        return_code = process.wait(timeout=remaining)
+    except subprocess.TimeoutExpired as exc:
+        terminate_process(process)
+        close_process_streams(process, streams)
+        raise ConvergenceError("NATIVE_COMMAND_TIMEOUT") from exc
     close_process_streams(process, streams)
     try:
         stdout = captured["stdout"].decode("utf-8")
@@ -203,6 +230,42 @@ def load_helpers(plugin: Path) -> dict[str, ModuleType]:
         "runtime": load_module("th_update_runtime", setup / "manage_runtime.py"),
         "agents": load_module("th_update_agents", setup / "manage_agents.py"),
     }
+
+
+def verify_helper_integrity(plugin: Path) -> None:
+    root = codex_home_path()
+    for relative, expected_digest in HELPER_DIGESTS.items():
+        helper = plugin / relative
+        assert_regular_chain(helper, root)
+        try:
+            digest = hashlib.sha256(helper.read_bytes()).hexdigest()
+        except OSError as exc:
+            raise ConvergenceError("HELPER_UNAVAILABLE") from exc
+        if digest != expected_digest:
+            raise ConvergenceError("HELPER_IDENTITY_MISMATCH")
+
+
+def snapshot_identity(plugin: Path) -> str:
+    root = codex_home_path()
+    relative_paths = [
+        ".codex-plugin/plugin.json",
+        "skills/update/scripts/converge.py",
+        *HELPER_DIGESTS,
+        *HOOK_DIGESTS,
+    ]
+    digest = hashlib.sha256()
+    for relative in sorted(relative_paths):
+        artifact = plugin / relative
+        assert_regular_chain(artifact, root)
+        try:
+            content = artifact.read_bytes()
+        except OSError as exc:
+            raise ConvergenceError("SNAPSHOT_IDENTITY_UNAVAILABLE") from exc
+        digest.update(relative.encode())
+        digest.update(b"\0")
+        digest.update(len(content).to_bytes(8, "big"))
+        digest.update(content)
+    return digest.hexdigest()
 
 
 def validate_manifest(plugin: Path, expected_version: str) -> dict[str, str]:
@@ -245,14 +308,15 @@ def parse_features(output: str) -> dict[str, bool]:
         line = raw_line.strip()
         if not line:
             continue
-        columns = line.split()
-        if len(columns) != 3:
+        match = re.fullmatch(
+            r"([a-z][a-z0-9_]*)\s{2,}([a-z][a-z0-9 -]*[a-z0-9])\s{2,}(true|false)",
+            line,
+        )
+        if match is None:
             raise ConvergenceError("FEATURE_LIST_INVALID")
-        name, stage, enabled_raw = columns
+        name, stage, enabled_raw = match.groups()
         if (
-            not re.fullmatch(r"[a-z][a-z0-9_]*", name)
-            or not re.fullmatch(r"[a-z][a-z0-9_-]*", stage)
-            or enabled_raw not in {"true", "false"}
+            not re.fullmatch(r"[a-z][a-z0-9 -]*", stage)
             or name in features
         ):
             raise ConvergenceError("FEATURE_LIST_INVALID")
@@ -414,7 +478,14 @@ def redacted_runtime_path(value: object) -> str:
     return f"$EXTERNAL_ROOT/{digest}"
 
 
-def runtime_pending_decision(runtime_state: dict[str, object], new_version: str) -> dict[str, object]:
+def runtime_pending_decision(
+    runtime_state: dict[str, object],
+    new_version: str,
+    *,
+    old_plugin: Path,
+    new_plugin: Path,
+    snapshot_digest: str,
+) -> dict[str, object]:
     mismatched = runtime_state.get("mismatchedSettings", [])
     missing_roots = runtime_state.get("missingWritableRoots", [])
     missing_directories = runtime_state.get("missingDirectories", [])
@@ -435,6 +506,9 @@ def runtime_pending_decision(runtime_state: dict[str, object], new_version: str)
         project_path = redacted_runtime_path(project_config.get("path"))
     raw_identity = {
         "version": new_version,
+        "oldPlugin": str(old_plugin),
+        "newPlugin": str(new_plugin),
+        "snapshotDigest": snapshot_digest,
         "mismatchedSettings": sorted(mismatched),
         "missingWritableRoots": sorted(missing_roots),
         "missingDirectories": sorted(missing_directories),
@@ -624,6 +698,8 @@ def run_convergence(
             raise ConvergenceError("VERSION_ARGUMENT_INVALID")
         codex_binary = validate_codex_binary(args.codex_bin)
         validate_manifest(new_plugin, args.new_version)
+        verify_helper_integrity(new_plugin)
+        new_snapshot_digest = snapshot_identity(new_plugin)
         helpers = load_helpers(new_plugin)
     except Exception as exc:
         receipt["domains"]["bridge"] = domain_error(exc)
@@ -701,7 +777,13 @@ def run_convergence(
         elif runtime_state.get("status") != "stale":
             raise ConvergenceError("RUNTIME_CLASSIFICATION_INVALID")
         else:
-            pending = runtime_pending_decision(runtime_state, args.new_version)
+            pending = runtime_pending_decision(
+                runtime_state,
+                args.new_version,
+                old_plugin=old_plugin,
+                new_plugin=new_plugin,
+                snapshot_digest=new_snapshot_digest,
+            )
         if runtime_state.get("status") == "stale" and args.runtime_approval is not None:
             if args.escalation_domain is not None:
                 raise ConvergenceError("RUNTIME_APPROVAL_ESCALATION_MIXED")
