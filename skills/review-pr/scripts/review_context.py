@@ -387,6 +387,56 @@ def _write_existing_leaf(path: Path, content: bytes) -> None:
         os.close(directory_fd)
 
 
+def promote_artifact_pair(
+    artifact_root: Path,
+    first_temporary_name: str,
+    first_final_name: str,
+    second_temporary_name: str,
+    second_final_name: str,
+) -> None:
+    names = [
+        _safe_leaf(first_temporary_name),
+        _safe_leaf(first_final_name),
+        _safe_leaf(second_temporary_name),
+        _safe_leaf(second_final_name),
+    ]
+    if len(set(names)) != len(names):
+        raise ContextError("artifact pair names must be distinct")
+
+    previous = [
+        safe_read_leaf(artifact_root, first_final_name),
+        safe_read_leaf(artifact_root, second_final_name),
+    ]
+    rollback: list[Path] = []
+    try:
+        rollback.append(
+            _temporary_leaf(artifact_root, "tmp-artifact-pair-rollback-first")
+        )
+        rollback.append(
+            _temporary_leaf(artifact_root, "tmp-artifact-pair-rollback-second")
+        )
+        _write_existing_leaf(rollback[0], previous[0])
+        _write_existing_leaf(rollback[1], previous[1])
+        try:
+            promote_artifact(artifact_root, first_temporary_name, first_final_name)
+            promote_artifact(artifact_root, second_temporary_name, second_final_name)
+        except Exception as promotion_error:
+            rollback_errors: list[Exception] = []
+            for temporary, final in zip(
+                rollback, (first_final_name, second_final_name), strict=True
+            ):
+                try:
+                    promote_artifact(artifact_root, temporary.name, final)
+                except Exception as rollback_error:
+                    rollback_errors.append(rollback_error)
+            if rollback_errors:
+                raise ContextError("artifact pair promotion and rollback failed") from promotion_error
+            raise
+    finally:
+        for temporary in rollback:
+            _discard_artifact_leaf(artifact_root, temporary.name)
+
+
 def find_resumable_review_run(repo_root: Path, pr: int) -> dict[str, Any]:
     parent = _review_parent(repo_root, pr, create=False)
     candidates: list[dict[str, Any]] = []
@@ -1195,9 +1245,6 @@ def compare_contexts(expected: dict[str, Any], actual: dict[str, Any]) -> dict[s
     # Invalidation keys on head_oid/commits/code_hash only; mergeability drift is
     # reported for the operator but never forces a restart.
     code_changed = expected.get("code_hash") != actual.get("code_hash")
-    conversation_changed = (
-        expected.get("conversation_hash") != actual.get("conversation_hash")
-    )
     commits_changed = expected.get("commits") != actual.get("commits")
     expected_semantic_hash = expected.get("semantic_conversation_hash") or stable_hash(
         semantic_conversation_identity(expected)
@@ -1213,6 +1260,7 @@ def compare_contexts(expected: dict[str, Any], actual: dict[str, Any]) -> dict[s
     )
     semantic_conversation_changed = expected_semantic_hash != actual_semantic_hash
     review_state_changed = expected_review_state_hash != actual_review_state_hash
+    conversation_changed = semantic_conversation_changed or review_state_changed
     mergeability_changed = expected.get("mergeability") != actual.get("mergeability")
     changed_fields = [
         key
@@ -1942,8 +1990,13 @@ def refresh_review_context(
             _write_existing_leaf(
                 conversation_tmp, render_context(current).encode("utf-8")
             )
-            promote_artifact(run, context_tmp.name, context_path.name)
-            promote_artifact(run, conversation_tmp.name, conversation_path.name)
+            promote_artifact_pair(
+                run,
+                conversation_tmp.name,
+                conversation_path.name,
+                context_tmp.name,
+                context_path.name,
+            )
         return {
             **comparison,
             "status": comparison["status"],

@@ -1255,6 +1255,39 @@ class ReviewContextTests(unittest.TestCase):
             "conversation-changed",
         )
 
+    def test_compare_normalizes_legacy_combined_conversation_hash(self):
+        current = context()
+        legacy = dict(current)
+        legacy.pop("technical_hash")
+        legacy.pop("semantic_conversation_hash")
+        legacy.pop("review_state_hash")
+        legacy["conversation_hash"] = MODULE.stable_hash(
+            {
+                "pr_metadata": {
+                    "title": legacy["pr"]["title"],
+                    "body": legacy["pr"]["body"],
+                },
+                "issue_comments": legacy["issue_comments"],
+                "review_comments": legacy["review_comments"],
+                "review_threads": legacy["review_threads"],
+                "reviews": legacy["reviews"],
+            }
+        )
+        legacy["context_hash"] = MODULE.stable_hash(
+            {
+                "code_hash": legacy["code_hash"],
+                "conversation_hash": legacy["conversation_hash"],
+                "commits": legacy["commits"],
+            }
+        )
+
+        comparison = MODULE.compare_contexts(legacy, current)
+
+        self.assertEqual(comparison["status"], "current")
+        self.assertFalse(comparison["conversation_changed"])
+        self.assertEqual(comparison["conversation_change_kind"], "none")
+        self.assertEqual(comparison["next_action"], "continue")
+
     def test_refresh_context_promotes_review_state_without_rebuilding_technical_state(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
@@ -1316,6 +1349,59 @@ class ReviewContextTests(unittest.TestCase):
                 MODULE.load_context(root / "pr-review-context.json")["context_hash"],
                 original["context_hash"],
             )
+            MODULE.cleanup_review_run(repo, root, run["owner_token"])
+
+    def test_refresh_context_rolls_back_pair_when_second_promotion_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            run = MODULE.create_review_run(repo, 34)
+            root = Path(run["artifact_root"])
+            original = context()
+            current = context(reviews=[{
+                "id": 10,
+                "author": "reviewer",
+                "state": "COMMENTED",
+                "submitted_at": "2026-01-01T00:00:00Z",
+                "commit_id": "head",
+                "body": "arrived during review",
+            }])
+            MODULE.write_json(root / "pr-review-context.json", original)
+            conversation = root / "pr-review-conversation.md"
+            conversation.write_text("old\n", encoding="utf-8")
+            original_context = (root / "pr-review-context.json").read_bytes()
+            original_conversation = conversation.read_bytes()
+
+            def capture_current(**kwargs):
+                MODULE.write_json(kwargs["output"], current)
+                return current
+
+            real_promote = MODULE.promote_artifact
+            calls = 0
+
+            def fail_second_promotion(*args, **kwargs):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise MODULE.ContextError("injected second promotion failure")
+                return real_promote(*args, **kwargs)
+
+            with patch.object(MODULE, "capture_to_path", side_effect=capture_current):
+                with patch.object(
+                    MODULE,
+                    "promote_artifact",
+                    side_effect=fail_second_promotion,
+                ):
+                    with self.assertRaisesRegex(
+                        MODULE.ContextError, "injected second promotion failure"
+                    ):
+                        MODULE.refresh_review_context(
+                            repo, "owner/repo", 34, root, run["owner_token"]
+                        )
+
+            self.assertEqual(
+                (root / "pr-review-context.json").read_bytes(), original_context
+            )
+            self.assertEqual(conversation.read_bytes(), original_conversation)
             MODULE.cleanup_review_run(repo, root, run["owner_token"])
 
     def test_latest_same_author_ignores_dismissed_reviews(self):
