@@ -42,3 +42,11 @@ control-plane helper results and selected role set; only the historical baseline
 remains fixture data. The executable assertions require fewer pre-Gate
 operations/attempts, no architect for valid OpenSpec, no empty cleaner, no
 unconditional tester, and exactly one complete quality run per candidate.
+
+`docs/benchmarks/pipeline-baseline.md` is the companion record and measures a
+different thing: three fixture requests run through the live pipeline against a
+named tree anchor, with time to Gate 1, dispatches, tool calls,
+acceptance-criteria count, correction rounds, terminal state, and exclusive
+defects per lens. The contract benchmark proves the control plane does less
+work; the real-run baseline is what a later contract change compares its own
+measurement against.
