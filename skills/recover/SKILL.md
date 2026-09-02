@@ -1,6 +1,6 @@
 ---
 name: recover
-description: Resume an interrupted pipeline from its v5 control log or convert one supported legacy workspace once.
+description: Resume an interrupted pipeline from its v5 control log or close a workspace without one administratively.
 disable-model-invocation: true
 ---
 
@@ -25,7 +25,8 @@ counts, ordinals, elapsed time, tokens, and tool calls never choose a route.
 
 A workspace without `control/control.jsonl` has nothing to replay. Close it
 administratively through the packaged helper, which appends one `pipeline.close`
-entry to its events file and refuses a symlinked `control/` path, then offer
+entry to its events file and refuses a symlinked or hard-linked `control/` or
+events path, then offer
 inline continuation or a fresh run. Missing or conflicting authority requires a
 live decision; never infer or repair it. Mixed writable schemas fail closed.
 

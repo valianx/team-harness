@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { link, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -337,6 +337,10 @@ try {
   await mkdir(eventsLinkWorkspace, { recursive: true });
   await symlink(path.join(orphanWorkspace, "00-execution-events.jsonl"), path.join(eventsLinkWorkspace, "00-execution-events.jsonl"));
   assert.equal((await closeWorkspaceWithoutControlLog({ workspace: eventsLinkWorkspace })).error_code, "EVENTS_PATH_INVALID");
+  const hardLinkWorkspace = path.join(temporary, "hard-link-workspace");
+  await mkdir(hardLinkWorkspace, { recursive: true });
+  await link(path.join(orphanWorkspace, "00-execution-events.jsonl"), path.join(hardLinkWorkspace, "00-execution-events.jsonl"));
+  assert.equal((await closeWorkspaceWithoutControlLog({ workspace: hardLinkWorkspace })).error_code, "EVENTS_PATH_INVALID");
   assert.equal((await readFile(path.join(orphanWorkspace, "00-execution-events.jsonl"), "utf8")).split("\n").filter(Boolean).length, 1);
 } finally {
   await rm(temporary, { recursive: true, force: true });

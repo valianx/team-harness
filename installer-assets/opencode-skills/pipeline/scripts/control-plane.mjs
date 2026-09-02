@@ -3,8 +3,9 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
+import { constants as fsConstants } from "node:fs";
 import {
-  appendFile, lstat, mkdir, open, readFile, realpath, rename, rm, unlink,
+  lstat, mkdir, open, readFile, realpath, rename, rm, unlink,
 } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
@@ -39,7 +40,7 @@ export {
 const {
   SHA256, SAFE_ID, SECRET, LEASE_KEYS, LEASE_CREATE_KEYS, RESULT_KEYS,
   exactKeys, canonical, boundedString, safeRelative, boundedArray, validReference,
-  canonicalDirectory, pathContainedWithoutSymlink, leaseBodyValid, resultBodyValid,
+  canonicalDirectory, leaseBodyValid, resultBodyValid,
 } = controlPlaneSpecialistInternals;
 const execFileAsync = promisify(execFile);
 const MAX_GIT_OUTPUT_BYTES = 1024 * 1024;
@@ -641,12 +642,22 @@ export async function closeWorkspaceWithoutControlLog({ workspace }) {
     }
     const eventsPath = path.join(root, "00-execution-events.jsonl");
     const eventsStat = await entryStat(eventsPath);
-    if (eventsStat !== null && (eventsStat.isSymbolicLink() || !eventsStat.isFile())) throw new Error("EVENTS_PATH_INVALID");
+    if (eventsStat !== null && (eventsStat.isSymbolicLink() || !eventsStat.isFile() || eventsStat.nlink !== 1)) {
+      throw new Error("EVENTS_PATH_INVALID");
+    }
     const entry = {
       ts: new Date().toISOString(), event: "pipeline.close", terminal_state: "closed-administratively",
       reason: "no control/control.jsonl", offer: ["inline-continuation", "fresh-run"],
     };
-    await appendFile(eventsPath, `${JSON.stringify(entry)}\n`);
+    const { O_WRONLY, O_APPEND, O_CREAT, O_NOFOLLOW } = fsConstants;
+    const handle = await open(eventsPath, O_WRONLY | O_APPEND | O_CREAT | (O_NOFOLLOW ?? 0), 0o600);
+    try {
+      const opened = await handle.stat();
+      if (!opened.isFile() || opened.nlink !== 1) throw new Error("EVENTS_PATH_INVALID");
+      await handle.appendFile(`${JSON.stringify(entry)}\n`);
+    } finally {
+      await handle.close();
+    }
     return { ok: true, outcome: "closed-administratively", offer: entry.offer, error_code: null };
   } catch (error) {
     const known = new Set(["WORKSPACE_INVALID", "CONTROL_PATH_SYMLINK", "CONTROL_LOG_PRESENT", "EVENTS_PATH_INVALID"]);

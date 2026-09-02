@@ -236,8 +236,10 @@ assert.match(pipelineVersionContracts[0], /only current machine[\s\S]*design →
   "Codex pipeline activation is not pinned to the canonical v5 state machine");
 assert.match(pipelineVersionContracts[3], /without `control\/control\.jsonl`[\s\S]*administratively/,
   "recovery does not close a workspace without a control log administratively");
-assert.doesNotMatch(pipelineVersionContracts[3], /one-shot converter|current\.json|v1-v4/,
-  "recovery still names the retired converter");
+for (const contract of pipelineVersionContracts) {
+  assert.doesNotMatch(contract, /one-shot converter|create-then-switch|legacy conversion|current\.json|v1-v4/,
+    "a pipeline contract still names the retired converter");
+}
 assert.match(pipelineIdentityDocs[1], /Choose the configured repository or Obsidian workspace root/,
   "Codex pipeline does not honor the configured workspace root");
 assert.match(pipelineIdentityDocs[1], /Bind the repository's OpenSpec change root separately from the workspace root/,
