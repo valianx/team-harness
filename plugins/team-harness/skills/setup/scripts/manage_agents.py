@@ -366,19 +366,23 @@ def write_atomic(source: Path, target: Path) -> None:
         temp.unlink(missing_ok=True)
 
 
-def inspect(scope: str) -> int:
+def inspect_result(scope: str) -> dict[str, object]:
     agents, rows = inventory(scope)
     runtime_config = classify_runtime_config(runtime_config_path(scope))
-    print(json.dumps({
+    return {
         "scope": scope,
         "directory": str(agents),
         "agents": rows,
         "runtimeConfig": runtime_config,
-    }, sort_keys=True))
+    }
+
+
+def inspect(scope: str) -> int:
+    print(json.dumps(inspect_result(scope), sort_keys=True))
     return 0
 
 
-def sync(scope: str) -> int:
+def sync_result(scope: str) -> dict[str, object]:
     agents, before = inventory(scope)
     conflicts = [row for row in before if row["status"] == "conflict"]
     if conflicts:
@@ -396,7 +400,7 @@ def sync(scope: str) -> int:
         row["role"]: oct(stat.S_IMODE(Path(row["path"]).stat().st_mode))
         for row in after
     }
-    print(json.dumps({
+    return {
         "scope": scope,
         "directory": str(agents),
         "changed": changed,
@@ -405,7 +409,11 @@ def sync(scope: str) -> int:
         "runtimeConfig": runtime_config,
         "runtimeConfigChanged": runtime_config_changed,
         "restartRequired": bool(changed or runtime_config_changed),
-    }, sort_keys=True))
+    }
+
+
+def sync(scope: str) -> int:
+    print(json.dumps(sync_result(scope), sort_keys=True))
     return 0
 
 

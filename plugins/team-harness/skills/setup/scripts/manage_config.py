@@ -440,7 +440,7 @@ def set_values(assignments: list[str], removals: list[str], version: str | None)
     return 0
 
 
-def ensure_defaults(version: str | None) -> int:
+def ensure_defaults_result(version: str | None) -> dict[str, Any]:
     path = config_path()
     before = read_json(path)
     after = json.loads(json.dumps(before))
@@ -457,13 +457,17 @@ def ensure_defaults(version: str | None) -> int:
         after["installed_version"] = version
     after["updated_at"] = dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
     changed = write_atomic(path, before, after)
-    print(json.dumps({
+    return {
         "path": str(path),
         "changed": changed,
         "added": added,
         "removedLegacySelectors": removed_legacy,
         "migrationGuidance": LEGACY_GUIDANCE if removed_legacy else None,
-    }, sort_keys=True))
+    }
+
+
+def ensure_defaults(version: str | None) -> int:
+    print(json.dumps(ensure_defaults_result(version), sort_keys=True))
     return 0
 
 

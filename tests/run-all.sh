@@ -162,6 +162,20 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 3h: Codex update single-pass convergence"
+echo "############################################################"
+if [ -n "$PY" ] && $PY "$TESTS_DIR/test_codex_update_convergence.py"; then
+    echo "codex-update-convergence: PASS"
+elif [ -z "$PY" ]; then
+    echo "codex-update-convergence: FAIL (Python 3 not found)"
+    FAILED=$((FAILED + 1))
+else
+    echo "codex-update-convergence: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 echo "# Suite 3e: Codex hook launcher and manifest floor"
 echo "# Requires: node. Skipped when node is absent."
 echo "############################################################"
