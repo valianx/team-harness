@@ -180,22 +180,31 @@ def baseline() -> dict[str, dict]:
 
 
 def base_baseline() -> dict[str, dict] | None:
-    """The fixture as committed on the base ref, or None when no base is reachable.
+    """The fixture as committed on the base ref; {} when the base has none, None when no base is reachable.
 
     The ratchet is a property across commits, not within one: without the base
     copy, a commit that grows a file and raises its ceiling to match is
     self-consistent and passes every snapshot check.
     """
     ref = os.environ.get("TH_BASELINE_BASE_REF", "origin/main")
+    git = ["git", "-C", str(ROOT)]
+    try:
+        subprocess.run(
+            [*git, "rev-parse", "--verify", "--quiet", "--end-of-options", f"{ref}^{{commit}}"],
+            check=True, capture_output=True, text=True, encoding="utf-8",
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
     spec = f"{ref}:{BASELINE.relative_to(ROOT).as_posix()}"
     try:
         shown = subprocess.run(
-            ["git", "-C", str(ROOT), "show", "--end-of-options", spec],
+            [*git, "show", "--end-of-options", spec],
             check=True, capture_output=True, text=True, encoding="utf-8",
         )
         return json.loads(shown.stdout)
-    except (subprocess.CalledProcessError, FileNotFoundError, json.JSONDecodeError):
-        return None
+    except (subprocess.CalledProcessError, json.JSONDecodeError):
+        # A reachable base without the fixture is the bootstrap commit; nothing to ratchet against.
+        return {}
 
 
 def check_ratchet(recorded: dict[str, dict], base: dict[str, dict], out: list[str]) -> None:
