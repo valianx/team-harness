@@ -649,11 +649,16 @@ export async function closeWorkspaceWithoutControlLog({ workspace }) {
       ts: new Date().toISOString(), event: "pipeline.close", terminal_state: "closed-administratively",
       reason: "no control/control.jsonl", offer: ["inline-continuation", "fresh-run"],
     };
-    const { O_WRONLY, O_APPEND, O_CREAT, O_NOFOLLOW } = fsConstants;
-    const handle = await open(eventsPath, O_WRONLY | O_APPEND | O_CREAT | (O_NOFOLLOW ?? 0), 0o600);
+    const { O_WRONLY, O_APPEND, O_CREAT, O_NOFOLLOW = 0 } = fsConstants;
+    const handle = await open(eventsPath, O_WRONLY | O_APPEND | O_CREAT | O_NOFOLLOW, 0o600);
     try {
       const opened = await handle.stat();
-      if (!opened.isFile() || opened.nlink !== 1) throw new Error("EVENTS_PATH_INVALID");
+      const current = await lstat(eventsPath);
+      const sameInode = (a, b) => a.dev === b.dev && a.ino === b.ino;
+      if (!opened.isFile() || opened.nlink !== 1 || current.isSymbolicLink() || !sameInode(current, opened)
+        || (eventsStat !== null && !sameInode(eventsStat, opened))) {
+        throw new Error("EVENTS_PATH_INVALID");
+      }
       await handle.appendFile(`${JSON.stringify(entry)}\n`);
     } finally {
       await handle.close();

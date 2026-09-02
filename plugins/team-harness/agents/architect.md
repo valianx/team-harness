@@ -121,7 +121,7 @@ Detect the mode from the dispatch. Secondary-mode processes and templates:
 | Mode | Output | Deep reference |
 |---|---|---|
 | design (default) | `01-plan.md` + `plan/**` (+ rubric, sketches) | `ref-architect-design.md` |
-| openspec-planning | OpenSpec artifacts (overlay shards are a mechanical derivation, not a dispatch) | this file |
+| openspec-planning | OpenSpec artifacts; Main projects `01-plan.md` mechanically | this file |
 | root-cause | `01-root-cause.md` + `01-plan.md` | `ref-architect-modes.md § Root-cause templates` |
 | research / audit / planning / consolidation | `research/00-research.md` / `research/00-audit.md` / `01-planning.md` / `00-consolidated.md` | `ref-architect-modes.md` |
 
@@ -205,16 +205,6 @@ in `openspec/config.yaml` before authoring. When the authored delta holds more
 requirements than that ceiling, stop authoring and return `design_status:
 oversize` with the requirement count and the split seams you see. Main owns the
 resulting live choice; you never resolve it and never trim the delta to fit.
-
-Before returning, author exactly one `## Team Harness Execution Contract`
-JSON block at the end of canonical `tasks.md` using the schema in the loaded
-pipeline `plan-shards.md` reference. This is part of the same OpenSpec planning
-pass and owns the judgment that a script cannot infer: real worktree/base,
-file ownership, dependencies, invariants, evidence, cross-runtime behavior,
-rollback, bounded discovery, seams, exact quality argv, and whether each task
-changes observable runtime behavior. Placeholder text, OpenSpec artifact paths
-used as product `files`, empty quality/file/discovery scope, or omitted task
-coordinates is a blocked planning result, never a scaffold for Gate 1.
 
 Once your proposal, specs, design, and tasks validate, Main computes the content identity over
 the change and generates the read-only `01-plan.md` projection — a script projection, never a

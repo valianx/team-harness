@@ -6,9 +6,9 @@
 
 ## 2. Delete helpers
 
-- [x] 2.1 Re-run the reference scan over `agents/**` and `skills/**` (excluding `scripts/`) for the eleven helpers and record zero hits in the PR body; abort the deletion of any helper that gains a hit.
+- [x] 2.1 Re-run the reference scan over `agents/**`, `skills/**`, `plugins/team-harness/agents/**`, and `plugins/team-harness/skills/**` (excluding `scripts/`) for the eleven helpers and record zero hits in the PR body; abort the deletion of any helper that gains a hit.
 - [x] 2.2 Delete the eleven `skills/pipeline/scripts/*.mjs` files and their `plugins/team-harness/skills/pipeline/scripts/` mirrors.
-- [x] 2.3 Delete `tests/test_openspec_bindings.mjs`, `test_openspec_overlay.mjs`, `test_openspec_snapshot.mjs`, `test_openspec_adapter.mjs`, `test_openspec_recovery.mjs`, `test_openspec_design_e2e.mjs`, `test_correction_packet_preflight.mjs`, `test_plan_contract.mjs`, `test_helper_bundle.mjs`, `test_specialist_write_scope.mjs`; remove their `tests/run-all.sh` lines; update `test_pipeline_helper_entrypoints.mjs` to the surviving entrypoints.
+- [x] 2.3 Delete `tests/test_openspec_bindings.mjs`, `test_openspec_overlay.mjs`, `test_openspec_snapshot.mjs`, `test_openspec_adapter.mjs`, `test_openspec_recovery.mjs`, `test_openspec_design_e2e.mjs`, `test_correction_packet_preflight.mjs`, `test_plan_contract.mjs`, `test_helper_bundle.mjs`, `test_specialist_write_scope.mjs`, `test_specialist_liveness.mjs`; remove their `tests/run-all.sh` lines; update `test_pipeline_helper_entrypoints.mjs` to the surviving entrypoints.
 - [x] 2.4 Repoint `cmd/install/manifest_registry_test.go` at a surviving pipeline script so the opencode manifest test does not require a deleted file.
 
 ## 3. Remove the converter

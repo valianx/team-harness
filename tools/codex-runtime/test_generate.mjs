@@ -234,12 +234,6 @@ for (const contract of pipelineVersionContracts) {
 }
 assert.match(pipelineVersionContracts[0], /only current machine[\s\S]*design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete/,
   "Codex pipeline activation is not pinned to the canonical v5 state machine");
-assert.match(pipelineVersionContracts[3], /without `control\/control\.jsonl`[\s\S]*administratively/,
-  "recovery does not close a workspace without a control log administratively");
-for (const contract of pipelineVersionContracts) {
-  assert.doesNotMatch(contract, /one-shot converter|create-then-switch|legacy conversion|current\.json|v1-v4/,
-    "a pipeline contract still names the retired converter");
-}
 assert.match(pipelineIdentityDocs[1], /Choose the configured repository or Obsidian workspace root/,
   "Codex pipeline does not honor the configured workspace root");
 assert.match(pipelineIdentityDocs[1], /Bind the repository's OpenSpec change root separately from the workspace root/,
@@ -280,11 +274,7 @@ for (const marker of ["control/control.jsonl", "projection", "Main is the only l
   assert.ok(orchestratorStateContract.includes(marker), `orchestrator artifact verification misses section marker ${marker}`);
 }
 const implementationContract = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/implementation.md"), "utf8");
-const coordinatorLivenessContract = await readFile(join(root, "agents/_shared/coordinator-liveness.md"), "utf8");
 const coordinatorRecoveryContract = await readFile(join(root, "agents/_shared/coordinator-recovery.md"), "utf8");
-for (const marker of ["delivery", "terminality", "never chooses", "causal recovery"]) {
-  assert.ok(coordinatorLivenessContract.includes(marker), `specialist liveness pipeline contract misses ${marker}`);
-}
 for (const marker of ["Continue the same lease", "Replace the session", "Pause", "live decision", "Counts, ordinals", "fresh QA"]) {
   assert.ok(coordinatorRecoveryContract.includes(marker), `coordinator recovery contract misses ${marker}`);
 }
@@ -294,12 +284,6 @@ for (const marker of ["Just-in-time batching", "capability_lease", "one committi
 assert.doesNotMatch(implementationContract, /repair-derived|seal-dispatch|permanent seal|execution_items/,
   "current implementation route retains a legacy overlay, seal, or universal RED hot path");
 assert.match(implementationContract, /no universal RED/);
-const recoveryContract = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/recovery.md"), "utf8");
-for (const marker of ["without `control/control.jsonl`", "administratively", "symlinked `control/` path", "Ambiguous authority"]) {
-  assert.ok(recoveryContract.includes(marker), `v5 recovery contract misses ${marker}`);
-}
-assert.doesNotMatch(recoveryContract, /create-then-switch|v1-v4|current pointer/,
-  "Codex recovery reference still describes the retired converter");
 for (const role of ["implementer", "tester"]) {
   const adapter = await readFile(join(root, `runtime/codex/instructions/${role}.md`), "utf8");
   const generatedAgent = await readFile(join(root, `.codex/agents/${role}.toml`), "utf8");

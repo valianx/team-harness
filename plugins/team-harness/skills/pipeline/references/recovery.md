@@ -21,5 +21,5 @@ when impact is true or unknown.
 
 A workspace without `control/control.jsonl` has nothing to replay. Close it
 administratively through the packaged helper, which appends one `pipeline.close`
-entry and refuses a symlinked `control/` path, then offer inline continuation or
-a fresh run. Ambiguous authority or mixed writable schemas fails closed.
+entry and refuses a symlinked `control/` path or a symlinked or hard-linked
+events file, then offer inline continuation or a fresh run. Ambiguous authority or mixed writable schemas fails closed.

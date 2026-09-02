@@ -32,4 +32,4 @@ None.
 
 ## Impact
 
-Deletes eleven scripts, their `plugins/team-harness/skills/pipeline/scripts/` mirrors, and eleven tests; edits `tests/run-all.sh`, `control-plane.mjs`, `agents/ref-pipeline.md § Recovery and legacy state`, `agents/_shared/orchestrator-state.md`, three docs, and the Codex and opencode projections. Depends on `right-size-pipeline-contracts` task 5.3 archiving the six completed changes first. The earlier full-retirement draft is preserved in the vault run `2026-08-31_simplify-pipeline-control-plane/inputs/openspec/team-harness/superseded-v5-proposal/`.
+Deletes eleven scripts, their `plugins/team-harness/skills/pipeline/scripts/` mirrors, and eleven tests; edits `tests/run-all.sh`, `control-plane.mjs`, `agents/ref-pipeline.md § Recovery and legacy state`, `agents/_shared/orchestrator-state.md`, three docs, and the Codex and opencode projections. Depends on `right-size-pipeline-contracts` task 5.3 archiving the six completed changes first.

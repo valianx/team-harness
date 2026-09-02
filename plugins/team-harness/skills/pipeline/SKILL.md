@@ -48,7 +48,8 @@ it while available. Native sandbox and approval policy remain unchanged.
 
 1. Apply [activation.md](references/activation.md). Validate only the pipeline
    core, select the workspace, establish the repository/worktree identity, and
-   replay or convert control state. Do not preflight every specialist.
+   replay control state or close a workspace without a control log
+   administratively. Do not preflight every specialist.
 2. Bind one OpenSpec change. Read `proposal.md`, `design.md`, `tasks.md`, and
    delta specs, then run strict validation. If the complete change is already
    valid, do not dispatch architect. If it is missing or the live operator

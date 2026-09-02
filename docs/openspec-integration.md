@@ -80,8 +80,9 @@ OpenSpec integrations are preserved unchanged.
 - Cleaner, security/adversary, delivery, state/events, nonces, corrections, Gate 1, Gate 3, and
   publication remain unchanged TH responsibilities.
 
-After implementation begins, `tasks.md` accepts only monotonic checkbox transitions from pending
-to complete. Task text, structure, added or removed coordinates, or any other canonical change
+After implementation begins, normal `tasks.md` progress is monotonic from pending to complete. A
+completed checkbox that returns to pending leaves the identity unchanged; the regression is
+recorded in the control log and the batch that owns the task is re-leased. Task text, structure, added or removed coordinates, or any other canonical change
 alters the content identity, makes `01-plan.md` stale, and blocks the next dispatch until Design
 regenerates and re-presents.
 

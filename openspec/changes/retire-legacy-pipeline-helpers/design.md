@@ -19,7 +19,7 @@ See [proposal.md](proposal.md). After #631 the live pipeline reads `agents/ref-p
 
 ### 1. Delete by reference count, not by opinion
 
-A helper is deleted when `grep` over `agents/**`, `skills/**/SKILL.md`, and `skills/**/*.md` (excluding the scripts directory) returns zero hits. The eleven named in the proposal meet that test today; `specialist-liveness.mjs` has one hit in `ref-pipeline.md § Failures` as a failure-kind name, not an invocation, and is deleted with the prose pointing at the v5 liveness facts instead. Any helper with a live hit stays, whatever its age.
+A helper is deleted when `grep` over `agents/**`, `skills/**` (excluding `scripts/`), `plugins/team-harness/agents/**`, and `plugins/team-harness/skills/**` (excluding `scripts/`) returns zero hits. The eleven named in the proposal meet that test today; `specialist-liveness.mjs` has one hit in `ref-pipeline.md § Failures` as a failure-kind name, not an invocation, and is deleted with the prose pointing at the v5 liveness facts instead. Any helper with a live hit stays, whatever its age.
 
 ### 2. Reconcile specs after archive, in one delta
 
