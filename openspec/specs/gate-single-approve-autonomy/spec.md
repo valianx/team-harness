@@ -33,33 +33,55 @@ The Gate-1 presentation SHALL offer exactly one approval outcome, plus edit and 
 - **THEN** Gate 1 remains unreleased until Main regenerates the projection from canonical artifacts
 
 ### Requirement: Post-approval execution is autonomous until the draft PR
-After Gate-1 approval, the pipeline SHALL run implementation, validation, bounded correction (max-3 on the frozen result), and delivery through draft-PR creation without requesting operator input, provided validation reaches total green.
+After Gate-1 approval, the pipeline SHALL run implementation, validation,
+causal correction, and delivery through draft-PR creation without requesting
+operator input while work remains inside approved intent, scope, acceptance
+meaning, and security floor and validation reaches total green. No attempt,
+correction, continuation, replacement, or iteration count SHALL limit that
+authority.
 
 #### Scenario: Validation finds correctable findings
-- **WHEN** validation returns findings correctable in scope and the correction budget is not exhausted
-- **THEN** the pipeline corrects, revalidates the delta, and continues without pausing
+- **WHEN** findings are correctable in scope and evidence supports a different safe causal action
+- **THEN** the pipeline corrects, refreshes stale evidence, and continues without pausing
 
 #### Scenario: Validation is totally green
 - **WHEN** validation completes with no open blocking findings
-- **THEN** Gate 3 executes mechanically, citing the Gate-1 record, and publishes the draft PR
+- **THEN** Gate 3 executes mechanically, cites the Gate-1 authority event, and publishes the draft PR
 
 ### Requirement: Pauses come only from the closed exception list
-The pipeline SHALL pause between Gate 1 and the draft PR only for the closed exception classes: the design changed (structural contradiction, scope expansion), a security obligation changed or a surviving broke-it exists, or infrastructure failed (including correction-budget exhaustion). The exception list always takes precedence over auto-ship.
+The pipeline SHALL pause between Gate 1 and the draft PR only when authority is
+absent for a semantic, scope, acceptance, security, or outward-effect change;
+when mutable ownership cannot be made safe; when immutable identity or integrity
+cannot be restored mechanically; when an external prerequisite is unavailable;
+or when every known safe strategy repeats the same causal identity. Ordinal
+exhaustion MUST NOT be an exception.
 
 #### Scenario: A non-correctable concern survives validation
-- **WHEN** validation ends with a concern that is not correctable in scope
-- **THEN** the pipeline pauses loudly with the concern instead of shipping
+- **WHEN** validation ends with a concern that requires a semantic or authority change
+- **THEN** the pipeline pauses with the bounded decision and evidence instead of shipping
+
+#### Scenario: Recovery has no different safe action
+- **WHEN** every known safe action would reproduce the same failed causal identity
+- **THEN** the pipeline pauses with the missing condition and preserves authority, progress, and evidence
 
 #### Scenario: A convenience pause is proposed
-- **WHEN** any flow, skill, or agent proposes an intermediate confirmation not on the exception list
-- **THEN** the contract rejects it; no new gates or approval currencies are added
+- **WHEN** any flow, skill, or agent proposes an intermediate confirmation outside the exception list
+- **THEN** the contract rejects it and adds no gate, round approval, or approval currency
 
 ### Requirement: Recovery understands auto-ship and never releases
-Recovery SHALL treat `{ship, auto-ship}` as cleared `gate3_release` values and MUST NOT execute an auto-release itself; it resumes the pipeline at the recorded next action.
+Recovery SHALL derive Gate-3 clearance from a valid control-log event with
+decision `ship` or `auto-ship` and MUST NOT execute an auto-release itself. It
+resumes at the next action derived from the log. Legacy release fields are
+readable only by the converter and are never sufficient without matching
+historical authority.
 
 #### Scenario: A run is interrupted after mechanical Gate 3
-- **WHEN** recovery finds `gate3_release: auto-ship` with delivery incomplete
-- **THEN** it resumes delivery mechanics without re-asking for a release decision and without re-releasing
+- **WHEN** recovery finds a valid `auto-ship` event with delivery incomplete
+- **THEN** it resumes delivery mechanics without another release decision or duplicate release event
+
+#### Scenario: A projected release field disagrees
+- **WHEN** `00-state.md` disagrees with the valid control log
+- **THEN** recovery rebuilds the projection and does not infer or revoke authority from the cache
 
 ### Requirement: The deterministic guard covers only the minimal outward floor
 `dev-guard` SHALL cover only the irreversible publication boundary: pushes to the default branch, force/tag/non-benign pushes, and PR merge (`gh pr merge`, `gh api` merge endpoints) remain `ask`; the single clean non-default-branch push on `origin` remains `allow`. Every other outward write (`gh pr create/review/comment`, issue writes, non-merge API mutations, MCP tool writes) SHALL be uncovered by the hook — no decision — and governed by the host runtime's permission model. The `autogate` config mechanism SHALL be removed.

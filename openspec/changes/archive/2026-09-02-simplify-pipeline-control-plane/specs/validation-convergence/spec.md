@@ -1,6 +1,6 @@
 ## MODIFIED Requirements
 
-### Requirement: A persistent findings ledger is the correction flow's memory
+### Requirement: A persistent findings ledger is the correction loop's memory
 The workspace SHALL carry `reviews/findings-ledger.md` as a rebuildable view
 projected only by Main from accepted result events and live dispositions in the
 control log. It SHALL expose one row per finding ID with class, severity,
@@ -26,7 +26,11 @@ reviewer narrative.
 - **WHEN** an accepted residual or operator-ruled finding returns without a changed root cause
 - **THEN** the prior disposition stands and no correction package is created
 
-### Requirement: Ratchet termination ends correction on evidence, not patience
+#### Scenario: A correction round is dispatched
+- **WHEN** the coordinator dispatches any re-review after a correction
+- **THEN** the dispatch context includes the ledger, and the verifier classifies every reported finding as `new_in_delta`, `pre_existing_missed`, or `reopened`
+
+### Requirement: Ratchet termination ends the loop on severity, not patience
 The ratchet SHALL govern the complete reasoning-lens finding set and require the
 deterministic quality conjunctions green. Zero open critical/high findings and
 a passing impact-required security result SHALL be convergence-complete. Remaining
@@ -51,7 +55,19 @@ labels such as `round`, `max-3`, or `N/3` MUST NOT select the route.
 - **WHEN** a blocking finding remains but the proposed closure repeats the same causal identity
 - **THEN** no redispatch occurs until evidence supports a different safe action
 
-### Requirement: Convergence is measurable without controlling the route
+#### Scenario: A sub-floor correctable security finding remains
+- **WHEN** a re-review round's only open finding is a medium-severity security finding correctable in scope that is neither a `broke-it` nor an incomplete-changed-control condition
+- **THEN** it records as a ledger residual and a PR-body concern, and no further correction round opens
+
+#### Scenario: A correctable `broke-it` survives the round
+- **WHEN** a re-review round reports a `broke-it` correctable within the approved scope, or an incomplete-changed-control condition on a sensitive pipeline
+- **THEN** validation fails exactly as today, the finding is never a ledger residual, and the round is not convergence-complete at any severity label
+
+#### Scenario: A new critical appears in the corrected delta
+- **WHEN** a re-review round reports an open critical finding classified `new_in_delta`
+- **THEN** a correction round opens exactly as today
+
+### Requirement: Convergence is measurable in the event trace
 Accepted result and recovery events SHALL contain stable finding
 classifications, causal identities, and observed ordinals sufficient to derive
 convergence trajectories. These values SHALL be observations only and MUST NOT
@@ -64,6 +80,10 @@ be duplicated as authority or required mutable state.
 #### Scenario: A projection counter is wrong
 - **WHEN** a displayed counter disagrees with accepted control-log events
 - **THEN** it is rebuilt or omitted and the recovery route remains unchanged
+
+#### Scenario: An iteration begins after a re-review
+- **WHEN** the coordinator emits `iteration.start` following a correction fan
+- **THEN** the event includes the three classification counts as one `convergence_counts` object, making per-run convergence trajectories derivable from the trace
 
 ## ADDED Requirements
 

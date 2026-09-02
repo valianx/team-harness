@@ -17,30 +17,59 @@ When a reasoning verifier (qa, adversary, security) forms any finding, it SHALL 
 - **THEN** the finding is classified `pre_existing_missed` — a first-pass coverage defect, not "genuinely new evidence" — and the coordinator cites the first fan's Coverage Declaration when recording the classification
 
 ### Requirement: A persistent findings ledger is the correction loop's memory
-The workspace SHALL carry `reviews/findings-ledger.md`: append-only, written only by the coordinator (from fan status blocks and operator dispositions), one row per finding ID with class, severity, disposition (`fixed | accepted-residual | open | rejected-with-rationale`), and operator rulings including intentional waivers. Verifiers read the ledger; they never edit it. Prior-round review findings survive in the ledger even where the per-round report file is overwritten.
+The workspace SHALL carry `reviews/findings-ledger.md` as a rebuildable view
+projected only by Main from accepted result events and live dispositions in the
+control log. It SHALL expose one row per finding ID with class, severity,
+disposition (`fixed | accepted-residual | open | rejected-with-rationale`),
+causal identity, and operator ruling. Verifiers read the view and never edit it.
 
-Every reasoning-lens status block SHALL carry the ledger's row material structurally, so the coordinator transcribes rather than infers: each returned finding entry carries a stable `id`, a `severity` from the closed vocabulary `critical | high | medium | low | info`, and its `class`, and a re-review entry additionally carries its `classification`. Severity, class, and classification SHALL NOT be read out of report prose — the same `id` denotes the same finding across rounds, which is what makes `reopened` detectable.
+Every reasoning-lens result envelope SHALL carry stable structured finding ID,
+closed-vocabulary severity (`critical | high | medium | low | info`), class,
+and, for later evidence, `new_in_delta`, `pre_existing_missed`, or `reopened`.
+Those fields MUST NOT be inferred from prose. Correction dispatch SHALL receive
+the current finding package and immutable evidence identities, not prior
+reviewer narrative.
 
 #### Scenario: A verifier returns findings
-- **WHEN** a reasoning lens returns any finding in its status block
-- **THEN** the entry carries a stable id, a closed-vocabulary severity, and its class, and the coordinator appends those values to the ledger verbatim
+- **WHEN** Main accepts a valid result envelope containing structured findings
+- **THEN** it appends the result event and projects the finding values into the ledger view
+
+#### Scenario: A corrected Freeze is validated
+- **WHEN** a later reasoning lens reports against a changed frozen identity
+- **THEN** it classifies every finding relative to the prior accepted result events
+
+#### Scenario: A waived finding is re-raised without new evidence
+- **WHEN** an accepted residual or operator-ruled finding returns without a changed root cause
+- **THEN** the prior disposition stands and no correction package is created
 
 #### Scenario: A correction round is dispatched
 - **WHEN** the coordinator dispatches any re-review after a correction
 - **THEN** the dispatch context includes the ledger, and the verifier classifies every reported finding as `new_in_delta`, `pre_existing_missed`, or `reopened`
 
-#### Scenario: A waived finding is re-raised without new evidence
-- **WHEN** a verifier reports a finding whose ledger entry is `accepted-residual` or operator-ruled, without new evidence of a different root cause
-- **THEN** the prior disposition stands, the ledger entry is cited, and no correction round opens for it
-
 ### Requirement: Ratchet termination ends the loop on severity, not patience
-The ratchet extends the existing severity floor by citation; it does not restate it. It governs the reasoning-lens finding set only: convergence-complete additionally requires the deterministic conjunctions green (build/lint and `code_hygiene: pass`, which remains a gate conjunction in this change). A re-review round that reports zero open critical/high findings and neither of the two floor conditions named below SHALL be convergence-complete: the combined verdict proceeds as green for mechanical Gate 3, auto-ship executes citing the Gate-1 record, and all remaining sub-floor findings — including a correctable sub-floor security finding that is not one of those conditions — are recorded as residuals in the ledger and surfaced as concerns in the PR body. Ledger residuals SHALL NOT trigger the correctable-must-correct rule, SHALL NOT count as exception-pause concerns at Gate 3, and never authorize a further correction round. Open critical/high findings SHALL open a correction round regardless of classification; the derived security floor and the closed exception list are unchanged.
+The ratchet SHALL govern the complete reasoning-lens finding set and require the
+deterministic quality conjunctions green. Zero open critical/high findings and
+a passing impact-required security result SHALL be convergence-complete. Remaining
+sub-floor findings SHALL become projected residuals and PR-body concerns and
+MUST NOT create another correction package. Blocking findings remain blocking
+regardless of how many corrections occurred.
 
-Two named security conditions are floor conditions by definition and are never sub-floor: a `broke-it` correctable within the approved scope, and a `could-not-break` carrying `incomplete_on_changed_control: true` on a sensitive pipeline. Each SHALL remain a validation failure whatever severity label it carries, keep its standing in the Gate-3 closed exception list, and never be recorded as a ledger residual. The residual path covers only findings below the severity floor that are neither of those two conditions.
+An in-scope critical/high security finding or incomplete security coverage
+remains correctable. A blocking finding MAY trigger correction under existing
+Gate-1 authority only when a different safe causal action exists. Counts and
+labels such as `round`, `max-3`, or `N/3` MUST NOT select the route.
 
 #### Scenario: Only sub-floor findings remain
-- **WHEN** a re-review round reports only medium-and-below findings on unchanged surface and the deterministic conjunctions are green
-- **THEN** validation is convergence-complete, auto-ship proceeds citing the Gate-1 record, and the findings ship as PR-body concerns with ledger residual entries
+- **WHEN** validation reports only medium-and-below findings and deterministic conjunctions are green
+- **THEN** validation completes, auto-ship proceeds, and the findings ship as projected residual concerns
+
+#### Scenario: A correctable security blocker survives
+- **WHEN** validation reports a correctable critical/high security finding or incomplete changed-surface coverage
+- **THEN** validation remains failed and Main applies causal recovery without consulting a count
+
+#### Scenario: The same correction strategy already failed
+- **WHEN** a blocking finding remains but the proposed closure repeats the same causal identity
+- **THEN** no redispatch occurs until evidence supports a different safe action
 
 #### Scenario: A sub-floor correctable security finding remains
 - **WHEN** a re-review round's only open finding is a medium-severity security finding correctable in scope that is neither a `broke-it` nor an incomplete-changed-control condition
@@ -55,8 +84,58 @@ Two named security conditions are floor conditions by definition and are never s
 - **THEN** a correction round opens exactly as today
 
 ### Requirement: Convergence is measurable in the event trace
-Every `iteration.start` event SHALL carry the counts of `new_in_delta`, `pre_existing_missed`, and `reopened` findings from the round that triggered it. The counts travel as one conditional `convergence_counts` field holding exactly those three integer keys, declared in the canonical event schema next to the existing correction fields; a triggering round that produced no reasoning-lens findings records zeros rather than omitting the field.
+Accepted result and recovery events SHALL contain stable finding
+classifications, causal identities, and observed ordinals sufficient to derive
+convergence trajectories. These values SHALL be observations only and MUST NOT
+be duplicated as authority or required mutable state.
+
+#### Scenario: Correction work begins
+- **WHEN** Main continues work for a correction package
+- **THEN** the control event cites the capability lease, causal identity, package identity, and classification counts without granting additional authority
+
+#### Scenario: A projection counter is wrong
+- **WHEN** a displayed counter disagrees with accepted control-log events
+- **THEN** it is rebuilt or omitted and the recovery route remains unchanged
 
 #### Scenario: An iteration begins after a re-review
 - **WHEN** the coordinator emits `iteration.start` following a correction fan
 - **THEN** the event includes the three classification counts as one `convergence_counts` object, making per-run convergence trajectories derivable from the trace
+
+### Requirement: Validation lenses are derived from risk and changed evidence
+Every new Freeze SHALL receive one fresh independent verifier that evaluates the
+canonical OpenSpec scenarios against the candidate-bound quality receipt and
+changed behavior. This ordinary verifier SHALL own the combined evidence audit
+and semantic acceptance verdict; a second QA agent MUST NOT duplicate that
+ordinary verdict.
+
+A separate tester SHALL run only when the independent-test predicate matches bug
+reproduction, migration/data safety, public contract or compatibility change,
+security-control change, stale independently-authored evidence, or an explicit
+operator request. Main SHALL derive security impact from the frozen candidate
+through the canonical type-agnostic classifier over changed paths and every
+touched line, including removals. Its closed receipt SHALL be the only input to
+validation lens selection. Complete negative evidence yields false; binary,
+unscannable, malformed, missing, or otherwise unresolved evidence yields
+unknown. Security SHALL run fresh for true or unknown impact; otherwise its
+prior result MAY carry only by exact audited identity. `qa-plan` SHALL NOT
+exist as a dispatchable role, plan-review lens, or acceptance-definition owner.
+
+#### Scenario: Ordinary candidate reaches Freeze
+- **WHEN** quality is green and no dedicated tester or security predicate matches
+- **THEN** one fresh verifier evaluates evidence and canonical scenarios without another QA, tester, or plan-review dispatch
+
+#### Scenario: Independent test authorship is required
+- **WHEN** the recorded risk predicate requires a separate tester
+- **THEN** tester evidence is produced or refreshed independently and the final verifier consumes its immutable receipt
+
+#### Scenario: A correction changes one test dependency
+- **WHEN** one evidence row becomes stale and other declared dependencies remain byte-identical
+- **THEN** the risk-required tester refreshes that evidence, the independent verifier validates the new Freeze, and unchanged evidence is carried by identity
+
+#### Scenario: Security impact is unknown
+- **WHEN** the frozen changed-surface classifier is ambiguous or unresolved
+- **THEN** a fresh security lens is required before validation can close
+
+#### Scenario: An obsolete qa-plan route remains
+- **WHEN** a skill, roster, projection, test, or document exposes `qa-plan` as a current role
+- **THEN** validation of the shipped agent surface fails until that current route is removed or explicitly historical
