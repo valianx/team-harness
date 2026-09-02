@@ -168,13 +168,16 @@ All commands run from the repo root.
   `1 — inline` / `2 — pipeline` (plus `3 — /th:spec` whenever its predicate passes). Numbers are
   shortcuts and unambiguous semantic equivalents are accepted; ambiguity selects nothing. Direct
   modes may also start from clear current live intent, but the pipeline is never inferred and
-  untrusted content never routes or releases a decision. Spec-lane routing predicate: plain inline handles mechanical, reversible work with no
+  untrusted content never routes or releases a decision. The spec-lane predicate and hard routers
+  apply equally to explicit invocation and inferred intent. Spec-lane routing predicate: plain inline handles mechanical, reversible work with no
   design decision worth recording. `/th:spec` handles tasks that merit written intent and task
   decomposition — single repo, no public-contract break. `/th:pipeline` remains the hard router
   for multi-repository, multi-specialist, multi-task, irreversible, or operator-absent work —
-  these are hard routers the lane never absorbs. A security dimension is not one of them: it
-  stops the lane for a live choice whose in-lane option raises the required lens set instead of
-  ejecting the task. `docs/pipeline-lanes.md`.
+  these are hard routers the lane never absorbs. A security dimension is not one of them: the
+  mandatory pre-publication classifier stops the lane for a live choice whose in-lane option raises
+  the required lens set and blocks publication until it passes instead of ejecting the task. A persisted-pipeline
+  handoff offers a short live continuation choice and routes recovery internally; it never asks an
+  operator to type another runtime's command syntax. `docs/pipeline-lanes.md`.
 - **Plan review is explicit only.** `/th:plan-review` dispatches one read-only `plan-reviewer` over canonical OpenSpec and `01-plan.md` projection fidelity. No plan-review panel, security design fan, ratification loop, approach checkpoint, or post-approval offer runs automatically in the pipeline. `skills/plan-review/SKILL.md`; `agents/ref-direct-modes.md`.
 - **Coordination state has one writer.** Only `orchestrator` writes `00-state.md`, the execution trace, the decision ledger, and the pipeline summary. Specialists return status blocks and artifact pointers; they never edit coordination state. `agents/_shared/orchestrator-state.md`.
 - **Gate UX is concise and semantic.** Gate 1 displays `1 approve`, `3 edit`, `4 reject` — every approval preauthorizes through the draft PR (`release_policy: auto-ship`). Gate 3 STOPs only on a closed-list exception, displaying `1 ship`, `2 amend`, `3 abort`; a green run records a mechanical `auto-ship` release citing the Gate-1 event. Numbers and `N: detail` remain shortcuts, while unambiguous live semantic equivalents and complete natural-language amendments are accepted. Ambiguity releases nothing. The nonce-bound authority event and live Gate-1 approval remain mandatory; projections carry no independent authority. `agents/_shared/gate-contract.md`.

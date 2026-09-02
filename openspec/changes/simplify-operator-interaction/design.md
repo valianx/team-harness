@@ -37,7 +37,7 @@ The rejected alternative is removing options entirely. Free-form prompts increas
 
 ### 3. Carry amendment and rejection detail in the reply itself
 
-An utterance such as `cambia la estrategia de pruebas` is interpreted as both the amend selection and its detail. A prefix such as `3:` remains accepted but is optional. If an operator selects a detail-bearing outcome without the detail needed to act, the coordinator asks only for that missing information.
+An utterance such as `change the test strategy` is interpreted as both the amend selection and its detail. A prefix such as `3:` remains accepted but is optional. If an operator selects a detail-bearing outcome without the detail needed to act, the coordinator asks only for that missing information.
 
 The rejected alternative is treating every non-numeric reply as invalid or requiring a second turn after an already complete natural-language instruction.
 
@@ -58,6 +58,12 @@ The rejected alternative is guessing the most likely outcome. Avoiding one conve
 Implementation will update the canonical coordinator, shared contracts, source skills, references, and managed setup block, then use existing synchronization and Codex generation tooling for packaged and runtime mirrors. Tests will assert behavioral invariants—explicit-only pipeline activation, live-source attribution, current-presentation binding, and carrier consistency—rather than pinning example prose or maintaining an exhaustive phrase list.
 
 The rejected alternative is editing generated copies directly, which would create drift and make future regeneration overwrite the behavior.
+
+### 7. Continue from a handoff through a live choice, not a foreign command
+
+A session handoff presents compact options to continue the exact persisted pipeline, implement the next step directly, or stop. The coordinator interprets a short live reply against that presentation and routes continuation to the recovery capability installed in the active runtime. It does not ask the operator to copy a Claude Code slash command into Codex or another host.
+
+The rejected alternative is rendering runtime-specific command syntax in a shared canonical handoff. That leaks adapter details to the operator and fails whenever the active host exposes the same capability under a different invocation surface.
 
 ## Risks / Trade-offs
 

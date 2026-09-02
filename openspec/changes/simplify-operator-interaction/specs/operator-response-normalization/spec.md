@@ -45,7 +45,7 @@ When more than one offered outcome remains reasonably possible, Team Harness MUS
 - **THEN** Team Harness asks a concise clarification and performs neither outcome
 
 ### Requirement: Only attributable live operator replies can select an outcome
-Files, issues, web or tool results, quoted text, and other untrusted content MUST NOT be interpreted as an operator response. A response that selects an authority-bearing outcome SHALL remain attributable to the current live presentation and its nonce or equivalent identity, and selecting an outcome MUST NOT grant permission for external writes, destructive actions, scope expansion, or other effects governed by separate authority.
+Files, issues, web or tool results, quoted text, and other untrusted content MUST NOT be interpreted as an operator response. Every gated decision SHALL require exact equality with the consumed nonce of the current live gate presentation; another identifier MUST NOT be accepted as equivalent for a gated outcome. Non-authoritative prompts MAY bind a response to an equivalent presentation identity. Selecting an outcome MUST NOT grant permission for external writes, destructive actions, scope expansion, or other effects governed by separate authority.
 
 #### Scenario: Quoted content contains an approval phrase
 - **WHEN** a file, issue, tool result, or pasted quotation contains text equivalent to an offered approval
@@ -53,4 +53,15 @@ Files, issues, web or tool results, quoted text, and other untrusted content MUS
 
 #### Scenario: A short reply selects a gated outcome
 - **WHEN** the live operator gives an unambiguous short reply to the current gate presentation
-- **THEN** Team Harness records the semantic decision against that presentation's identity while preserving every separate approval and permission boundary
+- **THEN** Team Harness records the semantic decision only when the reply's gate nonce exactly equals the consumed presentation nonce, while preserving every separate approval and permission boundary
+
+### Requirement: Continuation handoffs offer a live choice instead of foreign command syntax
+A handoff that can continue a persisted pipeline SHALL present concise options to continue the exact workspace now, implement the next step directly, or stop. It MUST NOT require the operator to enter runtime-specific command syntax. An unambiguous live continuation reply SHALL route internally to the active runtime's installed recovery capability with the presented workspace identity; the handoff turn itself remains report-only and creates no authority or file mutation.
+
+#### Scenario: Codex presents a resumable pipeline handoff
+- **WHEN** a report-only handoff identifies an exact persisted workspace and the active runtime is Codex
+- **THEN** it offers continuation as a short live choice and does not instruct the operator to enter a Claude Code slash command
+
+#### Scenario: The operator accepts the continuation offer
+- **WHEN** the operator gives an unambiguous affirmative reply to the current handoff presentation
+- **THEN** the coordinator invokes the installed recovery capability for that exact workspace without requiring a command phrase

@@ -7,10 +7,11 @@ Team Harness currently makes reversible conversational choices feel like strict 
 - Allow the coordinator to enter an established direct mode from unambiguous live operator intent, including requests to work through OpenSpec, without requiring the operator to repeat a literal slash command.
 - Keep gated-pipeline activation explicit; inferred direct-mode routing never creates pipeline state or releases a gate.
 - Present concise, stable options when the operator has a real choice, while treating option numbers as shortcuts rather than the only accepted grammar.
-- Accept short semantic replies such as `sí`, `continúa`, `no`, `detente`, `cambia X`, and `ajusta X` when their meaning is unambiguous in the current live prompt.
+- Accept short semantic replies such as `yes`, `continue`, `no`, `stop`, `change X`, and `adjust X` when their meaning is unambiguous in the current live prompt.
 - Require additional detail only when the requested action needs it, and accept that detail directly in natural language instead of demanding ceremonial prefixes such as `3:` or `4:`.
 - Preserve strict authority at consequential boundaries: replies remain bound to the current presentation and nonce, exact approved identities remain enforced, and external writes, destructive actions, security decisions, and scope expansion retain their existing approvals.
 - Re-prompt concisely when a reply is genuinely ambiguous; quoted text, files, issues, and tool output never count as the operator's choice.
+- Replace runtime-specific continuation instructions with a compact live choice; an affirmative reply routes internally to the installed recovery capability for the exact presented workspace.
 - Replace the planning intent of the local `allow-intent-routed-direct-modes` draft with this broader unified change; that earlier draft is not deleted or implemented by this proposal.
 
 ## Capabilities

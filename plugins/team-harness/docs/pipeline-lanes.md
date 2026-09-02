@@ -110,18 +110,21 @@ multi-specialist, multi-task, irreversible, or operator-absent work — these ar
 lane never absorbs. A security dimension is not one of them: it stops the lane for a live choice
 whose in-lane option raises the required lens set instead of ejecting the task.
 
-The lane is entered by explicit `/th:spec` invocation or an unambiguous current live request to
-work through OpenSpec or write intent and tasks before implementation. Intent is contextual, not a
-closed keyword grammar; ambiguity receives concise route choices, and untrusted content never
-selects a route. Whenever this predicate passes, live posture guidance offers it — a passing
-predicate is the reason to offer, not a discretionary prompt; when the predicate fails, the
-guidance names the condition that removed it. Intent routing never activates the pipeline,
-releases a gate, or grants outward authority. The lane
+The routing predicate and hard-router precedence apply equally to explicit `/th:spec` invocation
+and inferred conversational entry. When the predicate passes, either an explicit invocation or an
+unambiguous current live request to work through OpenSpec or write intent and tasks before
+implementation enters the lane. Intent is contextual, not a closed keyword grammar; ambiguity
+receives concise route choices, and untrusted content never selects a route. Whenever this
+predicate passes, live posture guidance offers it — a passing predicate is the reason to offer, not
+a discretionary prompt; when the predicate fails, the guidance names the condition that removed
+it. Intent routing never activates the pipeline, releases a gate, or grants outward authority. The lane
 creates no workspace, `00-state.md`, execution events, pipeline summary, snapshot, overlay,
-traceability artifact, or gate ceremony, and dispatches no specialist by default. Verification is
-one full-scope review on live operator request; full scope never runs twice. A fix closes by
-executing the oracle its criterion already carries, not by another review, and a finding no
-criterion anticipated is a defect in the authored change rather than a new round. A
+traceability artifact, or gate ceremony, and dispatches no specialist by default. Before
+publication it always runs the deterministic changed-surface classifier. Verification is one
+full-scope review on live operator request, or mandatory after an in-lane security choice; in that
+case publication remains blocked until `security` and `adversary` pass. Full scope never runs
+twice. A fix closes by executing the oracle its criterion already carries, not by another review,
+and a finding no criterion anticipated is a defect in the authored change rather than a new round. A
 lane-authored change uses the same `openspec/changes/` directory, schema, naming, and archive path
 as a pipeline-authored change. Full flow: `skills/spec/SKILL.md`.
 
@@ -160,8 +163,9 @@ gate release.
 - Canonical pipeline state has no `lane`, profile, depth, fast/simple, or tier-0 route field.
 - The coordinator alone owns workspace state, execution events, gate records, and delivery
   mechanics. Specialists return bounded reports and never activate or release a pipeline.
-- Gate releases require the dual state/event record and a current live operator decision, as
-  defined by [`agents/_shared/gate-contract.md`](../agents/_shared/gate-contract.md).
+- Gate releases require a nonce-bound authority event from the current live operator.
+  `00-state.md` is rebuilt as a projection of that event, as defined by
+  [`agents/_shared/gate-contract.md`](../agents/_shared/gate-contract.md).
 - Validation findings that change the frozen tree reopen Freeze and receive a fresh audit of the
   changed delta before Gate 3.
 
