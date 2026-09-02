@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Codex updates now converge post-install state in one bounded pass and accept short runtime decisions.
+- Codex updates now converge post-install state in one bounded pass and accept short runtime decisions, while binding execution to the installed snapshot, exact hook artifacts, and the approved runtime delta.
 
 ## [3.20.5] - 2026-08-25
 

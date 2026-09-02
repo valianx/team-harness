@@ -24,3 +24,10 @@
 - [x] 4.2 Add an orchestration regression test proving one post-install convergence call in the common case, at most one additional call after runtime approval, and no coordinator-side domain rechecks.
 - [x] 4.3 Run the focused update/setup/runtime suites and the repository's shared runtime/package validation suites, recording any intentionally unaffected cross-runtime behavior.
 - [x] 4.4 Apply the required plugin version, marketplace metadata, and changelog updates only after the distributable Codex snapshot includes the new helper and tests pass.
+
+## 5. Security Review Closure
+
+- [x] 5.1 Bind the executable snapshot to the active `CODEX_HOME`, reject symlinked components, pin the absolute Codex executable, and verify the exact packaged hook artifacts.
+- [x] 5.2 Bound native output while the child is running and validate closed feature, MCP, domain, pending-decision, and receipt schemas.
+- [x] 5.3 Bind runtime authorization to the exact redacted pending delta and constrain escalated retries to the receipt's single failed domain.
+- [x] 5.4 Re-read bridge and config postconditions and add regression coverage for tampered snapshots, oversized output, nested receipt fields, and stale approval fingerprints.

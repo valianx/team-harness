@@ -5,13 +5,18 @@ from __future__ import annotations
 
 import argparse
 import errno
+import hashlib
 import importlib.util
 import json
 import os
 from pathlib import Path
 import re
+import selectors
+import signal
+import stat
 import subprocess
 import sys
+import time
 from types import ModuleType
 from typing import Callable
 
@@ -19,19 +24,26 @@ from typing import Callable
 SCHEMA_VERSION = 1
 PLUGIN_NAME = "team-harness"
 REQUIRED_FEATURES = ("multi_agent", "multi_agent_v2")
-EXPECTED_HOOKS = ("policy-block", "gcp-guard", "gate-guard")
-FORBIDDEN_HOOKS = ("dev-guard", "prepublish-guard", "worktree-guard")
 DOMAIN_NAMES = ("bridge", "config", "runtime", "features", "agents", "mcp", "hooks")
 OVERALL_STATUSES = {"current", "converged", "pending-approval", "partial-convergence"}
-DOMAIN_STATUSES = {"not-run", "current", "changed", "pending", "preserved", "failed"}
 RECOVERY_INVOCATION = "$team-harness:update"
 MAX_NATIVE_OUTPUT = 256 * 1024
 MAX_HOOK_MANIFEST = 64 * 1024
+MAX_RECEIPT_BYTES = 128 * 1024
+MAX_LIST_ITEMS = 128
+SAFE_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
 SEMVER_RE = re.compile(r"\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?")
 NON_FATAL_ALIAS_WARNING = (
     "WARNING: proceeding, even though we could not create PATH aliases: "
     "Read-only file system (os error 30)"
 )
+HOOK_DIGESTS = {
+    "hooks/hooks.json": "1dc8a618a90981885a7006e9fe9b156e4ae10f05b9ecb64ecd150372596101eb",
+    "hooks/run-codex-hook.sh": "6e13c288ceed9feba3493d1eb886237971b96818d3819b0279917bc71496ac5b",
+    "hooks/dist/policy-block.cjs": "1970f768289b7d6fc375dc882671f4740d0499bdf81feffd756224ba1ddf809d",
+    "hooks/dist/gcp-guard.cjs": "1016604dbb885fa5dd58410c33a068f0c1979a3b2bc7a6b7da54b9c7268c8acc",
+    "hooks/dist/gate-guard.cjs": "405d76c700ec7f225fd7935d16946fea16064a76b7b06b0951b33ab81006aa52",
+}
 
 
 class ConvergenceError(RuntimeError):
@@ -48,45 +60,132 @@ def lexical_path(value: str) -> Path:
     return Path(os.path.abspath(os.path.expanduser(value)))
 
 
+def codex_home_path() -> Path:
+    raw = os.environ.get("CODEX_HOME")
+    root = lexical_path(raw if raw else str(Path.home() / ".codex"))
+    if not root.is_absolute():
+        raise ConvergenceError("UNSAFE_CODEX_HOME")
+    return root
+
+
+def assert_regular_chain(path: Path, root: Path, *, directory: bool = False) -> None:
+    """Reject links in every snapshot-owned component, not only the final leaf."""
+    try:
+        relative = path.relative_to(root)
+    except ValueError as exc:
+        raise ConvergenceError("PATH_OUTSIDE_CODEX_HOME") from exc
+    current = root
+    for part in relative.parts:
+        current = current / part
+        try:
+            mode = current.lstat().st_mode
+        except OSError as exc:
+            raise ConvergenceError("SNAPSHOT_COMPONENT_UNAVAILABLE") from exc
+        if stat.S_ISLNK(mode):
+            raise ConvergenceError("SNAPSHOT_COMPONENT_SYMLINK")
+    mode = path.lstat().st_mode
+    if directory and not stat.S_ISDIR(mode):
+        raise ConvergenceError("SNAPSHOT_COMPONENT_NOT_DIRECTORY")
+    if not directory and not stat.S_ISREG(mode):
+        raise ConvergenceError("SNAPSHOT_COMPONENT_NOT_REGULAR")
+
+
+def validate_codex_binary(value: str) -> Path:
+    binary = lexical_path(value)
+    try:
+        resolved = binary.resolve(strict=True)
+        mode = resolved.stat().st_mode
+    except OSError as exc:
+        raise ConvergenceError("CODEX_BINARY_INVALID") from exc
+    if not binary.is_absolute() or not stat.S_ISREG(mode) or mode & 0o111 == 0:
+        raise ConvergenceError("CODEX_BINARY_INVALID")
+    return resolved
+
+
 def safe_native_env() -> dict[str, str]:
-    allowed = {
-        "PATH", "HOME", "USERPROFILE", "CODEX_HOME", "XDG_CONFIG_HOME",
-        "TMPDIR", "TMP", "TEMP", "SYSTEMROOT", "COMSPEC", "PATHEXT",
+    root = codex_home_path()
+    return {
+        "CODEX_HOME": str(root),
+        "HOME": str(root.parent),
+        "PATH": "/usr/bin:/bin",
+        "LANG": "C.UTF-8",
     }
-    return {key: value for key, value in os.environ.items() if key in allowed}
+
+
+def stop_process(process: subprocess.Popen[bytes]) -> None:
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except OSError:
+        try:
+            process.kill()
+        except OSError:
+            pass
+
+
+def close_process_streams(process: subprocess.Popen[bytes], streams: selectors.BaseSelector) -> None:
+    streams.close()
+    if process.stdout is not None:
+        process.stdout.close()
+    if process.stderr is not None:
+        process.stderr.close()
 
 
 def run_native(argv: list[str]) -> str:
+    process: subprocess.Popen[bytes] | None = None
     try:
-        result = subprocess.run(
+        process = subprocess.Popen(
             argv,
-            text=True,
-            capture_output=True,
-            check=False,
-            timeout=30,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             env=safe_native_env(),
+            start_new_session=True,
         )
-    except subprocess.TimeoutExpired as exc:
-        raise ConvergenceError("NATIVE_COMMAND_TIMEOUT") from exc
     except OSError as exc:
         retry = exc.errno in {errno.EACCES, errno.EPERM, errno.EROFS}
         raise ConvergenceError(
             "NATIVE_COMMAND_WRITE_PROTECTED" if retry else "NATIVE_COMMAND_UNAVAILABLE",
             retry_with_escalation=retry,
         ) from exc
-    if len(result.stdout.encode()) > MAX_NATIVE_OUTPUT or len(result.stderr.encode()) > MAX_NATIVE_OUTPUT:
-        raise ConvergenceError("NATIVE_COMMAND_OUTPUT_TOO_LARGE")
-    stderr = result.stderr.strip()
-    if result.returncode != 0:
+    assert process.stdout is not None and process.stderr is not None
+    streams = selectors.DefaultSelector()
+    streams.register(process.stdout, selectors.EVENT_READ, "stdout")
+    streams.register(process.stderr, selectors.EVENT_READ, "stderr")
+    captured = {"stdout": bytearray(), "stderr": bytearray()}
+    deadline = time.monotonic() + 30
+    while streams.get_map():
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            stop_process(process)
+            process.wait()
+            close_process_streams(process, streams)
+            raise ConvergenceError("NATIVE_COMMAND_TIMEOUT")
+        for key, _ in streams.select(min(remaining, 0.25)):
+            chunk = os.read(key.fileobj.fileno(), 64 * 1024)
+            if not chunk:
+                streams.unregister(key.fileobj)
+                continue
+            captured[key.data].extend(chunk)
+            if sum(len(value) for value in captured.values()) > MAX_NATIVE_OUTPUT:
+                stop_process(process)
+                process.wait()
+                close_process_streams(process, streams)
+                raise ConvergenceError("NATIVE_COMMAND_OUTPUT_TOO_LARGE")
+    return_code = process.wait()
+    close_process_streams(process, streams)
+    try:
+        stdout = captured["stdout"].decode("utf-8")
+        stderr = captured["stderr"].decode("utf-8").strip()
+    except UnicodeDecodeError as exc:
+        raise ConvergenceError("NATIVE_COMMAND_OUTPUT_INVALID") from exc
+    if return_code != 0:
         raise ConvergenceError("NATIVE_COMMAND_FAILED")
     if stderr and stderr != NON_FATAL_ALIAS_WARNING:
         raise ConvergenceError("NATIVE_COMMAND_UNEXPECTED_STDERR")
-    return result.stdout
+    return stdout
 
 
 def load_module(name: str, path: Path) -> ModuleType:
-    if path.is_symlink() or not path.is_file():
-        raise ConvergenceError("HELPER_NOT_REGULAR")
+    assert_regular_chain(path, codex_home_path())
     spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
         raise ConvergenceError("HELPER_LOAD_FAILED")
@@ -109,21 +208,20 @@ def load_helpers(plugin: Path) -> dict[str, ModuleType]:
 def validate_manifest(plugin: Path, expected_version: str) -> dict[str, str]:
     if not plugin.is_absolute() or ".." in plugin.parts:
         raise ConvergenceError("UNSAFE_PLUGIN_PATH")
+    codex_root = codex_home_path()
+    expected_parent = codex_root / "plugins/cache" / PLUGIN_NAME / PLUGIN_NAME
+    expected_plugin = expected_parent / expected_version
+    if plugin != expected_plugin:
+        raise ConvergenceError("PLUGIN_CACHE_IDENTITY_MISMATCH")
     try:
         resolved = plugin.resolve(strict=True)
-        lexical_parent = plugin.parent.resolve(strict=True)
     except OSError as exc:
         raise ConvergenceError("UNSAFE_PLUGIN_PATH") from exc
-    if not resolved.is_dir() or resolved.is_symlink():
+    if resolved != plugin:
         raise ConvergenceError("UNSAFE_PLUGIN_PATH")
-    cache_parent = resolved.parent
-    if tuple(cache_parent.parts[-4:]) != ("plugins", "cache", PLUGIN_NAME, PLUGIN_NAME):
-        raise ConvergenceError("UNSAFE_PLUGIN_PATH")
-    if plugin.is_symlink() and lexical_parent != cache_parent:
-        raise ConvergenceError("UNSAFE_PLUGIN_PATH")
+    assert_regular_chain(plugin, codex_root, directory=True)
     manifest_path = resolved / ".codex-plugin/plugin.json"
-    if manifest_path.is_symlink() or not manifest_path.is_file():
-        raise ConvergenceError("MANIFEST_NOT_REGULAR")
+    assert_regular_chain(manifest_path, codex_root)
     try:
         raw = manifest_path.read_bytes()
         if len(raw) > 64 * 1024:
@@ -147,12 +245,16 @@ def parse_features(output: str) -> dict[str, bool]:
         line = raw_line.strip()
         if not line:
             continue
-        try:
-            prefix, enabled_raw = line.rsplit(None, 1)
-            name = prefix.split(None, 1)[0]
-        except ValueError as exc:
-            raise ConvergenceError("FEATURE_LIST_INVALID") from exc
-        if not re.fullmatch(r"[a-z][a-z0-9_]*", name) or enabled_raw not in {"true", "false"}:
+        columns = line.split()
+        if len(columns) != 3:
+            raise ConvergenceError("FEATURE_LIST_INVALID")
+        name, stage, enabled_raw = columns
+        if (
+            not re.fullmatch(r"[a-z][a-z0-9_]*", name)
+            or not re.fullmatch(r"[a-z][a-z0-9_-]*", stage)
+            or enabled_raw not in {"true", "false"}
+            or name in features
+        ):
             raise ConvergenceError("FEATURE_LIST_INVALID")
         features[name] = enabled_raw == "true"
     if any(name not in features for name in REQUIRED_FEATURES):
@@ -160,13 +262,15 @@ def parse_features(output: str) -> dict[str, bool]:
     return features
 
 
-def converge_features(native_runner: NativeRunner) -> dict[str, object]:
-    before = parse_features(native_runner(["codex", "features", "list"]))
+def converge_features(native_runner: NativeRunner, codex_bin: str, *, apply: bool = True) -> dict[str, object]:
+    before = parse_features(native_runner([codex_bin, "features", "list"]))
     missing = [name for name in REQUIRED_FEATURES if not before[name]]
+    if missing and not apply:
+        raise ConvergenceError("ESCALATION_SCOPE_EXCEEDED")
     for name in missing:
-        native_runner(["codex", "features", "enable", name])
+        native_runner([codex_bin, "features", "enable", name])
     if missing:
-        after = parse_features(native_runner(["codex", "features", "list"]))
+        after = parse_features(native_runner([codex_bin, "features", "list"]))
         if any(not after[name] for name in REQUIRED_FEATURES):
             raise ConvergenceError("FEATURE_RECONCILIATION_INCOMPLETE")
     return {
@@ -177,35 +281,77 @@ def converge_features(native_runner: NativeRunner) -> dict[str, object]:
     }
 
 
-def inspect_mcp(native_runner: NativeRunner, expected: tuple[str, ...]) -> dict[str, object]:
+def valid_mcp_transport(value: object) -> bool:
+    if not isinstance(value, dict) or not isinstance(value.get("type"), str):
+        return False
+    transport_type = value["type"]
+    if transport_type == "streamable_http":
+        allowed = {
+            "type", "url", "bearer_token_env_var", "http_headers",
+            "env_http_headers", "http_headers_helper",
+        }
+        return set(value) <= allowed and {"type", "url"} <= set(value) and isinstance(value.get("url"), str)
+    if transport_type == "stdio":
+        allowed = {"type", "command", "args", "env", "env_vars", "cwd"}
+        return (
+            set(value) <= allowed
+            and {"type", "command", "args"} <= set(value)
+            and isinstance(value.get("command"), str)
+            and isinstance(value.get("args"), list)
+            and all(isinstance(item, str) for item in value["args"])
+        )
+    return False
+
+
+def inspect_mcp(native_runner: NativeRunner, codex_bin: str, expected: tuple[str, ...]) -> dict[str, object]:
     try:
-        payload = json.loads(native_runner(["codex", "mcp", "list", "--json"]))
+        payload = json.loads(native_runner([codex_bin, "mcp", "list", "--json"]))
     except json.JSONDecodeError as exc:
         raise ConvergenceError("MCP_LIST_INVALID") from exc
     if not isinstance(payload, list):
         raise ConvergenceError("MCP_LIST_INVALID")
-    registered: list[str] = []
+    if len(payload) > MAX_LIST_ITEMS:
+        raise ConvergenceError("MCP_LIST_INVALID")
+    allowed_item = {
+        "name", "enabled", "disabled_reason", "transport", "startup_timeout_sec",
+        "tool_timeout_sec", "auth_status",
+    }
+    registered: set[str] = set()
     for item in payload:
-        if not isinstance(item, dict) or not isinstance(item.get("name"), str):
+        if (
+            not isinstance(item, dict)
+            or not set(item) <= allowed_item
+            or not {"name", "enabled", "transport"} <= set(item)
+            or not isinstance(item.get("name"), str)
+            or SAFE_NAME_RE.fullmatch(item["name"]) is None
+            or not isinstance(item.get("enabled"), bool)
+            or not valid_mcp_transport(item.get("transport"))
+            or item["name"] in registered
+        ):
             raise ConvergenceError("MCP_LIST_INVALID")
-        enabled = item.get("enabled")
-        if enabled is not None and not isinstance(enabled, bool):
-            raise ConvergenceError("MCP_LIST_INVALID")
-        if enabled is not False:
-            registered.append(item["name"])
+        if item["enabled"]:
+            registered.add(item["name"])
     missing = [name for name in expected if name not in registered]
     return {
         "status": "preserved" if missing else "current",
-        "registered": sorted(registered),
+        "registeredCount": len(registered),
         "missingExpected": missing,
         "restartRequired": False,
     }
 
 
 def validate_hooks(plugin: Path) -> dict[str, object]:
+    root = codex_home_path()
+    for relative, expected_digest in HOOK_DIGESTS.items():
+        artifact = plugin / relative
+        assert_regular_chain(artifact, root)
+        try:
+            digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+        except OSError as exc:
+            raise ConvergenceError("HOOK_ARTIFACT_UNAVAILABLE") from exc
+        if digest != expected_digest:
+            raise ConvergenceError("HOOK_ARTIFACT_IDENTITY_MISMATCH")
     path = plugin / "hooks/hooks.json"
-    if path.is_symlink() or not path.is_file():
-        raise ConvergenceError("HOOK_MANIFEST_NOT_REGULAR")
     size = path.stat().st_size
     if size > MAX_HOOK_MANIFEST:
         raise ConvergenceError("HOOK_MANIFEST_TOO_LARGE")
@@ -213,7 +359,7 @@ def validate_hooks(plugin: Path) -> dict[str, object]:
         manifest = json.loads(path.read_bytes())
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ConvergenceError("HOOK_MANIFEST_INVALID") from exc
-    if not isinstance(manifest, dict) or set(manifest) - {"description", "hooks"}:
+    if not isinstance(manifest, dict) or set(manifest) != {"description", "hooks"}:
         raise ConvergenceError("HOOK_MANIFEST_INVALID")
     hooks = manifest.get("hooks")
     if not isinstance(hooks, dict) or set(hooks) != {"PreToolUse"}:
@@ -221,31 +367,20 @@ def validate_hooks(plugin: Path) -> dict[str, object]:
     groups = hooks["PreToolUse"]
     if not isinstance(groups, list):
         raise ConvergenceError("HOOK_MANIFEST_INVALID")
-    commands: list[str] = []
-    for group in groups:
-        if not isinstance(group, dict) or not isinstance(group.get("hooks"), list):
-            raise ConvergenceError("HOOK_MANIFEST_INVALID")
-        for hook in group["hooks"]:
-            if not isinstance(hook, dict) or hook.get("type") != "command":
-                raise ConvergenceError("HOOK_MANIFEST_INVALID")
-            command = hook.get("command")
-            if not isinstance(command, str):
-                raise ConvergenceError("HOOK_MANIFEST_INVALID")
-            commands.append(command)
-    if len(commands) != 2:
+    if len(groups) != 2:
         raise ConvergenceError("HOOK_ADAPTER_COUNT_INVALID")
-    joined = "\n".join(commands)
-    if any(name not in joined for name in EXPECTED_HOOKS):
-        raise ConvergenceError("HOOK_FLOOR_MISSING")
-    if any(name in joined for name in FORBIDDEN_HOOKS) or "PermissionRequest" in joined:
-        raise ConvergenceError("HOOK_SURFACE_UNSUPPORTED")
-    if any(
-        token not in command
-        for command in commands
-        for token in ("PLUGIN_ROOT", "CLAUDE_PLUGIN_ROOT", "plugin runtime missing")
-    ):
-        raise ConvergenceError("HOOK_RECOVERY_INVALID")
-    return {"status": "current", "adapterCount": len(commands), "restartRequired": False}
+    for group in groups:
+        if set(group) != {"matcher", "hooks"} or not isinstance(group["matcher"], str):
+            raise ConvergenceError("HOOK_MANIFEST_INVALID")
+        hooks_list = group["hooks"]
+        if not isinstance(hooks_list, list) or len(hooks_list) != 1:
+            raise ConvergenceError("HOOK_MANIFEST_INVALID")
+        hook = hooks_list[0]
+        if not isinstance(hook, dict) or set(hook) != {"type", "command", "timeout", "statusMessage"}:
+            raise ConvergenceError("HOOK_MANIFEST_INVALID")
+        if hook["type"] != "command" or not isinstance(hook["command"], str) or hook["timeout"] != 10:
+            raise ConvergenceError("HOOK_MANIFEST_INVALID")
+    return {"status": "current", "adapterCount": 2, "restartRequired": False}
 
 
 def domain_error(exc: Exception) -> dict[str, object]:
@@ -259,6 +394,65 @@ def domain_error(exc: Exception) -> dict[str, object]:
         code = "DOMAIN_FAILED"
         retry = False
     return {"status": "failed", "errorCode": code, "retryWithEscalation": retry, "restartRequired": False}
+
+
+def redacted_runtime_path(value: object) -> str:
+    if not isinstance(value, str):
+        raise ConvergenceError("RUNTIME_CLASSIFICATION_INVALID")
+    candidate = lexical_path(value)
+    roots = (
+        (codex_home_path(), "$CODEX_HOME"),
+        (lexical_path(str(Path.cwd())), "$PROJECT"),
+    )
+    for root, label in roots:
+        try:
+            relative = candidate.relative_to(root)
+            return label if not relative.parts else f"{label}/{'/'.join(relative.parts)}"
+        except ValueError:
+            continue
+    digest = hashlib.sha256(str(candidate).encode()).hexdigest()[:12]
+    return f"$EXTERNAL_ROOT/{digest}"
+
+
+def runtime_pending_decision(runtime_state: dict[str, object], new_version: str) -> dict[str, object]:
+    mismatched = runtime_state.get("mismatchedSettings", [])
+    missing_roots = runtime_state.get("missingWritableRoots", [])
+    missing_directories = runtime_state.get("missingDirectories", [])
+    if (
+        not isinstance(mismatched, list)
+        or not isinstance(missing_roots, list)
+        or not isinstance(missing_directories, list)
+        or any(not isinstance(item, str) for item in [*mismatched, *missing_roots, *missing_directories])
+        or any(len(items) > MAX_LIST_ITEMS for items in (mismatched, missing_roots, missing_directories))
+    ):
+        raise ConvergenceError("RUNTIME_CLASSIFICATION_INVALID")
+    project_config = runtime_state.get("projectConfig")
+    project_shadowing = bool(runtime_state.get("projectConfigShadowing"))
+    project_path = None
+    if project_shadowing:
+        if not isinstance(project_config, dict):
+            raise ConvergenceError("RUNTIME_CLASSIFICATION_INVALID")
+        project_path = redacted_runtime_path(project_config.get("path"))
+    raw_identity = {
+        "version": new_version,
+        "mismatchedSettings": sorted(mismatched),
+        "missingWritableRoots": sorted(missing_roots),
+        "missingDirectories": sorted(missing_directories),
+        "projectConfigShadowing": project_shadowing,
+        "projectConfigPath": project_config.get("path") if isinstance(project_config, dict) else None,
+    }
+    fingerprint = hashlib.sha256(
+        json.dumps(raw_identity, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    return {
+        "kind": "runtime-profile",
+        "mismatchedSettings": sorted(mismatched),
+        "missingWritableRoots": [redacted_runtime_path(item) for item in sorted(missing_roots)],
+        "missingDirectories": [redacted_runtime_path(item) for item in sorted(missing_directories)],
+        "projectConfigShadowing": project_shadowing,
+        "projectConfigPath": project_path,
+        "approvalFingerprint": fingerprint,
+    }
 
 
 def empty_receipt(old_plugin: Path, old_version: str, new_plugin: Path, new_version: str) -> dict[str, object]:
@@ -294,11 +488,64 @@ def validate_receipt(receipt: object) -> dict[str, object]:
     domains = receipt["domains"]
     if not isinstance(domains, dict) or tuple(domains) != DOMAIN_NAMES:
         raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
-    for result in domains.values():
-        if not isinstance(result, dict) or result.get("status") not in DOMAIN_STATUSES:
+    domain_keys = {
+        "bridge": {"status", "bridgeStatus", "restartRequired"},
+        "config": {"status", "added", "removedLegacySelectors", "restartRequired"},
+        "runtime": {"status", "restartRequired"},
+        "features": {"status", "changed", "required", "restartRequired"},
+        "agents": {"status", "scope", "changedCount", "customDefaultsPreserved", "restartRequired"},
+        "mcp": {"status", "registeredCount", "missingExpected", "restartRequired"},
+        "hooks": {"status", "adapterCount", "restartRequired"},
+    }
+    domain_statuses = {
+        "bridge": {"not-run", "current", "changed", "preserved", "failed"},
+        "config": {"not-run", "current", "changed", "failed"},
+        "runtime": {"not-run", "current", "changed", "pending", "failed"},
+        "features": {"not-run", "current", "changed", "failed"},
+        "agents": {"not-run", "current", "changed", "failed"},
+        "mcp": {"not-run", "current", "preserved", "failed"},
+        "hooks": {"not-run", "current", "failed"},
+    }
+    for name, result in domains.items():
+        if not isinstance(result, dict) or result.get("status") not in domain_statuses[name]:
             raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
         if not isinstance(result.get("restartRequired"), bool):
             raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+        if result["status"] in {"not-run", "pending"}:
+            expected_keys = {"status", "restartRequired"}
+        elif result["status"] == "failed":
+            expected_keys = {"status", "errorCode", "retryWithEscalation", "restartRequired"}
+            if SAFE_NAME_RE.fullmatch(str(result.get("errorCode", ""))) is None or not isinstance(result.get("retryWithEscalation"), bool):
+                raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+        else:
+            expected_keys = domain_keys[name]
+        if set(result) != expected_keys:
+            raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+    for name in ("added", "removedLegacySelectors"):
+        value = domains["config"].get(name, [])
+        if not isinstance(value, list) or len(value) > MAX_LIST_ITEMS or any(not isinstance(item, str) for item in value):
+            raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+    for name in ("changed", "required"):
+        value = domains["features"].get(name, [])
+        if not isinstance(value, list) or len(value) > MAX_LIST_ITEMS or any(item not in REQUIRED_FEATURES for item in value):
+            raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+    missing_expected = domains["mcp"].get("missingExpected", [])
+    if not isinstance(missing_expected, list) or len(missing_expected) > MAX_LIST_ITEMS or any(SAFE_NAME_RE.fullmatch(str(item)) is None for item in missing_expected):
+        raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+    bridge_status = domains["bridge"].get("bridgeStatus")
+    if bridge_status is not None and bridge_status not in {
+        "same-snapshot", "current", "linked", "relinked", "skipped-existing-path",
+    }:
+        raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+    if domains["agents"].get("scope") is not None and domains["agents"]["scope"] not in {"project", "global"}:
+        raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+    for name, key in (("agents", "changedCount"), ("mcp", "registeredCount"), ("hooks", "adapterCount")):
+        value = domains[name].get(key)
+        if value is not None and (not isinstance(value, int) or isinstance(value, bool) or value < 0 or value > 4096):
+            raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+    custom_preserved = domains["agents"].get("customDefaultsPreserved")
+    if custom_preserved is not None and not isinstance(custom_preserved, bool):
+        raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
     changed = receipt["changedDomains"]
     if (
         not isinstance(changed, list)
@@ -310,7 +557,21 @@ def validate_receipt(receipt: object) -> dict[str, object]:
         raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
     pending = receipt["pendingDecision"]
     if pending is not None:
-        if not isinstance(pending, dict) or pending.get("kind") != "runtime-profile":
+        pending_keys = {
+            "kind", "mismatchedSettings", "missingWritableRoots", "missingDirectories",
+            "projectConfigShadowing", "projectConfigPath", "approvalFingerprint",
+        }
+        if not isinstance(pending, dict) or set(pending) != pending_keys or pending.get("kind") != "runtime-profile":
+            raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+        if not isinstance(pending["projectConfigShadowing"], bool):
+            raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+        if not re.fullmatch(r"[0-9a-f]{64}", str(pending["approvalFingerprint"])):
+            raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+        for key in ("mismatchedSettings", "missingWritableRoots", "missingDirectories"):
+            values = pending[key]
+            if not isinstance(values, list) or len(values) > MAX_LIST_ITEMS or any(not isinstance(item, str) or len(item) > 256 for item in values):
+                raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+        if pending["projectConfigPath"] is not None and not isinstance(pending["projectConfigPath"], str):
             raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
     if receipt["status"] == "pending-approval" and pending is None:
         raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
@@ -321,13 +582,35 @@ def validate_receipt(receipt: object) -> dict[str, object]:
             raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
     elif receipt["failedDomain"] is not None:
         raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+    derived_changed = [name for name in DOMAIN_NAMES if domains[name]["status"] == "changed"]
+    if changed != derived_changed:
+        raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+    if receipt["restartRequired"] != any(result["restartRequired"] for result in domains.values()):
+        raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+    failed = [name for name in DOMAIN_NAMES if domains[name]["status"] == "failed"]
+    if receipt["status"] == "partial-convergence":
+        expected_failure = "bridge" if receipt["failedDomain"] == "preflight" else receipt["failedDomain"]
+        if failed != [expected_failure]:
+            raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+    elif failed:
+        raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+    if (domains["runtime"]["status"] == "pending") != (pending is not None):
+        raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+    if receipt["status"] == "pending-approval" and domains["runtime"]["status"] != "pending":
+        raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+    if receipt["status"] == "current" and (derived_changed or pending is not None):
+        raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+    if receipt["status"] == "converged" and (not derived_changed or pending is not None):
+        raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+    if len(json.dumps(receipt, ensure_ascii=False).encode()) > MAX_RECEIPT_BYTES:
+        raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
     return receipt
 
 
 def run_convergence(
     args: argparse.Namespace,
     *,
-    native_runner: NativeRunner = run_native,
+    native_runner: NativeRunner | None = None,
 ) -> dict[str, object]:
     old_plugin = lexical_path(args.old_plugin)
     new_plugin = lexical_path(args.new_plugin)
@@ -339,11 +622,18 @@ def run_convergence(
     try:
         if SEMVER_RE.fullmatch(args.old_version) is None or SEMVER_RE.fullmatch(args.new_version) is None:
             raise ConvergenceError("VERSION_ARGUMENT_INVALID")
+        codex_binary = validate_codex_binary(args.codex_bin)
         validate_manifest(new_plugin, args.new_version)
         helpers = load_helpers(new_plugin)
     except Exception as exc:
         receipt["domains"]["bridge"] = domain_error(exc)
         return receipt
+
+    runner = native_runner if native_runner is not None else run_native
+    codex_bin = str(codex_binary)
+
+    def may_mutate(name: str) -> bool:
+        return args.escalation_domain is None or args.escalation_domain == name
 
     def apply_domain(name: str, operation: Callable[[], dict[str, object]]) -> bool:
         nonlocal restart_required
@@ -366,6 +656,13 @@ def run_convergence(
             return False
 
     def bridge_operation() -> dict[str, object]:
+        if not may_mutate("bridge"):
+            new_snapshot, _ = helpers["bridge"].validate_new_snapshot(new_plugin)
+            if old_plugin == new_snapshot:
+                return {"status": "current", "bridgeStatus": "same-snapshot", "restartRequired": False}
+            if old_plugin.is_symlink() and helpers["bridge"].link_target(old_plugin) == new_snapshot:
+                return {"status": "current", "bridgeStatus": "current", "restartRequired": False}
+            raise ConvergenceError("ESCALATION_SCOPE_EXCEEDED")
         result = helpers["bridge"].bridge_result(old_plugin, new_plugin)
         status = result.get("status")
         if status == "skipped-unmanaged-symlink":
@@ -383,7 +680,9 @@ def run_convergence(
         return receipt
 
     def config_operation() -> dict[str, object]:
-        result = helpers["config"].ensure_defaults_result(args.new_version)
+        result = helpers["config"].ensure_defaults_result(args.new_version, apply=may_mutate("config"))
+        if result["changed"] and not may_mutate("config"):
+            raise ConvergenceError("ESCALATION_SCOPE_EXCEEDED")
         return {
             "status": "changed" if result["changed"] else "current",
             "added": result["added"],
@@ -401,23 +700,20 @@ def run_convergence(
             runtime_result = {"status": "current", "restartRequired": False}
         elif runtime_state.get("status") != "stale":
             raise ConvergenceError("RUNTIME_CLASSIFICATION_INVALID")
-        elif args.authorize_runtime:
+        else:
+            pending = runtime_pending_decision(runtime_state, args.new_version)
+        if runtime_state.get("status") == "stale" and args.runtime_approval is not None:
+            if args.escalation_domain is not None:
+                raise ConvergenceError("RUNTIME_APPROVAL_ESCALATION_MIXED")
+            if args.runtime_approval != pending["approvalFingerprint"]:
+                raise ConvergenceError("RUNTIME_APPROVAL_MISMATCH")
             ensured = helpers["runtime"].ensure_result()
             runtime_result = {
                 "status": "changed" if ensured["changed"] or ensured["createdDirectories"] else "current",
                 "restartRequired": bool(ensured["restartRequired"]),
             }
-        else:
+        elif runtime_state.get("status") == "stale":
             runtime_pending = True
-            pending = {
-                "kind": "runtime-profile",
-                "mismatchedSettings": runtime_state.get("mismatchedSettings", []),
-                "missingWritableRoots": runtime_state.get("missingWritableRoots", []),
-                "missingDirectories": runtime_state.get("missingDirectories", []),
-                "projectConfigShadowing": bool(runtime_state.get("projectConfigShadowing")),
-                "projectConfigPath": (runtime_state.get("projectConfig") or {}).get("path")
-                if isinstance(runtime_state.get("projectConfig"), dict) else None,
-            }
             receipt["pendingDecision"] = pending
             runtime_result = {"status": "pending", "restartRequired": False}
         receipt["domains"]["runtime"] = runtime_result
@@ -431,7 +727,7 @@ def run_convergence(
         receipt["failedDomain"] = "runtime"
         return receipt
 
-    if not apply_domain("features", lambda: converge_features(native_runner)):
+    if not apply_domain("features", lambda: converge_features(runner, codex_bin, apply=may_mutate("features"))):
         return receipt
 
     def agents_operation() -> dict[str, object]:
@@ -455,6 +751,8 @@ def run_convergence(
                 "customDefaultsPreserved": runtime_config["status"] == "custom-preserved",
                 "restartRequired": False,
             }
+        if not may_mutate("agents"):
+            raise ConvergenceError("ESCALATION_SCOPE_EXCEEDED")
         synced = helpers["agents"].sync_result(scope)
         return {
             "status": "changed",
@@ -467,7 +765,11 @@ def run_convergence(
     if not apply_domain("agents", agents_operation):
         return receipt
     expected_mcp = tuple(dict.fromkeys(args.expected_mcp))
-    if not apply_domain("mcp", lambda: inspect_mcp(native_runner, expected_mcp)):
+    if any(SAFE_NAME_RE.fullmatch(name) is None for name in expected_mcp) or len(expected_mcp) > MAX_LIST_ITEMS:
+        receipt["domains"]["mcp"] = domain_error(ConvergenceError("EXPECTED_MCP_INVALID"))
+        receipt["failedDomain"] = "mcp"
+        return receipt
+    if not apply_domain("mcp", lambda: inspect_mcp(runner, codex_bin, expected_mcp)):
         return receipt
     if not apply_domain("hooks", lambda: validate_hooks(new_plugin)):
         return receipt
@@ -490,7 +792,9 @@ def parser() -> argparse.ArgumentParser:
     root.add_argument("--old-version", required=True)
     root.add_argument("--new-plugin", required=True)
     root.add_argument("--new-version", required=True)
-    root.add_argument("--authorize-runtime", action="store_true")
+    root.add_argument("--codex-bin", required=True)
+    root.add_argument("--runtime-approval")
+    root.add_argument("--escalation-domain", choices=tuple(name for name in DOMAIN_NAMES if name != "runtime"))
     root.add_argument("--expected-mcp", action="append", default=[])
     return root
 

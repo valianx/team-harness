@@ -31,6 +31,7 @@ def load_converge():
 
 
 CONVERGE = load_converge()
+CODEX_BIN = str(Path("/usr/bin/true").resolve())
 
 
 class FakeCodex:
@@ -44,19 +45,19 @@ class FakeCodex:
     def __call__(self, argv: list[str]) -> str:
         call = tuple(argv)
         self.calls.append(call)
-        if call == ("codex", "features", "list"):
+        if call == (CODEX_BIN, "features", "list"):
             if self.invalid_features:
                 return "not-a-feature-table\n"
             return "".join(
                 f"{name:<40} stable             {'true' if enabled else 'false'}\n"
                 for name, enabled in self.features.items()
             )
-        if len(call) == 4 and call[:3] == ("codex", "features", "enable"):
+        if len(call) == 4 and call[:3] == (CODEX_BIN, "features", "enable"):
             if self.fail_enable:
                 raise CONVERGE.ConvergenceError("NATIVE_COMMAND_FAILED")
             self.features[call[3]] = True
             return ""
-        if call == ("codex", "mcp", "list", "--json"):
+        if call == (CODEX_BIN, "mcp", "list", "--json"):
             return json.dumps(self.mcp)
         raise AssertionError(f"unexpected native call: {call}")
 
@@ -91,18 +92,25 @@ class ConvergenceFixture(unittest.TestCase):
             pass
         self.temp.cleanup()
 
-    def args(self, *, authorize_runtime: bool = False) -> argparse.Namespace:
+    def args(self, *, runtime_approval: str | None = None, escalation_domain: str | None = None) -> argparse.Namespace:
         return argparse.Namespace(
             old_plugin=str(self.plugin),
             old_version=PLUGIN_VERSION,
             new_plugin=str(self.plugin),
             new_version=PLUGIN_VERSION,
-            authorize_runtime=authorize_runtime,
+            codex_bin=CODEX_BIN,
+            runtime_approval=runtime_approval,
+            escalation_domain=escalation_domain,
             expected_mcp=[],
         )
 
     def converge(self, native: FakeCodex, *, authorize_runtime: bool = False) -> dict[str, object]:
-        receipt = CONVERGE.run_convergence(self.args(authorize_runtime=authorize_runtime), native_runner=native)
+        approval = None
+        if authorize_runtime:
+            helpers = CONVERGE.load_helpers(self.plugin)
+            state = helpers["runtime"].classify()
+            approval = CONVERGE.runtime_pending_decision(state, PLUGIN_VERSION)["approvalFingerprint"]
+        receipt = CONVERGE.run_convergence(self.args(runtime_approval=approval), native_runner=native)
         return CONVERGE.validate_receipt(receipt)
 
     def test_pending_approval_then_authorized_pass_then_current_fast_path(self) -> None:
@@ -125,7 +133,7 @@ class ConvergenceFixture(unittest.TestCase):
         self.assertEqual(current["changedDomains"], [])
         self.assertEqual(
             native.calls,
-            [("codex", "features", "list"), ("codex", "mcp", "list", "--json")],
+            [(CODEX_BIN, "features", "list"), (CODEX_BIN, "mcp", "list", "--json")],
         )
 
     def test_declined_runtime_can_remain_pending_without_a_prescribed_command(self) -> None:
@@ -140,8 +148,8 @@ class ConvergenceFixture(unittest.TestCase):
         receipt = self.converge(native, authorize_runtime=True)
         self.assertEqual(receipt["domains"]["features"]["status"], "changed")
         self.assertEqual(receipt["domains"]["features"]["changed"], ["multi_agent"])
-        self.assertEqual(native.calls.count(("codex", "features", "enable", "multi_agent")), 1)
-        self.assertEqual(native.calls.count(("codex", "features", "list")), 2)
+        self.assertEqual(native.calls.count((CODEX_BIN, "features", "enable", "multi_agent")), 1)
+        self.assertEqual(native.calls.count((CODEX_BIN, "features", "list")), 2)
 
     def test_partial_failure_preserves_completed_work_and_rerun_resumes(self) -> None:
         failing = FakeCodex(features={"multi_agent": False, "multi_agent_v2": True})
@@ -173,7 +181,7 @@ class ConvergenceFixture(unittest.TestCase):
         hooks.symlink_to(target)
         unsafe = self.converge(FakeCodex())
         self.assertEqual(unsafe["failedDomain"], "hooks")
-        self.assertEqual(unsafe["domains"]["hooks"]["errorCode"], "HOOK_MANIFEST_NOT_REGULAR")
+        self.assertEqual(unsafe["domains"]["hooks"]["errorCode"], "SNAPSHOT_COMPONENT_SYMLINK")
 
     def test_protected_config_target_requests_exact_retry_escalation(self) -> None:
         self.codex_home.chmod(stat.S_IRUSR | stat.S_IXUSR)
@@ -202,6 +210,67 @@ class ConvergenceFixture(unittest.TestCase):
         open_shape["unexpected"] = True
         with self.assertRaisesRegex(CONVERGE.ConvergenceError, "RECEIPT_SCHEMA_INVALID"):
             CONVERGE.validate_receipt(open_shape)
+        nested_open = json.loads(json.dumps(receipt))
+        nested_open["domains"]["hooks"]["unexpected"] = True
+        with self.assertRaisesRegex(CONVERGE.ConvergenceError, "RECEIPT_SCHEMA_INVALID"):
+            CONVERGE.validate_receipt(nested_open)
+
+    def test_snapshot_components_and_hook_identity_reject_tampering(self) -> None:
+        hooks = self.plugin / "hooks"
+        real_hooks = self.plugin / "hooks-real"
+        hooks.rename(real_hooks)
+        hooks.symlink_to(real_hooks, target_is_directory=True)
+        linked = self.converge(FakeCodex())
+        self.assertEqual(linked["failedDomain"], "hooks")
+        self.assertEqual(linked["domains"]["hooks"]["errorCode"], "SNAPSHOT_COMPONENT_SYMLINK")
+
+        hooks.unlink()
+        real_hooks.rename(hooks)
+        manifest = hooks / "hooks.json"
+        manifest.write_text(manifest.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+        tampered = self.converge(FakeCodex())
+        self.assertEqual(tampered["failedDomain"], "hooks")
+        self.assertEqual(tampered["domains"]["hooks"]["errorCode"], "HOOK_ARTIFACT_IDENTITY_MISMATCH")
+
+    def test_runtime_approval_is_bound_to_exact_pending_delta(self) -> None:
+        receipt = CONVERGE.run_convergence(
+            self.args(runtime_approval="0" * 64),
+            native_runner=FakeCodex(),
+        )
+        receipt = CONVERGE.validate_receipt(receipt)
+        self.assertEqual(receipt["failedDomain"], "runtime")
+        self.assertEqual(receipt["domains"]["runtime"]["errorCode"], "RUNTIME_APPROVAL_MISMATCH")
+
+    def test_native_output_limit_is_enforced_while_streaming(self) -> None:
+        with self.assertRaisesRegex(CONVERGE.ConvergenceError, "NATIVE_COMMAND_OUTPUT_TOO_LARGE"):
+            CONVERGE.run_native([
+                sys.executable,
+                "-c",
+                f"import sys; sys.stdout.write('x' * {CONVERGE.MAX_NATIVE_OUTPUT + 1})",
+            ])
+
+    def test_escalated_retry_cannot_write_a_second_domain(self) -> None:
+        self.converge(FakeCodex(), authorize_runtime=True)
+        native = FakeCodex(features={"multi_agent": False, "multi_agent_v2": True})
+        receipt = CONVERGE.run_convergence(
+            self.args(escalation_domain="config"),
+            native_runner=native,
+        )
+        receipt = CONVERGE.validate_receipt(receipt)
+        self.assertEqual(receipt["failedDomain"], "features")
+        self.assertEqual(receipt["domains"]["features"]["errorCode"], "ESCALATION_SCOPE_EXCEEDED")
+        self.assertNotIn((CODEX_BIN, "features", "enable", "multi_agent"), native.calls)
+
+    def test_mcp_parser_rejects_unknown_native_fields(self) -> None:
+        native = FakeCodex(mcp=[{
+            "name": "docs",
+            "enabled": True,
+            "transport": {"type": "stdio", "command": "server", "args": []},
+            "unexpected": "opaque",
+        }])
+        receipt = self.converge(native, authorize_runtime=True)
+        self.assertEqual(receipt["failedDomain"], "mcp")
+        self.assertEqual(receipt["domains"]["mcp"]["errorCode"], "MCP_LIST_INVALID")
 
     def test_existing_helper_clis_remain_compatible(self) -> None:
         env = os.environ.copy()

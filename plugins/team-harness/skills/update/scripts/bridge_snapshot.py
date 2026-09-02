@@ -145,6 +145,9 @@ def bridge_result(old_plugin: Path, new_plugin: Path) -> dict[str, object]:
         if os.path.lexists(temporary):
             temporary.unlink()
 
+    if not old_plugin.is_symlink() or link_target(old_plugin) != new_snapshot:
+        fail("snapshot bridge reconciliation did not converge")
+
     return outcome(
         status,
         restart_required=False,

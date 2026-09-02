@@ -33,7 +33,7 @@ Alternative considered: one helper that also shells out to marketplace upgrade a
 
 ### 2. Implement a single-pass domain engine with a closed receipt
 
-Add a Codex update convergence helper with one normal entry point and an optional explicit runtime-authorization flag. Internally it uses ordered domain adapters:
+Add a Codex update convergence helper with one normal entry point and an optional explicit runtime-approval fingerprint bound to the pending delta. Internally it uses ordered domain adapters:
 
 1. validate the exact old/new snapshot roots and bridge state;
 2. ensure Team Harness native settings;
@@ -50,7 +50,7 @@ Alternative considered: retain separate helpers and shorten only the skill prose
 
 ### 3. Reuse domain logic as importable code, not subprocess every helper
 
-Refactor or wrap existing configuration, runtime, agent, and bridge logic so the convergence engine can call their classify/apply functions in-process while their existing command-line interfaces remain compatible. Native Codex operations that have no safe library interface use fixed argument arrays, sanitized environment, bounded output, and timeouts; they execute only when classification proves a change is needed. In particular, the already-current path does not call two unconditional feature-enable commands or an agent inspect followed by an agent sync.
+Refactor or wrap existing configuration, runtime, agent, and bridge logic so the convergence engine can call their classify/apply functions in-process while their existing command-line interfaces remain compatible. Native Codex operations that have no safe library interface use the canonical absolute runtime executable, fixed argument arrays, sanitized environment, streaming output limits, and timeouts; they execute only when classification proves a change is needed. Snapshot-owned paths reject symlink components, and hook validation binds to exact packaged artifact digests rather than command substrings. In particular, the already-current path does not call two unconditional feature-enable commands or an agent inspect followed by an agent sync.
 
 Alternative considered: invoke every existing helper as a child process inside one outer helper. It would reduce model round trips but retain duplicate parsing, process startup, and inspect-then-sync work. Compatibility shims may use subprocesses temporarily, but the target implementation shares domain functions.
 
@@ -58,7 +58,7 @@ Alternative considered: invoke every existing helper as a child process inside o
 
 The first pass applies and verifies all automatically authorized domains even when runtime classification is stale. It records the minimal redacted runtime delta and returns `pending-approval` without applying that domain. The skill renders this as a concise yes/no/change question and interprets a short unambiguous live response conversationally.
 
-On approval, the skill reruns the same helper with an explicit runtime-authorization flag. The helper recomputes every domain, skips current work, applies the runtime profile, and verifies it. The flag is invocation-scoped and is never persisted or inferred. A decline preserves completed work and reports the ordinary update invocation as recovery.
+On approval, the skill reruns the same helper with the pending receipt's runtime-approval fingerprint. The helper recomputes every domain, rejects a changed delta or snapshot, skips current work, applies the runtime profile, and verifies it. The authorization is invocation-scoped and is never persisted or inferred. A decline preserves completed work and reports the ordinary update invocation as recovery.
 
 Alternative considered: stop the first pass before all later domains, matching the current sequence. Rejected because it makes an optional runtime decision block unrelated safe reconciliation and increases the work repeated after approval.
 
@@ -73,7 +73,7 @@ Alternative considered: emit free-form summaries from each domain. Rejected beca
 ## Risks / Trade-offs
 
 - **[A larger helper becomes a new control point]** → Keep domain adapters small, use a closed receipt schema, and test each adapter plus the joined pass independently.
-- **[One escalated helper can touch several protected targets]** → Hard-code the target families, preserve existing path/symlink/ownership checks, perform classification before writes, and keep runtime mutation behind its explicit invocation flag.
+- **[One escalated helper can touch several protected targets]** → Bind an escalated retry to the receipt's failed domain; every other domain is classification-only and fails rather than writing if it became stale. Runtime mutation remains under its separate delta-bound live authorization.
 - **[Partial writes are not transactionally rolled back]** → Retain the existing monotonic idempotent model, expose the exact failed domain, and prove reruns skip completed postconditions.
 - **[Refactoring existing helpers could change setup behavior]** → Preserve their CLI contracts and add parity fixtures before switching update to shared functions.
 - **[Native Codex JSON or config shapes can change]** → Validate bounded closed inputs, fail as partial convergence on unknown shapes, and avoid speculative direct writes where native CLI authority exists.

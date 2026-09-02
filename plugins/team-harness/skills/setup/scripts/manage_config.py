@@ -440,7 +440,7 @@ def set_values(assignments: list[str], removals: list[str], version: str | None)
     return 0
 
 
-def ensure_defaults_result(version: str | None) -> dict[str, Any]:
+def ensure_defaults_result(version: str | None, *, apply: bool = True) -> dict[str, Any]:
     path = config_path()
     before = read_json(path)
     after = json.loads(json.dumps(before))
@@ -455,8 +455,21 @@ def ensure_defaults_result(version: str | None) -> dict[str, Any]:
         if re.fullmatch(r"\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?", version) is None:
             raise ValueError("version must be a semantic version")
         after["installed_version"] = version
-    after["updated_at"] = dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
-    changed = write_atomic(path, before, after)
+    comparable_before = json.loads(json.dumps(before))
+    comparable_before.pop("updated_at", None)
+    comparable_after = json.loads(json.dumps(after))
+    comparable_after.pop("updated_at", None)
+    if comparable_before != comparable_after:
+        after["updated_at"] = dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+    elif "updated_at" in before:
+        after["updated_at"] = before["updated_at"]
+    changed = before != after
+    if changed and apply:
+        write_atomic(path, before, after)
+    if apply:
+        persisted = read_json(path)
+        if persisted != after:
+            raise ValueError("Team Harness config reconciliation did not converge")
     return {
         "path": str(path),
         "changed": changed,
