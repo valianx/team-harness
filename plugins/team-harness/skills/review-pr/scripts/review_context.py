@@ -271,6 +271,26 @@ def _load_review_owner(artifact_root: Path) -> dict[str, Any]:
     return value
 
 
+def validate_owned_review_run(
+    repo_root: Path,
+    artifact_root: Path,
+    owner_token: str,
+    pr: int,
+) -> Path:
+    if not re.fullmatch(r"[a-f0-9]{32}", owner_token):
+        raise ContextError("invalid review run owner token")
+    run, run_fd = _open_directory(artifact_root)
+    os.close(run_fd)
+    if run.name != f"run-{owner_token}":
+        raise ContextError("review run path does not match its owner token")
+    expected_parent = _review_parent(repo_root, pr, create=False)
+    if run.parent != expected_parent:
+        raise ContextError("review run is outside the repository review parent")
+    if _load_review_owner(run) != _review_owner(pr, owner_token):
+        raise ContextError("review run ownership mismatch")
+    return run
+
+
 def create_review_run(repo_root: Path, pr: int) -> dict[str, Any]:
     parent = _review_parent(repo_root, pr, create=True)
     for _ in range(8):
@@ -329,6 +349,21 @@ def _temporary_leaf(artifact_root: Path, prefix: str) -> Path:
     finally:
         os.close(directory_fd)
     raise ContextError("cannot allocate a temporary review artifact")
+
+
+def _discard_artifact_leaf(artifact_root: Path, name: str) -> None:
+    name = _safe_leaf(name)
+    _, directory_fd = _open_directory(artifact_root)
+    try:
+        try:
+            metadata = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        if not stat.S_ISREG(metadata.st_mode):
+            raise ContextError("temporary artifact is not a regular file")
+        os.unlink(name, dir_fd=directory_fd)
+    finally:
+        os.close(directory_fd)
 
 
 def _write_existing_leaf(path: Path, content: bytes) -> None:
@@ -401,21 +436,12 @@ def _remove_tree_contents(directory_fd: int) -> None:
 
 
 def cleanup_review_run(repo_root: Path, artifact_root: Path, owner_token: str) -> None:
-    if not re.fullmatch(r"[a-f0-9]{32}", owner_token):
-        raise ContextError("invalid review run owner token")
-    run, run_fd = _open_directory(artifact_root)
-    os.close(run_fd)
-    match = REVIEW_RUN_RE.fullmatch(run.name)
-    parent_match = REVIEW_PARENT_RE.fullmatch(run.parent.name)
-    if not match or not parent_match or match.group(1) != owner_token:
+    parent_match = REVIEW_PARENT_RE.fullmatch(artifact_root.parent.name)
+    if not parent_match:
         raise ContextError("review run path does not match its owner token")
     pr = int(parent_match.group(1))
-    expected_parent = _review_parent(repo_root, pr, create=False)
-    if run.parent != expected_parent:
-        raise ContextError("review run is outside the repository review parent")
-    owner = _load_review_owner(run)
-    if owner != _review_owner(pr, owner_token):
-        raise ContextError("review run ownership mismatch")
+    run = validate_owned_review_run(repo_root, artifact_root, owner_token, pr)
+    expected_parent = run.parent
 
     snapshot = run / "pr-review-snapshot.git"
     worktree = run / "pr-review-worktree"
@@ -938,12 +964,17 @@ def stable_hash(value: Any) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def conversation_identity(context: dict[str, Any]) -> dict[str, Any]:
+def semantic_conversation_identity(context: dict[str, Any]) -> dict[str, Any]:
     return {
         "pr_metadata": {
             "title": (context.get("pr") or {}).get("title"),
             "body": (context.get("pr") or {}).get("body"),
         },
+    }
+
+
+def review_state_identity(context: dict[str, Any]) -> dict[str, Any]:
+    return {
         "issue_comments": [
             comment
             for comment in context.get("issue_comments", [])
@@ -952,6 +983,13 @@ def conversation_identity(context: dict[str, Any]) -> dict[str, Any]:
         "review_comments": context.get("review_comments", []),
         "review_threads": context.get("review_threads", []),
         "reviews": context.get("reviews", []),
+    }
+
+
+def conversation_identity(context: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "semantic": semantic_conversation_identity(context),
+        "review_state": review_state_identity(context),
     }
 
 
@@ -1040,12 +1078,18 @@ def finalize_hashes(context: dict[str, Any]) -> None:
         "merge_base_oid": context["merge_base_oid"],
     }
     context["code_hash"] = stable_hash(code)
+    context["technical_hash"] = stable_hash(
+        {"code_hash": context["code_hash"], "commits": context.get("commits", [])}
+    )
+    context["semantic_conversation_hash"] = stable_hash(
+        semantic_conversation_identity(context)
+    )
+    context["review_state_hash"] = stable_hash(review_state_identity(context))
     context["conversation_hash"] = stable_hash(conversation_identity(context))
     context["context_hash"] = stable_hash(
         {
-            "code_hash": context["code_hash"],
+            "technical_hash": context["technical_hash"],
             "conversation_hash": context["conversation_hash"],
-            "commits": context.get("commits", []),
         }
     )
 
@@ -1155,6 +1199,20 @@ def compare_contexts(expected: dict[str, Any], actual: dict[str, Any]) -> dict[s
         expected.get("conversation_hash") != actual.get("conversation_hash")
     )
     commits_changed = expected.get("commits") != actual.get("commits")
+    expected_semantic_hash = expected.get("semantic_conversation_hash") or stable_hash(
+        semantic_conversation_identity(expected)
+    )
+    actual_semantic_hash = actual.get("semantic_conversation_hash") or stable_hash(
+        semantic_conversation_identity(actual)
+    )
+    expected_review_state_hash = expected.get("review_state_hash") or stable_hash(
+        review_state_identity(expected)
+    )
+    actual_review_state_hash = actual.get("review_state_hash") or stable_hash(
+        review_state_identity(actual)
+    )
+    semantic_conversation_changed = expected_semantic_hash != actual_semantic_hash
+    review_state_changed = expected_review_state_hash != actual_review_state_hash
     mergeability_changed = expected.get("mergeability") != actual.get("mergeability")
     changed_fields = [
         key
@@ -1171,12 +1229,35 @@ def compare_contexts(expected: dict[str, Any], actual: dict[str, Any]) -> dict[s
         ),
         "code_changed": code_changed or commits_changed,
         "conversation_changed": conversation_changed,
+        "conversation_change_kind": (
+            "semantic"
+            if semantic_conversation_changed
+            else "review-state"
+            if review_state_changed
+            else "none"
+        ),
+        "next_action": (
+            "restart-technical-review"
+            if code_changed or commits_changed or semantic_conversation_changed
+            else "reconcile-conversation"
+            if review_state_changed
+            else "continue"
+        ),
+        "technical_results_reusable": not (
+            code_changed or commits_changed or semantic_conversation_changed
+        ),
         "mergeability_changed": mergeability_changed,
         "changed_fields": changed_fields,
         "expected_head_oid": expected.get("head_oid"),
         "actual_head_oid": actual.get("head_oid"),
         "expected_context_hash": expected.get("context_hash"),
         "actual_context_hash": actual.get("context_hash"),
+        "expected_technical_hash": expected.get("technical_hash") or stable_hash(
+            {"code_hash": expected.get("code_hash"), "commits": expected.get("commits", [])}
+        ),
+        "actual_technical_hash": actual.get("technical_hash") or stable_hash(
+            {"code_hash": actual.get("code_hash"), "commits": actual.get("commits", [])}
+        ),
     }
 
 
@@ -1403,6 +1484,8 @@ def command_capture(args: argparse.Namespace) -> int:
                 "head_oid": context["head_oid"],
                 "base_oid": context["base_oid"],
                 "merge_base_oid": context["merge_base_oid"],
+                "technical_hash": context["technical_hash"],
+                "conversation_hash": context["conversation_hash"],
                 "context_hash": context["context_hash"],
                 "mergeability": context.get("mergeability"),
                 "output": str(args.output),
@@ -1826,6 +1909,73 @@ def command_ensure_workspaces_ignore(args: argparse.Namespace) -> int:
     return 0
 
 
+def refresh_review_context(
+    repo_root: Path,
+    repo: str,
+    pr: int,
+    artifact_root: Path,
+    owner_token: str,
+) -> dict[str, Any]:
+    run = validate_owned_review_run(repo_root, artifact_root, owner_token, pr)
+    context_path = run / "pr-review-context.json"
+    conversation_path = run / "pr-review-conversation.md"
+    snapshot = run / "pr-review-snapshot.git"
+    safe_read_leaf(run, context_path.name)
+    safe_read_leaf(run, conversation_path.name)
+    previous = load_context(context_path)
+    context_tmp = _temporary_leaf(run, "tmp-pr-review-context-refresh")
+    conversation_tmp: Path | None = None
+    try:
+        current = capture_to_path(
+            repo=repo,
+            pr=pr,
+            output=context_tmp,
+            git_dir=repo_root,
+            snapshot_dir=snapshot,
+            deadline_epoch=time.time() + COMMAND_TIMEOUT_SECONDS,
+        )
+        comparison = compare_contexts(previous, current)
+        if comparison["next_action"] != "restart-technical-review":
+            conversation_tmp = _temporary_leaf(
+                run, "tmp-pr-review-conversation-refresh"
+            )
+            _write_existing_leaf(
+                conversation_tmp, render_context(current).encode("utf-8")
+            )
+            promote_artifact(run, context_tmp.name, context_path.name)
+            promote_artifact(run, conversation_tmp.name, conversation_path.name)
+        return {
+            **comparison,
+            "status": comparison["status"],
+            "technical_hash": current["technical_hash"],
+            "conversation_hash": current["conversation_hash"],
+            "context_hash": current["context_hash"],
+            "promoted": comparison["next_action"] != "restart-technical-review",
+            "context": str(context_path),
+            "conversation": str(conversation_path),
+        }
+    finally:
+        _discard_artifact_leaf(run, context_tmp.name)
+        if conversation_tmp is not None:
+            _discard_artifact_leaf(run, conversation_tmp.name)
+
+
+def command_refresh_context(args: argparse.Namespace) -> int:
+    result = refresh_review_context(
+        args.repo_root,
+        args.repo,
+        args.pr,
+        args.artifact_root,
+        args.owner_token,
+    )
+    print(json.dumps(result, sort_keys=True))
+    return {
+        "continue": 0,
+        "reconcile-conversation": 10,
+        "restart-technical-review": 20,
+    }[result["next_action"]]
+
+
 def prepare_review_run(repo_root: Path, repo: str, pr: int) -> dict[str, Any]:
     ensure_workspaces_ignored(repo_root)
     run = create_review_run(repo_root, pr)
@@ -1889,6 +2039,8 @@ def prepare_review_run(repo_root: Path, repo: str, pr: int) -> dict[str, Any]:
             "head_oid": context["head_oid"],
             "base_oid": context["base_oid"],
             "merge_base_oid": context["merge_base_oid"],
+            "technical_hash": context["technical_hash"],
+            "conversation_hash": context["conversation_hash"],
             "context_hash": context["context_hash"],
             "context": str(context_path),
             "conversation": str(conversation_path),
@@ -1978,6 +2130,14 @@ def build_parser() -> argparse.ArgumentParser:
     compare_parser.add_argument("--expected", required=True, type=Path)
     compare_parser.add_argument("--actual", required=True, type=Path)
     compare_parser.set_defaults(func=command_compare)
+
+    refresh_parser = subparsers.add_parser("refresh-context")
+    refresh_parser.add_argument("--repo-root", required=True, type=Path)
+    refresh_parser.add_argument("--repo", required=True)
+    refresh_parser.add_argument("--pr", required=True, type=int)
+    refresh_parser.add_argument("--artifact-root", required=True, type=Path)
+    refresh_parser.add_argument("--owner-token", required=True)
+    refresh_parser.set_defaults(func=command_refresh_context)
 
     render_parser = subparsers.add_parser("render")
     render_parser.add_argument("--context", required=True, type=Path)
