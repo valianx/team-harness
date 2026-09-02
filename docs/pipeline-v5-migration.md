@@ -17,6 +17,14 @@ does not create semantic overlays, permanent future task capsules, or an
 exhaustive execution graph. The hot path never imports legacy routing, numeric
 ceilings, fixed replacement allowances, or projection release fields.
 
+The content identity is `openspecContentIdentity` in `control-plane.mjs`: the
+sorted relative paths and bytes of every file under the change root, with the
+checkbox markers in `tasks.md` normalized out, so a renamed, added, or removed
+file changes it while a tick does not. `taskProgressDelta` classifies a
+checkbox-only difference as `progress`, `regression`, or `structural`; only
+progress continues without a recorded action. An identity pinned before this
+formula is not comparable and requires Gate 1 again.
+
 Design now treats strict-valid OpenSpec as the sole semantic plan and generates
 compact read-only `01-plan.md` for the operator. An existing valid change needs
 no architect. Acceptance authoring remains in OpenSpec; explicit plan review

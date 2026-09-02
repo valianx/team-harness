@@ -71,8 +71,8 @@ specialist by default.
    blocked until both `security` and `adversary` pass with no blocker.
 7. **Archive.** Check the pull request state once. When it reports merged, offer
    `openspec archive <change>` behind a one-line Y/n; on acceptance, run it on a branch delivered
-   as its own pull request — never this run's own pull request, never a direct default-branch
-   push. When the pull request is not yet merged, record the archive as pending instead. Archive
+   through an ordinary pull request — a dedicated chore or the next pull request that follows the
+   merge — never this run's own pull request, never a direct default-branch push. When the pull request is not yet merged, record the archive as pending instead. Archive
    never runs silently, and a declined or deferred offer never blocks close — either way, note the
    disposition for a later explicit request. Identical semantics to the pipeline's terminal-close
    step (`agents/_shared/orchestrator-state.md § "Terminal status write — mandatory"`).

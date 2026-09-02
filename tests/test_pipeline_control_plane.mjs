@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { link, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { link, mkdtemp, mkdir, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -36,7 +36,7 @@ import {
   validateCapabilityLease,
   validateExecutionProfile,
   validationRequirements,
-  validateResultEnvelope,
+  validateResultEnvelope, openspecContentIdentity, taskProgressDelta,
 } from "../skills/pipeline/scripts/control-plane.mjs";
 
 const hash = value => createHash("sha256").update(value).digest("hex");
@@ -342,6 +342,36 @@ try {
   await link(path.join(orphanWorkspace, "00-execution-events.jsonl"), path.join(hardLinkWorkspace, "00-execution-events.jsonl"));
   assert.equal((await closeWorkspaceWithoutControlLog({ workspace: hardLinkWorkspace })).error_code, "EVENTS_PATH_INVALID");
   assert.equal((await readFile(path.join(orphanWorkspace, "00-execution-events.jsonl"), "utf8")).split("\n").filter(Boolean).length, 1);
+
+  const changeRoot = path.join(temporary, "change");
+  await mkdir(path.join(changeRoot, "specs", "cap"), { recursive: true });
+  const pinnedTasks = "# Tasks\n\n- [ ] 1.1 first\n- [x] 1.2 second\n";
+  await writeFile(path.join(changeRoot, "proposal.md"), "## Why\n");
+  await writeFile(path.join(changeRoot, "tasks.md"), pinnedTasks);
+  await writeFile(path.join(changeRoot, "specs", "cap", "spec.md"), "## ADDED Requirements\n");
+  const pinned = await openspecContentIdentity({ change_root: changeRoot });
+  assert.equal(pinned.ok, true, JSON.stringify(pinned));
+  assert.deepEqual(pinned.files, ["proposal.md", "specs/cap/spec.md", "tasks.md"]);
+  await writeFile(path.join(changeRoot, "tasks.md"), "# Tasks\n\n- [x] 1.1 first\n- [x] 1.2 second\n");
+  assert.equal((await openspecContentIdentity({ change_root: changeRoot })).identity, pinned.identity);
+  await rename(path.join(changeRoot, "specs", "cap", "spec.md"), path.join(changeRoot, "specs", "cap", "renamed.md"));
+  const renamed = await openspecContentIdentity({ change_root: changeRoot });
+  assert.notEqual(renamed.identity, pinned.identity);
+  await writeFile(path.join(changeRoot, "design.md"), "");
+  const added = await openspecContentIdentity({ change_root: changeRoot });
+  assert.notEqual(added.identity, renamed.identity);
+  await rm(path.join(changeRoot, "proposal.md"));
+  assert.notEqual((await openspecContentIdentity({ change_root: changeRoot })).identity, added.identity);
+  await symlink(path.join(workspace, "control"), path.join(changeRoot, "linked"), "dir");
+  assert.equal((await openspecContentIdentity({ change_root: changeRoot })).error_code, "CHANGE_PATH_SYMLINK");
+  assert.equal((await openspecContentIdentity({ change_root: path.join(temporary, "missing") })).error_code, "CHANGE_ROOT_INVALID");
+
+  assert.equal(taskProgressDelta({ pinned: pinnedTasks, current: pinnedTasks }).delta, "none");
+  assert.equal(taskProgressDelta({ pinned: pinnedTasks, current: pinnedTasks.replace("- [ ] 1.1", "- [x] 1.1") }).delta, "progress");
+  assert.equal(taskProgressDelta({ pinned: pinnedTasks, current: pinnedTasks.replace("- [x] 1.2", "- [ ] 1.2") }).delta, "regression");
+  assert.equal(taskProgressDelta({ pinned: pinnedTasks, current: pinnedTasks.replace("- [x] 1.2", "- [ ] 1.2").replace("- [ ] 1.1", "- [x] 1.1") }).delta, "regression");
+  assert.equal(taskProgressDelta({ pinned: pinnedTasks, current: `${pinnedTasks}- [ ] 1.3 third\n` }).delta, "structural");
+  assert.equal(taskProgressDelta({ pinned: pinnedTasks, current: 7 }).error_code, "TASKS_INVALID");
 } finally {
   await rm(temporary, { recursive: true, force: true });
 }
