@@ -1,269 +1,169 @@
 ---
 name: update
-description: "Update Team Harness for Codex and automatically reconcile the complete operational installation: marketplace snapshot, native configuration, bundled specialist agents, MCP registrations, and deterministic hook wiring."
+description: "Update Team Harness for Codex and converge the complete operational installation through one bounded, receipt-driven pass."
 ---
 
 # Update Team Harness for Codex
 
-The marketplace distributes code; this skill updates and configures the
-installed runtime. Do not activate a pipeline, create workspace state, or spawn
-subagents. Accept `--force` to reinstall an equal-version development snapshot.
+Update the marketplace snapshot, select the installed version, and delegate all
+post-install inspection, repair, and verification to one versioned convergence
+helper. Do not activate a pipeline, create workspace state, or spawn agents.
+Accept `--force` only to reinstall an equal-version development snapshot; it
+never authorizes a downgrade.
 
-## Sandbox execution contract
+## Execution and sandbox contract
 
-Codex may emit exactly `WARNING: proceeding, even though we could not create
-PATH aliases: Read-only file system (os error 30)` while the current session
-still lacks the managed `~/.codex/tmp` writable root. For `plugin list`,
-`marketplace list`, `mcp list`, and other read/inspect commands, treat only that
-exact stderr line as a non-fatal `current-session-runtime-stale` warning when
-the command exits zero and its stdout parses as the required JSON. Do not retry
-or escalate a read solely for that warning. Any other stderr, non-zero exit, or
-invalid JSON follows the normal failure contract. Runtime reconciliation fixes
-the alias path for a new session; it does not hot-reload the current sandbox.
+Run each native marketplace or plugin mutation as its own tool call. Keep reads
+sandboxed. For a mutation outside the current writable roots, request native
+escalation before its first execution. The convergence helper is one command
+even though it owns several bounded domains internally.
 
-Run every update command as its own tool call. Keep reads sandboxed. For a
-mutation whose declared target is outside the current materialized writable
-roots, request native escalation before its first execution; otherwise run it
-sandboxed first. If a sandboxed mutation returns `EROFS`, `EACCES`, `EPERM`, or
-the bridge helper's `CACHE_WRITE_PROTECTED`, retry the exact argv with
-narrow escalation and `login:false`. A successful retry is authoritative and
-the initial sandbox denial is not `partial-convergence`. A rejected approval or
-failed escalated action is `partial-convergence` at that step; never repeat that
-unchanged failed action. Never chain mutations,
-change argv between attempts, ask the operator to run the command, or add the
-plugin cache, agent directory, or whole Codex home to persistent writable
-roots. `manage_runtime.py ensure` has the additional live approval gate below
-because it changes the persistent execution profile.
+For a successful read, ignore only this exact stderr warning when stdout still
+parses as the required result:
 
-## Procedure
+```text
+WARNING: proceeding, even though we could not create PATH aliases: Read-only file system (os error 30)
+```
 
-1. Record `OLD_PLUGIN` as the lexical absolute plugin root that contains this
-   loaded `skills/update/SKILL.md`; do not resolve away a versioned symlink.
-   Read and validate `OLD_VERSION` from its `.codex-plugin/plugin.json`. Run
-   `codex plugin list --json` and `codex plugin marketplace list --json`.
-   Require `team-harness@team-harness`; otherwise direct the operator to the
-   marketplace install followed by `$team-harness:setup`.
+If the convergence receipt identifies one failed domain with
+`retryWithEscalation: true`, retry the helper once with narrow escalation,
+`login:false`, and `--escalation-domain FAILED_DOMAIN`. Preserve every other
+argument. In this mode the helper permits a write only in that domain; it
+classifies the others read-only and fails if another domain would need a write.
+A rejected or failed retry is `partial-convergence`; do not repeat the failed
+action, ask the operator to run it manually, or grant persistent write access
+to the plugin cache, agent directory, or whole Codex home. Persistent
+runtime-profile reconciliation has the separate live decision below and is
+never authorized merely by escalation approval.
 
-2. Refresh only this marketplace, then inspect the refreshed plugin listing:
+## Stage A — select the snapshot
 
-   ```text
-   codex plugin marketplace upgrade team-harness --json
-   codex plugin list --json
-   ```
+1. Resolve the active `codex` executable once. Record its canonical absolute,
+   regular, executable target as `CODEX_BIN`; reject an unresolved or relative
+   command. Use that exact path for every native command in both stages, never
+   a later `PATH` lookup.
 
-   Resolve the plugin's lexical marketplace
-   `source.path`, validate that source's `.codex-plugin/plugin.json`, and read
-   `AVAILABLE_VERSION` there. Do not treat the version displayed by `plugin
-   list` as the running version: after a marketplace refresh it can describe
-   the refreshed source while the current thread still uses `OLD_PLUGIN`.
-   Compare `OLD_VERSION` and `AVAILABLE_VERSION` semantically:
+2. Record `OLD_PLUGIN` as the lexical absolute plugin root containing this
+   loaded skill; do not resolve away a versioned symlink. Read only its regular
+   `.codex-plugin/plugin.json`, require `name: team-harness`, and record its
+   semantic `OLD_VERSION`.
 
-   - newer: continue with installation;
-   - equal with `--force`: continue with an equal-version development refresh;
-   - equal without `--force`: skip installation and use the current snapshot;
-   - older: stop before installation and report the stale marketplace; `--force`
-     never authorizes a downgrade.
-
-   A local marketplace is already source-current and is reinstalled only with
-   `--force`.
-
-3. For the newer and equal-plus-`--force` cases only, install or refresh the
-   marketplace snapshot in place through Codex's native permission flow:
+3. Refresh only the Team Harness marketplace, then resolve its refreshed root:
 
    ```text
-   codex plugin add team-harness@team-harness --json
+   CODEX_BIN plugin marketplace upgrade team-harness --json
+   CODEX_BIN plugin marketplace list --json
    ```
 
-   Capture the command's JSON `installedPath` and `version` as `NEW_PLUGIN` and
-   `NEW_VERSION`, then validate the installed manifest at that exact lexical
-   path. `plugin add` is idempotent for an existing installation and preserves the
-   active plugin until the replacement is ready. **Never run `codex plugin
-   remove` during update:** a live thread's trusted `PreToolUse` hooks resolve
-   through the installed versioned cache path, so removing it first creates a
-   fail-closed gap that can block the subsequent add command itself. Do not
-   remove the marketplace either. If add fails, stop and report the error; the
-   prior installation remains the recovery path and must not be removed or
-   repaired manually by this skill.
+   Require one marketplace named `team-harness`. Read its bounded regular
+   `.agents/plugins/marketplace.json`, resolve the declared Team Harness source
+   beneath that marketplace root without traversal, and validate the source's
+   regular `.codex-plugin/plugin.json`. Its manifest supplies
+   `AVAILABLE_VERSION`; a listing's displayed version never represents the
+   already-loaded runtime.
 
-   When no install is required, set `NEW_PLUGIN=OLD_PLUGIN` and
-   `NEW_VERSION=OLD_VERSION`.
+4. Compare versions semantically:
 
-4. The running skill text is still the old snapshot. Initialize the
-   post-install convergence result as `pending`. From this point,
-   `NEW_PLUGIN` and `NEW_VERSION` are the only operational source: never
-   execute a helper, inspect a hook, or derive the post-update installed
-   version from `OLD_PLUGIN`.
+   - newer: install the refreshed snapshot;
+   - equal plus `--force`: reinstall the development snapshot;
+   - equal without `--force`: skip installation and converge the loaded path;
+   - older: stop before installation and report a stale marketplace.
 
-   Bridge the current thread's old versioned path to the validated new
-   snapshot using the new helper:
-
-   ```bash
-   python3 NEW_PLUGIN/skills/update/scripts/bridge_snapshot.py \
-     --old-plugin OLD_PLUGIN --new-plugin NEW_PLUGIN
-   ```
-
-   The helper writes only inside the common
-   `plugins/cache/team-harness/team-harness/` directory. It creates a missing
-   old path or atomically repoints an existing in-cache symlink, but never
-   replaces a real directory or an unrelated symlink. Preserving a real old
-   snapshot is intentional: the running thread remains operational on those
-   already-loaded bytes and the helper reports `restartRequired: true` instead
-   of risking a live-path deletion. A missing or previously bridged old path can
-   still point safely at the new snapshot. Preserve the helper's
-   `restartRequired` result for the final report.
-
-   The bridge is compatibility protection for non-pipeline skill execution;
-   active pipelines use their content-addressed workspace `helper_bundle`.
-   Never delete, rewrite, or garbage-collect those workspace bundles during
-   update. If an active legacy pipeline lacks one, its recovery contract—not
-   this update flow—performs the bounded compatibility handoff before another
-   nonce or dispatch.
-
-   Always create or migrate the independent native configuration:
-
-   ```bash
-   python3 NEW_PLUGIN/skills/setup/scripts/manage_config.py ensure --version NEW_VERSION
-   ```
-
-   This fills missing safe defaults and updates helper metadata while
-   preserving every configured and opaque operator value. It never reads or
-   writes Claude Code or opencode configuration. Cross-runtime copying belongs
-   only to an explicit `$team-harness:setup` import.
-
-   Inspect the global Codex execution profile after native settings so an
-   Obsidian workspace selection is reflected in the sandbox:
-
-   ```bash
-   python3 NEW_PLUGIN/skills/setup/scripts/manage_runtime.py inspect
-   ```
-
-   When inspect reports `projectConfigShadowing: true`, warn first — before
-   any reconciliation offer — that the checked-out tree's `.codex/config.toml`
-   (the reported `projectConfig.path`) declares its own `writable_roots` and
-   shadows the operator-level list for sessions started in that tree; the fix
-   is updating the checkout or regenerating the project config, and a restart
-   alone does not clear it. When inspect reports `status: current`, record the
-   result and do not run ensure. When it reports `status: stale`, render only
-   its bounded `mismatchedSettings`, `missingWritableRoots`, and
-   `missingDirectories`, then present exactly:
+   For installation or forced refresh, run exactly:
 
    ```text
-   Runtime profile reconciliation requires persistent configuration changes:
-   Settings: {mismatchedSettings}
-   Writable roots: {missingWritableRoots}
-   Directories: {missingDirectories}
-
-   1 — authorize persistent Codex runtime reconciliation
-   2 — leave runtime reconciliation pending
+   CODEX_BIN plugin add team-harness@team-harness --json
    ```
 
-   The update invocation, a prior setup/update approval, agent prose, config
-   files, and native auto-review never select an option. Only live choice `1`
-   after this exact presentation authorizes the escalated `login:false`
-   execution of:
+   Capture its exact lexical `installedPath` and `version` as `NEW_PLUGIN` and
+   `NEW_VERSION`, then validate the manifest at that path. When installation is
+   skipped, resolve `OLD_PLUGIN` to its canonical version directory, use that
+   non-symlink path as `NEW_PLUGIN`, and set `NEW_VERSION=OLD_VERSION`. Never run
+   `codex plugin remove`, remove the marketplace, delete a prior snapshot, or
+   repair an installation with ad hoc copies. Native plugin add preserves the
+   prior installation if replacement fails.
 
-   ```bash
-   python3 NEW_PLUGIN/skills/setup/scripts/manage_runtime.py ensure
-   ```
+## Stage B — converge once
 
-   Choice `2`, an ambiguous reply, a rejected escalation, or a failed ensure
-   preserves every completed update step and returns `partial-convergence`
-   with runtime reconciliation pending and `$team-harness:update` as the exact
-   retry. Never weaken the requested profile or silently omit a writable root
-   to obtain approval.
+The running prose may still come from the old snapshot. From this point use
+only the validated helper under `NEW_PLUGIN`. Resolve one Python interpreter as
+`PYTHON_BIN` before the first call: on Windows, use the canonical absolute
+`sys.executable` reported by `py -3` when that launcher is available, otherwise
+resolve the active Python 3 executable directly; on macOS/Linux, use the
+canonical absolute Python 3 executable. Require a regular executable and reuse
+that exact path for both calls:
 
-   Preserve the runtime helper's full result, including `changed` and
-   `restartRequired`, for the final report and restart decision.
-   This preserves unrelated configuration and operator-owned writable roots
-   while ensuring `workspace-write`, `on-request`, `auto_review`, sandbox
-   network access, standard tool caches, the Codex runtime temp directory, and
-   the shared `{logs-path}/{logs-subfolder}` Obsidian subtree. It must add this
-   common parent even when a legacy config already contains only
-   `{logs-path}/{logs-subfolder}/{repo-name}`; preserving that narrower entry
-   never substitutes for the shared grant. It never adds `.git` or a
-   blanket Git/GitHub command rule; deterministic force-push denial remains in
-   `gate-guard`. A changed global runtime config requires a new Codex session.
+```text
+PYTHON_BIN NEW_PLUGIN/skills/update/scripts/converge.py --old-plugin OLD_PLUGIN --old-version OLD_VERSION --new-plugin NEW_PLUGIN --new-version NEW_VERSION --codex-bin CODEX_BIN
+```
 
-   Reconcile the native multi-agent backend on every update, including an
-   equal-version repair. These commands are idempotent and make the V2 runtime
-   requirement explicit instead of relying on a prior setup:
+This is the only post-install call before operator input. It validates and
+bridges the running snapshot path, attests every imported helper before
+execution, ensures native Team Harness settings,
+classifies the persistent runtime profile, enables only missing multi-agent
+features, synchronizes agents only when stale, inspects MCP registrations
+without replacing them, validates that the exact hook manifest contains only
+the deterministic `policy-block`, `gcp-guard`, and deny-only `gate-guard`
+adapters, verifies changed
+postconditions, and emits exactly one closed JSON receipt. It must use fixed
+native argv, bounded output and timeouts, preserve opaque/operator-owned
+configuration and custom agent defaults, reject unmanaged conflicts and unsafe
+files, and never read another runtime's config or touch pipeline helper bundles.
 
-   ```text
-   codex features enable multi_agent
-   codex features enable multi_agent_v2
-   ```
+Accept a receipt only when it has `schemaVersion: 1`, the exact seven domains
+`bridge`, `config`, `runtime`, `features`, `agents`, `mcp`, and `hooks`, one of
+the overall statuses `current | converged | pending-approval |
+partial-convergence`, and all required identity, changed-domain, restart,
+pending, failure, and recovery fields. Invalid, missing, extra, or multiple
+JSON results are a failed convergence pass. The receipt is the final
+verification authority: never repeat its domain inspections in coordinator
+tool calls.
 
-5. Read `agent-scope` from the native config (the ensured default is
-   `global`) and reconcile all nineteen bundled agents automatically:
+### Runtime decision
 
-   ```bash
-   python3 NEW_PLUGIN/skills/setup/scripts/manage_agents.py inspect --scope SCOPE
-   python3 NEW_PLUGIN/skills/setup/scripts/manage_agents.py sync --scope SCOPE
-   ```
+When the receipt is `pending-approval`, show only its redacted runtime delta:
+stale settings, missing writable roots, missing directories, and project-config
+shadowing. Then ask one concise conversational question, for example:
 
-   Install missing agents and replace only stale Team Harness-generated files.
-   The same sync installs a missing generic fallback or migrates the exact
-   formerly managed `gpt-5.6-terra` / `medium` pair to `gpt-5.6-luna` / `max`;
-   any other complete operator-selected pair is preserved and reported as
-   `custom-preserved`.
-   It also preserves the ordered `project_doc_fallback_filenames` array and
-   appends `CLAUDE.md` once when absent, so `AGENTS.md` retains precedence.
-   Named roles keep their exact generated model/effort mappings. Stop on an
-   unmanaged same-name conflict. Do not call or download the separate Go
-   installer; agent bytes are part of the marketplace snapshot. Preserve
-   `runtimeConfigChanged` and `restartRequired` from sync for the final report;
-   a project-document fallback change requires a fresh Codex thread.
+```text
+The Codex runtime profile needs these persistent changes: {bounded summary}.
+Continue? You can answer yes, no, or tell me what you want to change.
+```
 
-6. Inspect `codex mcp list --json`. Preserve registered MCP definitions and
-   report missing registrations that native configuration expects; never
-   replace an MCP or reveal credentials during an update.
+Do not demand a number, an exact phrase, a copied command, or a new skill
+invocation. A short unambiguous live affirmation such as `yes`, `sí`, `ok`, or
+`continúa` authorizes one focused follow-up call:
 
-7. Verify the new snapshot's `hooks/hooks.json` contains only the supported
-   deterministic deny hooks (`policy-block`, `gcp-guard`, and the deny-only
-   `gate-guard` force-push floor) and no `PermissionRequest` or
-   approval-classifying guards. Read only that exact regular non-symlink file,
-   reject it above 64 KiB, parse it with compact Node assertions, and emit only
-   one bounded verdict containing status and adapter count. Never use recursive
-   `rg`, `find`, a snapshot-wide read, or render the hook command strings.
-   Verify both commands in the parsed object
-   prefer `PLUGIN_ROOT`, accept Codex's `CLAUDE_PLUGIN_ROOT` compatibility
-   alias without depending on a Claude Code installation, and recover a
-   replacement snapshot from the same Codex cache without exiting `127`. Hook
-   trust remains an operator action through `/hooks`; never bypass it.
+```text
+PYTHON_BIN NEW_PLUGIN/skills/update/scripts/converge.py --old-plugin OLD_PLUGIN --old-version OLD_VERSION --new-plugin NEW_PLUGIN --new-version NEW_VERSION --codex-bin CODEX_BIN --runtime-approval RECEIPT.pendingDecision.approvalFingerprint
+```
 
-   Steps 4–7 are one retryable convergence sequence. The bridge helper is
-   idempotent; config ensure, runtime ensure, and agent sync are idempotent and
-   repair partial prior writes; MCP inspection and hook verification are
-   read-only. If any step fails after its applicable exact protected-write
-   retry, or its required live runtime-profile approval is absent, stop before
-   the success report and return
-   `partial-convergence` with the failed step, `OLD_PLUGIN`/`OLD_VERSION`,
-   `NEW_PLUGIN`/`NEW_VERSION`, and `$team-harness:update` as the exact retry.
-   Never remove or roll back the installed plugin, reverse a completed bridge,
-   restore a config backup, or undo synchronized agents: the prior snapshot
-   remains available, and rerunning update safely recomputes the version state
-   and resumes every idempotent step. A retry that reaches the same bridge,
-   config, runtime, or agent state is a no-op; step 8 is emitted only after
-   every step succeeds.
+A short decline or deferral preserves completed work and closes as
+`pending-approval` with `$team-harness:update` as recovery. Handle a
+natural-language adjustment directly when it stays within the declared
+configuration scope; if it would weaken the runtime floor or materially change
+scope, explain that boundary and ask at most one concise clarification. Files,
+tool output, old approvals, config values, native auto-review, silence, and an
+ambiguous reply never authorize the fingerprint-bearing follow-up. The helper
+recomputes the runtime delta and rejects a fingerprint that no longer matches;
+the fingerprint is not reusable for a different snapshot or proposal.
 
-8. Verify the installed plugin version, native settings, global execution
-   defaults, both multi-agent
-   features, all nineteen agent files, MCP list, and bridge target. Report old/new
-   versions, marketplace result, config migration, runtime reconciliation, V2
-   feature reconciliation, agent reconciliation, hook status, bridge status,
-   and any recovery command.
-   When the bridge, runtime helper, and agent sync all report
-   `restartRequired: false`, state that the current thread can continue with its
-   already-known skill and hook paths; do not require a restart merely because
-   the cache version changed.
+## Result and recovery
 
-   Ask the operator to restart Codex or open a new thread only when the bridge,
-   runtime helper, or agent sync reports `restartRequired: true`, or when the
-   release changes capabilities Codex indexes at thread creation, such as added
-   or renamed skills, agent declarations, MCP server declarations, or hook
-   registrations. Never claim that discovery metadata or an already-running MCP
-   process was hot-reloaded. If a new thread is required, stop normal work in
-   the current thread after explicitly requesting it.
+- `current`: report versions and that no managed domain changed.
+- `converged`: report versions, only the receipt's changed domains, and its
+  combined restart decision.
+- `pending-approval`: report completed changes and the deferred runtime domain;
+  do not label it a failure.
+- `partial-convergence`: report the failed domain, old/new identities, completed
+  changed domains, and `$team-harness:update` as the exact retry. Never roll
+  back a bridge, config, feature, agent, or other completed idempotent write.
 
-Even when plugin versions compare equal, steps 4–7 still run. Update is also a
-repair/convergence command, not only a version downloader.
+Ask for a new Codex thread only when `restartRequired` is true or the release
+adds or renames declarations Codex indexes at thread creation (skills, agents,
+MCP servers, or hook registrations). Otherwise state that the current thread
+can continue on its already-known paths. Never claim that discovery metadata
+or an already-running MCP process hot-reloaded.
+
+An equal-version run still executes Stage B: update remains the supported
+repair command as well as the version updater.

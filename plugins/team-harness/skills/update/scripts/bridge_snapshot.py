@@ -14,12 +14,20 @@ import sys
 PLUGIN_NAME = "team-harness"
 
 
-def emit(status: str, *, restart_required: bool, **details: object) -> None:
-    print(json.dumps({
+class BridgeError(ValueError):
+    """A bounded bridge validation failure safe to report to the operator."""
+
+
+def outcome(status: str, *, restart_required: bool, **details: object) -> dict[str, object]:
+    return {
         "status": status,
         "restartRequired": restart_required,
         **details,
-    }, indent=2, sort_keys=True))
+    }
+
+
+def emit(status: str, *, restart_required: bool, **details: object) -> None:
+    print(json.dumps(outcome(status, restart_required=restart_required, **details), indent=2, sort_keys=True))
 
 
 def lexical_path(value: str) -> Path:
@@ -27,8 +35,7 @@ def lexical_path(value: str) -> Path:
 
 
 def fail(message: str) -> None:
-    emit("error", restart_required=True, error=message)
-    raise SystemExit(2)
+    raise BridgeError(message)
 
 
 def fail_write_protected() -> None:
@@ -79,7 +86,7 @@ def link_target(path: Path) -> Path:
     return raw_target.resolve(strict=False)
 
 
-def bridge(old_plugin: Path, new_plugin: Path) -> None:
+def bridge_result(old_plugin: Path, new_plugin: Path) -> dict[str, object]:
     new_snapshot, version = validate_new_snapshot(new_plugin)
     cache_parent = new_snapshot.parent
 
@@ -90,29 +97,27 @@ def bridge(old_plugin: Path, new_plugin: Path) -> None:
     if old_parent != cache_parent:
         fail("old and new snapshots are not in the same Team Harness Codex cache")
     if old_plugin == new_snapshot:
-        emit(
+        return outcome(
             "same-snapshot",
             restart_required=False,
             oldPlugin=str(old_plugin),
             newPlugin=str(new_snapshot),
             version=version,
         )
-        return
 
     status = "linked"
     if os.path.lexists(old_plugin):
         if not old_plugin.is_symlink():
-            emit(
+            return outcome(
                 "skipped-existing-path",
                 restart_required=True,
                 oldPlugin=str(old_plugin),
                 newPlugin=str(new_snapshot),
                 version=version,
             )
-            return
         current_target = link_target(old_plugin)
         if current_target.parent != cache_parent:
-            emit(
+            return outcome(
                 "skipped-unmanaged-symlink",
                 restart_required=True,
                 oldPlugin=str(old_plugin),
@@ -120,16 +125,14 @@ def bridge(old_plugin: Path, new_plugin: Path) -> None:
                 newPlugin=str(new_snapshot),
                 version=version,
             )
-            return
         if current_target == new_snapshot:
-            emit(
+            return outcome(
                 "current",
                 restart_required=False,
                 oldPlugin=str(old_plugin),
                 newPlugin=str(new_snapshot),
                 version=version,
             )
-            return
         status = "relinked"
 
     temporary = old_plugin.with_name(
@@ -142,13 +145,20 @@ def bridge(old_plugin: Path, new_plugin: Path) -> None:
         if os.path.lexists(temporary):
             temporary.unlink()
 
-    emit(
+    if not old_plugin.is_symlink() or link_target(old_plugin) != new_snapshot:
+        fail("snapshot bridge reconciliation did not converge")
+
+    return outcome(
         status,
         restart_required=False,
         oldPlugin=str(old_plugin),
         newPlugin=str(new_snapshot),
         version=version,
     )
+
+
+def bridge(old_plugin: Path, new_plugin: Path) -> None:
+    print(json.dumps(bridge_result(old_plugin, new_plugin), indent=2, sort_keys=True))
 
 
 def main() -> None:
@@ -162,7 +172,11 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         main()
+    except BridgeError as exc:
+        emit("error", restart_required=True, error=str(exc))
+        raise SystemExit(2) from exc
     except OSError as exc:
         if exc.errno in {errno.EACCES, errno.EPERM, errno.EROFS}:
             fail_write_protected()
-        fail("snapshot bridge filesystem operation failed")
+        emit("error", restart_required=True, error="snapshot bridge filesystem operation failed")
+        raise SystemExit(2) from exc
