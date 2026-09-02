@@ -475,7 +475,7 @@ def ensure_directory(path: Path) -> bool:
     return not existed
 
 
-def ensure() -> int:
+def ensure_result() -> dict[str, object]:
     before = classify()
     raw, parsed = read_runtime_config()
     _, current_roots = current_runtime_state(parsed)
@@ -506,14 +506,18 @@ def ensure() -> int:
     after = classify()
     if after["status"] != "current":
         raise ValueError("Codex runtime reconciliation did not converge")
-    print(json.dumps({
+    return {
         "changed": changed,
         "before": before,
         "runtime": after,
         "mode": oct(stat.S_IMODE(runtime_config_path().stat().st_mode)),
         "createdDirectories": created_directories,
         "restartRequired": bool(changed or created_directories),
-    }, sort_keys=True))
+    }
+
+
+def ensure() -> int:
+    print(json.dumps(ensure_result(), sort_keys=True))
     return 0
 
 
