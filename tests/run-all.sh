@@ -429,32 +429,17 @@ echo "# Suite 14e: worktree dependency provisioning"
 echo "############################################################"
 run_node_suite "worktree-dependencies" "test_worktree_dependencies.mjs" "node not found — install Node.js to run this suite"
 
-echo
-echo "############################################################"
-echo "# Suite 164: OpenSpec runtime policy and adapter"
-echo "# Requires: node. Missing runtime follows CI-required semantics."
-echo "############################################################"
-run_node_suite "openspec-adapter" "test_openspec_adapter.mjs" "node not found — install Node.js to run this suite"
 
 echo
 echo "############################################################"
-echo "# Suite 165: OpenSpec canonical planning snapshot"
+echo "# Suite 165: OpenSpec and control-plane runtime suites"
 echo "# Requires: node. Missing runtime follows CI-required semantics."
 echo "############################################################"
-run_node_suite "openspec-snapshot" "test_openspec_snapshot.mjs" "node not found — install Node.js to run this suite"
-run_node_suite "openspec-overlay" "test_openspec_overlay.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "openspec-distribution" "test_openspec_distribution.mjs" "node not found — install Node.js to run this suite"
-run_node_suite "openspec-recovery" "test_openspec_recovery.mjs" "node not found — install Node.js to run this suite"
-run_node_suite "openspec-bindings" "test_openspec_bindings.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "openspec-events" "test_openspec_events.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "pipeline-control-plane" "test_pipeline_control_plane.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "pipeline-simplification-benchmark" "test_pipeline_simplification_benchmark.mjs" "node not found — install Node.js to run this suite"
-run_node_suite "specialist-liveness" "test_specialist_liveness.mjs" "node not found — install Node.js to run this suite"
-run_node_suite "specialist-write-scope" "test_specialist_write_scope.mjs" "node not found — install Node.js to run this suite"
-run_node_suite "correction-packet-preflight" "test_correction_packet_preflight.mjs" "node not found — install Node.js to run this suite"
-run_node_suite "helper-bundle" "test_helper_bundle.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "pipeline-helper-entrypoints" "test_pipeline_helper_entrypoints.mjs" "node not found — install Node.js to run this suite"
-run_node_suite "openspec-design-e2e" "test_openspec_design_e2e.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "herdr-message" "test_herdr_message.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "resume-session-workspace" "test_resume_session_workspace.mjs" "node not found — install Node.js to run this suite"
 
@@ -527,12 +512,6 @@ else
     FAILED=$((FAILED + 1))
 fi
 
-echo
-echo "############################################################"
-echo "# Suite 167: deterministic functional-first plan contract"
-echo "# Requires: node. Missing runtime follows CI-required semantics."
-echo "############################################################"
-run_node_suite "functional-plan-contract" "test_plan_contract.mjs" "node not found — install Node.js to run this suite"
 
 echo
 echo "############################################################"

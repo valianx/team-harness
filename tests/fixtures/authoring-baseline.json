@@ -30,13 +30,13 @@
     "target": 4000
   },
   "agents/ref-dispatch-machinery.md": {
-    "ceiling": 1178
+    "ceiling": 1176
   },
   "agents/ref-intake-flows.md": {
     "ceiling": 3723
   },
   "agents/ref-pipeline.md": {
-    "ceiling": 1647,
+    "ceiling": 1622,
     "reason": "initial record on the tree that adds the design.oversize choice to the Design steps"
   },
   "agents/ref-special-flows.md": {
