@@ -1,0 +1,45 @@
+{
+  "agents/_shared/apply-review-disposition.md": {
+    "ceiling": 1927,
+    "target": 1500
+  },
+  "agents/_shared/gh-fallback.md": {
+    "ceiling": 2040,
+    "target": 1500
+  },
+  "agents/_shared/inline-review-contract.md": {
+    "ceiling": 1887,
+    "target": 1500
+  },
+  "agents/_shared/kg-write-policy.md": {
+    "ceiling": 1550,
+    "target": 1500
+  },
+  "agents/orchestrator.md": {
+    "ceiling": 2528,
+    "target": 2000
+  },
+  "agents/ref-architect-design.md": {
+    "ceiling": 3980
+  },
+  "agents/ref-architect-modes.md": {
+    "ceiling": 1892
+  },
+  "agents/ref-direct-modes.md": {
+    "ceiling": 6977,
+    "target": 4000
+  },
+  "agents/ref-dispatch-machinery.md": {
+    "ceiling": 1178
+  },
+  "agents/ref-intake-flows.md": {
+    "ceiling": 3723
+  },
+  "agents/ref-pipeline.md": {
+    "ceiling": 1612
+  },
+  "agents/ref-special-flows.md": {
+    "ceiling": 11300,
+    "target": 6000
+  }
+}
