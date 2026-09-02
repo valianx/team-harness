@@ -5,8 +5,8 @@ A contract names the helper that classifies and the vocabulary the helper return
 Restating the helper's flag list, decision procedure, or attempt ordinals forks the
 procedure: prose and helper then disagree silently, and the prose is what a reader
 follows. The oracle is a closed list of tokens that only appear when that fork has
-happened — helper subcommand names and its flag spellings. The vocabulary the helper
-returns is never retired: a contract must be able to name it.
+happened — helper subcommand names, its flag spellings, and the one decision literal the
+contract-right-sizing scenario names. The rest of the returned vocabulary stays nameable.
 
 The list is closed on purpose. It is not a wording preference: each token is an
 identifier owned by `skills/review-pr/scripts/review_context.py`, so a contract that
@@ -24,6 +24,7 @@ RETIRED_PHRASES = (
     "classify-agent-failure",
     "--contract-signal",
     "--attempt {1|2}",
+    "retry-contract",
 )
 
 # Shrink-only. A value names the change that removes the entry; the suite fails when an

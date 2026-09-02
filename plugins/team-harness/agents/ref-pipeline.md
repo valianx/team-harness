@@ -66,7 +66,7 @@ and tasks.
    milestone, initiative detection/confirmation before binding an initiative,
    and initiative create-or-join after confirmation. Then replay/convert the
    selected workspace.
-2. Count `### Requirement:` headers across the bound change's delta specs
+2. Count `### Requirement:` headers across the bound change's `specs/*/spec.md`
    against `max_requirements_per_change` in `openspec/config.yaml`; past it,
    step 4 applies with or without architect. If the complete bound change
    passes strict validation within the ceiling, use it directly and do not

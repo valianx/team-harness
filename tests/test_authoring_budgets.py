@@ -190,7 +190,7 @@ def base_baseline() -> dict[str, dict] | None:
     spec = f"{ref}:{BASELINE.relative_to(ROOT).as_posix()}"
     try:
         shown = subprocess.run(
-            ["git", "-C", str(ROOT), "show", spec],
+            ["git", "-C", str(ROOT), "show", "--end-of-options", spec],
             check=True, capture_output=True, text=True, encoding="utf-8",
         )
         return json.loads(shown.stdout)
@@ -204,7 +204,7 @@ def check_ratchet(recorded: dict[str, dict], base: dict[str, dict], out: list[st
         if not isinstance(before, int):
             continue
         if rel not in recorded:
-            if (ROOT / rel).is_file():
+            if (ROOT / rel).is_file() and classify(ROOT / rel) is not None:
                 out.append(f"{rel}: ceiling entry removed while the file still exists")
             continue
         after = recorded[rel].get("ceiling")
@@ -261,7 +261,8 @@ def main() -> int:
     ceilings_seen: set[str] = set()
     base = base_baseline()
     if base is None:
-        notes.append("ceiling ratchet: no base ref fixture reachable; set TH_BASELINE_BASE_REF")
+        message = "ceiling ratchet: no base ref fixture reachable; set TH_BASELINE_BASE_REF"
+        (failures if os.environ.get("TH_REQUIRE_RUNTIMES") == "1" and os.environ.get("TH_BASELINE_BASE_REF") else notes).append(message)
     else:
         check_ratchet(recorded, base, failures)
 

@@ -339,7 +339,7 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 ## 9. Patterns & Conventions
 <!-- Updated in the reviewed implementation tree when a feature establishes a durable pattern. Empty at init. -->
 > Full history: see `docs/patterns.md`. Recent entries below.
-- **Suite-run evidence ledger** (#532): append-only `docs/suite-evidence.md`-defined per-feature registry, one row per verification-command run; `tree_anchor` reused literally from `docs/verification-packet.md § 2`; strict full-tree-anchor equality (never a "relevant files" heuristic) decides skip-vs-rerun; closed writer list. → `docs/suite-evidence.md`, `agents/ref-pipeline.md`
+- **Suite-run evidence ledger** (#532): append-only `docs/suite-evidence.md`-defined per-feature registry, one row per verification-command run; `tree_anchor` reused literally from `docs/verification-packet.md § 1a`; strict full-tree-anchor equality (never a "relevant files" heuristic) decides skip-vs-rerun; closed writer list. → `docs/suite-evidence.md`, `agents/ref-pipeline.md`
 - **Shared-review-file write discipline** (#527): on a review file several agents write, use `Edit` rather than `Write` once it exists and anchor `old_string` to your own section. The `tools:` grant is the only enforcement; the header-survival check a prior revision named was never defined. → `agents/_shared/plan-consolidation.md`
 - **Publish-only delivery**: `agents/_shared/implementation-assembly.md` owns version/changelog and the complete pre-Freeze commit; `agents/delivery.md` prepares PR prose; `agents/_shared/delivery-mechanics.md` verifies the validated commit/tree, pushes, and creates the draft PR without tests or branch mutation. → `agents/_shared/delivery-mechanics.md`
 

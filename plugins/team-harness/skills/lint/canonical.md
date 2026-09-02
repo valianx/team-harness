@@ -327,9 +327,9 @@ For each file in scope:
    deterministic classification and the vocabulary it returns; it never
    restates the helper's flag list, decision procedure, or attempt ordinals.
    Search `agents/**/*.md` and every `skills/**/SKILL.md` for this closed
-   list — `classify-agent-failure`, `--contract-signal`, `--attempt {1|2}` —
-   and FAIL naming the file and the phrase. The vocabulary a helper returns
-   is never on the list; a contract must be able to name it. This file states the list and is
+   list — `classify-agent-failure`, `--contract-signal`, `--attempt {1|2}`,
+   `retry-contract` — and FAIL naming the file and the phrase. Other returned
+   vocabulary is never on the list; a contract must be able to name it. This file states the list and is
    therefore not scanned against it; any other file is exempt only through
    the shrink-only map in `tests/test_retired_phrases.py`, whose entry names
    the change that removes it. An exempt file with no remaining phrase also
@@ -341,7 +341,7 @@ For each file in scope:
 
 Result:
 - **PASS** if every file fits budgets and formats and every anchor resolves.
-- **WARN** for 80%-budget crossings and depth-two references.
+- **WARN** for 80%-budget crossings, depth-two references, and archive lag.
 - **FAIL** for a hard-cap breach, missing description/tools, missing TOC, a
   dangling anchor, or a retired phrase outside the exemption map.
 
