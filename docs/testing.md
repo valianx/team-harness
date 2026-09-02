@@ -61,7 +61,7 @@ Everything below has inputs, outputs, and exit codes.
 | `test_agent_frontmatter.py` | YAML frontmatter parses for every `agents/*.md`, via PyYAML. Catches the silent-agent-drop class: an unquoted `": "` in a description breaks parsing, and Claude Code then drops the agent from the registered `subagent_type` list with no error surfaced |
 | `test_opencode_agent_frontmatter.sh` | The same, for the opencode transform |
 | `test_security_scan.py` | Exact source allowlists for all four PR agents, optional Codex projection validation, read-only-tier Bash grants, hook injection patterns, secrets, and roster reachability |
-| `test_review_context.py` | PR security-selection reason enums plus snapshot mergeability classification, hash/freshness comparison, rendering, and conversation capture behavior |
+| `test_review_context.py` | PR security-selection reason enums, review-policy parsing, verifier demotion and drop application, coverage-line forms, preflight blockers, snapshot mergeability classification, hash/freshness comparison, rendering, and conversation capture behavior |
 | `test_pipeline_control_plane.mjs` | Closed leases/results, actual Git scope reconciliation, Main-only mutation, safe specialist exports, canonical log replay/projections, causal recovery, Freeze quality, capsules, and the administrative close of a workspace without a control log (symlinked control or events paths refused) |
 | `test_permission_disjointness.py` | The permission-allowlist disjointness invariant (#18312 floor) |
 | `test_flow_event_schema_sync.py` | Cross-repo flow-event schema sync |

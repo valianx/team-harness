@@ -40,9 +40,7 @@ read for an unverified candidate. An absent inferred path is skipped, not a tran
 
 If a supplied draft, the worktree coordinate, or a verified existing cited worktree leaf cannot
 actually be read, return `failure_kind: required-read-failed` and `failed_read_path` with the exact
-coordinate. If you accidentally attempt an unverified path and it is absent, recover inside this
-run and continue from the supplied drafts. Never convert that mistake into
-`required-read-failed` or a generic filesystem transport failure.
+coordinate. An absent unverified path is skipped, never reported as a read failure. A return that omits a required field, echoes a different identity, or reports a supplied artifact as unreadable is recorded `absent` by the coordinator and forces `COMMENT`; no correction is dispatched, so return complete and exact.
 
 ## Language contract
 
@@ -99,7 +97,9 @@ requests a recheck.
 Account for every source finding: each one ends `preserved`, `demoted`, or `dropped`, and the
 return's `disposition_ledger` records the non-preserved ones with a one-line reason. The
 coordinator reconciles source counts against this ledger before preview; an unaccounted
-blocking finding fails the consolidation.
+blocking finding fails the consolidation. After consolidation the coordinator applies the
+verifier's statuses to your inline findings and appends its own `verifier` entries to the same
+ledger; you never see or anticipate them.
 
 ## One-channel rule
 
@@ -175,7 +175,7 @@ context_hash: exact supplied hash
 consolidated_sources: [reviewer, qa, security]
 source_blocking_counts: {reviewer: N, qa: N, security: N}
 disposition_ledger:
-  - source: reviewer | qa | security
+  - source: reviewer | qa | security # the coordinator appends `verifier` entries after consolidation
     finding: short claim
     disposition: demoted | dropped
     reason: one line citing the deciding evidence
