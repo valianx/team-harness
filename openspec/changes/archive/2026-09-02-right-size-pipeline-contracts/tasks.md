@@ -3,7 +3,7 @@
 ## 1. Real-run baseline
 
 - [x] 1.1 Author three fixture requests under `tests/fixtures/pipeline-baseline/` (small fix, medium feature, security-sensitive fix) with request text and expected touched surface.
-- [ ] 1.2 Run each through the live pipeline on the 3.20.14 tree once and record in `docs/benchmarks/pipeline-baseline.md`: tree anchor, time to Gate 1, architect dispatches, acceptance-criteria count, specialist dispatches, tool calls, correction rounds, terminal state, exclusive defects per lens.
+- [x] 1.2 Run each through the live pipeline on the 3.20.14 tree once and record in `docs/benchmarks/pipeline-baseline.md`: tree anchor, time to Gate 1, architect dispatches, acceptance-criteria count, specialist dispatches, tool calls, correction rounds, terminal state, exclusive defects per lens. Deferred: the 3.20.14 tree is no longer `main`, and the operator chose to close the change without the three live runs; `docs/benchmarks/pipeline-baseline.md` keeps the fixture table with the run columns empty until an explicit request runs them.
 - [x] 1.3 Reference the baseline from `docs/pipeline-v5-migration.md` next to the contract benchmark, stating what each measures.
 
 ## 2. Shrink-only ceilings
