@@ -16,7 +16,8 @@ Remove options before parsing the PR identifier.
 ## Non-negotiable invariants
 
 1. Invoke `orchestrator` for every agent dispatch. Agents run no Bash.
-2. Bind every artifact and GitHub review to the captured `head_oid` and `context_hash`.
+2. Bind technical results to `head_oid` and `technical_hash`; bind conversation-aware drafts,
+   previews, and GitHub writes to the current `context_hash`.
 3. Review the detached worktree, never the operator's checkout or a moving branch.
 4. Fail closed when code or semantic conversation freshness cannot be verified.
 5. Never publish without preview and explicit approval unless `--auto-publish` was supplied.
@@ -31,6 +32,11 @@ Remove options before parsing the PR identifier.
    Before creating that directory, ensure the repository `.gitignore` contains an anchored
    `/workspaces` or `/workspaces/` entry; add `/workspaces/` when neither exists. Never use
    `.claude/` for review state.
+10. Drive the mode to a review outcome. A code blocker becomes a `REQUEST_CHANGES` finding; it
+    never blocks the review workflow. Recoverable orchestration failures are corrected internally
+    without asking the operator how to continue. Stop only when a trustworthy review cannot be
+    verified or published because an external prerequisite remains unavailable, or when an
+    already-published review on the same head contains every current finding.
 
 ## Operator-facing communication
 
@@ -68,9 +74,12 @@ It must contain `pr-review-context.json`, a non-empty body draft, and
 `pr-review-inline.json` (an empty JSON array is valid). Capture a fresh context
 and run `review_context.py compare`.
 
-- `current`: continue at Preview. Carry a reported `mergeability_changed` as one informational
-  drift line in the preview; it never blocks resume.
-- `conversation-changed` or `code-changed`: discard the draft and restart at Gather.
+- `next_action: continue`: continue at Preview. Carry a reported `mergeability_changed` as one
+  informational drift line in the preview; it never blocks resume.
+- `next_action: reconcile-conversation`: preserve the technical draft, refresh the context and
+  conversation, rerun same-author/prior-review detection, reconcile the draft once against the
+  new review state, and return to Preview without rerunning technical specialists.
+- `next_action: restart-technical-review`: discard the draft and restart at Gather.
 - Capture failure or missing snapshot identity: stop; do not publish a legacy or stale draft.
 
 ## Gather
@@ -130,8 +139,8 @@ Main never recreates these mechanics with `mktemp`, shell promotion chains, or
 a fixed `workspaces/pr-review-{number}` path.
 
 Read metadata and immutable refs from `$CONTEXT`. Store `head_oid`, `base_oid`,
-`merge_base_oid`, `context_hash`, `fetched_at`, `is_cross_repository`, and the classified and raw
-mergeability values.
+`merge_base_oid`, `technical_hash`, `conversation_hash`, `context_hash`, `fetched_at`,
+`is_cross_repository`, and the classified and raw mergeability values.
 
 The helper resolves the configured source remote from `$REVIEW_ROOT`, initializes without user Git
 templates or validates a private bare repository at `$SNAPSHOT_GIT`, and fetches the exact base SHA
@@ -247,12 +256,31 @@ Announce the selected specialists using the operator-facing communication contra
 
 ## Pre-dispatch freshness
 
-Capture a new context immediately before dispatch and compare it with `$CONTEXT`.
+Immediately before dispatch, refresh through the owned-run helper:
 
-- `current`: dispatch. Carry a reported `mergeability_changed` as one informational drift line;
-  it never blocks dispatch.
-- `conversation-changed` or `code-changed`: rebuild artifacts and restart Gather once.
-- A second movement or capture failure: stop without reviewing.
+```bash
+python3 "$REVIEW_CONTEXT_HELPER" refresh-context \
+  --repo-root "$REVIEW_ROOT" --repo "{owner}/{repo}" --pr {number} \
+  --artifact-root "$ARTIFACTS" --owner-token "$REVIEW_OWNER_TOKEN"
+```
+
+- `next_action: continue`: dispatch. Carry a reported `mergeability_changed` as one informational
+  drift line; it never blocks dispatch.
+- `next_action: reconcile-conversation`: the helper has atomically refreshed only `$CONTEXT` and
+  `$CONVERSATION`; rerun same-author/prior-review detection, then dispatch once against the fresh
+  conversation. No technical result exists yet, so this consumes no restart budget.
+- `next_action: restart-technical-review`: rebuild artifacts and restart Gather once.
+- A second code or semantic movement means the external target is still moving and cannot yet be
+  reviewed against one trustworthy snapshot; report that external freshness failure. A
+  review-state-only movement always remains on the reconciliation path.
+
+The helper returns `restart-technical-review` for code drift or semantic scope drift in the PR
+title/body, because those inputs define intent and acceptance. New issue discussion, a review,
+review comment, thread-state, or reply on the same technical hash returns
+`reconcile-conversation`: it can affect deduplication and publication, but it does not by itself
+invalidate evidence derived from the frozen code. The reconciler may request one bounded
+technical recheck only when that new context cites a concrete locus whose claim cannot otherwise
+be adjudicated.
 
 ## Dispatch
 
@@ -285,6 +313,8 @@ Direct Mode Task:
 - Reviewed Head SHA: {head_oid}
 - Base SHA: {base_oid}
 - Merge Base SHA: {merge_base_oid}
+- Technical Hash: {technical_hash}
+- Conversation Hash: {conversation_hash}
 - Context Hash: {context_hash}
 - Mergeability: {clean|conflicting|indeterminate}
 - Raw Mergeable: {raw mergeable value}
@@ -314,6 +344,7 @@ coordinates:
 Mode: pr-review-qa | pr-review-security
 PR: #{number}
 Reviewed Head SHA: {head_oid}
+- Technical Hash: {technical_hash}
 Context Hash: {context_hash}
 Worktree: {WORKTREE}
 Workspace Path: {workspace_path or "none"}
@@ -350,7 +381,7 @@ transport failed:
 - A non-`none` supplied artifact, the frozen worktree coordinate, or a project leaf independently
   verified as existing but unreadable is `required-read-failed`: fail closed and do not preview or
   publish.
-- A missing echoed reviewed SHA/context hash in an otherwise supplied packet is
+- A missing echoed reviewed SHA/technical hash/context hash in an otherwise supplied packet is
   `agent-contract-invalid` for the automatic correction below. A different echoed value, a
   non-identical post-dispatch snapshot, or a failed identity/freshness comparison is an integrity
   failure: fail closed. Never relabel actual identity drift as an agent mistake.
@@ -390,7 +421,8 @@ When the helper returns `retry-contract`, its accepted snapshot/freshness inputs
 preflight authorize only this correction: the coordinator mechanically rebuilds the packet from
 the already captured coordinates, names the exact violated contract rule and expected field/read
 scope, and dispatches one automatic correction using a fresh instance of the same agent identity
-against the same `head_oid`, `context_hash`, worktree, and supplied artifact coordinates. For a
+against the same `head_oid`, `technical_hash`, `context_hash`, worktree, and supplied artifact
+coordinates. For a
 path mistake, also name the exact absent path as unavailable optional/inferred context that MUST
 NOT be opened. This correction needs no preview, approval, gate, or operator reply. Do not clean
 up, rebuild, or recapture the snapshot before it.
@@ -404,17 +436,50 @@ not pause for operator guidance about that internal defect. A failed general-rev
 consolidation that leaves no trustworthy canonical draft still fails closed with the violated rule
 reported; the coordinator never fabricates findings or drops an unaccounted blocker.
 
-Every lens returns its draft inline with the exact reviewed SHA and context hash. A missing echo is
-`agent-contract-invalid` and follows the automatic classifier; reject a mismatched value as an
-identity failure. After the strict post-dispatch snapshots pass, the coordinator alone persists
-returns using this fixed mapping: reviewer body → `$ARTIFACTS/pr-review-draft.md`, reviewer findings →
+Every lens returns its draft inline with the exact reviewed SHA, technical hash, and supplied
+context hash. A missing echo is `agent-contract-invalid` and follows the automatic classifier;
+reject a mismatched SHA or technical hash as an identity failure. A stale context hash with the
+same technical hash is conversation drift and follows the reconciliation path below, not a reason
+to discard technical results. After validating the returned SHA and technical hash, the
+coordinator alone persists candidate returns using this fixed mapping: reviewer body →
+`$ARTIFACTS/pr-review-draft.md`, reviewer findings →
 `$ARTIFACTS/pr-review-draft-inline.json`, QA → `$ARTIFACTS/pr-review-qa.md`, security →
 `$ARTIFACTS/pr-review-security.md`, consolidator body → `$ARTIFACTS/pr-review-final.md`, and consolidator
 findings → `$ARTIFACTS/pr-review-inline.json`. Ignore any output path proposed by an agent.
 
+### Post-dispatch conversation reconciliation
+
+After every selected technical specialist joins and its candidate return is identity-validated,
+run `refresh-context` once more before choosing the canonical draft:
+
+- `next_action: continue`: use the candidate results normally.
+- `next_action: restart-technical-review`: discard candidate results and restart Gather once;
+  changed code or semantic intent invalidates their evidence.
+- `next_action: reconcile-conversation`: preserve every candidate whose `technical_hash` matches,
+  rerun same-author/prior-review detection on the promoted fresh context, and treat a formal
+  review by this author on the same `head_oid` as deduplication input, never as a blanket stop.
+  Perform exactly one conversation reconciliation: when only the general draft exists, dispatch
+  `reviewer` in `reconcile-conversation` mode with its candidate body/inline paths and the fresh context and
+  conversation; when multiple lens drafts exist, dispatch `reviewer-consolidator` once with those
+  candidates plus the fresh context and conversation. The reconciliation may remove duplicates,
+  account for active/resolved threads, and update verdict/body metadata, but it never repeats QA,
+  security, or a full general code review. Its return must echo the unchanged `technical_hash` and
+  the fresh `context_hash`.
+
+If reconciliation identifies a new conversation claim whose validity cannot be decided from its
+exact cited current-code locus, it returns `technical_recheck_required` naming `general` or
+`security`. Dispatch only that named specialist once against the unchanged technical snapshot and
+fresh context, then reconcile once more. An absent locus, a generic new review, or publication of
+another verdict never authorizes a technical recheck.
+
+After reconciliation, publish every net-new supported finding even when this author already
+reviewed the same head. If the earlier same-head review already contains every current finding,
+do not post a duplicate: report that the existing review satisfies the mode's review outcome.
+
 If only the general reviewer ran, its body and inline JSON are canonical. If any additional
 draft exists, dispatch `review-consolidate` once with the source file paths, `head_oid`,
-`context_hash`, and the read-only `Worktree` coordinate so adjudication cites code, not prose.
+`technical_hash`, `context_hash`, the current conversation path, and the read-only `Worktree`
+coordinate so adjudication cites code and deduplicates against current threads.
 The consolidator produces:
 
 - `$ARTIFACTS/pr-review-final.md`
@@ -426,8 +491,10 @@ There is no automatic convergence loop.
 findings received and their disposition (`preserved`, `demoted`, `dropped`) with a one-line
 reason each. Before preview, verify every blocking finding present in a source draft appears
 either in the consolidated output or in that ledger; on a mismatch, retry the consolidator once
-with the discrepancy named, then stop and surface it. A missing or count-inconsistent ledger is
-a failed consolidation, never a silent pass-through.
+with the discrepancy named. If the retry still fails, preserve the independently validated
+general draft and every validated specialist blocker as explicit cross-file findings, then
+produce a conservative `REQUEST_CHANGES` or `COMMENT` draft instead of asking the operator how to
+repair the consolidator. A missing or count-inconsistent ledger is never a silent pass-through.
 
 **Lens coverage line.** After the canonical body is chosen (either path), insert one line under
 `Checks:` naming each selected lens and its outcome — `ran`, `limited ({reason})`, or
@@ -492,7 +559,9 @@ against the frozen diff before preview and preserve `side` unchanged in the publ
 ## Prior-review check
 
 - No prior review from this author: continue.
-- Prior review with `commit_id == head_oid`: stop; do not duplicate it.
+- Prior review with `commit_id == head_oid`: use it as deduplication input. Publish a supplementary
+  review when net-new findings remain; when none remain, report that the existing review already
+  satisfies the requested outcome and do not duplicate it.
 - Prior review on another SHA: preview the new review as superseding that historical review.
 
 Never dismiss prior reviews automatically.
@@ -561,22 +630,26 @@ another complete preview.
 
 **`--auto-publish` path.** No menu is shown and no approval exists: the published event is
 exactly the recommendation's event, the anchor is taken from the canonical draft at validation
-time, and the pre-publish freshness comparison runs against the pre-dispatch capture. Any drift,
-capture failure, or anchor mismatch stops without publishing — the auto path never retries past
-a failed check and never publishes an event other than the recommendation.
+time, and the pre-publish freshness comparison runs against the pre-dispatch capture. Apply the
+same bounded code/semantic restart and review-state reconciliation rules below without prompting.
+A capture failure, unresolvable moving code target, or anchor mismatch prevents publication; the
+auto path never publishes unverified bytes or an event other than the recommendation.
 
 ## Pre-publish freshness
 
-After approval and immediately before the GitHub write, capture and compare again against the
+After approval and immediately before the GitHub write, run `refresh-context` again against the
 approved capture.
 
-- `current`: proceed directly to the write. When the comparison reports `mergeability_changed`,
+- `next_action: continue`: proceed directly to the write. When the comparison reports
+  `mergeability_changed`,
   add one informational drift line to the publish confirmation; it never blocks the write.
-- First `code-changed` result: invalidate approval, restart Gather once, and return to Preview
+- First `next_action: restart-technical-review`: invalidate approval, restart Gather once, and return to Preview
   for renewed approval.
-- `code-changed` again on the capture taken after that restart: stop without restarting further —
+- `restart-technical-review` again on the capture taken after that restart: stop without restarting further —
   present the drift to the operator and keep the drafted review for a manual retry.
-- `conversation-changed`: invalidate approval and restart Gather.
+- `next_action: reconcile-conversation`: invalidate only the approval, preserve technical results,
+  rerun same-author/prior-review detection and the single conversation reconciliation above, then
+  show the changed draft in a fresh Preview. Do not rerun unchanged specialists.
 - Capture or comparison failure: invalidate approval and restart Gather with
   `freshness could not be verified — review not published`.
 
