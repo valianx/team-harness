@@ -36,7 +36,8 @@
     "ceiling": 3723
   },
   "agents/ref-pipeline.md": {
-    "ceiling": 1612
+    "ceiling": 1661,
+    "reason": "initial record on the tree that adds the design.oversize choice to the Design steps"
   },
   "agents/ref-special-flows.md": {
     "ceiling": 11300,

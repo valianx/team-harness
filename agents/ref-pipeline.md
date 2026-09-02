@@ -73,11 +73,16 @@ and tasks.
 3. If planning is missing or the live operator requests a semantic update,
    preflight and dispatch at most one architect using upstream OpenSpec
    propose/update, then validate strictly.
-4. Compute a content identity over canonical OpenSpec artifacts.
-5. Main generates read-only `01-plan.md` with observable outcome,
+4. On `design_status: oversize`, present one live choice — split into the
+   proposed changes, accept oversize with a reason appended to `proposal.md`, or
+   narrow the request — and record it as a `design.oversize` event. Nothing in
+   steps 5-7 exists until that decision is recorded; accept resumes the same
+   pass.
+5. Compute a content identity over canonical OpenSpec artifacts.
+6. Main generates read-only `01-plan.md` with observable outcome,
    included/excluded scope, approach, coherent work batches, material risks and
    decisions, preserved behavior, canonical links, and the pinned identity.
-6. Present Gate 1 and stop. Only the live reply bound to that presentation may
+7. Present Gate 1 and stop. Only the live reply bound to that presentation may
    append authority and enter implementation.
 
 The projection contains no copied AC/TC prose, exhaustive file/task graph,

@@ -200,6 +200,12 @@ no TH planning indexes, shards, traceability, or coordinator state. Return
 artifact pointers plus unresolved contradictions; OpenSpec readiness never
 releases Gate 1.
 
+Read `max_requirements_per_change` from the repository-owned `team_harness` key
+in `openspec/config.yaml` before authoring. When the authored delta holds more
+requirements than that ceiling, stop authoring and return `design_status:
+oversize` with the requirement count and the split seams you see. Main owns the
+resulting live choice; you never resolve it and never trim the delta to fit.
+
 Before returning, author exactly one `## Team Harness Execution Contract`
 JSON block at the end of canonical `tasks.md` using the schema in the loaded
 pipeline `plan-shards.md` reference. This is part of the same OpenSpec planning
@@ -348,6 +354,9 @@ outputs:                               # every artifact produced, one entry each
     kind: sketch                         # one entry per triggered sketch
 summary: {1-2 sentences}
 classification: {known design-surface hints} | omitted   # optional; never gate evidence
+design_status: within-ceiling | oversize   # openspec-planning mode
+requirement_count: N                       # openspec-planning mode
+proposed_seams: [{one change per seam}, ...]   # required when design_status: oversize
 request_shape: adaptation | new-capability | fix | refactor   # design mode
 realized_scope: aligned | expanded                           # design mode
 expansion_reason: {required when expanded; omit when aligned}

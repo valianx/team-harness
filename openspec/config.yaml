@@ -30,3 +30,12 @@ schema: spec-driven
 #     archive:
 #       guidance:
 #         - Summarize the archive outcome before finishing
+
+# Repository-owned scope rules. Enforced by tests/test_openspec_scope.py on every
+# active change and read by agents/architect.md during the single design pass.
+team_harness:
+  max_requirements_per_change: 12
+  proposal_max_words: 500
+  proposal_required_sections:
+    - Non-Goals
+  tasks_max_items: 20
