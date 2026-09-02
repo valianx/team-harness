@@ -53,6 +53,17 @@ target because of genuinely required enumerations (a closed field schema, a
 literal template), keep the items and state `size_reason: required-items` in
 the PR body rather than deleting content to fit.
 
+**The ceiling ratchet.** `tests/fixtures/authoring-baseline.json` records a
+`ceiling` in words for every `agents/ref-*.md` file and every
+`agents/_shared/*.md` file over its class budget, and for
+`agents/orchestrator.md` because `CLAUDE.md § 14` cites its count. Each entry
+carries an optional `target` and an optional `reason`. `tests/test_authoring_budgets.py` fails when a file
+exceeds its ceiling and fails when a recorded ceiling sits more than 2% above
+the file's current count, so shrinking a file forces its ceiling down and the
+number can never move back up. A pull request may lower a ceiling; it may never
+raise one. The `target` is the distance the suite prints, not a gate, and the
+`reason` is reported to the reviewer and never lets a ceiling pass.
+
 ## Authoring rules
 
 1. **Per-line deletion test.** Every line must change behavior if deleted.

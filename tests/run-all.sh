@@ -103,7 +103,21 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 3g: agent authoring health (size signals are advisory)"
+echo "# Suite 3h: no contract restates a helper's classification"
+echo "############################################################"
+if [ -n "$PY" ] && $PY "$TESTS_DIR/test_retired_phrases.py"; then
+    echo "retired-phrases: PASS"
+elif [ -z "$PY" ]; then
+    echo "retired-phrases: FAIL (Python 3 not found)"
+    FAILED=$((FAILED + 1))
+else
+    echo "retired-phrases: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
+echo "# Suite 3g: agent authoring health (size and ceiling signals)"
 echo "############################################################"
 if [ -n "$PY" ] && $PY "$TESTS_DIR/test_authoring_budgets.py"; then
     echo "authoring-budgets: PASS"

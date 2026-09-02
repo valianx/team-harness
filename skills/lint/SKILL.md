@@ -327,12 +327,23 @@ For each file in scope:
    `` `file § "Heading"` `` or `file § Heading`, resolve the file and grep
    its headings for the quoted heading text. A cite whose file or heading
    does not exist → FAIL naming the citing file and the anchor.
+6. **Retired phrases:** a contract names the helper that performs a
+   deterministic classification and the vocabulary it returns; it never
+   restates the helper's flag list, decision procedure, or attempt ordinals.
+   Search `agents/**/*.md` and every `skills/**/SKILL.md` for this closed
+   list — `classify-agent-failure`, `--contract-signal`, `--attempt {1|2}`,
+   `retry-contract`, `agent-contract-invalid`, `absent after retry` — and
+   FAIL naming the file and the phrase. This file states the list and is
+   therefore not scanned against it; any other file is exempt only through
+   the shrink-only map in `tests/test_retired_phrases.py`, whose entry names
+   the change that removes it. An exempt file with no remaining phrase also
+   FAILs, so the exemption cannot outlive its reason.
 
 Result:
 - **PASS** if every file fits budgets and formats and every anchor resolves.
 - **WARN** for 80%-budget crossings and depth-two references.
-- **FAIL** for a hard-cap breach, missing description/tools, missing TOC, or
-  a dangling anchor.
+- **FAIL** for a hard-cap breach, missing description/tools, missing TOC, a
+  dangling anchor, or a retired phrase outside the exemption map.
 
 ---
 name: lint

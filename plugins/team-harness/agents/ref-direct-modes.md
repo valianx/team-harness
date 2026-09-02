@@ -489,34 +489,23 @@ verified-existing but unreadable project leaf is `required-read-failed` and fail
 nonexistent path that was neither supplied nor verified is an agent path-scope mistake, not a
 filesystem transport failure. A failure without an exact classifiable path also fails closed.
 
-The same automatic contract correction applies when an agent claims a supplied coordinate was
-missing, omits required return fields, proposes/uses its own persistence path, treats missing
-standalone read tools as unavailable despite its runtime adapter, or otherwise violates its
-read/return schema. Classify that return as `agent-contract-invalid`; it is a TH execution defect,
-not an operator decision. A different echoed SHA/hash, actual snapshot mutation, or failed
-freshness check remains an integrity failure, never a correctable contract defect.
+An agent return that violates its read/return schema is a TH execution defect, not an operator
+decision. A different echoed SHA/hash, actual snapshot mutation, or a failed freshness check is an
+integrity failure instead, and is never a correctable contract defect. For each violating return
+the packaged `review_context.py` failure classifier decides, invoked with the captured coordinates,
+the strict snapshot comparison, and current freshness as `skills/review-pr/SKILL.md § Step 2a`
+specifies. Its single returned decision is authoritative: a missing helper, an omitted required
+artifact, a malformed invocation, or a helper error fails closed, and coordinator judgment never
+replaces the executable classification.
 
-Invoke the packaged `review_context.py classify-agent-failure` subcommand for each such return,
-after computing the strict snapshot comparison and current freshness. Pass every non-`none` file
-coordinate as `--required-artifact`; include the workspace as `--required-directory` only when
-`Workspace Path` is not `none`. Pass the exact failed path when known, identity, actual
-snapshot/freshness status, role class, and attempt number.
-Follow only its `retry-contract`,
-`continue-comment`, or `fail-closed` decision. A missing helper, omitted required artifact,
-malformed invocation, or helper error fails closed; never replace the executable classification
-with coordinator judgment.
-
-On `agent-contract-invalid`, require byte-identical worktree/artifact snapshots and a passing
-freshness comparison, mechanically rebuild the packet from captured coordinates, name the exact
-violated rule, and automatically invoke one fresh replacement of the same role against the same
-reviewed SHA, context hash, worktree, and artifacts. For a path mistake, explicitly forbid the
-absent optional/inferred path. This internal correction never waits for an operator reply or opens
-a gate, and it never rebuilds or recaptures the snapshot. Accept only an identity-matched return
-after strict snapshots pass. If the selected specialist repeats a contract violation, continue
-with it marked `absent after retry (agent contract)` and force the body/recommendation to
-`COMMENT`; never infer a clean result or publish an approval. A mismatched identity,
-snapshot/freshness failure, a truly unreadable required coordinate, or no remaining trustworthy
-canonical draft still fails closed. The preview and live publish-approval gate remain mandatory.
+A correction the helper authorizes runs automatically. It never waits for an operator reply, never
+opens a gate, and never rebuilds or recaptures the snapshot; only an identity-matched return that
+passes strict snapshots is accepted. When the same role violates its contract again, the lens
+carries the review skill's absent outcome in the lens-coverage line and the body and recommendation
+are forced to `COMMENT`; a clean result is never inferred and an approval is never published. A
+mismatched identity, a snapshot or freshness failure, a truly unreadable required coordinate, or no
+remaining trustworthy canonical draft still fails closed. The preview and live publish-approval
+gate remain mandatory.
 
 ### Step 2b — Invoke reviewer (Update Body)
 
