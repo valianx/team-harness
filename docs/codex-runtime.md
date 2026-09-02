@@ -220,7 +220,7 @@ precedence and retains that flow's snapshot, lens selection, consolidation,
 preview, and publication gate.
 
 Skill activation cannot itself change Main's selected model, reasoning effort,
-sandbox, or approval policy. The projection below applies to the twelve
+sandbox, or approval policy. The projection below applies to the thirteen
 standard installed specialists:
 
 | Claude role metadata | Codex model | Effort |

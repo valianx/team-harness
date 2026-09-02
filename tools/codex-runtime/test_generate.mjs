@@ -72,11 +72,11 @@ async function withMutedStderr(action) {
 
 const first = await render();
 const second = await render();
-assert.equal(first.files.size, 40);
+assert.equal(first.files.size, 42);
 assert.deepEqual([...first.files], [...second.files], "identical inputs must render identical bytes");
 
 const agentOutputs = [...first.files].filter(([path]) => path.includes("/.codex/agents/"));
-assert.equal(agentOutputs.length, 19);
+assert.equal(agentOutputs.length, 20);
 for (const [path, content] of agentOutputs) {
   assert.match(content, /^name = /m);
   assert.match(content, /^description = /m);
@@ -89,7 +89,7 @@ for (const [path, content] of agentOutputs) {
 
 const packagedAgentOutputs = [...first.files].filter(([path]) =>
   path.includes("/plugins/team-harness/skills/setup/assets/agents/"));
-assert.equal(packagedAgentOutputs.length, 19);
+assert.equal(packagedAgentOutputs.length, 20);
 for (const [path, content] of agentOutputs) {
   const name = path.split("/").at(-1);
   assert.equal(
@@ -99,7 +99,7 @@ for (const [path, content] of agentOutputs) {
   );
 }
 
-for (const name of ["reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator"]) {
+for (const name of ["reviewer", "pr-review-qa", "pr-review-security", "pr-review-verifier", "reviewer-consolidator"]) {
   const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
   assert.match(content, /metadata, not project paths to open/, `${name} may infer its source marker as project context`);
   assert.match(content, /run that verification before `sed` or any content read/, `${name} may read before path verification`);
@@ -109,7 +109,7 @@ for (const name of ["reviewer", "pr-review-qa", "pr-review-security", "reviewer-
     `${name} still promotes every failed inferred read to fatal transport failure`);
 }
 
-for (const name of ["reviewer", "pr-review-qa", "pr-review-security"]) {
+for (const name of ["reviewer", "pr-review-qa", "pr-review-security", "pr-review-verifier"]) {
   const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
   assert.match(content, /Changed-files membership only nominates a project candidate/,
     `${name} treats changed-files membership as sufficient read authorization`);
@@ -345,6 +345,7 @@ assert.match(roster, /\| `inline-reviewer` \| `sonnet` \| `high` \| `gpt-5\.6-lu
 assert.match(roster, /\| `reviewer` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
 assert.match(roster, /\| `pr-review-qa` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
 assert.match(roster, /\| `pr-review-security` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `pr-review-verifier` \| `opus` \| `high` \| `gpt-5\.6-sol` \| `xhigh` \| installed custom agent \|/);
 assert.match(roster, /\| `reviewer-consolidator` \| `sonnet` \| `medium` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
 assert.match(roster, /\| `researcher` \| `haiku` \| `medium` \| `gpt-5\.6-luna` \| `max` \| not shipped in Codex beta \|/);
 assert.match(roster, /\| `orchestrator` \| `opus` \| `high` \| `gpt-5\.6-sol` \| `xhigh` \| Main via `init` \/ `pipeline` skills \|/);

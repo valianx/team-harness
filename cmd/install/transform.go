@@ -444,7 +444,7 @@ type orderedPermission struct {
 }
 
 var prReviewAgents = map[string]bool{
-	"pr-review-qa": true, "pr-review-security": true,
+	"pr-review-qa": true, "pr-review-security": true, "pr-review-verifier": true,
 	"reviewer": true, "reviewer-consolidator": true,
 }
 

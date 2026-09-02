@@ -54,7 +54,7 @@ $team-harness:setup
 
 The setup skill configures native Team Harness settings, optional MCP servers,
 workspace/language preferences, optional workspace-to-GitHub identity routes,
-and twelve specialist agents: seven for the gated
+and thirteen specialist agents: seven for the gated
 pipeline, one direct read-only inline reviewer, and four for immutable PR review. It preserves
 Codex's native permission and hook-trust prompts. It can also import every
 missing setting from an existing Claude Code or opencode Team Harness config;
@@ -68,12 +68,12 @@ loaded by an older session.
 Review the [plugin hook manifest](./plugins/team-harness/hooks/hooks.json) and
 its referenced scripts, then explicitly trust the repository before enabling
 those hooks. Plugin installation and agent installation are separate. The
-plugin provides the Team Harness skills; the twelve generated agents are installed
+plugin provides the Team Harness skills; the thirteen generated agents are installed
 by the setup skill from the marketplace snapshot.
 
 The equivalent manual agent-installation fallback, from the project root, is:
 
-From the root of the project where Team Harness will run, install its twelve
+From the root of the project where Team Harness will run, install its thirteen
    agents (requires Go 1.25.8 or newer):
 ```bash
 cd /path/to/your/project
@@ -92,7 +92,7 @@ chmod +x install-linux-amd64
 The checksum proves that the binary matches the file published in the same
 GitHub release; it does not protect against compromise of the release origin.
 
-Use `--scope global` instead when the twelve agents should be available from your
+Use `--scope global` instead when the thirteen agents should be available from your
 Codex user configuration rather than only this checkout. Seven agents are required
 by the gated `pipeline` workflow, `inline-reviewer` serves direct read-only
 reviews, and four agents are required by `review-pr`; lightweight `init` remains
