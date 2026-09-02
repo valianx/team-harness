@@ -4,17 +4,11 @@ Current pipeline execution reads only the v5 control contract. Its durable
 authority is a canonical hash-linked control log; state, Gate, finding,
 acceptance, counters, and receipts are projections or telemetry.
 
-Supported v1-v4 workspaces are converted once. The converter validates the
-historical live decision, original Gate identity, repository/service bindings,
-immutable inputs, dirty progress, and any continuation certificate, repaired
-aggregate, and repair evidence. A binding failure preserves its exact service
-and error. Missing or conflicting authority stops for a live decision.
-
-Conversion writes a new v5 log and projections beside the legacy workspace,
-replays and validates them completely, and commits `control/current.json` last.
-Until that pointer commits, legacy state remains selected. A valid existing v5
-pointer is idempotently reused and is never overwritten from reconstructed v4
-data. Mixed writable schemas fail closed.
+Every pre-v5 workspace is complete or aborted, and no converter remains. A
+workspace without `control/control.jsonl` is closed administratively: Main
+appends one `pipeline.close` entry with `terminal_state:
+closed-administratively` to its events file and offers inline continuation or a
+fresh run. Mixed writable schemas fail closed.
 
 After cutover, Main derives one minimal capability lease immediately before a
 dependency-ready coherent worktree batch and native return transport carries

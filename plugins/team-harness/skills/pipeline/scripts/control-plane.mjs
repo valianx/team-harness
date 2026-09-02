@@ -3,6 +3,7 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
+import { constants as fsConstants } from "node:fs";
 import {
   lstat, mkdir, open, readFile, realpath, rename, rm, unlink,
 } from "node:fs/promises";
@@ -39,7 +40,7 @@ export {
 const {
   SHA256, SAFE_ID, SECRET, LEASE_KEYS, LEASE_CREATE_KEYS, RESULT_KEYS,
   exactKeys, canonical, boundedString, safeRelative, boundedArray, validReference,
-  canonicalDirectory, pathContainedWithoutSymlink, leaseBodyValid, resultBodyValid,
+  canonicalDirectory, leaseBodyValid, resultBodyValid,
 } = controlPlaneSpecialistInternals;
 const execFileAsync = promisify(execFile);
 const MAX_GIT_OUTPUT_BYTES = 1024 * 1024;
@@ -619,125 +620,54 @@ export async function certifyCapabilityCapsule({ workspace, capability_lease: le
   }
 }
 
-const LEGACY_KEYS = [
-  "schema_version", "kind", "authority", "bindings", "immutable_inputs", "dirty_progress",
-  "phase", "status", "original_gate_identity", "continuation",
-];
-
-function legacyReferenceSetValid(value) {
-  return boundedArray(value, validReference) && new Set(value.map(item => item.path)).size === value.length;
-}
-
-async function validateReferenceBytes(root, references) {
-  for (const reference of references) {
-    if (!await pathContainedWithoutSymlink(root, reference.path, { allowMissing: false })) return false;
-    const stat = await lstat(path.join(root, reference.path));
-    if (!stat.isFile() || stat.isSymbolicLink()) return false;
-    if (createHash("sha256").update(await readFile(path.join(root, reference.path))).digest("hex") !== reference.sha256) return false;
+async function entryStat(target) {
+  try {
+    return await lstat(target);
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
   }
-  return true;
 }
 
-function offlineRecord(records, type, provenance, payload) {
-  const created = createControlRecord({
-    schema_version: CONTROL_PLANE_SCHEMA_VERSION, kind: "control_event",
-    sequence: records.length + 1, previous_hash: records.at(-1)?.event_id ?? null,
-    type, provenance, payload,
-  });
-  if (!created.ok) throw new Error("LEGACY_STATE_INVALID");
-  records.push(created.value);
-  return created.value;
-}
-
-/** Deterministic create-then-switch converter for normalized supported v1-v4 evidence. */
-export async function convertLegacyWorkspace({ workspace, legacy }) {
-  let target = null;
+/** A workspace without a control log has nothing to replay; it closes administratively. */
+export async function closeWorkspaceWithoutControlLog({ workspace }) {
   try {
     const root = await canonicalDirectory(workspace, "WORKSPACE_INVALID");
-    const pointerPath = path.join(root, "control", "current.json");
-    try {
-      const pointerBytes = await readFile(pointerPath);
-      const pointer = JSON.parse(pointerBytes.toString("utf8"));
-      if (exactKeys(pointer, ["schema_version", "kind", "path", "log_sha256"])
-        && pointer.schema_version === 5 && pointer.kind === "team_harness_control_pointer"
-        && safeRelative(pointer.path) && SHA256.test(pointer.log_sha256 ?? "")) {
-        const logBytes = await readFile(path.join(root, pointer.path));
-        const replay = replayControlBytes(logBytes);
-        if (replay.ok && createHash("sha256").update(logBytes).digest("hex") === pointer.log_sha256) {
-          return { ok: true, outcome: "already-v5", pointer, error_code: null, service: null };
-        }
-      }
-      return { ok: false, outcome: "blocked", pointer: null, error_code: "V5_POINTER_INVALID", service: null };
-    } catch (error) {
-      if (error?.code !== "ENOENT") return { ok: false, outcome: "blocked", pointer: null, error_code: "V5_POINTER_INVALID", service: null };
+    const controlDir = path.join(root, "control");
+    for (const target of [controlDir, path.join(controlDir, "control.jsonl")]) {
+      const stat = await entryStat(target);
+      if (stat === null) break;
+      if (stat.isSymbolicLink()) throw new Error("CONTROL_PATH_SYMLINK");
+      if (target !== controlDir || !stat.isDirectory()) throw new Error("CONTROL_LOG_PRESENT");
     }
-
-    if (!exactKeys(legacy, LEGACY_KEYS) || ![1, 2, 3, 4].includes(legacy.schema_version)
-      || legacy.kind !== "team_harness_legacy_control_state" || SECRET.test(JSON.stringify(legacy))
-      || !exactKeys(legacy.authority, ["presentation_nonce", "decision", "intent_identity", "scope_identity", "security_identity"])
-      || !SAFE_ID.test(legacy.authority.presentation_nonce ?? "") || legacy.authority.decision !== "approve"
-      || !SHA256.test(legacy.authority.intent_identity ?? "") || !SHA256.test(legacy.authority.scope_identity ?? "")
-      || !SHA256.test(legacy.authority.security_identity ?? "") || !SHA256.test(legacy.original_gate_identity ?? "")
-      || !SAFE_ID.test(legacy.phase ?? "") || !SAFE_ID.test(legacy.status ?? "")
-      || !Array.isArray(legacy.bindings) || legacy.bindings.length > 64
-      || !legacy.bindings.every(item => exactKeys(item, ["service", "verdict", "error_code"])
-        && SAFE_ID.test(item.service ?? "") && ["pass", "fail"].includes(item.verdict)
-        && (item.error_code === null || SAFE_ID.test(item.error_code)))
-      || !legacyReferenceSetValid(legacy.immutable_inputs) || !legacyReferenceSetValid(legacy.dirty_progress)) {
-      return { ok: false, outcome: "blocked", pointer: null, error_code: "LEGACY_AUTHORITY_INVALID", service: null };
+    const eventsPath = path.join(root, "00-execution-events.jsonl");
+    const eventsStat = await entryStat(eventsPath);
+    if (eventsStat !== null && (eventsStat.isSymbolicLink() || !eventsStat.isFile() || eventsStat.nlink !== 1)) {
+      throw new Error("EVENTS_PATH_INVALID");
     }
-    const failedBinding = legacy.bindings.find(item => item.verdict === "fail");
-    if (failedBinding) return { ok: false, outcome: "blocked", pointer: null, error_code: failedBinding.error_code, service: failedBinding.service };
-    if (!await validateReferenceBytes(root, [...legacy.immutable_inputs, ...legacy.dirty_progress])) {
-      return { ok: false, outcome: "blocked", pointer: null, error_code: "LEGACY_INPUT_INVALID", service: null };
-    }
-    if (legacy.continuation !== null) {
-      if (!exactKeys(legacy.continuation, ["identity", "repaired_aggregate", "repair_evidence"])
-        || !SHA256.test(legacy.continuation.identity ?? "") || !validReference(legacy.continuation.repaired_aggregate)
-        || !legacyReferenceSetValid(legacy.continuation.repair_evidence)) {
-        return { ok: false, outcome: "blocked", pointer: null, error_code: "LEGACY_CONTINUATION_INVALID", service: null };
-      }
-      const { identity, ...continuationBody } = legacy.continuation;
-      if (controlIdentity(continuationBody) !== identity
-        || !await validateReferenceBytes(root, [legacy.continuation.repaired_aggregate, ...legacy.continuation.repair_evidence])) {
-        return { ok: false, outcome: "blocked", pointer: null, error_code: "LEGACY_CONTINUATION_INVALID", service: null };
-      }
-    }
-
-    const records = [];
-    const authority = offlineRecord(records, "operator_authority", { actor: "main", authority_event_id: null }, legacy.authority);
-    offlineRecord(records, "transition", { actor: "main", authority_event_id: authority.event_id }, { phase: legacy.phase, status: legacy.status });
-    if (legacy.continuation) offlineRecord(records, "mechanical_release", { actor: "main", authority_event_id: authority.event_id }, {
-      name: "legacy-continuation", identity: legacy.continuation.identity,
-    });
-    const logBytes = Buffer.concat(records.map(canonicalControlBytes));
-    const replay = replayControlBytes(logBytes);
-    if (!replay.ok) throw new Error("LEGACY_STATE_INVALID");
-    const conversionIdentity = controlIdentity({
-      legacy_schema_version: legacy.schema_version,
-      original_gate_identity: legacy.original_gate_identity,
-      head: replay.head,
-    });
-    const relativeRoot = `control/v5-${conversionIdentity}`;
-    target = path.join(root, relativeRoot);
-    await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
-    await mkdir(target, { recursive: false, mode: 0o700 });
-    const logRelative = `${relativeRoot}/control.jsonl`;
-    await atomicWrite(path.join(root, logRelative), logBytes);
-    const projection = buildControlProjection(records);
-    await atomicWrite(path.join(target, "00-state.md"), Buffer.from(stateMarkdown(projection)));
-    await mkdir(path.join(target, "reviews"), { mode: 0o700 });
-    await atomicWrite(path.join(target, "reviews", "findings-ledger.md"), Buffer.from(findingsMarkdown(projection)));
-    const pointer = {
-      schema_version: 5, kind: "team_harness_control_pointer", path: logRelative,
-      log_sha256: createHash("sha256").update(logBytes).digest("hex"),
+    const entry = {
+      ts: new Date().toISOString(), event: "pipeline.close", terminal_state: "closed-administratively",
+      reason: "no control/control.jsonl", offer: ["inline-continuation", "fresh-run"],
     };
-    await mkdir(path.dirname(pointerPath), { recursive: true, mode: 0o700 });
-    await atomicWrite(pointerPath, canonicalControlBytes(pointer));
-    return { ok: true, outcome: "converted", pointer, error_code: null, service: null };
+    const { O_WRONLY, O_APPEND, O_CREAT, O_NOFOLLOW = 0 } = fsConstants;
+    const handle = await open(eventsPath, O_WRONLY | O_APPEND | O_CREAT | O_NOFOLLOW, 0o600);
+    try {
+      const opened = await handle.stat();
+      const current = await lstat(eventsPath);
+      const sameInode = (a, b) => a.dev === b.dev && a.ino === b.ino;
+      if (!opened.isFile() || opened.nlink !== 1 || current.isSymbolicLink() || !sameInode(current, opened)
+        || (eventsStat !== null && !sameInode(eventsStat, opened))) {
+        throw new Error("EVENTS_PATH_INVALID");
+      }
+      await handle.appendFile(`${JSON.stringify(entry)}\n`);
+    } finally {
+      await handle.close();
+    }
+    return { ok: true, outcome: "closed-administratively", offer: entry.offer, error_code: null };
   } catch (error) {
-    if (target) await rm(target, { recursive: true, force: true }).catch(() => {});
-    return { ok: false, outcome: "blocked", pointer: null, error_code: error?.message === "WORKSPACE_INVALID" ? "WORKSPACE_INVALID" : "LEGACY_CONVERSION_FAILED", service: null };
+    const known = new Set(["WORKSPACE_INVALID", "CONTROL_PATH_SYMLINK", "CONTROL_LOG_PRESENT", "EVENTS_PATH_INVALID"]);
+    const code = known.has(error?.message) ? error.message : "CLOSE_FAILED";
+    return { ok: false, outcome: "blocked", offer: [], error_code: code };
   }
 }
 

@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { link, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -18,7 +18,7 @@ import {
   createCapabilityLease,
   createControlRecord,
   createResultEnvelope,
-  convertLegacyWorkspace,
+  closeWorkspaceWithoutControlLog,
   certifyCapabilityCapsule,
   cleanerEligibility,
   decideCausalRecovery,
@@ -321,30 +321,27 @@ try {
     log_path: logPath, result: omittedOutside, writer: "main",
   })).error_code, "RESULT_SCOPE_VIOLATION");
 
-  const legacyWorkspace = path.join(temporary, "legacy-workspace");
-  await mkdir(path.join(legacyWorkspace, "inputs"), { recursive: true });
-  await writeFile(path.join(legacyWorkspace, "inputs", "snapshot.json"), "{}\n");
-  const legacy = {
-    schema_version: 4,
-    kind: "team_harness_legacy_control_state",
-    authority: authorityPayload,
-    bindings: [{ service: "team-harness", verdict: "pass", error_code: null }],
-    immutable_inputs: [{ path: "inputs/snapshot.json", sha256: h("{}\n") }],
-    dirty_progress: [],
-    phase: "implementation",
-    status: "active",
-    original_gate_identity: h("legacy-gate"),
-    continuation: null,
-  };
-  const bindingFailure = await convertLegacyWorkspace({
-    workspace: legacyWorkspace,
-    legacy: { ...legacy, bindings: [{ service: "team-harness", verdict: "fail", error_code: "OVERLAY_INVALID" }] },
-  });
-  assert.equal(bindingFailure.error_code, "OVERLAY_INVALID");
-  assert.equal(bindingFailure.service, "team-harness");
-  const converted = await convertLegacyWorkspace({ workspace: legacyWorkspace, legacy });
-  assert.equal(converted.outcome, "converted", JSON.stringify(converted));
-  assert.equal((await convertLegacyWorkspace({ workspace: legacyWorkspace, legacy })).outcome, "already-v5");
+  const orphanWorkspace = path.join(temporary, "orphan-workspace");
+  await mkdir(orphanWorkspace, { recursive: true });
+  const closed = await closeWorkspaceWithoutControlLog({ workspace: orphanWorkspace });
+  assert.equal(closed.outcome, "closed-administratively", JSON.stringify(closed));
+  assert.deepEqual(closed.offer, ["inline-continuation", "fresh-run"]);
+  const orphanEvents = await readFile(path.join(orphanWorkspace, "00-execution-events.jsonl"), "utf8");
+  assert.match(orphanEvents, /"terminal_state":"closed-administratively"/);
+  assert.equal((await closeWorkspaceWithoutControlLog({ workspace })).error_code, "CONTROL_LOG_PRESENT");
+  const linkedWorkspace = path.join(temporary, "linked-workspace");
+  await mkdir(linkedWorkspace, { recursive: true });
+  await symlink(path.join(workspace, "control"), path.join(linkedWorkspace, "control"), "dir");
+  assert.equal((await closeWorkspaceWithoutControlLog({ workspace: linkedWorkspace })).error_code, "CONTROL_PATH_SYMLINK");
+  const eventsLinkWorkspace = path.join(temporary, "events-link-workspace");
+  await mkdir(eventsLinkWorkspace, { recursive: true });
+  await symlink(path.join(orphanWorkspace, "00-execution-events.jsonl"), path.join(eventsLinkWorkspace, "00-execution-events.jsonl"));
+  assert.equal((await closeWorkspaceWithoutControlLog({ workspace: eventsLinkWorkspace })).error_code, "EVENTS_PATH_INVALID");
+  const hardLinkWorkspace = path.join(temporary, "hard-link-workspace");
+  await mkdir(hardLinkWorkspace, { recursive: true });
+  await link(path.join(orphanWorkspace, "00-execution-events.jsonl"), path.join(hardLinkWorkspace, "00-execution-events.jsonl"));
+  assert.equal((await closeWorkspaceWithoutControlLog({ workspace: hardLinkWorkspace })).error_code, "EVENTS_PATH_INVALID");
+  assert.equal((await readFile(path.join(orphanWorkspace, "00-execution-events.jsonl"), "utf8")).split("\n").filter(Boolean).length, 1);
 } finally {
   await rm(temporary, { recursive: true, force: true });
 }

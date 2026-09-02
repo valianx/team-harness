@@ -20,7 +20,8 @@ views, `01-plan.md`, findings, acceptance, counters, and reports are derived
 projections. A specialist receives one just-in-time `capability_lease`, returns
 one `result_envelope` through native transport, and never writes control state.
 Use the packaged `scripts/control-plane.mjs` for validation, append/replay,
-projection, lease lifecycle, risk predicates, and legacy conversion. Apply
+projection, lease lifecycle, risk predicates, and the administrative close of a
+workspace without a control log. Apply
 [state-and-gates.md](references/state-and-gates.md) for state and Gate ownership.
 
 ## Surviving roles
@@ -47,7 +48,8 @@ it while available. Native sandbox and approval policy remain unchanged.
 
 1. Apply [activation.md](references/activation.md). Validate only the pipeline
    core, select the workspace, establish the repository/worktree identity, and
-   replay or convert control state. Do not preflight every specialist.
+   replay control state or close a workspace without a control log
+   administratively. Do not preflight every specialist.
 2. Bind one OpenSpec change. Read `proposal.md`, `design.md`, `tasks.md`, and
    delta specs, then run strict validation. If the complete change is already
    valid, do not dispatch architect. If it is missing or the live operator
@@ -120,9 +122,10 @@ writes still require valid live authority and native approvals. Apply
 
 Before each continuation, replay the valid control-log prefix and read only the
 phase reference named by the derived next action. Projection drift is repaired
-from the log. Corruption stops at the first invalid record. Supported v1-v4
-state converts once through create-then-switch; current v5 dispatch never calls
-legacy routing modules or accepts mixed writable schemas.
+from the log. Corruption stops at the first invalid record. A workspace without
+`control/control.jsonl` is closed administratively and offered inline
+continuation or a fresh run; current v5 dispatch never calls legacy routing
+modules or accepts mixed writable schemas.
 
 ## Non-negotiable floors
 

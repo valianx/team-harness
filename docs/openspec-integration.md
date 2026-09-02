@@ -6,42 +6,25 @@ pipeline's Design phase (`@Team-Harness pipeline <task>`) retains both gates, st
 routing, Freeze, validation, correction authority, and delivery, exactly as below. The coordinator-
 only `/th:spec` lane (`skills/spec/SKILL.md`, `docs/pipeline-lanes.md § "The direct spec lane"`)
 authors the same `proposal.md`/`tasks.md` (and `design.md`/spec deltas when a specced capability is
-touched) directly, with one conversational approval and no workspace, state, snapshot, overlay, or
-gate ceremony. Neither entry point adds a third OpenSpec lifecycle or a lane-specific artifact
+touched) directly, with one conversational approval and no workspace, state, or gate ceremony. Neither entry point adds a third OpenSpec lifecycle or a lane-specific artifact
 layout; archive treats a change from either origin identically.
 
 ## Canonical source model
 
 OpenSpec owns the repository-local change under `openspec/changes/<change>/`: `proposal.md`,
 `specs/**/spec.md`, `design.md`, and `tasks.md`. TH never copies or paraphrases those artifacts
-into a second editable specification. A change exists only for product behavior: it adds or modifies at least one capability. Installing a tool, delivering an already-approved change, and other repository chores use the normal branch and pull-request flow with no change directory. `openspec/config.yaml` records the per-artifact sizes and `tests/test_openspec_scope.py` enforces them on every active change. A single-service run uses the same
-service-keyed layout as an initiative:
-`<workspace>/inputs/openspec/<service>/snapshot.json` and
-`<workspace>/plan/openspec/<service>/traceability.json`. The ordered aggregate
-lives at `<workspace>/inputs/openspec-bindings.json`.
+into a second editable specification. A change exists only for product behavior: it adds or modifies at least one capability. Installing a tool, delivering an already-approved change, and other repository chores use the normal branch and pull-request flow with no change directory. `openspec/config.yaml` records the per-artifact sizes and `tests/test_openspec_scope.py` enforces them on every active change.
 
-Every writable service owns its OpenSpec change in its repository. The aggregate
-hashes verified repository identities, child artifacts, roles, dependencies,
-execution order, and evidence-only dispositions. Evidence-only repositories are
-readable context only and cannot supply acceptance coordinates or become writable
-implicitly.
+Design pins the change once as a content identity over its canonical Markdown, with task
+checkbox state normalized out, and records it in the control log. Every writable service owns
+its OpenSpec change in its repository; Main records repository identities, dependency order,
+content identities, and evidence-only dispositions as immutable inputs of the same Gate-1
+presentation. Evidence-only repositories are readable context only and cannot supply acceptance
+coordinates or become writable implicitly.
 
-Every TH acceptance or execution item references stable OpenSpec coordinates. Every applicable
-OpenSpec requirement, scenario, design decision, and task maps back to a TH item or carries an
-explicit exclusion. Non-direct mappings are disclosed as `split`, `merged`, `th-extension`, or
-`excluded` with a rationale. `ambiguous`, missing reverse coverage, stale hashes, dangling
-coordinates, or copied normative text block Gate 1.
-
-The overlay v2 arrays are `acceptance_items` and `execution_items`; it has no
-top-level `tasks`. Task `Task-N` sources live at the unique matching
-`.execution_items[]` entry, and specialist packets bind that entry by JSON
-Pointer plus content hash.
-
-Execution packets use two explicit roots. Repository files and canonical
-OpenSpec source coordinates are relative to `path_roots.repository_root`;
-Team Harness plan, input, review, contract, and evidence artifacts are relative
-to `path_roots.workspace_artifact_root`. Bare relative paths never inherit cwd,
-and `../` is not a valid bridge between the two domains.
+Every `#### Scenario:` in the change's delta specs is an acceptance criterion and validation
+reads it directly. Dispatch prompts carry pointers to canonical coordinates, never copied
+normative text; the operator projection `01-plan.md` links to the change and copies nothing.
 
 ## Single-pass Design
 
@@ -50,55 +33,16 @@ Main advances through these actions without requiring another operator command a
 1. Preflight Node.js `>=20.19.0`, npm, OpenSpec `1.9.0`, project initialization, and the generated
    integration for the active runtime. A compatible but uninitialized repository is initialized
    automatically; this is not an operator checkpoint.
-2. Dispatch a fresh architect in `openspec-planning` mode — the single reasoning pass. It follows
-   the installed upstream `openspec-propose` or `openspec-update-change` skill and writes only the
-   bound OpenSpec change. Its canonical `tasks.md` ends with the closed Team
-   Harness execution-contract JSON block, carrying every judgment call that a
-   script cannot infer: worktree/base, file scope, routing, dependencies,
-   invariants, evidence, seams, discovery scope, quality argv, test-first
-   applicability, preservation, and rollback.
-3. Run OpenSpec status and strict validation, extract stable coordinates, and capture the snapshot.
-4. Run `openspec-overlay.mjs derive` directly over the validated snapshot and the live writable
-   roots — a mechanical projection of that validated execution contract, never a second agent dispatch. It writes the compact Gate-1
-   index, repository ownership, specialist routing, file scope, constraints, quality IDs,
-   Freeze/evidence controls, rollback, delivery grouping, and each shard's explicit dispatch
-   anchors plus the hash-bound workspace `.team-harness/quality.json`. Every proposed worktree must remain inside one of the writable roots. Missing or
-   placeholder judgment returns `EXECUTION_CONTRACT_INVALID`; a validator
-   failure re-enters the same `openspec-planning` flow and reruns the derivation over the
-   corrected snapshot, invoking it with `overwrite: true` authorized by that recorded correction
-   event since the prior derivation's targets already exist; there is no standing second dispatch
-   mode.
-5. Validate every snapshot's freshness, the hash-bound quality manifest, bidirectional traceability, exact agreement between every
-   shard's `required_invariants`, `required_evidence_anchors`, and
-   `cross_runtime_preservation` declarations and its execution item, writable execution
-   topology, service-bound event traces, and aggregate hash; then present one
-   consolidated Gate 1 whose nonce binds the ordered set. After approval,
-   execute services serially in aggregate dependency order without child Gate 1.
-6. At implementation entry, a failure limited to missing or damaged derived
-   plan/shard/quality/overlay artifacts may run `openspec-bindings.mjs
-   repair-derived` once. It requires the released gate's approved snapshot,
-   overlay, aggregate, and gate-identity hashes, no prior dispatch/progress,
-   unchanged canonical execution judgment, isolated staged validation, and an
-   exact regenerated-overlay hash match. It replaces the derived set
-   transactionally, records deterministic evidence, and preserves Gate 1;
-   missing canonical judgment or any identity drift remains fail-closed.
-7. A legacy v1 workspace whose approved overlay was a placeholder and whose
-   live operator already authorized a semantic execution-contract repair uses
-   `openspec-bindings.mjs migrate-v1`. It preserves the original Gate bytes and
-   writes a supplemental continuation certificate only after proving event
-   chronology, unchanged normative task prefixes, current derived hashes, and
-   recorded monotonic checkbox progress. See
-   [Approved OpenSpec v1 workspace repair](openspec-v1-gate-migration.md).
-8. During implementation, `openspec-overlay.mjs verify-progress` records every
-   authorized monotonic task-checkbox transition in
-   `inputs/openspec-progress.json` as one idempotent recoverable operation. It
-   never rewrites the immutable snapshot or approved overlay; every other stale
-   condition remains fail-closed.
-9. Aggregate implementation freshness is evaluated independently per service:
-   the active binding consumes its supplied authorized IDs, untouched bindings
-   use pre-Gate freshness, and previously progressed bindings revalidate only
-   their latest durable progress event. Empty sibling authorization is never
-   treated as a task transition.
+2. Count `### Requirement:` headers across the bound change's `specs/*/spec.md` against
+   `max_requirements_per_change` in `openspec/config.yaml`. A complete change that passes strict
+   validation within the ceiling is reused without an architect. Otherwise dispatch one architect in
+   `openspec-planning` mode; it follows the installed upstream `openspec-propose` or
+   `openspec-update-change` skill and writes only the bound change. Past the ceiling it returns
+   `design_status: oversize`, and Main records the live split, accept, or narrow choice as a
+   `design.oversize` event before anything else exists.
+3. Compute the content identity, generate the read-only `01-plan.md` projection, and present
+   Gate 1. Only the live reply bound to that presentation appends the authority event and enters
+   implementation.
 
 Crossing the architect SLA produces one concise operator update and one
 `agent.sla` observation. Main does not request heartbeats or inspect partial
@@ -129,55 +73,49 @@ OpenSpec integrations are preserved unchanged.
 
 ## Specialist consumption and authority
 
-- Implementer reads pinned OpenSpec task/design coordinates plus its TH execution shard. Apply
-  instructions are guidance; they cannot select a phase, expand scope, release a gate, or publish.
+- Implementer reads the pinned OpenSpec task/design coordinates named in its capability lease.
+  Apply instructions are guidance; they cannot select a phase, expand scope, release a gate, or publish.
 - Tester and QA read pinned OpenSpec requirements/scenarios directly. Tester owns executable
   evidence; QA remains final acceptance owner on the frozen tree.
 - Cleaner, security/adversary, delivery, state/events, nonces, corrections, Gate 1, Gate 3, and
   publication remain unchanged TH responsibilities.
 
-After implementation begins, the combined progress transition accepts only authorized monotonic
-task checkbox changes from pending to complete and immediately rebinds the overlay. Task text,
-structure, added/removed coordinates, rollbacks, or any other canonical change block the next
-dispatch and require reconciliation.
+After implementation begins, normal `tasks.md` progress is monotonic from pending to complete. A
+completed checkbox that returns to pending leaves the identity unchanged; the regression is
+recorded in the control log and the batch that owns the task is re-leased. Task text, structure, added or removed coordinates, or any other canonical change
+alters the content identity, makes `01-plan.md` stale, and blocks the next dispatch until Design
+regenerates and re-presents.
 
 ## Repository, local workspace, and Obsidian
 
-Canonical OpenSpec Markdown always stays in the target repository. TH state, snapshot, overlay,
-decisions, reviews, and evidence stay in the configured TH workspace:
+Canonical OpenSpec Markdown always stays in the target repository. TH control log, projections,
+reviews, and evidence stay in the configured TH workspace:
 
 ```text
 repository/openspec/changes/<change>/...       canonical source
-workspace/.team-harness/quality.json           operational quality policy
-workspace/inputs/openspec/<service>/snapshot.json       pinned identity and navigation
-workspace/plan/openspec/<service>/traceability.json     TH execution overlay
-workspace/inputs/openspec-bindings.json                  aggregate identity
+workspace/control/control.jsonl                authority log
+workspace/inputs/openspec-pin.json             pinned content identity
+workspace/01-plan.md                           operator projection
 workspace/reviews/...                          TH validation evidence
 ```
 
-When `logs_mode: obsidian`, `workspace` is the configured vault path and no
-local TH workspace duplicate is created. Snapshot metadata records the
-vault root, `mode: obsidian`, repository-relative artifact paths, coordinates, line numbers, and
-content hashes. Obsidian is therefore the audit/navigation surface, not a second OpenSpec source.
+When `logs_mode: obsidian`, `workspace` is the configured vault path and no local TH workspace
+duplicate is created. The pin records the vault root, `mode: obsidian`, repository-relative
+paths, and the content identity. Obsidian is therefore the audit/navigation surface, not a
+second OpenSpec source.
 
-Before Freeze, TH verifies that the snapshot-bound OpenSpec source set is
-present byte-for-byte below the implementation checkout, tracked by Git, and
-included in the final base-to-candidate diff when created or changed by this
-pipeline. It also verifies that the workspace quality manifest is absent from
-that product diff. When the workspace is nested below a checkout, the manifest
-must also be ignored and untracked. A worktree boundary never moves canonical
-OpenSpec artifacts into the workspace or operational quality state into a
-product path.
+Before Freeze, TH verifies that the pinned OpenSpec source set is present byte-for-byte below the
+implementation checkout, tracked by Git, and included in the final base-to-candidate diff when
+created or changed by this pipeline. A worktree boundary never moves canonical OpenSpec
+artifacts into the workspace.
 
 ## Recovery and finalization
 
-Durable v4 state records the persisted workspace identity, ordered service
-bindings, evidence repositories, aggregate path/hash, preflight result, current
-Design pass, and one next action. Recovery resumes preflight, an already
-approved provisioning operation, upstream planning, snapshot capture, or overlay generation at the
-recorded boundary. Historical v3 singular fields map to one in-memory binding
-without moving or rewriting the run. It does not ask the operator to re-enter a workflow command. Source drift routes
-to reconciliation; a valid completed Design resumes at Gate 1.
+Recovery replays the valid prefix of `control/control.jsonl` and rebuilds projections before
+routing; it never asks the operator to re-enter a workflow command. A workspace without a control
+log is closed administratively with one events entry and offered inline continuation or a fresh
+run. Source drift makes the projection stale and routes back to Design; a valid completed Design
+resumes at Gate 1.
 
 OpenSpec `sync` and `archive` remain outside implementation authority. They are offered only after
 TH acceptance and the applicable Gate 3/operator authority. They cannot replace push/PR authority

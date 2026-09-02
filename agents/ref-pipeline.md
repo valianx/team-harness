@@ -15,7 +15,7 @@ color: cyan
 - [Freeze and validation](#freeze-and-validation)
 - [Gates and delivery](#gates-and-delivery)
 - [Failures](#failures)
-- [Recovery and legacy state](#recovery-and-legacy-state)
+- [Recovery](#recovery)
 - [Retained safety floors](#retained-safety-floors)
 
 Load this reference only after explicit live pipeline activation or recovery of
@@ -213,7 +213,7 @@ formatting omission from evidence Main can verify, but never invent success,
 evidence, or a decision-bearing cause. Scope expansion remains
 decision-bearing because execution cannot supply operator authority.
 
-## Recovery and legacy state
+## Recovery
 
 Replay the valid log prefix and rebuild projections before routing. Preserve
 valid progress and prove the prior writer safe. Continue only with unchanged
@@ -221,11 +221,10 @@ authority/semantic/worktree/input/context identities and a different safe
 causal action. Replace unverifiable context; pause on unsafe ownership,
 integrity failure, unavailable prerequisites, or repeated causal identity.
 
-Supported v1-v4 state converts once in a create-then-switch transaction. Verify
-historical Gate authority, bindings, immutable inputs, dirty progress, and any
-continuation identity. Preserve the exact service/error on failure. Write and
-validate v5 beside legacy state, then switch the current pointer last. Current
-dispatch never imports legacy routing or accepts mixed writable schemas.
+A workspace without `control/control.jsonl` has nothing to replay. Close it
+administratively with one events entry and offer inline continuation or a
+fresh run. Current dispatch never imports legacy routing or accepts mixed
+writable schemas.
 
 ## Retained safety floors
 

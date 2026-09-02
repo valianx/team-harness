@@ -1,8 +1,8 @@
 # Coordinator liveness facts (v5)
 
 Liveness reports only delivery, acknowledgement, terminality, declared progress,
-and interruption cause for an identity-bound lease/session. The packaged
-`specialist-liveness.mjs` validates and returns those facts; it never chooses a
+and interruption cause for an identity-bound lease/session. Main collects those
+facts from the native status query and the control log; liveness never chooses a
 wait, interruption, continuation, replacement, correction, or terminal route.
 
 Wait timeouts and project SLAs are operator-visible telemetry. Main may use a

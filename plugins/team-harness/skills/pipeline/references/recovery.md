@@ -19,9 +19,7 @@ telemetry never select a route. A changed candidate receives one fresh
 independent verifier; a separate tester is risk-derived, and security is fresh
 when impact is true or unknown.
 
-For a supported v1-v4 workspace, run create-then-switch conversion. Validate
-historical authority, bindings, immutable inputs, dirty progress, original Gate,
-continuation identity, and repair evidence. Preserve the exact failing service
-and binding error. Write and validate the v5 log/projections beside legacy data,
-then commit the current pointer last. Ambiguous authority or mixed writable
-schemas fails closed; existing valid v5 data is never overwritten.
+A workspace without `control/control.jsonl` has nothing to replay. Close it
+administratively through the packaged helper, which appends one `pipeline.close`
+entry and refuses a symlinked `control/` path or a symlinked or hard-linked
+events file, then offer inline continuation or a fresh run. Ambiguous authority or mixed writable schemas fails closed.

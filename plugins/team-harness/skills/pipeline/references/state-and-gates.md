@@ -16,5 +16,5 @@ mechanical-release events and writes projections. Specialists return one result
 envelope and never edit these surfaces. Append/replay stops at the first corrupt
 record and preserves the last valid prefix.
 
-Current dispatch rejects writable v1-v4 state/release fields. Recovery invokes
-the one-shot converter before any current-path action.
+Current dispatch rejects legacy writable state/release fields. Recovery closes a
+workspace without a control log administratively before any current-path action.

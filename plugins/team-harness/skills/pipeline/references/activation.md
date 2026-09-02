@@ -35,10 +35,10 @@ already-present check, show the exact bounded allow/deny/additional-directory
 delta, and require the documented live confirmation. Do not reproduce or widen
 the canonical read-only command allowlist here.
 
-If current state is v5, replay its valid prefix and rebuild projections. If it
-is a supported v1-v4 workspace, invoke the one-shot create-then-switch converter
-before current dispatch. Mixed writable schemas, ambiguous authority, invalid
-bindings, unsafe paths, or a corrupt v5 prefix fail closed with precise evidence.
+If current state is v5, replay its valid prefix and rebuild projections. A
+workspace without `control/control.jsonl` is closed administratively and offered
+inline continuation or a fresh run. Mixed writable schemas, ambiguous authority,
+unsafe paths, or a corrupt v5 prefix fail closed with precise evidence.
 
 ## Design binding
 

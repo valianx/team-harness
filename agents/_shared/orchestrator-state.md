@@ -24,8 +24,8 @@ validate leases/capsules and construct results but cannot append or project.
 Before accepting a result, Main compares its commit list and `changed_paths`
 with the real Git diff and dirty state since the lease's bound baseline commit.
 
-Current v5 execution rejects legacy writable release/state fields. A supported
-v1-v4 workspace must pass the one-shot converter before dispatch.
+Current v5 execution rejects legacy writable release/state fields. A workspace
+without a control log is closed administratively, never converted.
 
 ## Current State — the schema you write
 

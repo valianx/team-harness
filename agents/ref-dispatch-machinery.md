@@ -65,10 +65,9 @@ service work in dependency order. You never spawn a copy of yourself to run a la
 **Order confirm.** With ≥2 eligible projects, show the operator the project list, the exclusions with their reason, and the order you propose. Wait for confirmation. This is a sequencing decision, not a gate release — it carries no nonce.
 
 **Gate 1 is consolidated.** Writable services own separate OpenSpec changes in
-their own repositories. `inputs/openspec-bindings.json` orders those bindings,
-records repository identities, dependency order, child snapshot/overlay hashes,
-and evidence-only dispositions. One Gate-1 nonce binds the exact aggregate hash
-and ordered binding set. A service child never presents another Gate 1. After
+their own repositories. Main records their repository identities, dependency
+order, content identities, and evidence-only dispositions as immutable inputs
+of one presentation. One Gate-1 nonce binds that ordered set. A service child never presents another Gate 1. After
 approval, execution is serial in the recorded order. Gate 3 and all publication
 safety remain fail-closed against the resulting immutable candidates.
 
