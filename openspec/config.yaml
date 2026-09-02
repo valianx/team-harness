@@ -47,8 +47,8 @@ rules:
 operations:
   archive:
     guidance:
-      - Archive a change in the pull request that checks its last task, or in the next
-        release pull request.
+      - Archive a completed change once its delivery is merged: in the next release
+        pull request, or in a dedicated archive pull request.
 
 # Repository-owned scope rules. Enforced by tests/test_openspec_scope.py on every
 # active change and read by agents/architect.md during the single design pass.

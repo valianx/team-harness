@@ -23,20 +23,28 @@ BASELINE = ROOT / "docs/benchmarks/pipeline-baseline.md"
 
 REQUIREMENT = re.compile(r"(?m)^### Requirement:")
 TASK_ITEM = re.compile(r"(?m)^\s*- \[[ xX]\]")
+OPEN_TASK = re.compile(r"(?m)^\s*- \[ \]")
 SCALAR = "(?m)^[ \t]+{key}:[ \t]*(\\d+)[ \t]*$"
 SECTION = "(?m)^##[ \t]+{name}[ \t]*$"
+LIST_ITEM = "(?m)^[ \t]+{key}:[ \t]*\n((?:[ \t]+-[ \t]*.+\n?)+)"
 
 RULE_KEYS = ("max_requirements_per_change", "proposal_max_words", "tasks_max_items")
 
 
-def rules() -> dict[str, int]:
+def rules() -> dict[str, object]:
     text = CONFIG.read_text(encoding="utf-8")
-    found = {}
+    found: dict[str, object] = {}
     for key in RULE_KEYS:
         match = re.search(SCALAR.format(key=key), text)
         if match is None:
             raise SystemExit(f"openspec-scope: FAIL\n  openspec/config.yaml declares no {key}")
         found[key] = int(match.group(1))
+    sections = re.search(LIST_ITEM.format(key="proposal_required_sections"), text)
+    if sections is None:
+        raise SystemExit("openspec-scope: FAIL\n  openspec/config.yaml declares no proposal_required_sections")
+    found["proposal_required_sections"] = [
+        line.strip().lstrip("-").strip() for line in sections.group(1).splitlines() if line.strip()
+    ]
     return found
 
 
@@ -86,8 +94,9 @@ def check(change: Path, limits: dict[str, int]) -> list[str]:
         words = len(text.split())
         if words >= limits["proposal_max_words"]:
             out.append(f"{name}: proposal is {words} words, at or over the {limits['proposal_max_words']}-word limit")
-        if section(text, "Non-Goals") is None:
-            out.append(f"{name}: proposal has no '## Non-Goals' section")
+        for required in limits["proposal_required_sections"]:
+            if section(text, required) is None:
+                out.append(f"{name}: proposal has no '## {required}' section")
         if not declares_capability(text):
             out.append(f"{name}: proposal declares no new and no modified capability")
 
@@ -108,9 +117,22 @@ def check(change: Path, limits: dict[str, int]) -> list[str]:
     return out
 
 
+def archive_lag(change: Path) -> str | None:
+    """A change whose every task is checked but still sits outside archive/."""
+    tasks = change / "tasks.md"
+    if not tasks.is_file():
+        return None
+    text = tasks.read_text(encoding="utf-8")
+    items = TASK_ITEM.findall(text)
+    if items and not OPEN_TASK.search(text):
+        return f"{change.name}: every task is checked and the change is not archived"
+    return None
+
+
 def main() -> int:
     limits = rules()
     failures: list[str] = []
+    warnings: list[str] = []
 
     if not BASELINE.is_file():
         failures.append(
@@ -121,6 +143,9 @@ def main() -> int:
     changes = active_changes()
     for change in changes:
         failures.extend(check(change, limits))
+        lag = archive_lag(change)
+        if lag:
+            warnings.append(lag)
 
     if failures:
         print("openspec-scope: FAIL", file=sys.stderr)
@@ -128,6 +153,8 @@ def main() -> int:
             print(f"  {line}", file=sys.stderr)
         return 1
 
+    for line in warnings:
+        print(f"WARN  {line}")
     print(f"openspec-scope: PASS ({len(changes)} active change(s))")
     return 0
 

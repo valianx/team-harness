@@ -327,13 +327,17 @@ For each file in scope:
    deterministic classification and the vocabulary it returns; it never
    restates the helper's flag list, decision procedure, or attempt ordinals.
    Search `agents/**/*.md` and every `skills/**/SKILL.md` for this closed
-   list — `classify-agent-failure`, `--contract-signal`, `--attempt {1|2}`,
-   `retry-contract`, `agent-contract-invalid`, `absent after retry` — and
-   FAIL naming the file and the phrase. This file states the list and is
+   list — `classify-agent-failure`, `--contract-signal`, `--attempt {1|2}` —
+   and FAIL naming the file and the phrase. The vocabulary a helper returns
+   is never on the list; a contract must be able to name it. This file states the list and is
    therefore not scanned against it; any other file is exempt only through
    the shrink-only map in `tests/test_retired_phrases.py`, whose entry names
    the change that removes it. An exempt file with no remaining phrase also
    FAILs, so the exemption cannot outlive its reason.
+7. **Archive lag:** run `openspec list`; a change it reports complete that
+   still sits under `openspec/changes/` outside `archive/` → WARN naming the
+   change. `tests/test_openspec_scope.py` prints the same warning for an
+   active change whose every task is checked.
 
 Result:
 - **PASS** if every file fits budgets and formats and every anchor resolves.

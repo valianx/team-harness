@@ -53,6 +53,7 @@ fi
 # The evaluator runs from an empty directory with only the delta root and the
 # ceiling as inputs: no workspace, no control log, no identity, no gate record.
 SANDBOX="$(mktemp -d)"
+[ -n "$SANDBOX" ] || exit 1
 trap 'rm -rf "$SANDBOX"' EXIT
 
 verdict() {

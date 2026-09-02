@@ -37,5 +37,5 @@ recorded here.
 | Exclusive defects — `security` | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
 
 The per-run tree anchor is the full `tree_anchor` value defined in
-`docs/verification-packet.md § 2`, recorded for the tree the run executed
+`docs/verification-packet.md § 1a`, recorded for the tree the run executed
 against. Anchor equality is a plain string comparison of the full value.

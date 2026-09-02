@@ -6,10 +6,9 @@ security floor derives from the changed surface rather than from the request.
 ## Request text
 
 ```text
-`dev-guard` resolves a push whose remote is spelled with a trailing slash
-(`origin/`) as an unknown destination and allows it without a prompt. A push to
-the default branch must require approval regardless of how the remote is
-spelled.
+Add regression coverage proving `dev-guard` asks before a push to the default
+branch when the remote is spelled with a trailing slash (`origin/`), a URL, or
+an uppercase name, and fix the check if any spelling resolves to `allow`.
 ```
 
 ## Expected touched surface

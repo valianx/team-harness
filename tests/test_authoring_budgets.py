@@ -10,7 +10,9 @@ that keeps the contract corpus from growing back.
 """
 
 import json
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -45,12 +47,10 @@ EXEMPT = {
     "agents/security.md": {"words"},
     "agents/tester.md": {"words"},
     "agents/_shared/apply-review-disposition.md": {"words"},
-    "agents/_shared/gate-contract.md": {"words"},
     "agents/_shared/gh-fallback.md": {"words"},
     "agents/_shared/inline-review-contract.md": {"words"},
     "agents/_shared/kg-write-policy.md": {"words"},
-    "agents/_shared/orchestrator-state.md": {"words", "lines"},
-    "agents/_shared/plan-consolidation.md": {"words"},
+    "agents/_shared/orchestrator-state.md": {"lines"},
 }
 
 # Reference files over 100 lines that have no contents block today. Same ratchet as
@@ -179,6 +179,39 @@ def baseline() -> dict[str, dict]:
     return json.loads(BASELINE.read_text(encoding="utf-8"))
 
 
+def base_baseline() -> dict[str, dict] | None:
+    """The fixture as committed on the base ref, or None when no base is reachable.
+
+    The ratchet is a property across commits, not within one: without the base
+    copy, a commit that grows a file and raises its ceiling to match is
+    self-consistent and passes every snapshot check.
+    """
+    ref = os.environ.get("TH_BASELINE_BASE_REF", "origin/main")
+    spec = f"{ref}:{BASELINE.relative_to(ROOT).as_posix()}"
+    try:
+        shown = subprocess.run(
+            ["git", "-C", str(ROOT), "show", spec],
+            check=True, capture_output=True, text=True, encoding="utf-8",
+        )
+        return json.loads(shown.stdout)
+    except (subprocess.CalledProcessError, FileNotFoundError, json.JSONDecodeError):
+        return None
+
+
+def check_ratchet(recorded: dict[str, dict], base: dict[str, dict], out: list[str]) -> None:
+    for rel, entry in sorted(base.items()):
+        before = entry.get("ceiling")
+        if not isinstance(before, int):
+            continue
+        if rel not in recorded:
+            if (ROOT / rel).is_file():
+                out.append(f"{rel}: ceiling entry removed while the file still exists")
+            continue
+        after = recorded[rel].get("ceiling")
+        if isinstance(after, int) and after > before:
+            out.append(f"{rel}: ceiling raised from {before} to {after} — a ceiling may be lowered, never raised")
+
+
 def ceiling_tracked(rel: str, kind: str, words: int) -> bool:
     """Reference files always carry a ceiling; shared contracts once over budget.
 
@@ -226,6 +259,11 @@ def main() -> int:
     seen: set[str] = set()
     recorded = baseline()
     ceilings_seen: set[str] = set()
+    base = base_baseline()
+    if base is None:
+        notes.append("ceiling ratchet: no base ref fixture reachable; set TH_BASELINE_BASE_REF")
+    else:
+        check_ratchet(recorded, base, failures)
 
     for path in sorted([*ROOT.glob("agents/**/*.md"), *ROOT.glob("skills/**/references/**/*.md")]):
         kind = classify(path)

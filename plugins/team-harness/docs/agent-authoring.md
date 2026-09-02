@@ -61,7 +61,9 @@ carries an optional `target` and an optional `reason`. `tests/test_authoring_bud
 exceeds its ceiling and fails when a recorded ceiling sits more than 2% above
 the file's current count, so shrinking a file forces its ceiling down and the
 number can never move back up. A pull request may lower a ceiling; it may never
-raise one. The `target` is the distance the suite prints, not a gate, and the
+raise one: the suite also reads the fixture at the base ref (`origin/main`, or
+`TH_BASELINE_BASE_REF`) and fails on a raised ceiling or on an entry removed
+while its file still exists. The `target` is the distance the suite prints, not a gate, and the
 `reason` is reported to the reviewer and never lets a ceiling pass.
 
 ## Authoring rules

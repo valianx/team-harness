@@ -6,4 +6,5 @@
 
 ### Changed
 - Moved the review mode's failure classification back into its helper: the contract names `review_context.py` and the skill that owns the returned vocabulary instead of restating its flags, decisions, and attempt ordinals, and `/th:lint` Check 12 fails on the closed list of retired phrases.
-- Corrected the orchestrator kernel and pipeline reference word counts in `CLAUDE.md § 14` to the values the authoring fixture records.
+- Corrected the orchestrator kernel and pipeline reference word counts in `CLAUDE.md § 14` to the ceilings the authoring fixture records, and made the ceiling ratchet read the fixture at the base ref so a raised ceiling fails.
+- `tests/test_openspec_scope.py` reads `proposal_required_sections` from `openspec/config.yaml` and warns on an active change whose every task is checked but is not archived; `/th:lint` Check 12 carries the same archive-lag warning.

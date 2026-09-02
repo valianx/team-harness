@@ -332,7 +332,7 @@ class ReviewContextTests(unittest.TestCase):
         self.assertIn("A deleted\nchanged-file path is evidence from `Diff Path` only", ref)
         # The optional-workspace flag rule is stated by the skill that owns the invocation.
         skill = (ROOT / "skills" / "review-pr" / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("`--required-directory`", skill)
+        self.assertIn('--required-directory "$WORKSPACE" when Workspace Path is non-none', skill)
 
         for relative in (
             "agents/reviewer.md",

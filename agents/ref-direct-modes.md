@@ -492,9 +492,9 @@ filesystem transport failure. A failure without an exact classifiable path also 
 An agent return that violates its read/return schema is a TH execution defect, not an operator
 decision. A different echoed SHA/hash, actual snapshot mutation, or a failed freshness check is an
 integrity failure instead, and is never a correctable contract defect. For each violating return
-the packaged `review_context.py` failure classifier decides, invoked with the captured coordinates,
-the strict snapshot comparison, and current freshness as `skills/review-pr/SKILL.md § Step 2a`
-specifies. Its single returned decision is authoritative: a missing helper, an omitted required
+the packaged `review_context.py` failure classifier decides, invoked as
+`skills/review-pr/SKILL.md § Read scope and failed-read recovery` specifies. Its single returned
+decision is authoritative: a missing helper, an omitted required
 artifact, a malformed invocation, or a helper error fails closed, and coordinator judgment never
 replaces the executable classification.
 
