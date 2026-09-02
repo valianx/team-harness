@@ -11,14 +11,14 @@ import json
 import os
 from pathlib import Path
 import re
-import selectors
 import signal
 import stat
 import subprocess
 import sys
+import threading
 import time
 from types import ModuleType
-from typing import Callable
+from typing import BinaryIO, Callable
 
 
 SCHEMA_VERSION = 1
@@ -32,6 +32,8 @@ NATIVE_TIMEOUT_SECONDS = 30
 MAX_HOOK_MANIFEST = 64 * 1024
 MAX_RECEIPT_BYTES = 128 * 1024
 MAX_LIST_ITEMS = 128
+WINDOWS_CREATE_NEW_PROCESS_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+WINDOWS_CTRL_BREAK_EVENT = getattr(signal, "CTRL_BREAK_EVENT", 1)
 SAFE_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
 SEMVER_RE = re.compile(r"\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?")
 NON_FATAL_ALIAS_WARNING = (
@@ -123,9 +125,15 @@ def safe_native_env() -> dict[str, str]:
 
 
 def stop_process(process: subprocess.Popen[bytes]) -> None:
+    if os.name == "nt":
+        try:
+            process.send_signal(WINDOWS_CTRL_BREAK_EVENT)
+            return
+        except OSError:
+            pass
     try:
         os.killpg(process.pid, signal.SIGKILL)
-    except OSError:
+    except (AttributeError, OSError):
         try:
             process.kill()
         except OSError:
@@ -137,15 +145,24 @@ def terminate_process(process: subprocess.Popen[bytes]) -> None:
     try:
         process.wait(timeout=1)
     except subprocess.TimeoutExpired:
-        pass
+        try:
+            process.kill()
+            process.wait(timeout=1)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
 
 
-def close_process_streams(process: subprocess.Popen[bytes], streams: selectors.BaseSelector) -> None:
-    streams.close()
+def close_process_streams(process: subprocess.Popen[bytes]) -> None:
     if process.stdout is not None:
         process.stdout.close()
     if process.stderr is not None:
         process.stderr.close()
+
+
+def process_group_options(platform: str | None = None) -> dict[str, object]:
+    if (platform or os.name) == "nt":
+        return {"creationflags": WINDOWS_CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
 
 
 def run_native(argv: list[str]) -> str:
@@ -157,7 +174,7 @@ def run_native(argv: list[str]) -> str:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             env=safe_native_env(),
-            start_new_session=True,
+            **process_group_options(),
         )
     except OSError as exc:
         retry = exc.errno in {errno.EACCES, errno.EPERM, errno.EROFS}
@@ -166,39 +183,68 @@ def run_native(argv: list[str]) -> str:
             retry_with_escalation=retry,
         ) from exc
     assert process.stdout is not None and process.stderr is not None
-    streams = selectors.DefaultSelector()
-    streams.register(process.stdout, selectors.EVENT_READ, "stdout")
-    streams.register(process.stderr, selectors.EVENT_READ, "stderr")
     captured = {"stdout": bytearray(), "stderr": bytearray()}
+    capture_lock = threading.Lock()
+    output_too_large = threading.Event()
+    stream_failed = threading.Event()
+
+    def drain(name: str, stream: BinaryIO) -> None:
+        try:
+            while True:
+                chunk = stream.read(64 * 1024)
+                if not chunk:
+                    return
+                with capture_lock:
+                    total = sum(len(value) for value in captured.values())
+                    if total + len(chunk) > MAX_NATIVE_OUTPUT:
+                        output_too_large.set()
+                        return
+                    captured[name].extend(chunk)
+        except OSError:
+            stream_failed.set()
+
+    readers = [
+        threading.Thread(target=drain, args=("stdout", process.stdout), daemon=True),
+        threading.Thread(target=drain, args=("stderr", process.stderr), daemon=True),
+    ]
+    for reader in readers:
+        reader.start()
     deadline = time.monotonic() + NATIVE_TIMEOUT_SECONDS
-    while streams.get_map():
+    while process.poll() is None or any(reader.is_alive() for reader in readers):
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             terminate_process(process)
-            close_process_streams(process, streams)
+            close_process_streams(process)
             raise ConvergenceError("NATIVE_COMMAND_TIMEOUT")
-        for key, _ in streams.select(min(remaining, 0.25)):
-            chunk = os.read(key.fileobj.fileno(), 64 * 1024)
-            if not chunk:
-                streams.unregister(key.fileobj)
-                continue
-            captured[key.data].extend(chunk)
-            if sum(len(value) for value in captured.values()) > MAX_NATIVE_OUTPUT:
-                terminate_process(process)
-                close_process_streams(process, streams)
-                raise ConvergenceError("NATIVE_COMMAND_OUTPUT_TOO_LARGE")
+        if output_too_large.is_set():
+            terminate_process(process)
+            close_process_streams(process)
+            raise ConvergenceError("NATIVE_COMMAND_OUTPUT_TOO_LARGE")
+        if stream_failed.is_set():
+            terminate_process(process)
+            close_process_streams(process)
+            raise ConvergenceError("NATIVE_COMMAND_OUTPUT_INVALID")
+        time.sleep(min(remaining, 0.01))
+    if output_too_large.is_set():
+        close_process_streams(process)
+        raise ConvergenceError("NATIVE_COMMAND_OUTPUT_TOO_LARGE")
+    if stream_failed.is_set():
+        close_process_streams(process)
+        raise ConvergenceError("NATIVE_COMMAND_OUTPUT_INVALID")
     remaining = deadline - time.monotonic()
     if remaining <= 0:
         terminate_process(process)
-        close_process_streams(process, streams)
+        close_process_streams(process)
         raise ConvergenceError("NATIVE_COMMAND_TIMEOUT")
     try:
         return_code = process.wait(timeout=remaining)
     except subprocess.TimeoutExpired as exc:
         terminate_process(process)
-        close_process_streams(process, streams)
+        close_process_streams(process)
         raise ConvergenceError("NATIVE_COMMAND_TIMEOUT") from exc
-    close_process_streams(process, streams)
+    for reader in readers:
+        reader.join(timeout=max(0, deadline - time.monotonic()))
+    close_process_streams(process)
     try:
         stdout = captured["stdout"].decode("utf-8")
         stderr = captured["stderr"].decode("utf-8").strip()

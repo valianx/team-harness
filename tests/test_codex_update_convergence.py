@@ -4,16 +4,17 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import importlib.util
 import json
 import os
 from pathlib import Path
 import shutil
-import stat
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,7 +32,7 @@ def load_converge():
 
 
 CONVERGE = load_converge()
-CODEX_BIN = str(Path("/usr/bin/true").resolve())
+CODEX_BIN = str(Path(sys.executable).resolve())
 
 
 class FakeCodex:
@@ -86,10 +87,6 @@ class ConvergenceFixture(unittest.TestCase):
             os.environ.pop("CODEX_HOME", None)
         else:
             os.environ["CODEX_HOME"] = self.old_codex_home
-        try:
-            self.codex_home.chmod(stat.S_IRWXU)
-        except FileNotFoundError:
-            pass
         self.temp.cleanup()
 
     def args(self, *, runtime_approval: str | None = None, escalation_domain: str | None = None) -> argparse.Namespace:
@@ -195,9 +192,19 @@ class ConvergenceFixture(unittest.TestCase):
         self.assertEqual(unsafe["domains"]["bridge"]["errorCode"], "SNAPSHOT_COMPONENT_SYMLINK")
 
     def test_protected_config_target_requests_exact_retry_escalation(self) -> None:
-        self.codex_home.chmod(stat.S_IRUSR | stat.S_IXUSR)
-        receipt = self.converge(FakeCodex())
-        self.codex_home.chmod(stat.S_IRWXU)
+        load_helpers = CONVERGE.load_helpers
+
+        def helpers_with_protected_config(plugin: Path):
+            helpers = load_helpers(plugin)
+
+            def deny_write(*_args, **_kwargs):
+                raise PermissionError(errno.EACCES, "controlled write failure")
+
+            helpers["config"].write_atomic = deny_write
+            return helpers
+
+        with mock.patch.object(CONVERGE, "load_helpers", side_effect=helpers_with_protected_config):
+            receipt = self.converge(FakeCodex())
         self.assertEqual(receipt["failedDomain"], "config")
         self.assertEqual(receipt["domains"]["config"]["errorCode"], "WRITE_PROTECTED")
         self.assertTrue(receipt["domains"]["config"]["retryWithEscalation"])
@@ -259,6 +266,13 @@ class ConvergenceFixture(unittest.TestCase):
                 "-c",
                 f"import sys; sys.stdout.write('x' * {CONVERGE.MAX_NATIVE_OUTPUT + 1})",
             ])
+
+    def test_native_process_group_options_are_platform_specific(self) -> None:
+        self.assertEqual(
+            CONVERGE.process_group_options("nt"),
+            {"creationflags": CONVERGE.WINDOWS_CREATE_NEW_PROCESS_GROUP},
+        )
+        self.assertEqual(CONVERGE.process_group_options("posix"), {"start_new_session": True})
 
     def test_escalated_retry_cannot_write_a_second_domain(self) -> None:
         self.converge(FakeCodex(), authorize_runtime=True)

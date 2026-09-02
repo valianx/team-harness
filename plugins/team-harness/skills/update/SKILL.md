@@ -86,10 +86,15 @@ never authorized merely by escalation approval.
 ## Stage B — converge once
 
 The running prose may still come from the old snapshot. From this point use
-only the validated helper under `NEW_PLUGIN`:
+only the validated helper under `NEW_PLUGIN`. Resolve one Python interpreter as
+`PYTHON_BIN` before the first call: on Windows, use the canonical absolute
+`sys.executable` reported by `py -3` when that launcher is available, otherwise
+resolve the active Python 3 executable directly; on macOS/Linux, use the
+canonical absolute Python 3 executable. Require a regular executable and reuse
+that exact path for both calls:
 
 ```text
-python3 NEW_PLUGIN/skills/update/scripts/converge.py --old-plugin OLD_PLUGIN --old-version OLD_VERSION --new-plugin NEW_PLUGIN --new-version NEW_VERSION --codex-bin CODEX_BIN
+PYTHON_BIN NEW_PLUGIN/skills/update/scripts/converge.py --old-plugin OLD_PLUGIN --old-version OLD_VERSION --new-plugin NEW_PLUGIN --new-version NEW_VERSION --codex-bin CODEX_BIN
 ```
 
 This is the only post-install call before operator input. It validates and
@@ -130,7 +135,7 @@ invocation. A short unambiguous live affirmation such as `yes`, `sí`, `ok`, or
 `continúa` authorizes one focused follow-up call:
 
 ```text
-python3 NEW_PLUGIN/skills/update/scripts/converge.py --old-plugin OLD_PLUGIN --old-version OLD_VERSION --new-plugin NEW_PLUGIN --new-version NEW_VERSION --codex-bin CODEX_BIN --runtime-approval RECEIPT.pendingDecision.approvalFingerprint
+PYTHON_BIN NEW_PLUGIN/skills/update/scripts/converge.py --old-plugin OLD_PLUGIN --old-version OLD_VERSION --new-plugin NEW_PLUGIN --new-version NEW_VERSION --codex-bin CODEX_BIN --runtime-approval RECEIPT.pendingDecision.approvalFingerprint
 ```
 
 A short decline or deferral preserves completed work and closes as
