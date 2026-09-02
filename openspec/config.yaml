@@ -30,3 +30,31 @@ schema: spec-driven
 #     archive:
 #       guidance:
 #         - Summarize the archive outcome before finishing
+
+rules:
+  proposal:
+    - Keep the proposal under 500 words and always include a "## Non-Goals" section.
+    - >-
+      A change exists only for product behavior: it must add or modify at least one
+      capability. Installing a tool, delivering an approved change, and other repository
+      chores use the normal branch and pull-request flow with no change directory.
+  tasks:
+    - Keep the task list at 20 items or fewer.
+  design:
+    - Keep the change delta at or under max_requirements_per_change requirements. Past
+      that, split the change rather than authoring one plan nobody can review in a sitting.
+
+operations:
+  archive:
+    guidance:
+      - Archive a completed change once its delivery is merged: in the next release
+        pull request, or in a dedicated archive pull request.
+
+# Repository-owned scope rules. Enforced by tests/test_openspec_scope.py on every
+# active change and read by agents/architect.md during the single design pass.
+team_harness:
+  max_requirements_per_change: 12
+  proposal_max_words: 500
+  proposal_required_sections:
+    - Non-Goals
+  tasks_max_items: 20

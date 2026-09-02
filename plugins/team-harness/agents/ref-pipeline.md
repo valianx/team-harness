@@ -29,8 +29,7 @@ The current machine is:
 design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete
 ```
 
-Direct work remains outside this machine. A completed or aborted pipeline
-returns Main to direct mode.
+A completed or aborted pipeline returns Main to direct mode.
 
 ## Control plane
 
@@ -65,19 +64,26 @@ and tasks.
    workspace, load only the applicable sections of
    `agents/ref-intake-flows.md`: milestone continuity for a named plan
    milestone, initiative detection/confirmation before binding an initiative,
-   and initiative create-or-join after confirmation. These are Main-owned
-   intake decisions and dispatch no design specialist. Then replay/convert the
+   and initiative create-or-join after confirmation. Then replay/convert the
    selected workspace.
-2. If the complete bound change passes strict validation, use it directly and
-   do not dispatch architect.
+2. Count `### Requirement:` headers across the bound change's `specs/*/spec.md`
+   against `max_requirements_per_change` in `openspec/config.yaml`; past it,
+   step 4 applies with or without architect. If the complete bound change
+   passes strict validation within the ceiling, use it directly and do not
+   dispatch architect.
 3. If planning is missing or the live operator requests a semantic update,
    preflight and dispatch at most one architect using upstream OpenSpec
    propose/update, then validate strictly.
-4. Compute a content identity over canonical OpenSpec artifacts.
-5. Main generates read-only `01-plan.md` with observable outcome,
+4. On `design_status: oversize`, present one live choice — split into the
+   proposed changes, accept oversize with a reason appended to `proposal.md`, or
+   narrow the request — and record it as a `design.oversize` event. Nothing in
+   steps 5-7 exists until that decision is recorded; accept resumes the same
+   pass.
+5. Compute a content identity over canonical OpenSpec artifacts.
+6. Main generates read-only `01-plan.md` with observable outcome,
    included/excluded scope, approach, coherent work batches, material risks and
    decisions, preserved behavior, canonical links, and the pinned identity.
-6. Present Gate 1 and stop. Only the live reply bound to that presentation may
+7. Present Gate 1 and stop. Only the live reply bound to that presentation may
    append authority and enter implementation.
 
 The projection contains no copied AC/TC prose, exhaustive file/task graph,
@@ -85,9 +91,7 @@ commands, seams, semantic overlay, dispatch schema, or permanent future task
 capsule. OpenSpec identity drift makes it stale and requires regeneration.
 Nobody edits it manually.
 
-There is no automatic design review panel. The former planning-QA role is not
-dispatchable. An
-explicit `/th:plan-review` dispatches one surviving read-only `plan-reviewer`
+There is no automatic design review panel. An explicit `/th:plan-review` dispatches one surviving read-only `plan-reviewer`
 over canonical OpenSpec and projection fidelity. It creates no Gate authority
 and reports that no dedicated security specialist ran, with `/th:security` as
 the explicit follow-up when the operator wants that separate assessment.
@@ -96,8 +100,7 @@ the explicit follow-up when the operator wants that separate assessment.
 
 After Gate 1, read dependency-ready OpenSpec tasks and form one coherent
 same-owner worktree batch. Derive writable paths, immutable inputs, and
-verification obligations just in time from current facts. Never require a
-complete future dispatch graph.
+verification obligations just in time from current facts.
 
 One canonical worktree permits one committing writer. Serialize implementer,
 tester, and cleaner writes; allow read-only concurrency only over immutable
@@ -120,8 +123,7 @@ runs only when the recorded closed predicate matches one or more of:
 - stale independently-authored evidence; or
 - explicit live operator request.
 
-Pre-implementation checks cover prerequisites only. There is no universal RED
-run or complete quality suite. Cleaner runs only for a deterministic non-empty
+Pre-implementation checks cover prerequisites only. Cleaner runs only for a deterministic non-empty
 behavior-preserving allowlist. Empty is a no-op.
 
 Accept the result envelope before projecting progress. Continue the same

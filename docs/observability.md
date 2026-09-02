@@ -99,6 +99,7 @@ Core event names are:
 | `iteration.start` | Implementation/validation correction observation linked by `decision_ref`; new producers use `cause: verification` only. `convergence_counts` may be derived from the findings ledger for diagnostics but is not required. Historical `cause: operator` events remain readable but are not emitted for plan repairs, operator decisions, or explicit design work |
 | `artifact.missing`, `operation.started/success/failed` | Artifact and operation observability |
 | `checkpoint.confirmed` | Discover reasoning checkpoint evidence, not a gate |
+| `design.oversize` | The live decision on a design delta past `max_requirements_per_change` — `split`/`accept`/`narrow`, with the requirement count; recorded before any content identity, `01-plan.md`, or Gate 1 |
 | `stage2.hygiene` | Implementation hygiene scan result |
 | `kg_write` | One reason-coded knowledge write batch; no `kg.started` family |
 | `compaction.trigger` | Context-compaction breadcrumb |

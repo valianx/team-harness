@@ -18,6 +18,8 @@ irreversible, or operator-absent work — these are hard routers the lane never 
 dimension is not one of them: it stops the lane for the live choice in § Escalation, where the
 in-lane option raises the required lens set instead of ejecting the task.
 
+A change exists only for product behavior: it adds or modifies at least one capability. Installing a tool, delivering an already-approved change, and other repository chores use the normal branch and pull-request flow with no change directory. `openspec/config.yaml` records the per-artifact sizes and `tests/test_openspec_scope.py` enforces them on every active change.
+
 The predicate and hard-router precedence apply equally to explicit `/th:spec` invocation and
 inferred conversational entry. When the predicate passes, the lane is entered by either an
 explicit invocation or a current live operator request that unambiguously asks to work through

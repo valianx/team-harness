@@ -1,16 +1,27 @@
 #!/usr/bin/env python3
-"""Report agent/reference authoring size signals without gating correctness.
+"""Report agent/reference authoring size signals, and gate the shrink-only ceilings.
 
 Word counts, line counts, and table-of-contents preferences are editorial aids,
-not behavioral or safety oracles. Only a contents link that points to no real
-heading remains an error because that is a mechanically broken navigation target.
+not behavioral or safety oracles, so they stay advisory. Two things are errors:
+a contents link that points to no real heading, because that is a mechanically
+broken navigation target, and a violation of a ceiling recorded in
+tests/fixtures/authoring-baseline.json, because that fixture is the only thing
+that keeps the contract corpus from growing back.
 """
 
+import json
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+
+BASELINE = ROOT / "tests/fixtures/authoring-baseline.json"
+# A ceiling this far above the current count means a file shrank and the fixture
+# was not lowered with it, which is how the ratchet loses its teeth.
+CEILING_SLACK = 0.02
 
 WORD_BUDGET = {"specialist": 2000, "shared": 1500}
 LINE_CAP = 500
@@ -36,12 +47,10 @@ EXEMPT = {
     "agents/security.md": {"words"},
     "agents/tester.md": {"words"},
     "agents/_shared/apply-review-disposition.md": {"words"},
-    "agents/_shared/gate-contract.md": {"words"},
     "agents/_shared/gh-fallback.md": {"words"},
     "agents/_shared/inline-review-contract.md": {"words"},
     "agents/_shared/kg-write-policy.md": {"words"},
-    "agents/_shared/orchestrator-state.md": {"words", "lines"},
-    "agents/_shared/plan-consolidation.md": {"words"},
+    "agents/_shared/orchestrator-state.md": {"lines"},
 }
 
 # Reference files over 100 lines that have no contents block today. Same ratchet as
@@ -166,10 +175,105 @@ def broken_anchors(lines: list[str]) -> list[str]:
     return [m.group(1) for line in block if (m := TOC_LINK.search(line)) and m.group(1) not in real]
 
 
+def baseline() -> dict[str, dict]:
+    return json.loads(BASELINE.read_text(encoding="utf-8"))
+
+
+def base_baseline() -> dict[str, dict] | None:
+    """The fixture as committed on the base ref; {} when the base has none, None when no base is reachable.
+
+    The ratchet is a property across commits, not within one: without the base
+    copy, a commit that grows a file and raises its ceiling to match is
+    self-consistent and passes every snapshot check.
+    """
+    ref = os.environ.get("TH_BASELINE_BASE_REF", "origin/main")
+    git = ["git", "-C", str(ROOT)]
+    try:
+        subprocess.run(
+            [*git, "rev-parse", "--verify", "--quiet", "--end-of-options", f"{ref}^{{commit}}"],
+            check=True, capture_output=True, text=True, encoding="utf-8",
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    spec = f"{ref}:{BASELINE.relative_to(ROOT).as_posix()}"
+    try:
+        shown = subprocess.run(
+            [*git, "show", "--end-of-options", spec],
+            check=True, capture_output=True, text=True, encoding="utf-8",
+        )
+        return json.loads(shown.stdout)
+    except (subprocess.CalledProcessError, json.JSONDecodeError):
+        # A reachable base without the fixture is the bootstrap commit; nothing to ratchet against.
+        return {}
+
+
+def check_ratchet(recorded: dict[str, dict], base: dict[str, dict], out: list[str]) -> None:
+    for rel, entry in sorted(base.items()):
+        before = entry.get("ceiling")
+        if not isinstance(before, int):
+            continue
+        if rel not in recorded:
+            if (ROOT / rel).is_file() and classify(ROOT / rel) is not None:
+                out.append(f"{rel}: ceiling entry removed while the file still exists")
+            continue
+        after = recorded[rel].get("ceiling")
+        if isinstance(after, int) and after > before:
+            out.append(f"{rel}: ceiling raised from {before} to {after} — a ceiling may be lowered, never raised")
+
+
+def ceiling_tracked(rel: str, kind: str, words: int) -> bool:
+    """Reference files always carry a ceiling; shared contracts once over budget.
+
+    A reference has no numeric class budget — it is split by execution path — so
+    its own current count is the only ceiling available to record.
+    """
+    if kind == "reference":
+        return rel.startswith("agents/ref-")
+    return kind == "shared" and words > WORD_BUDGET["shared"]
+
+
+def check_ceiling(rel: str, words: int, entry: dict, out: list[str], notes: list[str]) -> None:
+    ceiling = entry.get("ceiling")
+    if not isinstance(ceiling, int):
+        out.append(f"{rel}: baseline entry has no integer 'ceiling'")
+        return
+    if words > ceiling:
+        out.append(
+            f"{rel}: {words} words over its recorded ceiling of {ceiling} — a ceiling may be "
+            f"lowered, never raised"
+        )
+    elif ceiling > words * (1 + CEILING_SLACK):
+        out.append(
+            f"{rel}: recorded ceiling {ceiling} sits more than "
+            f"{int(CEILING_SLACK * 100)}% above the current {words} words — record the lower "
+            f"ceiling in {BASELINE.relative_to(ROOT).as_posix()}"
+        )
+    target = entry.get("target")
+    if isinstance(target, int):
+        distance = words - target
+        notes.append(
+            f"{rel}: {words} words, ceiling {ceiling}, target {target} "
+            f"({distance:+d} from target)"
+        )
+    reason = entry.get("reason")
+    if reason:
+        # Reported so a reviewer sees the claim; it never lets a ceiling pass.
+        notes.append(f"{rel}: size_reason {reason}")
+
+
 def main() -> int:
     failures: list[str] = []
     advisories: list[str] = []
+    notes: list[str] = []
     seen: set[str] = set()
+    recorded = baseline()
+    ceilings_seen: set[str] = set()
+    base = base_baseline()
+    if base is None:
+        message = "ceiling ratchet: no base ref fixture reachable; set TH_BASELINE_BASE_REF"
+        (failures if os.environ.get("TH_REQUIRE_RUNTIMES") == "1" and os.environ.get("TH_BASELINE_BASE_REF") else notes).append(message)
+    else:
+        check_ratchet(recorded, base, failures)
 
     for path in sorted([*ROOT.glob("agents/**/*.md"), *ROOT.glob("skills/**/references/**/*.md")]):
         kind = classify(path)
@@ -182,6 +286,15 @@ def main() -> int:
         words = len(text.split())
         line_count = len(lines) - 1 if text.endswith("\n") else len(lines)
         exempt = EXEMPT.get(rel, set())
+
+        if rel in recorded:
+            ceilings_seen.add(rel)
+            check_ceiling(rel, words, recorded[rel], failures, notes)
+        elif ceiling_tracked(rel, kind, words):
+            failures.append(
+                f"{rel}: over its class budget with no ceiling recorded in "
+                f"{BASELINE.relative_to(ROOT).as_posix()}"
+            )
 
         if kind == "reference":
             if line_count > TOC_REQUIRED_OVER and not has_toc(lines):
@@ -218,11 +331,16 @@ def main() -> int:
     for rel in sorted(set(EXEMPT) - seen):
         advisories.append(f"{rel}: exempt but no longer present — drop the entry")
 
+    for rel in sorted(set(recorded) - ceilings_seen):
+        failures.append(f"{rel}: has a recorded ceiling but no longer present — drop the entry")
+
     if failures:
         for line in failures:
             print(f"FAIL  {line}", file=sys.stderr)
         return 1
 
+    for line in notes:
+        print(f"SIZE  {line}")
     for line in advisories:
         print(f"WARN  {line}")
     print(f"authoring health: PASS ({len(advisories)} advisory signal(s))")

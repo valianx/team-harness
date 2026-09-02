@@ -329,8 +329,10 @@ class ReviewContextTests(unittest.TestCase):
 
     def test_reviewer_contracts_preserve_deleted_symlink_and_optional_workspace_rules(self):
         ref = (ROOT / "agents" / "ref-direct-modes.md").read_text(encoding="utf-8")
-        self.assertIn("workspace as `--required-directory` only when", ref)
         self.assertIn("A deleted\nchanged-file path is evidence from `Diff Path` only", ref)
+        # The optional-workspace flag rule is stated by the skill that owns the invocation.
+        skill = (ROOT / "skills" / "review-pr" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn('--required-directory "$WORKSPACE" when Workspace Path is non-none', skill)
 
         for relative in (
             "agents/reviewer.md",
