@@ -216,12 +216,10 @@ changes observable runtime behavior. Placeholder text, OpenSpec artifact paths
 used as product `files`, empty quality/file/discovery scope, or omitted task
 coordinates is a blocked planning result, never a scaffold for Gate 1.
 
-Once your proposal, specs, design, and tasks validate, Main derives the compact Gate-1 index,
-operational execution shards, the workspace quality manifest, and
-`plan/openspec-traceability.json` mechanically from the pinned coordinates and
-that execution contract — a script projection, never a second architect dispatch. A validator failure on
-that assembled plan re-enters this same `openspec-planning` mode with the failure; there is no
-standing repair dispatch mode.
+Once your proposal, specs, design, and tasks validate, Main computes the content identity over
+the change and generates the read-only `01-plan.md` projection — a script projection, never a
+second architect dispatch. A validator failure re-enters this same `openspec-planning` mode with
+the failure; there is no standing repair dispatch mode.
 
 ### Root-Cause Analysis Mode (`type: fix`, Tier 2-4)
 

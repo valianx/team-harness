@@ -234,10 +234,10 @@ for (const contract of pipelineVersionContracts) {
 }
 assert.match(pipelineVersionContracts[0], /only current machine[\s\S]*design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete/,
   "Codex pipeline activation is not pinned to the canonical v5 state machine");
-assert.match(pipelineVersionContracts[3], /supported v1-v4 state/,
-  "recovery does not recognize the closed legacy conversion range");
-assert.match(pipelineVersionContracts[3], /create-then-switch/,
-  "recovery does not require commit-last v5 conversion");
+assert.match(pipelineVersionContracts[3], /without `control\/control\.jsonl`[\s\S]*administratively/,
+  "recovery does not close a workspace without a control log administratively");
+assert.doesNotMatch(pipelineVersionContracts[3], /one-shot converter|current\.json|v1-v4/,
+  "recovery still names the retired converter");
 assert.match(pipelineIdentityDocs[1], /Choose the configured repository or Obsidian workspace root/,
   "Codex pipeline does not honor the configured workspace root");
 assert.match(pipelineIdentityDocs[1], /Bind the repository's OpenSpec change root separately from the workspace root/,
@@ -293,9 +293,11 @@ assert.doesNotMatch(implementationContract, /repair-derived|seal-dispatch|perman
   "current implementation route retains a legacy overlay, seal, or universal RED hot path");
 assert.match(implementationContract, /no universal RED/);
 const recoveryContract = await readFile(join(root, "plugins/team-harness/skills/pipeline/references/recovery.md"), "utf8");
-for (const marker of ["create-then-switch", "exact failing service", "commit the current pointer last", "Ambiguous authority", "never overwritten"]) {
-  assert.ok(recoveryContract.includes(marker), `v5 converter recovery contract misses ${marker}`);
+for (const marker of ["without `control/control.jsonl`", "administratively", "symlinked `control/` path", "Ambiguous authority"]) {
+  assert.ok(recoveryContract.includes(marker), `v5 recovery contract misses ${marker}`);
 }
+assert.doesNotMatch(recoveryContract, /create-then-switch|v1-v4|current pointer/,
+  "Codex recovery reference still describes the retired converter");
 for (const role of ["implementer", "tester"]) {
   const adapter = await readFile(join(root, `runtime/codex/instructions/${role}.md`), "utf8");
   const generatedAgent = await readFile(join(root, `.codex/agents/${role}.toml`), "utf8");

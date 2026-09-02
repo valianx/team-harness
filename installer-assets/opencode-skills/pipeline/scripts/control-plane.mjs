@@ -619,21 +619,38 @@ export async function certifyCapabilityCapsule({ workspace, capability_lease: le
   }
 }
 
+async function entryStat(target) {
+  try {
+    return await lstat(target);
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
 /** A workspace without a control log has nothing to replay; it closes administratively. */
 export async function closeWorkspaceWithoutControlLog({ workspace }) {
   try {
     const root = await canonicalDirectory(workspace, "WORKSPACE_INVALID");
-    if (await pathContainedWithoutSymlink(root, "control/control.jsonl", { allowMissing: false })) {
-      return { ok: false, outcome: "control-log-present", offer: [], error_code: "CONTROL_LOG_PRESENT" };
+    const controlDir = path.join(root, "control");
+    for (const target of [controlDir, path.join(controlDir, "control.jsonl")]) {
+      const stat = await entryStat(target);
+      if (stat === null) break;
+      if (stat.isSymbolicLink()) throw new Error("CONTROL_PATH_SYMLINK");
+      if (target !== controlDir || !stat.isDirectory()) throw new Error("CONTROL_LOG_PRESENT");
     }
+    const eventsPath = path.join(root, "00-execution-events.jsonl");
+    const eventsStat = await entryStat(eventsPath);
+    if (eventsStat !== null && (eventsStat.isSymbolicLink() || !eventsStat.isFile())) throw new Error("EVENTS_PATH_INVALID");
     const entry = {
       ts: new Date().toISOString(), event: "pipeline.close", terminal_state: "closed-administratively",
       reason: "no control/control.jsonl", offer: ["inline-continuation", "fresh-run"],
     };
-    await appendFile(path.join(root, "00-execution-events.jsonl"), `${JSON.stringify(entry)}\n`);
+    await appendFile(eventsPath, `${JSON.stringify(entry)}\n`);
     return { ok: true, outcome: "closed-administratively", offer: entry.offer, error_code: null };
   } catch (error) {
-    const code = error?.message === "WORKSPACE_INVALID" ? "WORKSPACE_INVALID" : "CLOSE_FAILED";
+    const known = new Set(["WORKSPACE_INVALID", "CONTROL_PATH_SYMLINK", "CONTROL_LOG_PRESENT", "EVENTS_PATH_INVALID"]);
+    const code = known.has(error?.message) ? error.message : "CLOSE_FAILED";
     return { ok: false, outcome: "blocked", offer: [], error_code: code };
   }
 }

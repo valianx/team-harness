@@ -329,6 +329,15 @@ try {
   const orphanEvents = await readFile(path.join(orphanWorkspace, "00-execution-events.jsonl"), "utf8");
   assert.match(orphanEvents, /"terminal_state":"closed-administratively"/);
   assert.equal((await closeWorkspaceWithoutControlLog({ workspace })).error_code, "CONTROL_LOG_PRESENT");
+  const linkedWorkspace = path.join(temporary, "linked-workspace");
+  await mkdir(linkedWorkspace, { recursive: true });
+  await symlink(path.join(workspace, "control"), path.join(linkedWorkspace, "control"), "dir");
+  assert.equal((await closeWorkspaceWithoutControlLog({ workspace: linkedWorkspace })).error_code, "CONTROL_PATH_SYMLINK");
+  const eventsLinkWorkspace = path.join(temporary, "events-link-workspace");
+  await mkdir(eventsLinkWorkspace, { recursive: true });
+  await symlink(path.join(orphanWorkspace, "00-execution-events.jsonl"), path.join(eventsLinkWorkspace, "00-execution-events.jsonl"));
+  assert.equal((await closeWorkspaceWithoutControlLog({ workspace: eventsLinkWorkspace })).error_code, "EVENTS_PATH_INVALID");
+  assert.equal((await readFile(path.join(orphanWorkspace, "00-execution-events.jsonl"), "utf8")).split("\n").filter(Boolean).length, 1);
 } finally {
   await rm(temporary, { recursive: true, force: true });
 }
