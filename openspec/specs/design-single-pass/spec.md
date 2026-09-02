@@ -12,13 +12,6 @@ For every OpenSpec-bound Design transaction, the pipeline SHALL dispatch exactly
 - **WHEN** the coordinator runs the Design transaction for a new workspace
 - **THEN** one architect dispatch produces the change and judgment content, and no second architect dispatch occurs
 
-### Requirement: The overlay skeleton is derived mechanically
-The pipeline scripts SHALL derive the overlay's mechanical content — traceability coordinates and content hashes, the Gate-1 index scaffold, and execution-shard scaffolds — from the validated change and snapshot, without a model pass.
-
-#### Scenario: The change passes CLI validation
-- **WHEN** the authored change validates strictly
-- **THEN** the script emits the overlay skeleton bound to the validated change's coordinates and hashes, ready for the judgment content authored in the same planning dispatch
-
 ### Requirement: The validator chain is the unchanged fail-closed backstop
 The deterministic validator chain (plan-contract validation and the OpenSpec validators) SHALL remain unchanged and fail-closed. A validator failure SHALL re-enter the same single-pass planning flow; no second standing dispatch mode exists for repair.
 
