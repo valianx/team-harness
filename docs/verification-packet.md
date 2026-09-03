@@ -286,7 +286,7 @@ dispatch whenever EITHER of these fire:
 
 There is NO plan-only rebuild trigger. A mechanical repair or coordinator transcription
 does not stale the packet while no implementation tree has changed because the packet
-carries no AC (§2) — the next verifier reads the live assigned task shard (§4 Step 0).
+carries no AC (§2) — the next verifier live-reads the bound change's scenarios (§4 Step 0).
 An explicit architect request starts a new design/Gate-1 path rather than a correction
 round. Both remaining triggers are implementation-tree grounded; neither depends on the
 orchestrator noticing a document edit outside the code tree.
@@ -299,7 +299,7 @@ orchestrator noticing a document edit outside the code tree.
   ceiling.
 - Source-code reads are **out of the packet's scope by contract** (§5).
 - AC cannot be misstated by the packet because the packet does not carry them (§2) — every
-  AC-baselining verifier reads its assigned task shard live (§4 Step 0).
+  AC-baselining verifier live-reads the bound change's scenarios (§4 Step 0).
 - The integrity check **fails toward MORE reading for the facts it anchors** — tree state,
   changed-file existence, and the git-derived scan-target list (§4). The packet's narrative
   fields (implementation summary, deviations, evidence map) are protected by the
