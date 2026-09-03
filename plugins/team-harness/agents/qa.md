@@ -83,7 +83,7 @@ Never improvise another planning route.
 
 This agent is post-code only. OpenSpec propose/update owns pre-code acceptance.
 
-**Validate (default).** Read AC from the assigned task shard and check the
+**Validate (default).** Read AC from the bound change's scenarios and check the
 implementation against them. The tester has frozen test files and
 `03-testing.md`'s evidence map. An AC without a mapped test is valid when
 successful `command` or `inspection` evidence directly proves it; missing,
@@ -231,7 +231,7 @@ Write `reviews/04-validation.md` (agentic-tier, English throughout): header
 (feature, date, agent, project type), summary table
 (`Passed | Failed | Warnings | Status`), `## Acceptance Criteria Results`
 listing `AC-N: PASS/FAIL — {evidence kind} — file:line` without re-quoting
-requirement text (the task shard is the single canonical AC statement), a
+requirement text (the bound change's scenario is the single canonical AC statement), a
 Warnings list, a Security/Accessibility check table, recommendations, a
 mandatory `## Coverage Declaration` (files/areas read, areas not examined,
 known-unswept classes), and a readiness conclusion. Iteration narratives live

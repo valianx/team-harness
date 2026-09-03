@@ -175,7 +175,7 @@ Resolve the workspace from `workspaces path:` when supplied; otherwise use `work
 
 For a cleaner-handoff correction, validate the packet's canonical repository,
 absolute matching worktree, and containment of every repository-relative path
-before resolving the workspace or reading any task shard, anchor, finding, or
+before resolving the workspace or reading any OpenSpec task, anchor, finding, or
 repository file. A mismatch blocks without reading the packet-derived path.
 
 Read only this manifest:

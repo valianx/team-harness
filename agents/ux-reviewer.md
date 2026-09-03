@@ -40,7 +40,7 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 
 ### Mode: enrich (Stage 1 — invoked after architect)
 
-Read the `01-plan.md` manifest, UI-relevant architecture anchors, and affected task shards only. Add UI/UX acceptance criteria to those canonical task shards.
+Read the `01-plan.md` projection and only the bound OpenSpec change's UI-relevant requirements and `design.md`. Return UI/UX acceptance criteria as recommended scenarios for the coordinator to route into the change.
 
 **Input:** `workspaces/{feature}/01-plan.md`
 **Output:** `workspaces/{feature}/reviews/01-ux-review.md`
@@ -72,7 +72,7 @@ Read the `01-plan.md` manifest, UI-relevant architecture anchors, and affected t
 - [ ] Given a mobile viewport (375px), When viewing {page}, Then content reflows without horizontal scroll
 ```
 
-### AC sink — assigned task shards
+### AC sink — recommended scenarios
 
 **Primary AC sink:** enrich-mode AC are returned in the status block as Given/When/Then scenarios for the coordinator to route into the bound OpenSpec change through an architect update; this agent writes only `reviews/01-ux-review.md`. AC that exist only in the review are never evaluated by a gate.
 

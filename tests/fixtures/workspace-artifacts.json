@@ -109,7 +109,7 @@
       "producer": "agents/_shared/gh-fallback.md"
     },
     "02-implementation.md": {
-      "status": "retired"
+      "producer": "agents/ref-special-flows.md"
     },
     "plan/**": {
       "status": "retired"

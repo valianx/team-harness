@@ -122,7 +122,7 @@ total line or byte target.
 | `00-state.md` | ≤160 lines and ≤16 KB; replace fields and keep only the latest result per role. |
 | `01-plan.md` | Compact projection of the bound OpenSpec change (`agents/ref-pipeline.md § "Design"`): outcome, scope, batches, risks, decisions, canonical links, pinned identity; no copied AC/TC prose, task graph, or commands. Above target emit `size_reason: required-items`. |
 | `reviews/01-plan-review.md` | Current snapshot only: fixed prose ≤120 lines, each finding ≤4 lines, each Panel Rounds entry exactly one table row. Replaced finding bodies are not retained. |
-| 02-implementation.md (spike flow only) | 5–30 lines and ≤8 KB; outcome, deviations, exceptions, one-line checks, and commit only. Git is the changed-file authority. |
+| `02-implementation.md` (spike flow only) | 5–30 lines and ≤8 KB; outcome, deviations, exceptions, one-line checks, and commit only. Git is the changed-file authority. |
 | `03-testing.md` | Fixed prose ≤40 lines plus one evidence-map row per AC and one line per authored test; one concise suite result. An ordinary single-project target is ≤80 lines/12 KB, not a ceiling. Never paste runner output. |
 | `reviews/04-validation.md` | Fixed prose ≤30 lines; one row per AC and ≤3 extra lines per failed AC. PASS entries are evidence pointers, not explanations. |
 | pipeline `reviews/04-security.md` | Fixed prose ≤20 lines plus one line per finding. Standalone audit mode remains audit-grade and is outside this pipeline budget. |

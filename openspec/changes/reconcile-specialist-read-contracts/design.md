@@ -10,7 +10,7 @@ Every specialist that baselines a verdict on acceptance criteria reads the requi
 
 ### 2. The frozen candidate diff replaces `02-implementation.md`
 
-The implementer never writes `02-implementation.md` (`agents/implementer.md § Session Context Protocol`) and no coordinator contract produces it. Verifiers scan the frozen candidate diff the coordinator writes at Freeze (`inputs/00-frozen.diff`) and the implementer's result envelope summary carried in the packet. Adding a coordinator-written `02-implementation.md` was rejected: it would duplicate the result envelope.
+The implementer never writes `02-implementation.md` on the pipeline path (`agents/implementer.md § Session Context Protocol`); only the spike flow writes it (`agents/ref-special-flows.md § Spike Flow`), so the registry records that producer while pipeline verifiers stop reading it. Verifiers scan the frozen candidate diff the coordinator writes at Freeze (`inputs/00-frozen.diff`) and the implementer's result envelope summary carried in the packet. Adding a coordinator-written `02-implementation.md` was rejected: it would duplicate the result envelope.
 
 ### 3. A registry, not a prose assertion, is the oracle
 

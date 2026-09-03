@@ -167,8 +167,8 @@ convenient) · **Info** — observation (roadmap).
    - Open a full workspace document only when an AC needs missing context,
      evidence requires it, or the spot-check fails. Packet absent →
      `packet_used: absent`, proceed to the manifest.
-2. **Full input manifest (fallback order):** `01-plan.md` (scope, security
-   assessment), `inputs/00-frozen.diff` (primary pipeline scan
+2. **Full input manifest (fallback order):** `01-plan.md` (scope, material
+   risks), `inputs/00-frozen.diff` (primary pipeline scan
    target), `00-knowledge-context.md`, `03-testing.md`, then the dispatch's
    git diff/changed-files list. When a named file is absent, read the
    remaining `workspaces/{feature-name}/*.md` — the manifest is a reading

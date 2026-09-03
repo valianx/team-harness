@@ -145,7 +145,7 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 3e: every workspace artifact a contract reads has a producer"
+echo "# Suite 3h: every workspace artifact a contract reads has a producer"
 echo "############################################################"
 if [ -n "$PY" ] && $PY "$TESTS_DIR/test_workspace_artifacts.py"; then
     echo "workspace-artifacts: PASS"
