@@ -162,7 +162,7 @@ function validPayload(type, payload) {
     return exactKeys(payload, ["lease_id"]) && SHA256.test(payload.lease_id ?? "");
   }
   if (type === "result_accepted") {
-    if (!exactKeys(payload, ["result"]) || !resultBodyValid(payload.result, RESULT_KEYS)
+    if (!exactKeys(payload, ["result"]) || !resultBodyValid(payload.result, RESULT_KEYS, { unique_findings: false })
       || !SHA256.test(payload.result.result_id ?? "")) return false;
     const { result_id: resultId, ...body } = payload.result;
     return controlIdentity(body) === resultId;
@@ -328,7 +328,7 @@ export function buildControlProjection(records) {
       const result = record.payload.result;
       projection.accepted_results[result.result_id] = result;
       const lens = projection.lease_roles[result.lease_id] ?? null;
-      for (const finding of result.findings) projection.findings[`${lens ?? "unknown"}:${finding.id}`] = { ...finding, lens };
+      for (const finding of result.findings) projection.findings[`${lens ?? "unknown"}/${finding.id}`] = { ...finding, lens };
     }
     if (record.type === "transition") ({ phase: projection.phase, status: projection.status } = record.payload);
     if (record.type === "mechanical_release") projection.releases[record.payload.name] = record.payload.identity;

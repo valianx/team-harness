@@ -18,7 +18,7 @@ The implementer never writes `02-implementation.md` on the pipeline path (`agent
 
 ### 4. The lens is derived from the lease, not self-reported
 
-`buildControlProjection` keeps a `lease_roles` map from every `lease_issued` record and stamps `lens` on each projected finding from the accepted result's lease. A specialist cannot mislabel its own findings, and the value exists for every accepted result without a new envelope field. Projected findings are keyed by `lens:id`, so two lenses reporting one finding ID keep separate rows instead of the later overwriting the earlier; `findingsMarkdown` prints the `Lens` column beside the ID. The decision ledger's `disposition` record gains a conditional `lens` field so a coordinator disposition of a finding stays joinable to the lens that raised it.
+`buildControlProjection` keeps a `lease_roles` map from every `lease_issued` record and stamps `lens` on each projected finding from the accepted result's lease. A specialist cannot mislabel its own findings, and the value exists for every accepted result without a new envelope field. Projected findings are keyed by `lens/id` (`/` is outside the role and ID alphabet, so the key cannot collide), so two lenses reporting one finding ID keep separate rows instead of the later overwriting the earlier; `findingsMarkdown` prints the `Lens` column beside the ID. The decision ledger's `disposition` record gains a conditional `lens` field so a coordinator disposition of a finding stays joinable to the lens that raised it.
 
 ### 5. Baseline rows follow the dispatchable lens set
 

@@ -136,10 +136,9 @@ tokens, and tool calls never route.
 
 ## Freeze and validation
 
-After implementation closes, assemble one committed candidate, write
-`inputs/00-frozen.diff` and `00-verify-packet.md`
-(`docs/verification-packet.md § "1. Build site"`), and compute its immutable
-identity.
+After implementation closes, assemble one committed candidate, compute its
+immutable identity, then write `inputs/00-frozen.diff` and `00-verify-packet.md`
+(`docs/verification-packet.md § "1. Build site"`).
 
 Main derives security impact from the frozen candidate through the canonical
 type-agnostic floor classifier in

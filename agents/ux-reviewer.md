@@ -66,7 +66,7 @@ Read the `01-plan.md` projection and only the bound OpenSpec change's UI-relevan
 
 **Browser-real signal hints:** when an AC depends on real browser behavior — layout geometry (`getBoundingClientRect`/`offsetWidth`), `IntersectionObserver`/`ResizeObserver`, `matchMedia`/viewport breakpoints (375px/768px/1024px), Web Animations/CSS transitions, or computed CSS — state that dependency EXPLICITLY in the Then clause. Example: `…Then the lazy image loads when it intersects the viewport (IntersectionObserver)`. The tester routes such AC to browser-real environments; AC that omit the signal default to jsdom.
 
-**AC format:** append to the existing task's AC list using Given/When/Then format:
+**AC format:** list each recommended scenario under `recommended_ac` in Given/When/Then format; the agent never appends them to the change itself:
 ```
 - [ ] Given a screen reader, When navigating the {component}, Then all interactive elements are announced with their role and label
 - [ ] Given a mobile viewport (375px), When viewing {page}, Then content reflows without horizontal scroll
@@ -193,7 +193,8 @@ status: success | blocked | failed
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
 output: workspaces/{feature-name}/{01-ux-review|04-ux-validation}.md
 findings: {critical: N, high: N, medium: N, suggestion: N}
-ac_added: {count of AC added, enrich mode only}
+recommended_ac: [{Given/When/Then scenario strings}]   # enrich mode only; the coordinator routes them into the bound OpenSpec change
+recommended_ac_count: N                                 # enrich mode only; length of recommended_ac
 component_reuse_flags: {count of reuse opportunities found}
 packet_used: true | false | absent   # validate mode only; whether 00-verify-packet.md was read (docs/verification-packet.md)
 packet_escapes: N                    # validate mode only; count of full docs opened beyond the packet

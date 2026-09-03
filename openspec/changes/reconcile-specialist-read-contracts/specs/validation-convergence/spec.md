@@ -3,7 +3,8 @@
 ### Requirement: A persistent findings ledger is the correction loop's memory
 The workspace SHALL carry `reviews/findings-ledger.md` as a rebuildable view
 projected only by Main from accepted result events and live dispositions in the
-control log. It SHALL expose one row per finding ID with class, severity,
+control log. It SHALL expose one row per lens and finding ID pair — a finding ID two lenses
+report occupies two rows — with class, severity,
 disposition (`fixed | accepted-residual | open | rejected-with-rationale`),
 causal identity, operator ruling, and the originating lens, derived from the
 role of the lease under which the result was accepted and never from the

@@ -19,6 +19,7 @@
 - [x] 3.1 In `skills/pipeline/scripts/control-plane.mjs`, keep `lease_roles` in the projection, stamp `lens` on each projected finding from the accepted result's lease, and print a `Lens` column in `findingsMarkdown`; sync the two mirrors; add a case to `tests/test_pipeline_control_plane.mjs`.
 - [x] 3.2 Add the conditional `lens` field to the `disposition` record in `docs/observability.md § 6` and its field table.
 - [x] 3.3 Replace the exclusive-defect rows in `docs/benchmarks/pipeline-baseline.md` with `qa`, `tester`, `cleaner`, `security`, and document `n/a — lens not dispatched`.
+- [ ] 3.4 After this change merges, run the three fixture pipelines on `main` and record every metric, tree anchor, and exclusive-defect cell in `docs/benchmarks/pipeline-baseline.md`.
 
 ## 4. Close
 
