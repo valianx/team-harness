@@ -159,6 +159,7 @@ function resultBodyValid(value, keys) {
     && boundedArray(value.artifacts, validReference)
     && boundedArray(value.commits, item => GIT_COMMIT.test(item), 32)
     && boundedArray(value.findings, validFinding, 64)
+    && new Set(value.findings.map(item => item.id)).size === value.findings.length
     && boundedArray(value.closure_evidence, validReference, 64)
     && boundedArray(value.diagnostics, item => boundedString(item, MAX_DIAGNOSTIC_BYTES, { empty: true }), 32)
     && boundedArray(value.next_prerequisites, item => boundedString(item, 512), 32)

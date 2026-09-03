@@ -278,7 +278,7 @@ Read together: a task is never SPLIT across delivery groups (anti-split), and a 
 
 **Same delivery flow alignment.** The consolidated batch ships through the same single Delivery prose dispatch and coordinator publication mechanics as a single task, with the same review → merge → next-session preflight-sweep lifecycle (`docs/worktree-discipline.md` Rule 7). There is no separate batch-delivery path. The only structural difference is that publication operates on the `batch/<name>-verify` integration branch (Step 5a) rather than a single-task branch.
 
-**Stage files are FLAT, whole-task documents.** `02-implementation.md`, `03-testing.md`, `reviews/04-security.md`, and `reviews/04-validation.md` cover the ENTIRE build in one file each — no per-milestone subsections. One workspace: one commit per milestone (in dependency order), accumulated on the single feature branch.
+**Stage files are FLAT, whole-task documents.** `03-testing.md`, `reviews/04-security.md`, and `reviews/04-validation.md` cover the ENTIRE build in one file each — no per-milestone subsections. One workspace: one commit per milestone (in dependency order), accumulated on the single feature branch.
 
 **Milestone Index (summary).** The plan's `00-state.md` `## Milestone Index` table tracks one row per milestone with a `Commit` column (commit sha per milestone). No per-milestone `PR` column. A single build-level PR is recorded once at the end.
 
@@ -303,7 +303,7 @@ The plan artifact for a milestone build is **`01-plan.md`** — the architect wr
   00-knowledge-context.md         ← KG results (if any)
   00-execution-events.md          ← event trace
   01-plan.md                      ← milestone breakdown w/ per-milestone DEPENDENCY annotations (independent vs depends-on-Mx)
-  02-implementation.md            ← FLAT whole-task implementer report (NO per-milestone subsections)
+  inputs/00-frozen.diff           ← one frozen candidate diff for the whole task
   03-testing.md                   ← FLAT whole-task tester report
   reviews/04-security.md                  ← FLAT whole-task security report (tier-gated)
   reviews/04-validation.md                ← FLAT whole-task qa report
@@ -312,7 +312,7 @@ The plan artifact for a milestone build is **`01-plan.md`** — the architect wr
 
 One flat workspace. ONE file of each stage type, each covering the WHOLE TASK with no per-milestone subsections. NO child workspaces, NO `{NN}_{milestone-slug}/` sub-folders, NO suffixed files of any kind; milestone and letter suffixes are PROHIBITED. The milestone breakdown lives ONLY in `01-plan.md`.
 
-The `02-implementation.md`, `03-testing.md`, `reviews/04-security.md`, and `reviews/04-validation.md` are FLAT, whole-task documents. They cover the entire build in one file — not split by milestone.
+The `03-testing.md`, `reviews/04-security.md`, and `reviews/04-validation.md` are FLAT, whole-task documents. They cover the entire build in one file — not split by milestone.
 
 ### Milestone execution: detect-and-continue by identity
 

@@ -149,6 +149,7 @@ try {
   assert.equal((await validateResultEnvelope({ ...result, lease_id: h("other") }, { lease, currentSequence: 2 })).error_code, "RESULT_IDENTITY_MISMATCH");
   assert.equal((await createResultEnvelope({ ...resultInput, changed_paths: ["outside.txt"] }, { lease, currentSequence: 2 })).error_code, "RESULT_SCOPE_VIOLATION");
   assert.equal((await createResultEnvelope({ ...resultInput, diagnostics: ["token=github_pat_0123456789abcdef"] }, { lease, currentSequence: 2 })).error_code, "RESULT_SCHEMA_INVALID");
+  assert.equal((await createResultEnvelope({ ...resultInput, findings: [resultInput.findings[0], { ...resultInput.findings[0], summary: "twice" }] }, { lease, currentSequence: 2 })).error_code, "RESULT_SCHEMA_INVALID");
   assert.equal((await createResultEnvelope(resultInput, { lease, currentSequence: 3 })).error_code, "RESULT_SEQUENCE_STALE");
 
   assert.equal((await acceptResultEnvelope({ log_path: logPath, result })).error_code, "CONTROL_WRITER_INVALID");
