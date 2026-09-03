@@ -10,28 +10,16 @@
     "agents/ux-reviewer.md",
     "agents/orchestrator.md",
     "agents/ref-pipeline.md",
+    "agents/ref-special-flows.md",
+    "agents/README.md",
     "agents/_shared/*.md",
     "docs/verification-packet.md",
-    "docs/output-contract-patterns.md"
+    "docs/output-contract-patterns.md",
+    "docs/observability.md"
   ],
   "artifacts": {
-    "control/control.jsonl": {
-      "producer": "agents/ref-pipeline.md"
-    },
-    "00-state.md": {
-      "producer": "agents/_shared/orchestrator-state.md"
-    },
-    "01-plan.md": {
-      "producer": "agents/ref-pipeline.md"
-    },
-    "reviews/findings-ledger.md": {
-      "producer": "agents/_shared/orchestrator-state.md"
-    },
-    "00-execution-events.jsonl": {
-      "producer": "docs/observability.md"
-    },
-    "00-execution-events.md": {
-      "producer": "docs/observability.md"
+    "00-consolidated.md": {
+      "producer": "agents/ref-architect-modes.md"
     },
     "00-decision-ledger.jsonl": {
       "producer": "docs/observability.md"
@@ -39,29 +27,47 @@
     "00-decision-ledger.md": {
       "producer": "docs/observability.md"
     },
-    "00-pipeline-summary.md": {
+    "00-execution-events.jsonl": {
+      "producer": "docs/observability.md"
+    },
+    "00-execution-events.md": {
       "producer": "docs/observability.md"
     },
     "00-knowledge-context.md": {
       "producer": "agents/ref-special-flows.md"
     },
-    "00-verify-packet.md": {
-      "producer": "agents/ref-pipeline.md"
+    "00-leader-roster.md": {
+      "producer": "agents/ref-dispatch-machinery.md"
     },
-    "inputs/00-frozen.diff": {
-      "producer": "agents/ref-pipeline.md"
+    "00-pipeline-summary.md": {
+      "producer": "docs/observability.md"
+    },
+    "00-state.md": {
+      "producer": "agents/_shared/orchestrator-state.md"
     },
     "00-suite-evidence.md": {
       "producer": "docs/suite-evidence.md"
     },
+    "00-verify-packet-v2.md": {
+      "status": "retired"
+    },
+    "00-verify-packet.md": {
+      "producer": "agents/ref-pipeline.md"
+    },
+    "01-plan.md": {
+      "producer": "agents/ref-pipeline.md"
+    },
+    "01-planning.md": {
+      "producer": "agents/ref-architect-modes.md"
+    },
     "01-root-cause.md": {
       "producer": "agents/architect.md"
     },
-    "research/00-research.md": {
-      "producer": "agents/research-consolidator.md"
+    "02-documentation.md": {
+      "producer": "agents/documenter.md"
     },
-    "sketches/*": {
-      "producer": "agents/architect.md"
+    "02-implementation.md": {
+      "producer": "agents/ref-special-flows.md"
     },
     "02-regression-test.md": {
       "producer": "agents/tester.md"
@@ -69,32 +75,17 @@
     "03-testing.md": {
       "producer": "agents/tester.md"
     },
-    "reviews/04-validation.md": {
-      "producer": "agents/qa.md"
+    "control/control.jsonl": {
+      "producer": "agents/ref-pipeline.md"
     },
-    "reviews/04-security.md": {
-      "producer": "agents/security.md"
-    },
-    "reviews/01-plan-review.md": {
-      "producer": "agents/plan-reviewer.md"
-    },
-    "reviews/01-ux-review.md": {
-      "producer": "agents/ux-reviewer.md"
-    },
-    "reviews/04-ux-validation.md": {
-      "producer": "agents/ux-reviewer.md"
-    },
-    "reviews/04-adversary.md": {
-      "producer": "agents/adversary.md"
-    },
-    "reviews/04-adversary-amend-{N}.md": {
-      "producer": "agents/adversary.md"
-    },
-    "reviews/04-adversary-correction-{N}.md": {
-      "producer": "agents/adversary.md"
+    "inputs/00-frozen.diff": {
+      "producer": "agents/ref-pipeline.md"
     },
     "inputs/acceptance-matrix.md": {
       "producer": "agents/delivery.md"
+    },
+    "inputs/issue-create.md": {
+      "producer": "agents/_shared/gh-fallback.md"
     },
     "inputs/pr-body-draft.md": {
       "producer": "agents/delivery.md"
@@ -102,14 +93,8 @@
     "inputs/pr-body.md": {
       "producer": "agents/_shared/gh-fallback.md"
     },
-    "inputs/issue-create.md": {
-      "producer": "agents/_shared/gh-fallback.md"
-    },
     "inputs/{resource}-{N}.json": {
       "producer": "agents/_shared/gh-fallback.md"
-    },
-    "02-implementation.md": {
-      "producer": "agents/ref-special-flows.md"
     },
     "plan/**": {
       "status": "retired"
@@ -126,8 +111,41 @@
     "plan/tasks/Task-N.md": {
       "status": "retired"
     },
-    "00-verify-packet-v2.md": {
-      "status": "retired"
+    "research/00-research.md": {
+      "producer": "agents/research-consolidator.md"
+    },
+    "research/research-findings-{angle}.md": {
+      "producer": "agents/researcher.md"
+    },
+    "reviews/01-plan-review.md": {
+      "producer": "agents/plan-reviewer.md"
+    },
+    "reviews/01-ux-review.md": {
+      "producer": "agents/ux-reviewer.md"
+    },
+    "reviews/04-adversary-amend-{N}.md": {
+      "producer": "agents/adversary.md"
+    },
+    "reviews/04-adversary-correction-{N}.md": {
+      "producer": "agents/adversary.md"
+    },
+    "reviews/04-adversary.md": {
+      "producer": "agents/adversary.md"
+    },
+    "reviews/04-security.md": {
+      "producer": "agents/security.md"
+    },
+    "reviews/04-ux-validation.md": {
+      "producer": "agents/ux-reviewer.md"
+    },
+    "reviews/04-validation.md": {
+      "producer": "agents/qa.md"
+    },
+    "reviews/findings-ledger.md": {
+      "producer": "agents/_shared/orchestrator-state.md"
+    },
+    "sketches/*": {
+      "producer": "agents/architect.md"
     }
   }
 }

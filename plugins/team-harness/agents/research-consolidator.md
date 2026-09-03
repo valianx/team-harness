@@ -145,7 +145,7 @@ Emit a fenced `gaps` block — one entry per gap. When no gaps exist, emit `- no
 - Code follow-up: `material: true` AND `code_closeable: true` — triggers a `code-researcher` (sonnet) follow-up lane.
 - A gap can be web-closeable, code-closeable, both, or neither. A non-material gap or a gap where both flags are false does NOT trigger a follow-up lane.
 
-**Reconcile-don't-accrete:** in follow-up rounds, amend the SAME `research/00-research.md` in place — do NOT create `00-research-v2.md` or append a new sibling file. Merge new lane findings into `## Consolidated Findings` and update this `## Coverage gaps` block to reflect which gaps have now been addressed.
+**Reconcile-don't-accrete:** in follow-up rounds, amend the SAME `research/00-research.md` in place — do NOT create a `-v2` sibling or append a new sibling file. Merge new lane findings into `## Consolidated Findings` and update this `## Coverage gaps` block to reflect which gaps have now been addressed.
 
 ## Findings summary
 
