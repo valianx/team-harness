@@ -35,7 +35,7 @@ Team Harness SHALL invoke OpenSpec only as an internal part of the Design phase 
 - **THEN** Main pauses once with the exact decision or authority required and the evidence needed to answer it
 
 ### Requirement: Planning inputs are pinned for Gate 1
-TH SHALL compute one content identity per writable service with `openspecContentIdentity` over the canonical OpenSpec artifacts — every file under the change root, hashed as the sorted sequence of relative path and bytes, with checkbox state in `tasks.md` normalized out — so a renamed, added, or removed file changes the identity. TH SHALL record it in the control log at Gate 1 together with the change name, path, and CLI version. TH SHALL recompute and compare the identity before every lease is issued and at Freeze. A mismatch SHALL pause with the diff shown and SHALL require Gate 1 to be re-presented over the revised change. A checkbox transition SHALL NOT change the identity; `taskProgressDelta` SHALL classify it as authorized progress, regression, or a structural change, and only authorized progress continues without a recorded action. No snapshot file, aggregate manifest, overlay hash, or helper-bundle identity is recorded.
+TH SHALL compute one content identity per writable service with `openspecContentIdentity` over the canonical OpenSpec artifacts — every file under the change root in sorted relative-path order, each contributing its length-prefixed relative path and its length-prefixed bytes to one SHA-256, with checkbox state in `tasks.md` normalized out — so a renamed, added, or removed file changes the identity. TH SHALL record it in the control log at Gate 1 together with the change name, path, and CLI version. TH SHALL recompute and compare the identity before every lease is issued and at Freeze. A mismatch SHALL pause with the diff shown and SHALL require Gate 1 to be re-presented over the revised change. A checkbox transition SHALL NOT change the identity; `taskProgressDelta` SHALL classify it as authorized progress, regression, or a structural change, and only authorized progress continues without a recorded action. No snapshot file, aggregate manifest, overlay hash, or helper-bundle identity is recorded.
 
 #### Scenario: OpenSpec inputs remain unchanged
 - **WHEN** TH recomputes the identity before issuing a lease
@@ -96,7 +96,7 @@ An OpenSpec-bound multi-repository initiative SHALL present one consolidated Gat
 
 #### Scenario: All service bindings are valid and fresh
 - **WHEN** every writable service has a strictly valid change with a fresh content identity and cross-service dependencies are unambiguous
-- **THEN** Team Harness presents one Gate 1 summary naming each service-owned change, its bounded scope, execution order, and aggregate identity
+- **THEN** Team Harness presents one Gate 1 summary naming each service-owned change, its bounded scope, execution order, and content identity
 
 #### Scenario: One service changes after the gate preview
 - **WHEN** any service's content identity, repository identity, list membership, dependency, or order differs before approval is consumed

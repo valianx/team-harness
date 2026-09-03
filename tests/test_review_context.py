@@ -194,7 +194,8 @@ class ReviewContextTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             policy = Path(directory) / "review-policy.md"
             policy.write_text(
-                "# Policy\n\n```yaml\nverification: off  # repo owner call\nmax_suggestions: 3\n```\n",
+                "# Policy\n\n```yaml\nverification: off  # repo owner call\nmax_suggestions: 3\n```\n"
+                "\nExample of an invalid value:\n\n```yaml\nverification: sometimes\n```\n",
                 encoding="utf-8",
             )
             self.assertEqual(
@@ -223,19 +224,26 @@ class ReviewContextTests(unittest.TestCase):
                 return subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True, env=env).stdout.strip()
             git("init", "-q")
             (repo / "README.md").write_text("base\n", encoding="utf-8")
-            git("add", "README.md"); git("commit", "-q", "-m", "base without policy")
+            git("add", "README.md")
+            git("commit", "-q", "-m", "base without policy")
             no_policy = git("rev-parse", "HEAD")
             (repo / ".team-harness").mkdir()
             (repo / ".team-harness" / "review-policy.md").write_text("```yaml\nverification: all\nmax_suggestions: 2\n```\n", encoding="utf-8")
-            git("add", ".team-harness"); git("commit", "-q", "-m", "owner policy")
+            git("add", ".team-harness")
+            git("commit", "-q", "-m", "owner policy")
             base = git("rev-parse", "HEAD")
             (repo / ".team-harness" / "review-policy.md").write_text("```yaml\nverification: off\n```\n", encoding="utf-8")
-            git("add", ".team-harness"); git("commit", "-q", "-m", "pr turns verification off")
+            git("add", ".team-harness")
+            git("commit", "-q", "-m", "pr turns verification off")
             snapshot = repo / ".git"
             self.assertEqual(MODULE.read_base_review_policy(snapshot, no_policy), {"verification": "blocking-only", "max_suggestions": 5, "source": "default"})
             self.assertEqual(MODULE.read_base_review_policy(snapshot, base), {"verification": "all", "max_suggestions": 2, "source": "base-commit"})
             with self.assertRaisesRegex(MODULE.ContextError, "full commit SHA"):
                 MODULE.read_base_review_policy(snapshot, "HEAD")
+            with self.assertRaisesRegex(MODULE.ContextError, r"git --git-dir .* failed: "):
+                MODULE.read_base_review_policy(snapshot, "0" * 40)
+            with self.assertRaisesRegex(MODULE.ContextError, r"git --git-dir .* failed: "):
+                MODULE.read_base_review_policy(repo / "not-a-snapshot.git", base)
             completed = subprocess.run(
                 [sys.executable, str(SCRIPT), "policy", "--snapshot-git", str(snapshot), "--base-oid", base],
                 check=True, capture_output=True, text=True,
@@ -272,14 +280,17 @@ class ReviewContextTests(unittest.TestCase):
         )
         self.assertTrue(all(entry["reason"].startswith("verifier — ") for entry in result["ledger"]))
 
-    def test_apply_verification_never_adds_findings_and_handles_missing_results(self):
+    def test_apply_verification_requires_exact_coverage_of_the_selected_findings(self):
         inline, verifier = self.verification_fixture()
-        verifier["findings"].append({"path": "src/new.ts", "line": 1, "side": "RIGHT", "status": "confirmed", "evidence": "x"})
-        del verifier["findings"][0]
-        result = MODULE.apply_verification(inline, verifier, "blocking-only")
-        self.assertEqual(result["coverage"], "verified 0/3")
-        self.assertEqual({finding["path"] for finding in result["inline"]}, {"src/a.ts", "src/b.ts", "src/d.ts"})
-        self.assertEqual(result["ledger"][0]["reason"], "verifier — no verifier result")
+        extra_finding = {"path": "src/new.ts", "line": 1, "side": "RIGHT", "status": "confirmed", "evidence": "x"}
+        with self.assertRaisesRegex(MODULE.ContextError, r"coverage does not match .*\(0 missing, 1 unexpected\)"):
+            MODULE.apply_verification(inline, {"findings": [*verifier["findings"], extra_finding]}, "blocking-only")
+        with self.assertRaisesRegex(MODULE.ContextError, r"coverage does not match .*\(1 missing, 0 unexpected\)"):
+            MODULE.apply_verification(inline, {"findings": verifier["findings"][1:]}, "blocking-only")
+        with self.assertRaisesRegex(MODULE.ContextError, r"coverage does not match .*\(1 missing, 0 unexpected\)"):
+            MODULE.apply_verification(inline, verifier, "all")
+        with self.assertRaisesRegex(MODULE.ContextError, "share one path:line side anchor"):
+            MODULE.apply_verification([*inline, dict(inline[0], body="**Blocking: other claim**")], verifier, "blocking-only")
 
     def test_apply_verification_absent_verifier_and_policy_off(self):
         inline, _ = self.verification_fixture()
@@ -290,8 +301,10 @@ class ReviewContextTests(unittest.TestCase):
         off = MODULE.apply_verification(inline, None, "off")
         self.assertEqual(off["coverage"], "verification off (policy)")
         self.assertIsNone(off["forced_event"])
-        every = MODULE.apply_verification(inline, {"findings": []}, "all")
-        self.assertEqual(every["coverage"], "verified 0/4")
+        _, verifier = self.verification_fixture()
+        verifier["findings"].append({"path": "src/d.ts", "line": 40, "side": "LEFT", "status": "unconfirmed", "reason": "style only"})
+        every = MODULE.apply_verification(inline, verifier, "all")
+        self.assertEqual(every["coverage"], "verified 1/4")
         with self.assertRaisesRegex(MODULE.ContextError, "verifier status"):
             MODULE.apply_verification(inline, {"findings": [{"path": "a", "line": 1, "side": "RIGHT", "status": "maybe"}]}, "all")
 
@@ -305,7 +318,8 @@ class ReviewContextTests(unittest.TestCase):
             {"path": "src/f.ts", "line": 6, "side": "RIGHT", "body": "Unlabelled claim.\n\nEvidence."},
             {"path": "src/g.ts", "line": 7, "side": "RIGHT", "body": "**suggestion: style**"},
         ]
-        result = MODULE.apply_verification(odd, {"findings": []}, "blocking-only")
+        statuses = [dict(finding, status="unconfirmed", reason="not readable") for finding in odd[:2]]
+        result = MODULE.apply_verification(odd, {"findings": statuses}, "blocking-only")
         self.assertEqual(result["coverage"], "verified 0/2")
         self.assertTrue(result["inline"][0]["body"].startswith("**Suggestion: (unverified) lower case**"))
         self.assertTrue(result["inline"][1]["body"].startswith("**Suggestion: (unverified)** Unlabelled claim."))
@@ -358,19 +372,34 @@ class ReviewContextTests(unittest.TestCase):
                     f'name = "{name}"\nsandbox_mode = "read-only"\n',
                     encoding="utf-8",
                 )
-            with patch.dict(os.environ, {"PATH": str(repo)}):
+            with patch.dict(os.environ, {"PATH": str(repo), "CODEX_HOME": str(repo / "codex-home")}):
                 result = MODULE.preflight(repo, "codex", None)
             self.assertFalse(result["ok"])
+            self.assertEqual(result["codex_agents"]["searched"], [str(agents), str(repo / "codex-home" / "agents")])
             self.assertEqual(result["gh"], "unavailable")
             self.assertEqual(result["workspaces_ignore"], "added")
             self.assertEqual(result["codex_agents"]["status"], "mixed")
             self.assertEqual(result["codex_agents"]["missing"], ["reviewer-consolidator"])
             self.assertIn("/workspaces/", (repo / ".gitignore").read_text(encoding="utf-8"))
             (agents / "reviewer-consolidator.toml").write_text('name = "reviewer-consolidator"\n', encoding="utf-8")
-            with patch.dict(os.environ, {"PATH": str(repo)}):
+            with patch.dict(os.environ, {"PATH": str(repo), "CODEX_HOME": str(repo / "codex-home")}):
                 again = MODULE.preflight(repo, "codex", None)
             self.assertEqual(again["workspaces_ignore"], "present")
             self.assertEqual(again["codex_agents"]["invalid"], ["reviewer-consolidator"])
+            global_agents = repo / "codex-home" / "agents"
+            global_agents.mkdir(parents=True)
+            for name in MODULE.REVIEW_AGENT_NAMES:
+                (global_agents / f"{name}.toml").write_text(
+                    f"# Instruction source: runtime/codex/instructions/{name}.md\n"
+                    f"# Semantic source: agents/{name}.md (sonnet/high)\n# Projection tier: x\n"
+                    f'name = "{name}"\nsandbox_mode = "read-only"\n',
+                    encoding="utf-8",
+                )
+            with patch.dict(os.environ, {"PATH": str(repo), "CODEX_HOME": str(repo / "codex-home")}):
+                from_global = MODULE.preflight(repo, "codex", None)
+            self.assertEqual(from_global["codex_agents"]["status"], "complete")
+            self.assertEqual(from_global["codex_agents"]["agents_dir"], str(global_agents))
+            self.assertEqual(from_global["blockers"], ["gh unavailable"])
             with patch.dict(os.environ, {"PATH": str(repo)}):
                 claude = MODULE.preflight(repo, "claude", None)
             self.assertIsNone(claude["codex_agents"])

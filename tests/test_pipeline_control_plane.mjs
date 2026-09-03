@@ -356,12 +356,16 @@ try {
   assert.equal((await openspecContentIdentity({ change_root: changeRoot })).identity, pinned.identity);
   await rename(path.join(changeRoot, "specs", "cap", "spec.md"), path.join(changeRoot, "specs", "cap", "renamed.md"));
   const renamed = await openspecContentIdentity({ change_root: changeRoot });
+  assert.equal(renamed.ok, true, JSON.stringify(renamed));
   assert.notEqual(renamed.identity, pinned.identity);
   await writeFile(path.join(changeRoot, "design.md"), "");
   const added = await openspecContentIdentity({ change_root: changeRoot });
+  assert.equal(added.ok, true, JSON.stringify(added));
   assert.notEqual(added.identity, renamed.identity);
   await rm(path.join(changeRoot, "proposal.md"));
-  assert.notEqual((await openspecContentIdentity({ change_root: changeRoot })).identity, added.identity);
+  const removed = await openspecContentIdentity({ change_root: changeRoot });
+  assert.equal(removed.ok, true, JSON.stringify(removed));
+  assert.notEqual(removed.identity, added.identity);
   await symlink(path.join(workspace, "control"), path.join(changeRoot, "linked"), "dir");
   assert.equal((await openspecContentIdentity({ change_root: changeRoot })).error_code, "CHANGE_PATH_SYMLINK");
   assert.equal((await openspecContentIdentity({ change_root: path.join(temporary, "missing") })).error_code, "CHANGE_ROOT_INVALID");

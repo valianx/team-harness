@@ -22,6 +22,7 @@ None.
 
 - `openspec-design-orchestration`: v5 multi-repository wording, administrative close, path-covering identity, authorized checkbox progress.
 - `openspec-archive-lifecycle`: archive vehicle relaxed to any ordinary pull request; backfill requirement removed.
+- `openspec-change-scope`: the archive requirement names the same post-merge vehicles and drops the completing pull request.
 
 ## Non-Goals
 
@@ -31,4 +32,4 @@ None.
 
 ## Impact
 
-`openspec/specs/openspec-design-orchestration/spec.md`, `openspec/specs/openspec-archive-lifecycle/spec.md` (through archive), `skills/pipeline/scripts/control-plane.mjs` and its two mirrors, `tests/test_pipeline_control_plane.mjs`, `agents/ref-pipeline.md § Recovery`, `skills/spec/SKILL.md § Flow` step 7, `agents/_shared/orchestrator-state.md` terminal close, and their Codex projections.
+`openspec/specs/openspec-design-orchestration/spec.md`, `openspec/specs/openspec-archive-lifecycle/spec.md`, `openspec/specs/openspec-change-scope/spec.md` (through archive), `skills/pipeline/scripts/control-plane.mjs` and its two mirrors, `tests/test_pipeline_control_plane.mjs`, `agents/ref-pipeline.md § Recovery`, `skills/spec/SKILL.md § Flow` step 7, `agents/_shared/orchestrator-state.md` terminal close, and their Codex projections.

@@ -6,7 +6,7 @@
 
 ## 2. Verifier agent
 
-- [x] 2.1 Author `agents/pr-review-verifier.md` (opus; `Read`, `Glob`, `Grep`; under 600 words) with the input coordinates, the per-finding `confirmed | unconfirmed` return with `file:line` evidence, and the echoed reviewed identity.
+- [x] 2.1 Author `agents/pr-review-verifier.md` (opus; `Read`, `Glob`, `Grep`; under 600 words) with the input coordinates, the per-finding `confirmed | unconfirmed | refuted` return with `file:line` evidence, and the echoed reviewed identity.
 - [x] 2.2 Register the agent in `runtime/schema/codex-agents.json` as read-only and regenerate the Codex TOML, opencode asset, and roster projections.
 
 ## 3. Skill flow

@@ -54,10 +54,9 @@ announce the exact agents and their useful scope against the concrete changed su
 blocking finding against the frozen code, unless the repository policy turns verification off).
 Do not call agents abstract "lenses" in operator-facing prose.
 
-Never emit a message whose only content is tool-status narration. During an extended wait, name
-the active specialists and the surfaces they inspect. Expose SHAs or the context hash only when
-identity drift blocks the review or the operator asks. If `preflight` reports
-`workspaces_ignore: added`, report that material `.gitignore` change once.
+Never emit a message whose only content is tool-status narration; during an extended wait, name
+the active specialists and their surfaces. Expose SHAs or the context hash only when identity
+drift blocks the review or the operator asks. Report a `workspaces_ignore: added` once.
 
 ## Resume
 
@@ -92,9 +91,10 @@ python3 "$REVIEW_CONTEXT_HELPER" preflight --repo-root "$REVIEW_ROOT" --runtime 
 ```
 
 `preflight` verifies `gh` authentication, ensures the repository `.gitignore` carries an anchored
-`/workspaces/` entry, and on Codex requires one complete project agent set: every one of the five
-review agents present as a regular Team Harness-generated read-only TOML. It returns `ok` with a
-`blockers` list. On a blocker, stop with:
+`/workspaces/` entry, and on Codex requires one complete agent set in the project `.codex/agents/`
+or the global `${CODEX_HOME:-$HOME/.codex}/agents/` scope: every one of the five review agents
+present as a Team Harness-generated read-only TOML. It returns `ok` with a `blockers` list. On a
+blocker, stop with:
 
 ```text
 cannot capture a trustworthy PR snapshot — authenticate gh or paste the diff and conversation
@@ -158,8 +158,8 @@ resume when the coordinator is lost early. On every terminal path except explici
 `cleanup_owned_review_run` exactly once.
 
 Detect an existing pipeline workspace from `workspaces/*/01-plan.md` or
-`workspaces/*/02-implementation.md` inside `$WORKTREE`; if present, pass its path to the reviewer
-and QA, which read only the sketches relevant to their own lens.
+`workspaces/*/02-implementation.md` inside `$WORKTREE`; if present, pass the containing workspace
+directory (never the matched file) to the reviewer and QA, which read only their own sketches.
 
 ### 4. Load the policy and prior-review identity
 
@@ -196,10 +196,10 @@ python3 "$REVIEW_CONTEXT_HELPER" select-security \
   {--explicit-security when requested} {--tier 4 when supplied}
 ```
 
-The selector returns `security_required` with its `reason` and triggers: required for
-`known-sensitive`, `unmatched-executable`, an explicit request, or Tier 4; omitted for
-`known-non-executable` and `indeterminate`. A missing selector or unreadable artifact fails closed
-and requires security. State the `reason` whenever security is omitted.
+The selector returns `security_required` with its `reason` and triggers: omitted only for
+`known-non-executable`; required for `known-sensitive`, `unmatched-executable`, `indeterminate`,
+an explicit request, or Tier 4. A missing selector or unreadable artifact fails closed and
+requires security. State the `reason` whenever security is omitted.
 
 Add specialists only from concrete signals: **QA** when a pipeline workspace with acceptance
 criteria exists and the diff changes executable behavior; **security** when the selector requires
@@ -250,8 +250,9 @@ coordinates: `Mode`, `PR`, `Reviewed Head SHA`, `Technical Hash`, `Context Hash`
 
 ### Read boundary and absent returns
 
-Every non-`none` coordinate in a dispatch is required; before dispatch, verify each is a regular
-non-symlink leaf inside `$ARTIFACTS` or `$WORKTREE`. Reviewers read only supplied coordinates and
+Every non-`none` coordinate in a dispatch is required; before dispatch, verify each artifact
+coordinate is a regular non-symlink leaf inside `$ARTIFACTS` or `$WORKTREE`, and `Worktree` and
+`Workspace Path` are contained non-symlink directories. Reviewers read only supplied coordinates and
 project leaves proven to exist as regular files inside the frozen worktree; a deleted changed-file
 path is evidence from `Diff Path` only, and source markers are never read coordinates. Every lens
 returns its draft inline with the exact reviewed SHA, technical hash, and context hash. Validate
@@ -333,8 +334,9 @@ python3 "$REVIEW_CONTEXT_HELPER" apply-verification \
 The helper demotes each unconfirmed blocker to a Suggestion whose body begins with
 `(unverified)`, drops each refuted blocker into the ledger as `dropped: verifier — <reason>`,
 leaves confirmed and unselected findings unchanged, and returns the coverage fragment
-(`verified k/n`). Pass `--verifier-name none` when the verifier returned nothing valid: the
-findings are untouched, the fragment reads `verified 0/n (verifier absent)`, and the
+(`verified k/n`). The helper rejects a return whose finding set differs from the selected findings.
+Pass `--verifier-name none` when the verifier returned nothing valid or the helper rejected its
+coverage: the findings are untouched, the fragment reads `verified 0/n (verifier absent)`, and the
 recommendation is forced to `COMMENT`. Append the verifier's ledger entries to the consolidation
 ledger (or write the ledger from them) and update the body's `Findings:` counts.
 
@@ -350,13 +352,7 @@ This line is coordinator-owned mechanical metadata; agents never write it. An ab
 or an absent verifier appears here and forces `COMMENT`, so a published APPROVE can never hide a
 lens or a verification that did not run.
 
-While agents run, keep raw dispatch coordinates and identity validation silent. If a progress
-update is warranted, name the active agents and their distinct responsibilities against the
-concrete changed surfaces; never relay raw agent status blocks or waiting-tool output.
-
 ## Output contract
-
-The canonical GitHub review has two surfaces.
 
 ### Body
 
@@ -412,8 +408,9 @@ Never dismiss prior reviews automatically.
 
 ## Preview
 
-Require a non-empty body and valid inline JSON. Retry the producing agent once for a missing or
-invalid artifact; then stop.
+Require a non-empty body and valid inline JSON. A missing or invalid artifact after a validated
+return is a coordinator persistence failure: rewrite it once from that return, then stop. A return
+already recorded `absent` is never retried.
 
 Unless `--auto-publish` was supplied, show `PR #{number} review ready — nothing has been
 published.`, the exact body, every inline comment with path, line, and side, each verifier ledger
@@ -433,9 +430,9 @@ events in the order `Comment only`, `Request changes`, `Approve` minus the recom
 `4 — Defer` and `5 — Cancel`:
 
 ```text
-1 — Request changes **(recommended)**
-2 — Comment only
-3 — Approve
+1 — {recommended event} **(recommended)**
+2 — {next remaining event}
+3 — {last remaining event}
 4 — Defer
 5 — Cancel
 ```
@@ -462,7 +459,9 @@ approved capture.
 - `next_action: restart-technical-review`: invalidate approval and restart Gather once; a second
   one after that restart stops and keeps the draft for a manual retry.
 - `next_action: reconcile-conversation`: invalidate only the approval, run the single
-  conversation reconciliation, and re-preview without rerunning specialists or the verifier.
+  conversation reconciliation, re-apply the persisted verifier return to the reconciled inline
+  set with `apply-verification` (a rejected coverage forces `COMMENT`), and re-preview without
+  rerunning specialists or the verifier.
 - Capture or comparison failure: invalidate approval and restart Gather with
   `freshness could not be verified — review not published`.
 

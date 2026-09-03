@@ -6,7 +6,7 @@ See [proposal.md](proposal.md). The spec text lags the code in two directions: i
 
 ### 1. Identity covers paths, not only bytes
 
-`openspecContentIdentity({ change_root })` walks the change directory, sorts relative POSIX paths, and hashes the sequence of `path\0bytes` pairs; `tasks.md` is hashed with every `- [ ]`/`- [x]` marker normalized to `- [ ]`. Hashing bytes alone was rejected because renaming or adding a spec file would preserve the identity.
+`openspecContentIdentity({ change_root })` walks the change directory, sorts relative POSIX paths, and feeds one SHA-256 with, per file in that order, the decimal byte length of the path followed by NUL, the path bytes, the decimal length of the content followed by NUL, and the content bytes (length framing keeps `a` + `\0b` distinct from `a\0` + `b`); `tasks.md` is hashed with every `- [ ]`/`- [x]` marker normalized to `- [ ]`. Hashing bytes alone was rejected because renaming or adding a spec file would preserve the identity.
 
 ### 2. Checkbox transitions are classified, not trusted
 

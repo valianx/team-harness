@@ -20,7 +20,7 @@ See [proposal.md](proposal.md). The review flow already produces a canonical bod
 
 ### 1. A dedicated verifier agent on opus, not a reviewer focus mode
 
-`agents/pr-review-verifier.md` is a new read-only agent (`Read`, `Glob`, `Grep`; `model: opus`; under 600 words). Input: the inline JSON, the diff path, the frozen worktree, the reviewed identity. Output: per finding `confirmed` with a `file:line` citation and one sentence of evidence, or `unconfirmed` with the reason, plus the echoed identity.
+`agents/pr-review-verifier.md` is a new read-only agent (`Read`, `Glob`, `Grep`; `model: opus`; under 600 words). Input: the inline JSON, the diff path, the frozen worktree, the reviewed identity. Output: per finding `confirmed` with a `file:line` citation and one sentence of evidence, `unconfirmed` with the reason, or `refuted` with the evidence, plus the echoed identity.
 
 A `Focus: verify` mode on the existing `reviewer` agent was rejected because model tier is per agent file and the value of the step is the stronger, independent reader. Reusing `inline-reviewer` was rejected because its package shape and lens vocabulary belong to `/th:verify`.
 

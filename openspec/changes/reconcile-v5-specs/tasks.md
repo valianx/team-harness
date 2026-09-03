@@ -10,7 +10,8 @@
 
 - [x] 2.1 Author the `openspec-design-orchestration` delta: modified multi-repository and separate-homes requirements, modified pinning requirement, modified lifecycle scenario, added administrative-close requirement.
 - [x] 2.2 Author the `openspec-archive-lifecycle` delta: modified archive requirement, removed backfill requirement.
-- [x] 2.3 Run `openspec validate reconcile-v5-specs --strict` and `python3 tests/test_openspec_scope.py`.
+- [x] 2.3 Author the `openspec-change-scope` delta: the archive requirement names the post-merge vehicles (dedicated chore or the next pull request) and no longer admits the completing pull request.
+- [x] 2.4 Run `openspec validate reconcile-v5-specs --strict` and `python3 tests/test_openspec_scope.py`.
 
 ## 3. Prose
 

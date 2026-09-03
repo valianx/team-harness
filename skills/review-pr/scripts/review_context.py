@@ -1762,7 +1762,8 @@ def read_review_policy(policy_path: Path | None) -> dict[str, Any]:
         text = policy_path.read_text(encoding="utf-8")
     except OSError as error:
         raise ContextError(f"review policy could not be read: {policy_path}") from error
-    for block in POLICY_YAML_BLOCK_RE.finditer(text):
+    block = POLICY_YAML_BLOCK_RE.search(text)
+    if block is not None:
         for line in block.group(1).splitlines():
             match = POLICY_KEY_RE.match(line)
             if not match:
@@ -1785,9 +1786,7 @@ def read_base_review_policy(snapshot_git: Path, base_oid: str) -> dict[str, Any]
     if not re.fullmatch(r"[0-9a-f]{40}", base_oid):
         raise ContextError("base oid must be a full commit SHA")
     git = ["git", "--git-dir", str(snapshot_git)]
-    try:
-        run_text([*git, "cat-file", "-e", f"{base_oid}:.team-harness/review-policy.md"])
-    except ContextError:
+    if not run_text([*git, "ls-tree", base_oid, "--", ".team-harness/review-policy.md"]):
         return read_review_policy(None)
     shown = run_text([*git, "show", f"{base_oid}:.team-harness/review-policy.md"])
     with tempfile.TemporaryDirectory() as directory:
@@ -1838,7 +1837,9 @@ def apply_verification(
 
     Unconfirmed findings are demoted to `(unverified)` suggestions, refuted findings are
     dropped into the ledger, and confirmed findings pass unchanged. Verification never adds a
-    finding. An absent verifier leaves the findings untouched and forces `COMMENT`.
+    finding. An absent verifier leaves the findings untouched and forces `COMMENT`; a present
+    verifier must cover exactly the selected findings, so a partial return cannot demote a
+    blocker outside the absent-verifier path.
     """
     if mode not in VERIFICATION_MODES:
         raise ContextError("unknown verification mode")
@@ -1854,6 +1855,9 @@ def apply_verification(
             "selected": 0,
         }
     selected = [finding for finding in inline if mode == "all" or _is_blocking(finding)]
+    selected_keys = [_finding_key(finding) for finding in selected]
+    if len(set(selected_keys)) != len(selected_keys):
+        raise ContextError("inline findings share one path:line side anchor, so verifier statuses would be ambiguous")
     if verifier is None:
         return {
             "inline": inline,
@@ -1873,16 +1877,23 @@ def apply_verification(
         if key in statuses:
             raise ContextError(f"verifier returned two statuses for {key[0]}:{key[1]} {key[2]}")
         statuses[key] = result
+    if set(statuses) != set(selected_keys):
+        missing = len(set(selected_keys) - set(statuses))
+        unexpected = len(set(statuses) - set(selected_keys))
+        raise ContextError(
+            f"verifier coverage does not match the selected findings ({missing} missing, {unexpected} unexpected)"
+        )
+    selected_ids = {id(finding) for finding in selected}
     output: list[dict[str, Any]] = []
     ledger: list[dict[str, Any]] = []
     confirmed = 0
     for finding in inline:
-        if finding not in selected:
+        if id(finding) not in selected_ids:
             output.append(finding)
             continue
-        result = statuses.get(_finding_key(finding))
-        status = result["status"] if result else "unconfirmed"
-        reason = str((result or {}).get("evidence") or (result or {}).get("reason") or "no verifier result")
+        result = statuses[_finding_key(finding)]
+        status = result["status"]
+        reason = str(result.get("evidence") or result.get("reason") or "no evidence given")
         claim = str(finding.get("body", "")).splitlines()[0].strip("* ")
         if status == "confirmed":
             confirmed += 1
@@ -1975,6 +1986,20 @@ def _codex_agent_set_status(agents_dir: Path) -> dict[str, Any]:
     return {"status": status, "missing": missing, "invalid": invalid, "agents_dir": str(agents_dir)}
 
 
+def _codex_agent_dirs(repo_root: Path, agents_dir: Path | None) -> list[Path]:
+    if agents_dir is not None:
+        return [agents_dir]
+    codex_home = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
+    return [repo_root / ".codex" / "agents", codex_home / "agents"]
+
+
+def _codex_agents_status(repo_root: Path, agents_dir: Path | None) -> dict[str, Any]:
+    """Report the first complete agent set among the project and global scopes."""
+    statuses = [(directory, _codex_agent_set_status(directory)) for directory in _codex_agent_dirs(repo_root, agents_dir)]
+    directory, status = next(((d, s) for d, s in statuses if s["status"] == "complete"), statuses[0])
+    return {**status, "agents_dir": str(directory), "searched": [str(d) for d, _ in statuses]}
+
+
 def preflight(repo_root: Path, runtime: str, agents_dir: Path | None) -> dict[str, Any]:
     """Check the review prerequisites once and report every blocker."""
     blockers: list[str] = []
@@ -1992,7 +2017,7 @@ def preflight(repo_root: Path, runtime: str, agents_dir: Path | None) -> dict[st
     ensure_workspaces_ignored(repo_root)
     codex_agents: dict[str, Any] | None = None
     if runtime == "codex":
-        codex_agents = _codex_agent_set_status(agents_dir or repo_root / ".codex" / "agents")
+        codex_agents = _codex_agents_status(repo_root, agents_dir)
         if codex_agents["status"] != "complete":
             blockers.append(f"codex review agents {codex_agents['status']}")
     return {
