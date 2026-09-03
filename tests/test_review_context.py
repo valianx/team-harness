@@ -213,6 +213,35 @@ class ReviewContextTests(unittest.TestCase):
             )
             self.assertEqual(json.loads(completed.stdout)["verification"], "blocking-only")
 
+    def test_review_policy_is_read_from_the_base_commit_not_the_pr_head(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory) / "repo"
+            repo.mkdir()
+            env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
+                   "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com"}
+            def git(*args):
+                return subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True, env=env).stdout.strip()
+            git("init", "-q")
+            (repo / "README.md").write_text("base\n", encoding="utf-8")
+            git("add", "README.md"); git("commit", "-q", "-m", "base without policy")
+            no_policy = git("rev-parse", "HEAD")
+            (repo / ".team-harness").mkdir()
+            (repo / ".team-harness" / "review-policy.md").write_text("```yaml\nverification: all\nmax_suggestions: 2\n```\n", encoding="utf-8")
+            git("add", ".team-harness"); git("commit", "-q", "-m", "owner policy")
+            base = git("rev-parse", "HEAD")
+            (repo / ".team-harness" / "review-policy.md").write_text("```yaml\nverification: off\n```\n", encoding="utf-8")
+            git("add", ".team-harness"); git("commit", "-q", "-m", "pr turns verification off")
+            snapshot = repo / ".git"
+            self.assertEqual(MODULE.read_base_review_policy(snapshot, no_policy), {"verification": "blocking-only", "max_suggestions": 5, "source": "default"})
+            self.assertEqual(MODULE.read_base_review_policy(snapshot, base), {"verification": "all", "max_suggestions": 2, "source": "base-commit"})
+            with self.assertRaisesRegex(MODULE.ContextError, "full commit SHA"):
+                MODULE.read_base_review_policy(snapshot, "HEAD")
+            completed = subprocess.run(
+                [sys.executable, str(SCRIPT), "policy", "--snapshot-git", str(snapshot), "--base-oid", base],
+                check=True, capture_output=True, text=True,
+            )
+            self.assertEqual(json.loads(completed.stdout)["verification"], "all")
+
     def verification_fixture(self):
         inline = [
             {"path": "src/a.ts", "line": 10, "side": "RIGHT", "body": "**Blocking: null deref**\n\nEvidence.\n\n**Fix:** guard."},

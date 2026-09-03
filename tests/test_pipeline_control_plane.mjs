@@ -372,6 +372,17 @@ try {
   assert.equal(taskProgressDelta({ pinned: pinnedTasks, current: pinnedTasks.replace("- [x] 1.2", "- [ ] 1.2").replace("- [ ] 1.1", "- [x] 1.1") }).delta, "regression");
   assert.equal(taskProgressDelta({ pinned: pinnedTasks, current: `${pinnedTasks}- [ ] 1.3 third\n` }).delta, "structural");
   assert.equal(taskProgressDelta({ pinned: pinnedTasks, current: 7 }).error_code, "TASKS_INVALID");
+  const bracketTasks = "- [x] 1.2 rename the [x] flag\n";
+  assert.equal(taskProgressDelta({ pinned: bracketTasks, current: bracketTasks.replace("- [x]", "- [ ]") }).delta, "regression");
+
+  const collisionA = path.join(temporary, "collision-a");
+  const collisionB = path.join(temporary, "collision-b");
+  await mkdir(collisionA, { recursive: true });
+  await mkdir(collisionB, { recursive: true });
+  await writeFile(path.join(collisionA, "a"), Buffer.from("X\0"));
+  await writeFile(path.join(collisionA, "b"), Buffer.from("\0"));
+  await writeFile(path.join(collisionB, "a"), Buffer.from("X\0\0b\0\0"));
+  assert.notEqual((await openspecContentIdentity({ change_root: collisionA })).identity, (await openspecContentIdentity({ change_root: collisionB })).identity);
 } finally {
   await rm(temporary, { recursive: true, force: true });
 }

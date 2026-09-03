@@ -13,6 +13,7 @@ import secrets
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Iterable
@@ -1779,7 +1780,36 @@ def read_review_policy(policy_path: Path | None) -> dict[str, Any]:
     return policy
 
 
+def read_base_review_policy(snapshot_git: Path, base_oid: str) -> dict[str, Any]:
+    """Read the policy from the base commit so the reviewed PR cannot set its own bar."""
+    if not re.fullmatch(r"[0-9a-f]{40}", base_oid):
+        raise ContextError("base oid must be a full commit SHA")
+    completed = subprocess.run(
+        ["git", "--git-dir", str(snapshot_git), "cat-file", "-e", f"{base_oid}:.team-harness/review-policy.md"],
+        capture_output=True, text=True, timeout=COMMAND_TIMEOUT_SECONDS,
+    )
+    if completed.returncode != 0:
+        return read_review_policy(None)
+    shown = subprocess.run(
+        ["git", "--git-dir", str(snapshot_git), "show", f"{base_oid}:.team-harness/review-policy.md"],
+        capture_output=True, text=True, timeout=COMMAND_TIMEOUT_SECONDS,
+    )
+    if shown.returncode != 0:
+        raise ContextError("review policy could not be read from the base commit")
+    with tempfile.TemporaryDirectory() as directory:
+        policy_path = Path(directory) / "review-policy.md"
+        policy_path.write_text(shown.stdout, encoding="utf-8")
+        policy = read_review_policy(policy_path)
+    policy["source"] = "base-commit" if policy["source"] == "policy" else policy["source"]
+    return policy
+
+
 def command_policy(args: argparse.Namespace) -> int:
+    if args.snapshot_git is not None or args.base_oid is not None:
+        if args.snapshot_git is None or args.base_oid is None:
+            raise ContextError("policy needs both --snapshot-git and --base-oid")
+        print(json.dumps(read_base_review_policy(args.snapshot_git, args.base_oid), sort_keys=True))
+        return 0
     policy_path = None if args.policy in (None, "none") else Path(args.policy)
     print(json.dumps(read_review_policy(policy_path), sort_keys=True))
     return 0
@@ -2246,6 +2276,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     policy_parser = subparsers.add_parser("policy")
     policy_parser.add_argument("--policy", default="none")
+    policy_parser.add_argument("--snapshot-git", type=Path)
+    policy_parser.add_argument("--base-oid")
     policy_parser.set_defaults(func=command_policy)
 
     verification_parser = subparsers.add_parser("apply-verification")

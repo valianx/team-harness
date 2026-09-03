@@ -1,5 +1,5 @@
 
-Analyze `$ARGUMENTS`. Accept a PR number (`45`, `#45`) or URL.
+Analyze `$ARGUMENTS`. Accept a PR number (`45`, `#45`) or URL; remove options before parsing it.
 
 ## Options
 
@@ -10,8 +10,6 @@ Analyze `$ARGUMENTS`. Accept a PR number (`45`, `#45`) or URL.
 - `--resume-from-draft`: publish a saved draft only after snapshot validation.
 - `--auto-publish`: operator opt-in to skip the preview menu.
 - `--converge`: compatibility alias for `--multi`; one set of independent passes, never a loop.
-
-Remove options before parsing the PR identifier.
 
 ## Non-negotiable invariants
 
@@ -82,7 +80,7 @@ Resolve `{owner}/{repo}` from the URL or `gh repo view`. Resolve the bundled hel
    Codex and opencode installs
 5. `./skills/review-pr/scripts/review_context.py`
 
-Do not recreate the helper inline. Then run the prerequisite check once:
+Do not recreate the helper inline; then run the prerequisite check once:
 
 ```bash
 REVIEW_ROOT="$(git rev-parse --show-toplevel)"
@@ -162,14 +160,15 @@ and QA, which read only the sketches relevant to their own lens.
 ### 4. Load the policy and prior-review identity
 
 Set `policy_path` to `$WORKTREE/.team-harness/review-policy.md` when present; otherwise `none`.
-Do not paste its contents into Task prompts. Read the verification bar once:
+Do not paste its contents into Task prompts. Read the verification bar once from the base commit,
+never from the reviewed head, so a pull request cannot set the bar for its own review:
 
 ```bash
-python3 "$REVIEW_CONTEXT_HELPER" policy --policy "{policy_path or none}"
+python3 "$REVIEW_CONTEXT_HELPER" policy --snapshot-git "$SNAPSHOT_GIT" --base-oid "$base_oid"
 ```
 
 It returns `verification` (`blocking-only` default, `all`, or `off`) and `max_suggestions`
-(default `5`). An unreadable or invalid policy stops the review with the helper's message.
+(default `5`). An invalid policy stops the review with the helper's message.
 
 Resolve the authenticated login and run:
 
@@ -412,8 +411,9 @@ Require a non-empty body and valid inline JSON. Retry the producing agent once f
 invalid artifact; then stop.
 
 Unless `--auto-publish` was supplied, show `PR #{number} review ready — nothing has been
-published.`, the exact body, every inline comment with path, line, and side, a superseded-review
-note when applicable, an informational mergeability-drift line when reported, and a closing
+published.`, the exact body, every inline comment with path, line, and side, each verifier ledger
+entry (`dropped` and `demoted` claims with the verifier's reason), a superseded-review note when
+applicable, an informational mergeability-drift line when reported, and a closing
 `Recommendation:` with the event in plain language and one rationale grounded in the supported
 findings and checks: the blocking count and consequence for `REQUEST_CHANGES`, the absence of
 supported blockers for `APPROVE`, and the reason the draft is informational for `COMMENT` (an

@@ -706,9 +706,10 @@ export async function openspecContentIdentity({ change_root: changeRoot }) {
     if (files.length === 0) throw new Error("CHANGE_EMPTY");
     const hash = createHash("sha256");
     for (const relative of files) {
-      const bytes = await readFile(path.join(root, relative));
-      hash.update(relative).update("\0");
-      hash.update(relative === "tasks.md" ? normalizeTaskCheckboxes(bytes.toString("utf8")) : bytes).update("\0");
+      const raw = await readFile(path.join(root, relative));
+      const bytes = relative === "tasks.md" ? Buffer.from(normalizeTaskCheckboxes(raw.toString("utf8"))) : raw;
+      const name = Buffer.from(relative);
+      hash.update(`${name.length}\0`).update(name).update(`${bytes.length}\0`).update(bytes);
     }
     return { ok: true, identity: hash.digest("hex"), files, error_code: null };
   } catch (error) {
@@ -723,7 +724,7 @@ export function taskProgressDelta({ pinned, current }) {
   if (normalizeTaskCheckboxes(pinned) !== normalizeTaskCheckboxes(current)) return { ok: true, delta: "structural", error_code: null };
   const before = pinned.split("\n");
   const after = current.split("\n");
-  const complete = (line) => /\[[xX]\]/.test(line);
+  const complete = (line) => /^\s*[-*]\s+\[[xX]\]/.test(line);
   const regression = before.some((line, index) => line !== after[index] && complete(line) && !complete(after[index]));
   return { ok: true, delta: regression ? "regression" : "progress", error_code: null };
 }
