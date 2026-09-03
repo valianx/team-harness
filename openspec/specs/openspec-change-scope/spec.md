@@ -20,8 +20,12 @@ An active change under `openspec/changes/` SHALL add or modify at least one capa
 - **THEN** the scope test fails naming the change
 
 ### Requirement: Completed changes are archived by the PR that finishes them
-The pull request that checks the last task of a change SHALL include `openspec archive <change>`, or the next release PR SHALL. A change reported complete by `openspec list` across two releases is a lint warning naming the change.
+Once the pull request that checks the last task of a change is confirmed merged, `openspec archive <change>` SHALL land through a dedicated chore pull request or the next pull request that follows it, never through the completing pull request itself. A change reported complete by `openspec list` across two releases is a lint warning naming the change.
 
 #### Scenario: A change completes without archive
 - **WHEN** `openspec list` reports a change complete and the release that followed did not archive it
 - **THEN** `/th:lint` warns with the change name
+
+#### Scenario: The next feature pull request carries the archive
+- **WHEN** a completed change's pull request is confirmed merged and the next pull request runs `openspec archive <change>`
+- **THEN** the archive is accepted as the post-merge vehicle without a separate chore pull request
