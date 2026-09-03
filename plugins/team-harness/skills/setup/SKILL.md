@@ -26,7 +26,7 @@ write:
   removing operator-owned writable roots. The grant is deliberately above the
   per-repository directory because pipelines resolve
   `{logs-path}/{logs-subfolder}/{repo-name}/{feature}` from their own cwd.
-- `scripts/manage_agents.py` installs or refreshes the nineteen bundled generated
+- `scripts/manage_agents.py` installs or refreshes the twenty bundled generated
   agents without overwriting an unmanaged same-name file.
 - `scripts/manage_github_identities.py` validates and atomically manages the
   runtime-neutral GitHub workspace/account routes without reading token bytes.
@@ -207,7 +207,7 @@ migration, and preserve every unrelated value.
    `writable_roots`. Restarting Codex alone does not clear shadowing; give the
    restart instruction only after the shadowing fix.
 
-7. Reconcile all nineteen bundled specialists in the persisted scope on every full
+7. Reconcile all twenty bundled specialists in the persisted scope on every full
    setup, and whenever `agents` is targeted:
 
    ```bash
@@ -259,7 +259,7 @@ migration, and preserve every unrelated value.
 
 10. Re-run the applicable helper inspections and `codex mcp list --json`; re-run
     `codex features list` only when step 4 ran. Report one compact result:
-    native config path, workspace/language, agent scope and nineteen agent statuses,
+    native config path, workspace/language, agent scope and twenty agent statuses,
     GitHub route count when configured, feature-flag status when checked, MCP registrations, hook
     verification/trust, global execution-default status, whether a new thread is
     required, and for Obsidian whether the writable-root grant still requires
