@@ -181,7 +181,7 @@ repository file. A mismatch blocks without reading the packet-derived path.
 Read only this manifest:
 
 1. **Runtime project instructions.** Use the `CLAUDE.md` already present in runtime context. Do not issue a second full-file read. Read a specific section only when the task needs a detail not already available.
-2. **Assigned OpenSpec tasks.** Read only the `tasks.md` items the lease assigns from the bound change named in `01-plan.md § Canonical links`, plus the requirements and scenarios in its `specs/**/spec.md` that those items cite. `01-plan.md` supplies scope, batches, and decisions only. Do not load sibling tasks or the full change set.
+2. **Assigned OpenSpec tasks.** Read only the `tasks.md` items the lease assigns from the bound change named in `01-plan.md § Canonical links`, plus every requirement and scenario in the change's `specs/**/spec.md` deltas — the requirement ceiling keeps them small, and a task never has to cite a spec for its acceptance intent to be read. `01-plan.md` supplies scope, batches, and decisions only. Do not load sibling tasks.
 3. **Conditional evidence.**
    - `01-root-cause.md`: bug location and scope only, for fix/hotfix.
    - `03-testing.md`: named regression and task-relevant test plan only.
