@@ -28,4 +28,4 @@
 
 - [x] 5.1 Update `docs/` review documentation and `skills/README.md` for the verification step and the policy keys.
 - [x] 5.2 Write `changelog.d/verify-review-findings.md`; bump the internal-distribution version sites.
-- [ ] 5.3 Run `bash tests/run-all.sh` and `openspec validate verify-review-findings --strict`.
+- [x] 5.3 Run `bash tests/run-all.sh` and `openspec validate verify-review-findings --strict`.
