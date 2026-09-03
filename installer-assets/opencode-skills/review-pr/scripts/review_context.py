@@ -1784,21 +1784,15 @@ def read_base_review_policy(snapshot_git: Path, base_oid: str) -> dict[str, Any]
     """Read the policy from the base commit so the reviewed PR cannot set its own bar."""
     if not re.fullmatch(r"[0-9a-f]{40}", base_oid):
         raise ContextError("base oid must be a full commit SHA")
-    completed = subprocess.run(
-        ["git", "--git-dir", str(snapshot_git), "cat-file", "-e", f"{base_oid}:.team-harness/review-policy.md"],
-        capture_output=True, text=True, timeout=COMMAND_TIMEOUT_SECONDS,
-    )
-    if completed.returncode != 0:
+    git = ["git", "--git-dir", str(snapshot_git)]
+    try:
+        run_text([*git, "cat-file", "-e", f"{base_oid}:.team-harness/review-policy.md"])
+    except ContextError:
         return read_review_policy(None)
-    shown = subprocess.run(
-        ["git", "--git-dir", str(snapshot_git), "show", f"{base_oid}:.team-harness/review-policy.md"],
-        capture_output=True, text=True, timeout=COMMAND_TIMEOUT_SECONDS,
-    )
-    if shown.returncode != 0:
-        raise ContextError("review policy could not be read from the base commit")
+    shown = run_text([*git, "show", f"{base_oid}:.team-harness/review-policy.md"])
     with tempfile.TemporaryDirectory() as directory:
         policy_path = Path(directory) / "review-policy.md"
-        policy_path.write_text(shown.stdout, encoding="utf-8")
+        policy_path.write_text(shown, encoding="utf-8")
         policy = read_review_policy(policy_path)
     policy["source"] = "base-commit" if policy["source"] == "policy" else policy["source"]
     return policy

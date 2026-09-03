@@ -164,6 +164,7 @@ Do not paste its contents into Task prompts. Read the verification bar once from
 never from the reviewed head, so a pull request cannot set the bar for its own review:
 
 ```bash
+base_oid="$(jq -r '.base_oid' "$CONTEXT")"
 python3 "$REVIEW_CONTEXT_HELPER" policy --snapshot-git "$SNAPSHOT_GIT" --base-oid "$base_oid"
 ```
 

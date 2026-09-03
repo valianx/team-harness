@@ -707,7 +707,7 @@ export async function openspecContentIdentity({ change_root: changeRoot }) {
     const hash = createHash("sha256");
     for (const relative of files) {
       const raw = await readFile(path.join(root, relative));
-      const bytes = relative === "tasks.md" ? Buffer.from(normalizeTaskCheckboxes(raw.toString("utf8"))) : raw;
+      const bytes = relative === "tasks.md" ? Buffer.from(normalizeTaskCheckboxes(raw.toString("latin1")), "latin1") : raw;
       const name = Buffer.from(relative);
       hash.update(`${name.length}\0`).update(name).update(`${bytes.length}\0`).update(bytes);
     }

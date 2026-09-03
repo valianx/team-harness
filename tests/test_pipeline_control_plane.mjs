@@ -375,6 +375,12 @@ try {
   const bracketTasks = "- [x] 1.2 rename the [x] flag\n";
   assert.equal(taskProgressDelta({ pinned: bracketTasks, current: bracketTasks.replace("- [x]", "- [ ]") }).delta, "regression");
 
+  const invalidUtf8 = path.join(temporary, "invalid-utf8");
+  await mkdir(invalidUtf8, { recursive: true });
+  await writeFile(path.join(invalidUtf8, "tasks.md"), Buffer.from([0x2d, 0x20, 0x5b, 0x78, 0x5d, 0x20, 0xff]));
+  const invalidFirst = (await openspecContentIdentity({ change_root: invalidUtf8 })).identity;
+  await writeFile(path.join(invalidUtf8, "tasks.md"), Buffer.from([0x2d, 0x20, 0x5b, 0x78, 0x5d, 0x20, 0xfe]));
+  assert.notEqual((await openspecContentIdentity({ change_root: invalidUtf8 })).identity, invalidFirst);
   const collisionA = path.join(temporary, "collision-a");
   const collisionB = path.join(temporary, "collision-b");
   await mkdir(collisionA, { recursive: true });
