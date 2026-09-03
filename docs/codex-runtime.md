@@ -17,10 +17,10 @@ Then invoke `$team-harness:setup`. The marketplace only distributes code;
 setup converges the operational installation. It writes native settings to
 `${CODEX_HOME:-$HOME/.codex}/.team-harness.json`, configures workspace and
 language preferences and optional GitHub identity routes, offers Memory/context7
-MCP registration, verifies hook trust, and places nineteen bundled specialist
+MCP registration, verifies hook trust, and places twenty bundled specialist
 agents in project or global scope: seven standard logical roles, seven
 spawn-overridable `pipeline-*` identities, one direct read-only inline reviewer,
-and four for immutable PR review.
+and five for immutable PR review.
 An explicit setup import can copy missing values from Claude Code or opencode
 without printing opaque values; normal Codex modes never read another
 runtime's configuration and existing Codex-native values always win.
@@ -40,7 +40,7 @@ Use `$team-harness:update` for the normal update flow. It refreshes the
 marketplace, compares versions, refreshes the installed plugin through an
 idempotent native `codex plugin add` under native permissions, then runs one
 versioned convergence helper for the bridge, native settings, persistent
-runtime classification, required features, all nineteen bundled agents, MCP
+runtime classification, required features, all twenty bundled agents, MCP
 inspection, hook validation, and final postconditions. The already-current path
 performs no domain writes; a stale domain is repaired only when classification
 requires it. The helper returns one closed receipt, so the coordinator does not
@@ -106,7 +106,7 @@ pipeline contracts remain hand-authored for Codex; the other 47 are generated
 runtime adapters that package the canonical workflow, references, scripts, and
 assets while translating invocation, configuration paths, tools, delegation,
 and permission boundaries. This includes the diagram family and both GCP
-skills. The nineteen generated specialist definitions used by bounded skills,
+skills. The twenty generated specialist definitions used by bounded skills,
 the gated pipeline, direct inline review, and PR review remain a separate
 setup/update concern.
 Consumers do not need the Go installer.
@@ -220,7 +220,7 @@ precedence and retains that flow's snapshot, lens selection, consolidation,
 preview, and publication gate.
 
 Skill activation cannot itself change Main's selected model, reasoning effort,
-sandbox, or approval policy. The projection below applies to the twelve
+sandbox, or approval policy. The projection below applies to the thirteen
 standard installed specialists:
 
 | Claude role metadata | Codex model | Effort |

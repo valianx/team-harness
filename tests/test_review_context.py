@@ -170,169 +170,9 @@ class ReviewContextTests(unittest.TestCase):
             contract.index("Run `cleanup-run` explicitly from the coordinator only after"),
         )
 
-    def agent_failure_fixture(self, root: Path):
-        artifacts = root / "artifacts"
-        worktree = artifacts / "pr-review-worktree"
-        artifacts.mkdir()
-        worktree.mkdir()
-        required = artifacts / "pr-review-diff.patch"
-        required.write_text("diff\n", encoding="utf-8")
-        return artifacts, worktree, required
-
-    def classify_agent_failure(self, root: Path, **overrides):
-        artifacts, worktree, required = self.agent_failure_fixture(root)
-        values = {
-            "artifact_root": artifacts,
-            "worktree": worktree,
-            "required_artifacts": [required],
-            "required_directories": [],
-            "failed_path": None,
-            "contract_signal": "none",
-            "reviewed_sha_status": "match",
-            "context_hash_status": "match",
-            "snapshot_status": "match",
-            "freshness_status": "current",
-            "role": "specialist",
-            "attempt": 1,
-        }
-        values.update(overrides)
-        return MODULE.classify_agent_failure(**values), worktree, required
-
-    def test_nonexistent_unsupplied_path_retries_without_operator_decision(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            artifacts, worktree, required = self.agent_failure_fixture(root)
-            result = MODULE.classify_agent_failure(
-                artifact_root=artifacts,
-                worktree=worktree,
-                required_artifacts=[required],
-                required_directories=[],
-                failed_path=(
-                    worktree
-                    / "src"
-                    / "observability"
-                    / "filters"
-                    / "exception.filter.ts"
-                ),
-                contract_signal="none",
-                reviewed_sha_status="match",
-                context_hash_status="match",
-                snapshot_status="match",
-                freshness_status="current",
-                role="specialist",
-                attempt=1,
-            )
-        self.assertEqual(result["decision"], "retry-contract")
-        self.assertEqual(result["failure_kind"], "agent-contract-invalid")
-        self.assertFalse(result["operator_decision_required"])
-        self.assertTrue(result["preserve_snapshot"])
-
-    def test_failed_path_outside_frozen_worktree_fails_closed(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            artifacts, worktree, required = self.agent_failure_fixture(root)
-            result = MODULE.classify_agent_failure(
-                artifact_root=artifacts,
-                worktree=worktree,
-                required_artifacts=[required],
-                required_directories=[],
-                failed_path=root / "agents" / "pr-review-security.md",
-                contract_signal="unverified-path-read",
-                reviewed_sha_status="match",
-                context_hash_status="match",
-                snapshot_status="match",
-                freshness_status="current",
-                role="specialist",
-                attempt=1,
-            )
-        self.assertEqual(result["decision"], "fail-closed")
-        self.assertEqual(result["failure_kind"], "unclassified-agent-failure")
-
-    def test_agent_failure_classifier_cli_emits_the_recovery_decision(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            artifacts, worktree, required = self.agent_failure_fixture(root)
-            completed = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "classify-agent-failure",
-                    "--artifact-root",
-                    str(artifacts),
-                    "--worktree",
-                    str(worktree),
-                    "--required-artifact",
-                    str(required),
-                    "--failed-path",
-                    str(worktree / "agents" / "pr-review-security.md"),
-                    "--reviewed-sha-status",
-                    "match",
-                    "--context-hash-status",
-                    "match",
-                    "--snapshot-status",
-                    "match",
-                    "--freshness-status",
-                    "current",
-                    "--role",
-                    "specialist",
-                    "--attempt",
-                    "1",
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        result = json.loads(completed.stdout)
-        self.assertEqual(result["decision"], "retry-contract")
-        self.assertFalse(result["operator_decision_required"])
-
-    def test_agent_failure_classifier_cli_requires_every_snapshot_status(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            artifacts, worktree, required = self.agent_failure_fixture(root)
-            status_arguments = {
-                "--reviewed-sha-status": "match",
-                "--context-hash-status": "match",
-                "--snapshot-status": "match",
-                "--freshness-status": "current",
-            }
-            for omitted in status_arguments:
-                with self.subTest(omitted=omitted):
-                    command = [
-                        sys.executable,
-                        str(SCRIPT),
-                        "classify-agent-failure",
-                        "--artifact-root",
-                        str(artifacts),
-                        "--worktree",
-                        str(worktree),
-                        "--required-artifact",
-                        str(required),
-                        "--contract-signal",
-                        "unverified-path-read",
-                        "--role",
-                        "specialist",
-                        "--attempt",
-                        "1",
-                    ]
-                    for flag, value in status_arguments.items():
-                        if flag != omitted:
-                            command.extend([flag, value])
-                    completed = subprocess.run(
-                        command,
-                        check=False,
-                        capture_output=True,
-                        text=True,
-                    )
-                    self.assertNotEqual(completed.returncode, 0)
-                    self.assertNotIn("retry-contract", completed.stdout)
-
     def test_reviewer_contracts_preserve_deleted_symlink_and_optional_workspace_rules(self):
         ref = (ROOT / "agents" / "ref-direct-modes.md").read_text(encoding="utf-8")
         self.assertIn("A deleted\nchanged-file path is evidence from `Diff Path` only", ref)
-        # The optional-workspace flag rule is stated by the skill that owns the invocation.
-        skill = (ROOT / "skills" / "review-pr" / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn('--required-directory "$WORKSPACE" when Workspace Path is non-none', skill)
 
         for relative in (
             "agents/reviewer.md",
@@ -346,195 +186,224 @@ class ReviewContextTests(unittest.TestCase):
                 self.assertIn("deleted", contract)
                 self.assertIn("head worktree", contract)
 
-    def test_malformed_classifier_cli_cannot_authorize_recovery(self):
+    def test_review_policy_defaults_and_parses_the_fenced_yaml_block(self):
+        self.assertEqual(
+            MODULE.read_review_policy(None),
+            {"verification": "blocking-only", "max_suggestions": 5, "source": "default"},
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            policy = Path(directory) / "review-policy.md"
+            policy.write_text(
+                "# Policy\n\n```yaml\nverification: off  # repo owner call\nmax_suggestions: 3\n```\n"
+                "\nExample of an invalid value:\n\n```yaml\nverification: sometimes\n```\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                MODULE.read_review_policy(policy),
+                {"verification": "off", "max_suggestions": 3, "source": "policy"},
+            )
+            policy.write_text("```yaml\nverification: sometimes\n```\n", encoding="utf-8")
+            with self.assertRaisesRegex(MODULE.ContextError, "verification must be one of"):
+                MODULE.read_review_policy(policy)
+            policy.write_text("```yaml\nmax_suggestions: \u00b2\n```\n", encoding="utf-8")
+            with self.assertRaisesRegex(MODULE.ContextError, "non-negative integer"):
+                MODULE.read_review_policy(policy)
+            completed = subprocess.run(
+                [sys.executable, str(SCRIPT), "policy", "--policy", "none"],
+                check=True, capture_output=True, text=True,
+            )
+            self.assertEqual(json.loads(completed.stdout)["verification"], "blocking-only")
+
+    def test_review_policy_is_read_from_the_base_commit_not_the_pr_head(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory) / "repo"
+            repo.mkdir()
+            env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
+                   "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com"}
+            def git(*args):
+                return subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True, env=env).stdout.strip()
+            git("init", "-q")
+            (repo / "README.md").write_text("base\n", encoding="utf-8")
+            git("add", "README.md")
+            git("commit", "-q", "-m", "base without policy")
+            no_policy = git("rev-parse", "HEAD")
+            (repo / ".team-harness").mkdir()
+            (repo / ".team-harness" / "review-policy.md").write_text("```yaml\nverification: all\nmax_suggestions: 2\n```\n", encoding="utf-8")
+            git("add", ".team-harness")
+            git("commit", "-q", "-m", "owner policy")
+            base = git("rev-parse", "HEAD")
+            (repo / ".team-harness" / "review-policy.md").write_text("```yaml\nverification: off\n```\n", encoding="utf-8")
+            git("add", ".team-harness")
+            git("commit", "-q", "-m", "pr turns verification off")
+            snapshot = repo / ".git"
+            self.assertEqual(MODULE.read_base_review_policy(snapshot, no_policy), {"verification": "blocking-only", "max_suggestions": 5, "source": "default"})
+            self.assertEqual(MODULE.read_base_review_policy(snapshot, base), {"verification": "all", "max_suggestions": 2, "source": "base-commit"})
+            with self.assertRaisesRegex(MODULE.ContextError, "full commit SHA"):
+                MODULE.read_base_review_policy(snapshot, "HEAD")
+            with self.assertRaisesRegex(MODULE.ContextError, r"git --git-dir .* failed: "):
+                MODULE.read_base_review_policy(snapshot, "0" * 40)
+            with self.assertRaisesRegex(MODULE.ContextError, r"git --git-dir .* failed: "):
+                MODULE.read_base_review_policy(repo / "not-a-snapshot.git", base)
+            completed = subprocess.run(
+                [sys.executable, str(SCRIPT), "policy", "--snapshot-git", str(snapshot), "--base-oid", base],
+                check=True, capture_output=True, text=True,
+            )
+            self.assertEqual(json.loads(completed.stdout)["verification"], "all")
+
+    def verification_fixture(self):
+        inline = [
+            {"path": "src/a.ts", "line": 10, "side": "RIGHT", "body": "**Blocking: null deref**\n\nEvidence.\n\n**Fix:** guard."},
+            {"path": "src/b.ts", "line": 20, "side": "RIGHT", "body": "**Blocking: missing auth check**\n\nEvidence."},
+            {"path": "src/c.ts", "line": 30, "side": "RIGHT", "body": "**Blocking: phantom race**\n\nEvidence."},
+            {"path": "src/d.ts", "line": 40, "side": "LEFT", "body": "**Suggestion: rename**\n\nStyle."},
+        ]
+        verifier = {"findings": [
+            {"path": "src/a.ts", "line": 10, "side": "RIGHT", "status": "confirmed", "evidence": "src/a.ts:10 — value may be null"},
+            {"path": "src/b.ts", "line": 20, "side": "RIGHT", "status": "unconfirmed", "reason": "middleware not readable"},
+            {"path": "src/c.ts", "line": 30, "side": "RIGHT", "status": "refuted", "evidence": "src/c.ts:28 holds the lock"},
+        ]}
+        return inline, verifier
+
+    def test_apply_verification_confirms_demotes_and_drops(self):
+        inline, verifier = self.verification_fixture()
+        result = MODULE.apply_verification(inline, verifier, "blocking-only")
+        self.assertEqual(result["coverage"], "verified 1/3")
+        self.assertIsNone(result["forced_event"])
+        bodies = [finding["body"] for finding in result["inline"]]
+        self.assertEqual(len(bodies), 3)
+        self.assertTrue(bodies[0].startswith("**Blocking: null deref**"))
+        self.assertTrue(bodies[1].startswith("**Suggestion: (unverified) missing auth check**"))
+        self.assertEqual(result["inline"][2], inline[3])
+        self.assertEqual(
+            [(entry["disposition"], entry["finding"]) for entry in result["ledger"]],
+            [("demoted", "Blocking: missing auth check"), ("dropped", "Blocking: phantom race")],
+        )
+        self.assertTrue(all(entry["reason"].startswith("verifier — ") for entry in result["ledger"]))
+
+    def test_apply_verification_requires_exact_coverage_of_the_selected_findings(self):
+        inline, verifier = self.verification_fixture()
+        extra_finding = {"path": "src/new.ts", "line": 1, "side": "RIGHT", "status": "confirmed", "evidence": "x"}
+        with self.assertRaisesRegex(MODULE.ContextError, r"coverage does not match .*\(0 missing, 1 unexpected\)"):
+            MODULE.apply_verification(inline, {"findings": [*verifier["findings"], extra_finding]}, "blocking-only")
+        with self.assertRaisesRegex(MODULE.ContextError, r"coverage does not match .*\(1 missing, 0 unexpected\)"):
+            MODULE.apply_verification(inline, {"findings": verifier["findings"][1:]}, "blocking-only")
+        with self.assertRaisesRegex(MODULE.ContextError, r"coverage does not match .*\(1 missing, 0 unexpected\)"):
+            MODULE.apply_verification(inline, verifier, "all")
+        with self.assertRaisesRegex(MODULE.ContextError, "share one path:line side anchor"):
+            MODULE.apply_verification([*inline, dict(inline[0], body="**Blocking: other claim**")], verifier, "blocking-only")
+
+    def test_apply_verification_absent_verifier_and_policy_off(self):
+        inline, _ = self.verification_fixture()
+        absent = MODULE.apply_verification(inline, None, "blocking-only")
+        self.assertEqual(absent["coverage"], "verified 0/3 (verifier absent)")
+        self.assertEqual(absent["forced_event"], "COMMENT")
+        self.assertEqual(absent["inline"], inline)
+        off = MODULE.apply_verification(inline, None, "off")
+        self.assertEqual(off["coverage"], "verification off (policy)")
+        self.assertIsNone(off["forced_event"])
+        _, verifier = self.verification_fixture()
+        verifier["findings"].append({"path": "src/d.ts", "line": 40, "side": "LEFT", "status": "unconfirmed", "reason": "style only"})
+        every = MODULE.apply_verification(inline, verifier, "all")
+        self.assertEqual(every["coverage"], "verified 1/4")
+        with self.assertRaisesRegex(MODULE.ContextError, "verifier status"):
+            MODULE.apply_verification(inline, {"findings": [{"path": "a", "line": 1, "side": "RIGHT", "status": "maybe"}]}, "all")
+
+    def test_apply_verification_rejects_duplicate_anchors_and_labels_unknown_bodies(self):
+        inline, verifier = self.verification_fixture()
+        verifier["findings"].append(dict(verifier["findings"][0], status="refuted", evidence="second opinion"))
+        with self.assertRaisesRegex(MODULE.ContextError, "two statuses for src/a.ts:10 RIGHT"):
+            MODULE.apply_verification(inline, verifier, "blocking-only")
+        odd = [
+            {"path": "src/e.ts", "line": 5, "side": "RIGHT", "body": "**blocking: lower case**\n\nEvidence."},
+            {"path": "src/f.ts", "line": 6, "side": "RIGHT", "body": "Unlabelled claim.\n\nEvidence."},
+            {"path": "src/g.ts", "line": 7, "side": "RIGHT", "body": "**suggestion: style**"},
+        ]
+        statuses = [dict(finding, status="unconfirmed", reason="not readable") for finding in odd[:2]]
+        result = MODULE.apply_verification(odd, {"findings": statuses}, "blocking-only")
+        self.assertEqual(result["coverage"], "verified 0/2")
+        self.assertTrue(result["inline"][0]["body"].startswith("**Suggestion: (unverified) lower case**"))
+        self.assertTrue(result["inline"][1]["body"].startswith("**Suggestion: (unverified)** Unlabelled claim."))
+        self.assertEqual(result["inline"][2], odd[2])
+        self.assertEqual(len(result["ledger"]), 2)
+
+    def test_apply_verification_cli_writes_the_applied_inline_leaf(self):
+        inline, verifier = self.verification_fixture()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            artifacts, worktree, required = self.agent_failure_fixture(root)
+            (root / "pr-review-draft-inline.json").write_text(json.dumps(inline), encoding="utf-8")
+            (root / "pr-review-verifier.json").write_text(json.dumps(verifier), encoding="utf-8")
             completed = subprocess.run(
                 [
-                    sys.executable,
-                    str(SCRIPT),
-                    "classify-agent-failure",
-                    "--artifact-root",
-                    str(artifacts),
-                    "--worktree",
-                    str(worktree),
-                    "--required-artifact",
-                    str(required),
-                    "--role",
-                    "specialist",
-                    "--attempt",
-                    "3",
+                    sys.executable, str(SCRIPT), "apply-verification",
+                    "--artifact-root", str(root), "--inline-name", "pr-review-draft-inline.json",
+                    "--verifier-name", "pr-review-verifier.json", "--verification", "blocking-only",
+                    "--output-name", "pr-review-inline.json",
                 ],
-                check=False,
-                capture_output=True,
-                text=True,
+                check=True, capture_output=True, text=True,
             )
-        self.assertNotEqual(completed.returncode, 0)
-        self.assertNotIn("retry-contract", completed.stdout)
+            self.assertEqual(json.loads(completed.stdout)["coverage"], "verified 1/3")
+            written = json.loads((root / "pr-review-inline.json").read_text(encoding="utf-8"))
+            self.assertEqual(len(written), 3)
+            self.assertEqual(sorted(path.name for path in root.iterdir()), ["pr-review-draft-inline.json", "pr-review-inline.json", "pr-review-verifier.json"])
 
-    def test_repeated_specialist_contract_defect_forces_comment_and_continues(self):
+    def test_lenses_line_forms(self):
+        self.assertEqual(
+            MODULE.format_lenses_line(["reviewer ran", "security ran"], "verified 3/4"),
+            "Lenses: reviewer ran, security ran, verified 3/4",
+        )
+        self.assertEqual(
+            MODULE.format_lenses_line(["reviewer ran", "qa absent (missing identity echo)"], "verified 0/2 (verifier absent)"),
+            "Lenses: reviewer ran, qa absent (missing identity echo), verified 0/2 (verifier absent)",
+        )
+        self.assertEqual(MODULE.format_lenses_line(["reviewer ran"], "verification off (policy)"), "Lenses: reviewer ran, verification off (policy)")
+        with self.assertRaises(MODULE.ContextError):
+            MODULE.format_lenses_line([], None)
+
+    def test_preflight_reports_blockers_without_raising(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            artifacts, worktree, required = self.agent_failure_fixture(root)
-            result = MODULE.classify_agent_failure(
-                artifact_root=artifacts,
-                worktree=worktree,
-                required_artifacts=[required],
-                required_directories=[],
-                failed_path=worktree / "agents" / "pr-review-security.md",
-                contract_signal="unverified-path-read",
-                reviewed_sha_status="match",
-                context_hash_status="match",
-                snapshot_status="match",
-                freshness_status="current",
-                role="specialist",
-                attempt=2,
-            )
-        self.assertEqual(result["decision"], "continue-comment")
-        self.assertEqual(result["forced_event"], "COMMENT")
-        self.assertIn("absent after retry", result["lens_outcome"])
-        self.assertFalse(result["operator_decision_required"])
-
-    def test_missing_supplied_identity_echo_is_auto_corrected(self):
-        with tempfile.TemporaryDirectory() as directory:
-            result, _, _ = self.classify_agent_failure(
-                Path(directory), reviewed_sha_status="missing"
-            )
-        self.assertEqual(result["decision"], "retry-contract")
-        self.assertEqual(result["failure_kind"], "agent-contract-invalid")
-
-    def test_mismatched_identity_and_failed_freshness_fail_closed(self):
-        for field, value, expected_kind in (
-            ("reviewed_sha_status", "mismatch", "snapshot-identity-failed"),
-            ("freshness_status", "failed", "snapshot-integrity-failed"),
-            ("snapshot_status", "mismatch", "snapshot-integrity-failed"),
-        ):
-            with self.subTest(field=field), tempfile.TemporaryDirectory() as directory:
-                result, _, _ = self.classify_agent_failure(
-                    Path(directory), **{field: value}
+            repo = Path(directory)
+            (repo / ".gitignore").write_text("node_modules\n", encoding="utf-8")
+            agents = repo / ".codex" / "agents"
+            agents.mkdir(parents=True)
+            for name in MODULE.REVIEW_AGENT_NAMES[:-1]:
+                (agents / f"{name}.toml").write_text(
+                    f"# Instruction source: runtime/codex/instructions/{name}.md\n"
+                    f"# Semantic source: agents/{name}.md (sonnet/high)\n# Projection tier: x\n"
+                    f'name = "{name}"\nsandbox_mode = "read-only"\n',
+                    encoding="utf-8",
                 )
-                self.assertEqual(result["decision"], "fail-closed")
-                self.assertEqual(result["failure_kind"], expected_kind)
-
-    def test_required_artifact_and_existing_worktree_read_failures_fail_closed(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            artifacts, worktree, required = self.agent_failure_fixture(root)
-            missing_required = artifacts / "pr-review-files.txt"
-            result = MODULE.classify_agent_failure(
-                artifact_root=artifacts,
-                worktree=worktree,
-                required_artifacts=[required, missing_required],
-                required_directories=[],
-                failed_path=worktree / "optional.ts",
-                contract_signal="none",
-                reviewed_sha_status="match",
-                context_hash_status="match",
-                snapshot_status="match",
-                freshness_status="current",
-                role="specialist",
-                attempt=1,
-            )
-            self.assertEqual(result["failure_kind"], "required-read-failed")
-
-            result = MODULE.classify_agent_failure(
-                artifact_root=artifacts,
-                worktree=worktree,
-                required_artifacts=[required],
-                required_directories=[],
-                failed_path=required,
-                contract_signal="unverified-path-read",
-                reviewed_sha_status="match",
-                context_hash_status="match",
-                snapshot_status="match",
-                freshness_status="current",
-                role="specialist",
-                attempt=1,
-            )
-            self.assertEqual(result["decision"], "fail-closed")
-            self.assertEqual(result["failure_kind"], "required-read-failed")
-
-            existing = worktree / "src" / "service.ts"
-            existing.parent.mkdir()
-            existing.write_text("export {};\n", encoding="utf-8")
-            result = MODULE.classify_agent_failure(
-                artifact_root=artifacts,
-                worktree=worktree,
-                required_artifacts=[required],
-                required_directories=[],
-                failed_path=existing,
-                contract_signal="none",
-                reviewed_sha_status="match",
-                context_hash_status="match",
-                snapshot_status="match",
-                freshness_status="current",
-                role="specialist",
-                attempt=1,
-            )
-        self.assertEqual(result["decision"], "fail-closed")
-        self.assertEqual(result["failure_kind"], "required-read-failed")
-
-    def test_missing_worktree_and_required_directory_fail_closed(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            artifacts, worktree, required = self.agent_failure_fixture(root)
-            worktree.rmdir()
-            result = MODULE.classify_agent_failure(
-                artifact_root=artifacts,
-                worktree=worktree,
-                required_artifacts=[required],
-                required_directories=[],
-                failed_path=None,
-                contract_signal="missing-return-field",
-                reviewed_sha_status="match",
-                context_hash_status="match",
-                snapshot_status="match",
-                freshness_status="current",
-                role="specialist",
-                attempt=1,
-            )
-            self.assertEqual(result["decision"], "fail-closed")
-            self.assertEqual(result["failure_kind"], "required-read-failed")
-
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            artifacts, worktree, required = self.agent_failure_fixture(root)
-            result = MODULE.classify_agent_failure(
-                artifact_root=artifacts,
-                worktree=worktree,
-                required_artifacts=[required],
-                required_directories=[artifacts / "missing-workspace"],
-                failed_path=None,
-                contract_signal="missing-return-field",
-                reviewed_sha_status="match",
-                context_hash_status="match",
-                snapshot_status="match",
-                freshness_status="current",
-                role="specialist",
-                attempt=1,
-            )
-        self.assertEqual(result["decision"], "fail-closed")
-        self.assertEqual(result["failure_kind"], "required-read-failed")
-
-    def test_failure_without_path_or_contract_signal_fails_closed(self):
-        with tempfile.TemporaryDirectory() as directory:
-            result, _, _ = self.classify_agent_failure(Path(directory))
-        self.assertEqual(result["decision"], "fail-closed")
-        self.assertEqual(result["failure_kind"], "unclassified-agent-failure")
-
-    def test_repeated_primary_contract_defect_does_not_fabricate_a_draft(self):
-        for role in ("general", "consolidator"):
-            with self.subTest(role=role), tempfile.TemporaryDirectory() as directory:
-                result, _, _ = self.classify_agent_failure(
-                    Path(directory),
-                    contract_signal="missing-return-field",
-                    role=role,
-                    attempt=2,
+            with patch.dict(os.environ, {"PATH": str(repo), "CODEX_HOME": str(repo / "codex-home")}):
+                result = MODULE.preflight(repo, "codex", None)
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["codex_agents"]["searched"], [str(agents), str(repo / "codex-home" / "agents")])
+            self.assertEqual(result["gh"], "unavailable")
+            self.assertEqual(result["workspaces_ignore"], "added")
+            self.assertEqual(result["codex_agents"]["status"], "mixed")
+            self.assertEqual(result["codex_agents"]["missing"], ["reviewer-consolidator"])
+            self.assertIn("/workspaces/", (repo / ".gitignore").read_text(encoding="utf-8"))
+            (agents / "reviewer-consolidator.toml").write_text('name = "reviewer-consolidator"\n', encoding="utf-8")
+            with patch.dict(os.environ, {"PATH": str(repo), "CODEX_HOME": str(repo / "codex-home")}):
+                again = MODULE.preflight(repo, "codex", None)
+            self.assertEqual(again["workspaces_ignore"], "present")
+            self.assertEqual(again["codex_agents"]["invalid"], ["reviewer-consolidator"])
+            global_agents = repo / "codex-home" / "agents"
+            global_agents.mkdir(parents=True)
+            for name in MODULE.REVIEW_AGENT_NAMES:
+                (global_agents / f"{name}.toml").write_text(
+                    f"# Instruction source: runtime/codex/instructions/{name}.md\n"
+                    f"# Semantic source: agents/{name}.md (sonnet/high)\n# Projection tier: x\n"
+                    f'name = "{name}"\nsandbox_mode = "read-only"\n',
+                    encoding="utf-8",
                 )
-                self.assertEqual(result["decision"], "fail-closed")
-                self.assertEqual(result["failure_kind"], "canonical-draft-unavailable")
-                self.assertFalse(result["operator_decision_required"])
+            with patch.dict(os.environ, {"PATH": str(repo), "CODEX_HOME": str(repo / "codex-home")}):
+                from_global = MODULE.preflight(repo, "codex", None)
+            self.assertEqual(from_global["codex_agents"]["status"], "complete")
+            self.assertEqual(from_global["codex_agents"]["agents_dir"], str(global_agents))
+            self.assertEqual(from_global["blockers"], ["gh unavailable"])
+            with patch.dict(os.environ, {"PATH": str(repo)}):
+                claude = MODULE.preflight(repo, "claude", None)
+            self.assertIsNone(claude["codex_agents"])
+            self.assertEqual(claude["blockers"], ["gh unavailable"])
 
     def test_snapshot_repo_avoids_writes_to_read_only_source_git_dir(self):
         with tempfile.TemporaryDirectory() as directory:

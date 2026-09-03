@@ -51,6 +51,7 @@ func TestCodexManifestsAreValidatedAndComplete(t *testing.T) {
 		"codex-agent-reviewer",
 		"codex-agent-pr-review-qa",
 		"codex-agent-pr-review-security",
+		"codex-agent-pr-review-verifier",
 		"codex-agent-reviewer-consolidator",
 	}
 	if len(components) != len(wantComponents) {

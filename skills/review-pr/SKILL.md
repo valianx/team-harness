@@ -1,9 +1,9 @@
 ---
 name: review-pr
-description: Review a GitHub pull request against an immutable code and conversation snapshot, preview a concise review, and publish it atomically after operator approval.
+description: Review a GitHub pull request against an immutable code and conversation snapshot, verify its blocking findings, preview a concise review, and publish it atomically after operator approval.
 ---
 
-Analyze `$ARGUMENTS`. Accept a PR number (`45`, `#45`) or URL.
+Analyze `$ARGUMENTS`. Accept a PR number (`45`, `#45`) or URL; remove options before parsing it.
 
 ## Options
 
@@ -13,9 +13,7 @@ Analyze `$ARGUMENTS`. Accept a PR number (`45`, `#45`) or URL.
 - `[TIER: N]`: compatibility override. Tier 4 forces the security specialist; other values do not add reviewers.
 - `--resume-from-draft`: publish a saved draft only after snapshot validation.
 - `--auto-publish`: operator opt-in to skip the preview menu.
-- `--converge`: compatibility alias for `--multi`. Run one set of independent passes; never loop until models agree.
-
-Remove options before parsing the PR identifier.
+- `--converge`: compatibility alias for `--multi`; one set of independent passes, never a loop.
 
 ## Non-negotiable invariants
 
@@ -31,16 +29,15 @@ Remove options before parsing the PR identifier.
    - a genuinely cross-file finding lives in the review body;
    - the body may count inline findings but must not repeat them.
 8. Preserve every supported blocking finding. Brevity removes repetition and optional commentary, never blockers.
-9. Store each review in its own helper-created
-   `workspaces/pr-review-{number}/run-{owner-token}/` directory.
-   Before creating that directory, ensure the repository `.gitignore` contains an anchored
-   `/workspaces` or `/workspaces/` entry; add `/workspaces/` when neither exists. Never use
-   `.claude/` for review state.
-10. Drive the mode to a review outcome. A code blocker becomes a `REQUEST_CHANGES` finding; it
-    never blocks the review workflow. Recoverable orchestration failures are corrected internally
-    without asking the operator how to continue. Stop only when a trustworthy review cannot be
-    verified or published because an external prerequisite remains unavailable, or when an
-    already-published review on the same head contains every current finding.
+9. Every Blocking finding the operator reads has been checked against the frozen code by the
+   verifier, or the coverage line says why not.
+10. Store each review in its own helper-created
+    `workspaces/pr-review-{number}/run-{owner-token}/` directory. Never use `.claude/` for review
+    state.
+11. Drive the mode to a review outcome. A code blocker becomes a `REQUEST_CHANGES` finding; it
+    never blocks the review workflow. Stop only when a trustworthy review cannot be verified or
+    published because an external prerequisite remains unavailable, or when an already-published
+    review on the same head contains every current finding.
 
 ## Operator-facing communication
 
@@ -48,50 +45,33 @@ Keep snapshot mechanics internal. Operator updates explain who is working, what 
 is checking, and what decision comes next; they do not narrate skill reads, preflight checks,
 worktree setup, immutable-SHA binding, context hashes, artifact paths, or wait-tool lifecycle.
 
-At startup, announce only that Team Harness will prepare a PR review. When `--auto-publish` is
-absent, state that nothing will be published before approval. When `--auto-publish` was supplied,
-state that the operator opted into automatic publication after validation and that no preview menu
-will be shown. After selecting specialists, announce the exact agents and their useful scope:
+At startup, announce only that Team Harness will prepare a PR review and, without
+`--auto-publish`, that nothing will be published before approval. After selecting specialists,
+announce the exact agents and their useful scope against the concrete changed surfaces:
+`reviewer` (correctness, regressions, API/data contracts), `pr-review-qa` (acceptance evidence),
+`pr-review-security` (permissions, input validation, trust boundaries), `reviewer-consolidator`
+(one final draft when several results exist), and `pr-review-verifier` (confirmation of every
+blocking finding against the frozen code, unless the repository policy turns verification off).
+Do not call agents abstract "lenses" in operator-facing prose.
 
-- `reviewer`: functional correctness, regressions, and API/data contracts;
-- `pr-review-qa`: acceptance evidence, when selected;
-- `pr-review-security`: permissions, input validation, and trust/data boundaries, when selected;
-- `reviewer-consolidator`: de-duplication and one final draft, only when more than one review
-  result exists.
-
-Use concrete changed surfaces when known, such as query semantics, DTO contracts, migrations, or
-authorization boundaries. Do not call agents abstract "lenses" in operator-facing prose.
-
-Do not emit messages whose only content is `waiting for agents`, `no agents completed yet`, or an
-equivalent tool-status narration. During an extended wait, send a concise value-bearing update
-that names the active specialists and the affected surfaces they are inspecting. Do not expose
-head/base SHAs or the context hash unless identity drift blocks the review, the values are needed
-to distinguish a superseded review, or the operator explicitly requests technical details.
-
-If `ensure-workspaces-ignore` adds a tracked `.gitignore` entry, report that material change once
-after it happens. Do not repeat it in progress updates or the review preview.
+Never emit a message whose only content is tool-status narration; during an extended wait, name
+the active specialists and their surfaces. Expose SHAs or the context hash only when identity
+drift blocks the review or the operator asks. Report a `workspaces_ignore: added` once.
 
 ## Resume
 
-Resolve exactly one complete isolated run with `review_context.py resume-run`.
-It must contain `pr-review-context.json`, a non-empty body draft, and
-`pr-review-inline.json` (an empty JSON array is valid). Capture a fresh context
-and run `review_context.py compare`.
-
-- `next_action: continue`: continue at Preview. Carry a reported `mergeability_changed` as one
-  informational drift line in the preview; it never blocks resume.
-- `next_action: reconcile-conversation`: preserve the technical draft, refresh the context and
-  conversation, rerun same-author/prior-review detection, reconcile the draft once against the
-  new review state, and return to Preview without rerunning technical specialists.
-- `next_action: restart-technical-review`: discard the draft and restart at Gather.
-- Capture failure or missing snapshot identity: stop; do not publish a legacy or stale draft.
+Resolve exactly one complete isolated run with `review_context.py resume-run` (context, non-empty
+body draft, and inline JSON), capture a fresh context, and run `review_context.py compare`.
+`continue` resumes at Preview; `reconcile-conversation` refreshes the conversation, reruns
+same-author/prior-review detection, reconciles the draft once, and returns to Preview without
+rerunning specialists; `restart-technical-review` discards the draft and restarts at Gather. A
+capture failure or missing snapshot identity stops; never publish a stale draft.
 
 ## Gather
 
-### 1. Resolve the helper and repository
+### 1. Resolve the helper and run preflight
 
-Resolve `{owner}/{repo}` from the URL or `gh repo view`. Require authenticated `gh`, Python 3,
-and the bundled helper. Resolve it in this order:
+Resolve `{owner}/{repo}` from the URL or `gh repo view`. Resolve the bundled helper, in order:
 
 1. latest `~/.claude/plugins/cache/team-harness-marketplace/th/*/skills/review-pr/scripts/review_context.py`
 2. `~/.claude/skills/review-pr/scripts/review_context.py`
@@ -99,22 +79,34 @@ and the bundled helper. Resolve it in this order:
    `${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/skills/review-pr/scripts/review_context.py`
    (Windows: `%APPDATA%\opencode\skills\review-pr\scripts\review_context.py`; a project-scope
    install uses `<repo>/.opencode/skills/review-pr/scripts/review_context.py`)
-4. `scripts/review_context.py` resolved against this skill's own directory (the directory
-   containing this document) — the packaged copy on Codex and opencode installs
+4. `scripts/review_context.py` resolved against this skill's own directory — the packaged copy on
+   Codex and opencode installs
 5. `./skills/review-pr/scripts/review_context.py`
 
-If any prerequisite is unavailable, stop with:
+Do not recreate the helper inline; then run the prerequisite check once:
+
+```bash
+REVIEW_ROOT="$(git rev-parse --show-toplevel)"
+python3 "$REVIEW_CONTEXT_HELPER" preflight --repo-root "$REVIEW_ROOT" --runtime {claude|codex|opencode}
+```
+
+`preflight` verifies `gh` authentication, ensures the repository `.gitignore` carries an anchored
+`/workspaces/` entry, and on Codex requires one complete agent set in the project `.codex/agents/`
+or the global `${CODEX_HOME:-$HOME/.codex}/agents/` scope: every one of the five review agents
+present as a Team Harness-generated read-only TOML. It returns `ok` with a `blockers` list. On a
+blocker, stop with:
 
 ```text
 cannot capture a trustworthy PR snapshot — authenticate gh or paste the diff and conversation
 ```
 
-Do not recreate the helper inline.
+For a Codex agent-set blocker, direct the operator to `$team-harness:setup agents` or
+`$team-harness:update`, then require a new Codex thread so newly installed agent declarations are
+discovered. Never inherit a general agent's authority for a review role.
 
 ### 2. Prepare the isolated review run
 
 ```bash
-REVIEW_ROOT="$(git rev-parse --show-toplevel)"
 RUN_META="$(python3 "$REVIEW_CONTEXT_HELPER" prepare-run \
   --repo-root "$REVIEW_ROOT" --repo "{owner}/{repo}" --pr {number})"
 ARTIFACTS="$(printf '%s' "$RUN_META" | jq -r '.artifact_root')"
@@ -132,82 +124,56 @@ cleanup_owned_review_run() {
 }
 ```
 
-`prepare-run` is the sole owner of creation, capture, rendering, materialization,
-atomic promotion, and failure cleanup. It creates one private
-`workspaces/pr-review-{number}/run-{owner_token}/`, validates the Git ignore,
-uses one shared 60-second budget, and returns only after the immutable context,
-conversation, diff, file list, checks, bare snapshot, and detached worktree are
-ready. On any failure it removes only the marker-bound run it created; if safe
-cleanup cannot be proven, it preserves that run and returns the cleanup blocker.
-Main never recreates these mechanics with `mktemp`, shell promotion chains, or
-a fixed `workspaces/pr-review-{number}` path.
+`prepare-run` is the sole owner of creation, capture, materialization, atomic promotion, and
+failure cleanup under one shared 60-second budget; it removes only the marker-bound run it
+created. Main never recreates these mechanics with `mktemp`, shell promotion chains, or a fixed
+`workspaces/pr-review-{number}` path. Read `head_oid`, `base_oid`, `merge_base_oid`,
+`technical_hash`, `conversation_hash`, `context_hash`, `fetched_at`, `is_cross_repository`, and
+the mergeability values from `$CONTEXT`.
 
-Read metadata and immutable refs from `$CONTEXT`. Store `head_oid`, `base_oid`,
-`merge_base_oid`, `technical_hash`, `conversation_hash`, `context_hash`, `fetched_at`,
-`is_cross_repository`, and the classified and raw mergeability values.
+Write data once and pass paths to agents, never artifact bodies. Every later artifact write uses
+the helper's leaf-safe write and atomic promotion. Do not execute the PR's code or install
+dependencies; existing CI results are evidence. If the PR body links an issue with `Closes`,
+`Fixes`, or `Resolves`, fetch its number, title, body, and labels once into
+`$ARTIFACTS/pr-review-issue.json`; treat failure as `linked issue: unavailable`.
 
-The helper resolves the configured source remote from `$REVIEW_ROOT`, initializes without user Git
-templates or validates a private bare repository at `$SNAPSHOT_GIT`, and fetches the exact base SHA
-and PR head ref only there. It borrows the operator checkout's existing object database during the
-fetch, then repacks every reachable snapshot object locally so the bare repository is
-self-contained before use. It must never fetch, update refs, create worktree administration, or
-otherwise write inside the operator checkout's `.git`.
+### 3. Coordinator-owned snapshot lifecycle
 
-Write data once and pass these paths to agents. Do not duplicate the diff,
-policy, or conversation inside Task prompts. Every later artifact write uses
-the helper's leaf-safe temporary-write and atomic-promotion commands; never
-open a fixed final artifact path directly.
-
-Do not execute the PR's code or install dependencies. Existing CI results are evidence; local
-test execution is an explicit operator action outside this skill.
-
-If the PR body links an issue with `Closes`, `Fixes`, or `Resolves`, fetch its number, title,
-body, and labels once into `$ARTIFACTS/pr-review-issue.json`. Treat failure as
-`linked issue: unavailable`, not as a reason to weaken snapshot checks.
-
-### 3. Coordinator-owned cleanup
-
-The coordinator owns the successful snapshot lifecycle. Never register an `EXIT`,
-PTY, exec-session, subshell, or background-process cleanup hook in the command that
-captures, materializes, promotes, or announces readiness. Those command processes may
+Never register an `EXIT`, PTY, exec-session, subshell, or background-process cleanup hook in the
+command that captures, materializes, promotes, or announces readiness. Those command processes may
 end after a bounded tool yield while reviewers still need the files. `$ARTIFACTS`,
-`$SNAPSHOT_GIT`, and `$WORKTREE` MUST outlive every specialist dispatch, retry,
-join, consolidation read, and post-dispatch integrity comparison regardless of how
-many tool yields occur or whether any one yield exceeds 30 seconds.
+`$SNAPSHOT_GIT`, and `$WORKTREE` MUST outlive every specialist dispatch, join, consolidation read,
+verification read, and post-dispatch integrity comparison regardless of how many tool yields occur
+or whether any one yield exceeds 30 seconds.
 
-Capture `git status --untracked-files=all` and `git diff HEAD` for the frozen worktree. Separately
-capture the regular review-artifact leaves under `$ARTIFACTS`, excluding the exact
-`$SNAPSHOT_GIT` and `$WORKTREE` directories and their contents — Git legitimately updates
-administrative data in the snapshot during freshness checks and cleanup, and the worktree's
-integrity is verified by its own status/diff snapshot above. Repeat both snapshots after all agents finish.
-The compared surfaces must be byte-identical; surface any other mutation as a defect before
-trusting a returned draft. Only after this check may the coordinator persist inline returns to the
-fixed `$ARTIFACTS/pr-review-*` paths.
+Capture `git status --untracked-files=all` and `git diff HEAD` for the frozen worktree, and
+separately the regular review-artifact leaves under `$ARTIFACTS` (excluding `$SNAPSHOT_GIT` and
+`$WORKTREE`). Repeat both after all agents finish; the surfaces must be byte-identical before any
+returned draft is trusted or persisted to the fixed `$ARTIFACTS/pr-review-*` paths.
 
 Run `cleanup-run` explicitly from the coordinator only after every dispatched reviewer has
-reached a terminal result and all integrity/freshness checks that consume the snapshot
-have completed. The helper removes the worktree through `$SNAPSHOT_GIT` before
-removing the owned run. Never remove the PR parent or a sibling run, and never
-force-remove an unexpected dirty worktree. If the coordinator process is lost
-before this terminal point, preserve the isolated run for deterministic resume
-or explicit cancel; premature deletion is worse than a reported residual run.
-
-On every terminal path except explicit `defer`, invoke
+reached a terminal result and every check that consumes the snapshot has completed. Never remove
+the PR parent or a sibling run, never force-remove a dirty worktree, and preserve the run for
+resume when the coordinator is lost early. On every terminal path except explicit `defer`, invoke
 `cleanup_owned_review_run` exactly once.
 
 Detect an existing pipeline workspace from `workspaces/*/01-plan.md` or
-`workspaces/*/02-implementation.md` inside `$WORKTREE`. If present:
+`workspaces/*/02-implementation.md` inside `$WORKTREE`; if present, pass the containing workspace
+directory (never the matched file) to the reviewer and QA, which read only their own sketches.
 
-- run the resolved `sketch-guard.sh` probe best-effort;
-- pass the workspace path to the reviewer and QA;
-- let each receiving agent read only the sketches relevant to its own lens.
+### 4. Load the policy and prior-review identity
 
-Do not preload or paste sketches into dispatches.
+Set `policy_path` to `$WORKTREE/.team-harness/review-policy.md` when present; otherwise `none`.
+Do not paste its contents into Task prompts. Read the verification bar once from the base commit,
+never from the reviewed head, so a pull request cannot set the bar for its own review:
 
-### 4. Load optional policy and prior-review identity
+```bash
+base_oid="$(jq -r '.base_oid' "$CONTEXT")"
+python3 "$REVIEW_CONTEXT_HELPER" policy --snapshot-git "$SNAPSHOT_GIT" --base-oid "$base_oid"
+```
 
-Set `policy_path` to `$WORKTREE/.team-harness/review-policy.md` when present; otherwise use
-`none`. Do not paste its contents into Task prompts.
+It returns `verification` (`blocking-only` default, `all`, or `off`) and `max_suggestions`
+(default `5`). An invalid policy stops the review with the helper's message.
 
 Resolve the authenticated login and run:
 
@@ -230,33 +196,18 @@ python3 "$REVIEW_CONTEXT_HELPER" select-security \
   {--explicit-security when requested} {--tier 4 when supplied}
 ```
 
-The selector returns `known-sensitive`, `known-non-executable`, `unmatched-executable`, or
-`indeterminate`, alongside `security_required` and the trigger list. `known-non-executable` now
-also covers configuration-only diffs (`.json`, `.yaml`, `.yml`, `.toml`, `.ini`, `.cfg`,
-`.properties`); `.env` variants, sensitive filenames such as `package.json`/`go.mod`, and any path
-under `.github/workflows/` are still caught earlier and stay sensitive. Security is required for
-`known-sensitive` or `unmatched-executable`, and for an explicit request or Tier 4 regardless of
-suffix classification; `known-non-executable` and `indeterminate` omit it otherwise. A missing
-selector or an unreadable changed-files/diff artifact fails closed and requires security. State
-the resolved `reason` whenever security is omitted, so a not-required outcome stays visible
-instead of silent.
+The selector returns `security_required` with its `reason` and triggers: omitted only for
+`known-non-executable`; required for `known-sensitive`, `unmatched-executable`, `indeterminate`,
+an explicit request, or Tier 4. A missing selector or unreadable artifact fails closed and
+requires security. State the `reason` whenever security is omitted.
 
-Add specialist agents only from concrete signals:
-
-- **QA:** a pipeline workspace with acceptance criteria exists and the diff changes executable
-  behavior. Skip for docs, changelog, package metadata, formatting, and configuration-only
-  changes unless an AC explicitly describes that surface.
-- **Security:** the selector reports `security_required: true`.
-- **Focused reviewer passes:** only `general`/`architecture`, and only when explicitly requested
-  through `--reviewers`/`--multi`.
-  A large PR remains one general pass; report coverage limits instead of multiplying opinions.
-
-The general reviewer owns goal fit, correctness, public contracts, error behavior, and
-change-caused regressions. QA owns acceptance evidence. Security owns exploitability and trust
-boundaries. Do not ask two lenses to perform the same generic review.
-
-Announce the selected specialists using the operator-facing communication contract above. Include
-`reviewer-consolidator` in that announcement only when the selected set will require it.
+Add specialists only from concrete signals: **QA** when a pipeline workspace with acceptance
+criteria exists and the diff changes executable behavior; **security** when the selector requires
+it; **focused reviewer passes** (`general`/`architecture`) only when requested through
+`--reviewers`/`--multi`. A large PR remains one general pass. The general reviewer owns
+correctness, contracts, and regressions; QA owns acceptance evidence; security owns trust
+boundaries. Announce the selected specialists, `reviewer-consolidator` when several results will
+exist, and `pr-review-verifier` unless `verification` is `off`.
 
 ## Pre-dispatch freshness
 
@@ -268,256 +219,142 @@ python3 "$REVIEW_CONTEXT_HELPER" refresh-context \
   --artifact-root "$ARTIFACTS" --owner-token "$REVIEW_OWNER_TOKEN"
 ```
 
-- `next_action: continue`: dispatch. Carry a reported `mergeability_changed` as one informational
-  drift line; it never blocks dispatch.
-- `next_action: reconcile-conversation`: the helper has atomically refreshed only `$CONTEXT` and
-  `$CONVERSATION`; rerun same-author/prior-review detection, then dispatch once against the fresh
-  conversation. No technical result exists yet, so this consumes no restart budget.
-- `next_action: restart-technical-review`: rebuild artifacts and restart Gather once.
-- A second code or semantic movement means the external target is still moving and cannot yet be
-  reviewed against one trustworthy snapshot; report that external freshness failure. A
-  review-state-only movement always remains on the reconciliation path.
-
-The helper returns `restart-technical-review` for code drift or semantic scope drift in the PR
-title/body, because those inputs define intent and acceptance. New issue discussion, a review,
-review comment, thread-state, or reply on the same technical hash returns
-`reconcile-conversation`: it can affect deduplication and publication, but it does not by itself
-invalidate evidence derived from the frozen code. The reconciler may request one bounded
-technical recheck only when that new context cites a concrete locus whose claim cannot otherwise
-be adjudicated.
+- `next_action: continue`: dispatch; a reported `mergeability_changed` is one informational line.
+- `next_action: reconcile-conversation`: only `$CONTEXT` and `$CONVERSATION` were refreshed;
+  rerun same-author/prior-review detection, then dispatch once.
+- `next_action: restart-technical-review`: code or semantic scope drift; rebuild artifacts and
+  restart Gather once. A second movement is an external freshness failure to report.
 
 ## Dispatch
 
-The four PR agents are `reviewer`, `pr-review-qa`, `pr-review-security`, and
-`reviewer-consolidator`. Their source manifests and OpenCode projections are deny-by-default and
-read-only. Codex dispatch is unavailable unless a Team Harness Codex projection exists and its
-capability validator confirms the same exact allowlist; never inherit a general agent's authority.
-Host overrides after Team Harness emits an artifact are outside this guarantee.
+The five PR agents are `reviewer`, `pr-review-qa`, `pr-review-security`, `pr-review-verifier`, and
+`reviewer-consolidator`. Their source manifests and projections are deny-by-default and read-only;
+`preflight` has already confirmed the runtime exposes them.
 
-Before any dispatch, require the selected runtime to expose all four exact agent identities. In
-Codex, accept one complete project or global set only; every file must be a regular non-symlink
-Team Harness-generated TOML with the matching `name`, instruction-source marker, semantic-source
-marker, projection/profile marker, and `sandbox_mode = "read-only"`. The general `reviewer` may
-have only filesystem-read plus external-read capability in the canonical registry; the QA,
-security, and consolidator roles may have only filesystem-read. A missing, mixed, unmanaged, or
-stale set blocks review before snapshot dispatch. Direct the operator to
-`$team-harness:setup agents` or `$team-harness:update`, then require a new Codex thread so newly installed agent
-declarations are discovered.
-
-Pass coordinates and artifact paths, not artifact bodies:
-
-```text
-Direct Mode Task:
-- Mode: review
-- Focus: general
-- PR: #{number}
-- Repository: {owner}/{repo}
-- Base: {base_ref}
-- Head: {head_ref}
-- Reviewed Head SHA: {head_oid}
-- Base SHA: {base_oid}
-- Merge Base SHA: {merge_base_oid}
-- Technical Hash: {technical_hash}
-- Conversation Hash: {conversation_hash}
-- Context Hash: {context_hash}
-- Mergeability: {clean|conflicting|indeterminate}
-- Raw Mergeable: {raw mergeable value}
-- Raw Merge State: {raw mergeStateStatus value}
-- Worktree: {WORKTREE}
-- Review Artifacts Root: {ARTIFACTS absolute path}
-- Context Path: {CONTEXT}
-- Conversation Path: {CONVERSATION}
-- Diff Path: {DIFF}
-- Changed Files Path: {FILES}
-- Checks Path: {CHECKS}
-- Policy Path: {policy_path or "none"}
-- Workspace Path: {workspace_path or "none"}
-- Linked Issue Path: {$ARTIFACTS/pr-review-issue.json absolute path or "none"}
-- Draft Output: $ARTIFACTS/pr-review-draft{suffix}.md
-- Inline Output: $ARTIFACTS/pr-review-inline{suffix}.json
-```
+Pass coordinates and artifact paths, not artifact bodies. The `reviewer` packet is a
+`Direct Mode Task` with `Mode: review`, `Focus`, `PR`, `Repository`, `Base`, `Head`,
+`Reviewed Head SHA`, `Base SHA`, `Merge Base SHA`, `Technical Hash`, `Conversation Hash`,
+`Context Hash`, `Mergeability` with both raw GitHub values, `Worktree`, `Review Artifacts Root`,
+`Context Path`, `Conversation Path`, `Diff Path`, `Changed Files Path`, `Checks Path`,
+`Policy Path`, `Workspace Path`, and `Linked Issue Path` (each `none` when absent), plus
+`Draft Output: $ARTIFACTS/pr-review-draft{suffix}.md` and
+`Inline Output: $ARTIFACTS/pr-review-inline{suffix}.json`.
 
 For explicit general/architecture passes, change `Focus` and use a focus suffix. Dispatch
 independent passes in parallel. Never dispatch both a security-focused reviewer and the security
 specialist for the same review.
 
 When selected, dispatch QA and `pr-review-security` in parallel with only their required
-coordinates:
+coordinates: `Mode`, `PR`, `Reviewed Head SHA`, `Technical Hash`, `Context Hash`, `Worktree`,
+`Workspace Path`, `Context Path`, `Diff Path`, and `Changed Files Path`.
 
-```text
-Mode: pr-review-qa | pr-review-security
-PR: #{number}
-Reviewed Head SHA: {head_oid}
-- Technical Hash: {technical_hash}
-Context Hash: {context_hash}
-Worktree: {WORKTREE}
-Workspace Path: {workspace_path or "none"}
-Context Path: {CONTEXT}
-Diff Path: {DIFF}
-Changed Files Path: {FILES}
-```
+### Read boundary and absent returns
 
-### Read scope and failed-read recovery
+Every non-`none` coordinate in a dispatch is required; before dispatch, verify each artifact
+coordinate is a regular non-symlink leaf inside `$ARTIFACTS` or `$WORKTREE`, and `Worktree` and
+`Workspace Path` are contained non-symlink directories. Reviewers read only supplied coordinates and
+project leaves proven to exist as regular files inside the frozen worktree; a deleted changed-file
+path is evidence from `Diff Path` only, and source markers are never read coordinates. Every lens
+returns its draft inline with the exact reviewed SHA, technical hash, and context hash. Validate
+each return once:
 
-Treat every non-`none` artifact coordinate in a dispatch as required for that invocation. Before
-dispatch, verify each is a regular non-symlink leaf inside `$ARTIFACTS` or `$WORKTREE` as
-appropriate and verify that the frozen worktree coordinate is still the expected readable
-directory. Agent instruction-source and semantic-source markers are identity metadata, never
-project read coordinates.
+- A return that omits a required field, echoes a different identity, or reports a supplied
+  artifact as unreadable is recorded `absent ({reason})` on the coverage line and forces
+  `COMMENT`. Do not rebuild the packet, classify the mistake, or dispatch a correction.
+- A mismatched reviewed SHA or technical hash, a non-identical post-dispatch snapshot, or a failed
+  freshness comparison is an integrity failure: fail closed without preview or publication.
+- A stale context hash with the same technical hash is conversation drift and follows the
+  reconciliation path below.
+- An absent general reviewer or a consolidation that leaves no trustworthy canonical draft fails
+  closed with the violated rule reported; never fabricate findings or drop an unaccounted blocker.
 
-Reviewer agents start project reads from the supplied changed-files list. They may open another
-repo-relative worktree leaf only after an exact existence check proves it is a regular file under
-the frozen worktree. A conventional filename, remembered layout, unresolved import, or optional
-path whose coordinate is `none` is not evidence of existence. Do not open it. Deleted paths are
-read from the supplied diff, not guessed at the head worktree.
-
-This is coordinator-owned contract enforcement. A reviewer return or observed invocation is
-`agent-contract-invalid` when the dispatch contained a required coordinate but the agent claims it
-was missing, omits a required return field, proposes/uses an agent-chosen persistence path, treats
-missing standalone read tools as unavailable despite the runtime adapter, reads an unverified
-inferred path, or otherwise violates the declared read/return schema. These are TH execution
-defects, not operator decisions. The coordinator MUST diagnose and correct them automatically;
-never ask the operator whether or how to repair an agent contract.
-
-Classify a reviewer read failure from its exact failed path before deciding whether the review
-transport failed:
-
-- A non-`none` supplied artifact, the frozen worktree coordinate, or a project leaf independently
-  verified as existing but unreadable is `required-read-failed`: fail closed and do not preview or
-  publish.
-- A missing echoed reviewed SHA/technical hash/context hash in an otherwise supplied packet is
-  `agent-contract-invalid` for the automatic correction below. A different echoed value, a
-  non-identical post-dispatch snapshot, or a failed identity/freshness comparison is an integrity
-  failure: fail closed. Never relabel actual identity drift as an agent mistake.
-- A nonexistent path that was neither supplied nor verified is an agent path-scope mistake, not a
-  filesystem transport failure. Reject that failed result, preserve the current artifacts and
-  worktree, and do not tell the operator to repair filesystem access.
-- A failure without the exact path or enough evidence to distinguish those cases fails closed.
-
-For every failed/blocked reviewer return, observed failed read, or mechanically invalid return,
-first compute the strict post-dispatch snapshot comparison and current freshness status, then run
-the packaged helper before taking a recovery action. Pass those actual statuses and every
-non-`none` artifact used by that dispatch as a repeated `--required-artifact`; never omit one to
-obtain a retry result:
-
-```bash
-python3 "$REVIEW_CONTEXT_HELPER" classify-agent-failure \
-  --artifact-root "$ARTIFACTS" --worktree "$WORKTREE" \
-  --required-artifact "$CONTEXT" --required-artifact "$DIFF" \
-  --required-artifact "$FILES" \
-  {--required-directory "$WORKSPACE" when Workspace Path is non-none} \
-  {--failed-path "<exact failed path>" when known} \
-  --contract-signal {none|missing-coordinate|missing-return-field|agent-persistence-path|missing-read-tools|unverified-path-read} \
-  --reviewed-sha-status {match|missing|mismatch} \
-  --context-hash-status {match|missing|mismatch} \
-  --snapshot-status {match|mismatch} --freshness-status {current|failed} \
-  --role {general|specialist|consolidator} --attempt {1|2}
-```
-
-Add the other required file paths for the role (conversation, checks, policy, linked issue, or
-supplied drafts) with `--required-artifact`; pass a non-`none` workspace path with
-`--required-directory`. The helper revalidates those coordinates and the frozen worktree and
-returns exactly one `decision`: `retry-contract`, `continue-comment`, or `fail-closed`. Its
-decision is authoritative; do not replace it with model judgment. A missing helper, malformed
-invocation, or helper error fails closed.
-
-When the helper returns `retry-contract`, its accepted snapshot/freshness inputs and coordinate
-preflight authorize only this correction: the coordinator mechanically rebuilds the packet from
-the already captured coordinates, names the exact violated contract rule and expected field/read
-scope, and dispatches one automatic correction using a fresh instance of the same agent identity
-against the same `head_oid`, `technical_hash`, `context_hash`, worktree, and supplied artifact
-coordinates. For a
-path mistake, also name the exact absent path as unavailable optional/inferred context that MUST
-NOT be opened. This correction needs no preview, approval, gate, or operator reply. Do not clean
-up, rebuild, or recapture the snapshot before it.
-
-Accept the replacement only when its identity matches and the strict post-dispatch snapshots pass.
-If a selected specialist returns another contract-invalid result, mark that specialist `absent
-after retry (agent contract)` and continue with every successful draft; never treat it as a clean
-lens. Any selected-lens absence forces the recommendation and body verdict to `COMMENT`, so an
-incomplete review cannot auto-approve while the normal preview/approval gate remains intact. Do
-not pause for operator guidance about that internal defect. A failed general-review draft or
-consolidation that leaves no trustworthy canonical draft still fails closed with the violated rule
-reported; the coordinator never fabricates findings or drops an unaccounted blocker.
-
-Every lens returns its draft inline with the exact reviewed SHA, technical hash, and supplied
-context hash. A missing echo is `agent-contract-invalid` and follows the automatic classifier;
-reject a mismatched SHA or technical hash as an identity failure. A stale context hash with the
-same technical hash is conversation drift and follows the reconciliation path below, not a reason
-to discard technical results. After validating the returned SHA and technical hash, the
-coordinator alone persists candidate returns using this fixed mapping: reviewer body →
-`$ARTIFACTS/pr-review-draft.md`, reviewer findings →
+After validating the returned SHA and technical hash, the coordinator alone persists returns using
+this fixed mapping: reviewer body → `$ARTIFACTS/pr-review-draft.md`, reviewer findings →
 `$ARTIFACTS/pr-review-draft-inline.json`, QA → `$ARTIFACTS/pr-review-qa.md`, security →
-`$ARTIFACTS/pr-review-security.md`, consolidator body → `$ARTIFACTS/pr-review-final.md`, and consolidator
-findings → `$ARTIFACTS/pr-review-inline.json`. Ignore any output path proposed by an agent.
+`$ARTIFACTS/pr-review-security.md`, consolidator body → `$ARTIFACTS/pr-review-final.md`,
+consolidator findings → `$ARTIFACTS/pr-review-inline.json`, verifier →
+`$ARTIFACTS/pr-review-verifier.json`. Ignore any output path proposed by an agent.
 
 ### Post-dispatch conversation reconciliation
 
-After every selected technical specialist joins and its candidate return is identity-validated,
-run `refresh-context` once more before choosing the canonical draft:
+After every selected technical specialist joins and its return is identity-validated, run
+`refresh-context` once more. `continue` uses the results; `restart-technical-review` discards them
+and restarts Gather once; `reconcile-conversation` preserves every result whose `technical_hash`
+matches, reruns same-author/prior-review detection, and performs exactly one reconciliation —
+`reviewer` in `reconcile-conversation` mode when only the general draft exists, otherwise one
+`reviewer-consolidator` dispatch with the drafts plus the fresh context and conversation — whose
+return echoes the unchanged `technical_hash` and the fresh `context_hash`. A
+`technical_recheck_required` naming `general` or `security` with an exact cited locus dispatches
+only that specialist once against the unchanged snapshot, then reconciles once more.
 
-- `next_action: continue`: use the candidate results normally.
-- `next_action: restart-technical-review`: discard candidate results and restart Gather once;
-  changed code or semantic intent invalidates their evidence.
-- `next_action: reconcile-conversation`: preserve every candidate whose `technical_hash` matches,
-  rerun same-author/prior-review detection on the promoted fresh context, and treat a formal
-  review by this author on the same `head_oid` as deduplication input, never as a blanket stop.
-  Perform exactly one conversation reconciliation: when only the general draft exists, dispatch
-  `reviewer` in `reconcile-conversation` mode with its candidate body/inline paths and the fresh context and
-  conversation; when multiple lens drafts exist, dispatch `reviewer-consolidator` once with those
-  candidates plus the fresh context and conversation. The reconciliation may remove duplicates,
-  account for active/resolved threads, and update verdict/body metadata, but it never repeats QA,
-  security, or a full general code review. Its return must echo the unchanged `technical_hash` and
-  the fresh `context_hash`.
+### Canonical draft
 
-If reconciliation identifies a new conversation claim whose validity cannot be decided from its
-exact cited current-code locus, it returns `technical_recheck_required` naming `general` or
-`security`. Dispatch only that named specialist once against the unchanged technical snapshot and
-fresh context, then reconcile once more. An absent locus, a generic new review, or publication of
-another verdict never authorizes a technical recheck.
-
-After reconciliation, publish every net-new supported finding even when this author already
-reviewed the same head. If the earlier same-head review already contains every current finding,
-do not post a duplicate: report that the existing review satisfies the mode's review outcome.
-
-If only the general reviewer ran, its body and inline JSON are canonical. If any additional
-draft exists, dispatch `review-consolidate` once with the source file paths, `head_oid`,
+If only the general reviewer ran, its body and inline JSON are canonical. If any additional draft
+exists, dispatch `reviewer-consolidator` once with the source file paths, `head_oid`,
 `technical_hash`, `context_hash`, the current conversation path, and the read-only `Worktree`
-coordinate so adjudication cites code and deduplicates against current threads.
-The consolidator produces:
-
-- `$ARTIFACTS/pr-review-final.md`
-- `$ARTIFACTS/pr-review-inline.json`
-
+coordinate. It produces `$ARTIFACTS/pr-review-final.md` and `$ARTIFACTS/pr-review-inline.json`.
 There is no automatic convergence loop.
 
-**Reconcile the consolidation.** The consolidator's status block enumerates, per source lens,
-findings received and their disposition (`preserved`, `demoted`, `dropped`) with a one-line
-reason each. Before preview, verify every blocking finding present in a source draft appears
-either in the consolidated output or in that ledger; on a mismatch, retry the consolidator once
-with the discrepancy named. If the retry still fails, preserve the independently validated
-general draft and every validated specialist blocker as explicit cross-file findings, then
-produce a conservative `REQUEST_CHANGES` or `COMMENT` draft instead of asking the operator how to
-repair the consolidator. A missing or count-inconsistent ledger is never a silent pass-through.
+The consolidator's return enumerates, per source lens, findings received and their disposition
+(`preserved`, `demoted`, `dropped`) with a one-line reason. Before verification, confirm every
+blocking finding present in a source draft appears in the consolidated output or in that ledger.
+On a mismatch, retry the consolidator once with the discrepancy named; if it still fails, preserve
+the validated general draft and every validated specialist blocker as explicit cross-file findings
+and produce a conservative `REQUEST_CHANGES` or `COMMENT` draft. A missing or count-inconsistent
+ledger is never a silent pass-through.
 
-**Lens coverage line.** After the canonical body is chosen (either path), insert one line under
-`Checks:` naming each selected lens and its outcome — `ran`, `limited ({reason})`, or
-`absent after retry` — for example `Lenses: reviewer ran, qa limited (no operator oracle),
-security ran`. This line is coordinator-owned mechanical metadata; agents never write it. An
-absent selected lens must appear here and forces `COMMENT`, so a published APPROVE can never hide
-a lens that did not run.
+## Verify
 
-While agents run, keep raw dispatch coordinates and identity validation silent. If a progress
-update is warranted, name the active agents and summarize their distinct review responsibilities
-against the concrete changed surfaces; never relay raw agent status blocks or waiting-tool output.
+Skip this step only when `verification` is `off`. Otherwise dispatch one `pr-review-verifier`
+against the canonical inline JSON:
+
+```text
+Mode: pr-review-verifier
+PR: #{number}
+Reviewed Head SHA: {head_oid}
+Technical Hash: {technical_hash}
+Context Hash: {context_hash}
+Worktree: {WORKTREE}
+Diff Path: {DIFF}
+Inline Findings Path: {canonical inline JSON path}
+Verification: {blocking-only | all}
+```
+
+The verifier returns one status per selected finding — `confirmed` with a `file:line` citation,
+`unconfirmed` with the reason, or `refuted` with the evidence — and never adds findings. Validate
+its identity echo like any other return, persist it, then apply it mechanically:
+
+```bash
+python3 "$REVIEW_CONTEXT_HELPER" apply-verification \
+  --artifact-root "$ARTIFACTS" --inline-name {canonical inline leaf} \
+  --verifier-name {pr-review-verifier.json | none} \
+  --verification {blocking-only | all} --output-name pr-review-inline.json
+```
+
+The helper demotes each unconfirmed blocker to a Suggestion whose body begins with
+`(unverified)`, drops each refuted blocker into the ledger as `dropped: verifier — <reason>`,
+leaves confirmed and unselected findings unchanged, and returns the coverage fragment
+(`verified k/n`). The helper rejects a return whose finding set differs from the selected findings.
+Pass `--verifier-name none` when the verifier returned nothing valid or the helper rejected its
+coverage: the findings are untouched, the fragment reads `verified 0/n (verifier absent)`, and the
+recommendation is forced to `COMMENT`. Append the verifier's ledger entries to the consolidation
+ledger (or write the ledger from them) and update the body's `Findings:` counts.
+
+**Coverage line.** Compose one line under `Checks:` from each selected lens outcome — `ran`,
+`limited ({reason})`, or `absent ({reason})` — plus the verification fragment:
+
+```bash
+python3 "$REVIEW_CONTEXT_HELPER" lenses-line --lens "reviewer ran" {--lens "qa limited (no operator oracle)"} \
+  --verification "{verified k/n | verified 0/n (verifier absent) | verification off (policy)}"
+```
+
+This line is coordinator-owned mechanical metadata; agents never write it. An absent selected lens
+or an absent verifier appears here and forces `COMMENT`, so a published APPROVE can never hide a
+lens or a verification that did not run.
 
 ## Output contract
 
-The canonical GitHub review has two surfaces.
-
 ### Body
-
-Use a compact index:
 
 ```markdown
 ## Review
@@ -530,15 +367,13 @@ Lenses: {coordinator-inserted coverage line}
 {Only cross-file findings that cannot be anchored to one changed line. Omit when empty.}
 ```
 
-Do not include reviewability scores, estimated time, file counts, per-agent sections, repeated
-inline findings, praise, or out-of-scope observations by default.
-
-Target at most 80 lines and 900 words. If supported cross-file blockers require more, preserve
-them and remove optional prose; never truncate a blocker.
+No reviewability scores, estimated time, file counts, per-agent sections, repeated inline
+findings, praise, or out-of-scope observations. Target at most 80 lines and 900 words; when
+cross-file blockers need more, remove optional prose and never truncate a blocker.
 
 ### Inline threads
 
-Use one comment per actionable, line-anchored finding:
+One comment per actionable, line-anchored finding:
 
 ```markdown
 **Blocking: {claim}**
@@ -548,10 +383,11 @@ Use one comment per actionable, line-anchored finding:
 **Fix:** {concrete correction in at most two short sentences.}
 ```
 
-Use `Suggestion` instead of `Blocking` for non-blocking improvements. Publish every supported
-blocker. Keep at most five suggestions globally. Omit style-only nitpicks.
+Use `Suggestion` instead of `Blocking` for non-blocking improvements; a demoted finding reads
+`**Suggestion: (unverified) {claim}**`. Publish every supported blocker. Keep at most
+`max_suggestions` suggestions globally. Omit style-only nitpicks.
 
-Inline JSON must contain only GitHub fields:
+Inline JSON contains only GitHub fields:
 
 ```json
 [{"path":"src/file.ts","line":42,"side":"RIGHT","body":"..."}]
@@ -572,106 +408,75 @@ Never dismiss prior reviews automatically.
 
 ## Preview
 
-Require a non-empty body and valid inline JSON. Retry the producing agent once for a missing or
-invalid artifact; then stop.
+Require a non-empty body and valid inline JSON. A missing or invalid artifact after a validated
+return is a coordinator persistence failure: rewrite it once from that return, then stop. A return
+already recorded `absent` is never retried.
 
-Unless `--auto-publish` was supplied, show the evidence before the recommendation:
-
-1. `PR #{number} review ready — nothing has been published.`;
-2. the exact body;
-3. every inline comment with path, line, and side;
-4. a superseded-review note when applicable, without exposing snapshot identity unless needed to
-   disambiguate it;
-5. an informational mergeability-drift line when the latest freshness comparison reported
-   `mergeability_changed`, never phrased as a blocker;
-6. a closing `Recommendation:` with the event in plain language and one concise rationale grounded
-   in the supported findings and available checks;
-7. five numeric choices with the recommended publish event first and marked `**(recommended)**`.
-
-Build the rationale without adding new findings: for `REQUEST_CHANGES`, state the blocking count
-and concrete consequence category; for `APPROVE`, state that no supported blockers remain and
-qualify the available check evidence; for `COMMENT`, state why the draft is informational rather
-than an approval or change request.
+Unless `--auto-publish` was supplied, show `PR #{number} review ready — nothing has been
+published.`, the exact body, every inline comment with path, line, and side, each verifier ledger
+entry (`dropped` and `demoted` claims with the verifier's reason), a superseded-review note when
+applicable, an informational mergeability-drift line when reported, and a closing
+`Recommendation:` with the event in plain language and one rationale grounded in the supported
+findings and checks: the blocking count and consequence for `REQUEST_CHANGES`, the absence of
+supported blockers for `APPROVE`, and the reason the draft is informational for `COMMENT` (an
+absent lens, an absent verifier, or no supported blocker). Never add findings here.
 
 **Approval anchor.** When the operator approves, record the SHA-256 of the exact canonical body
 artifact and inline JSON shown in the preview. The approval applies to those bytes and the
 displayed `context_hash` only.
 
-Use exactly one of these menus, matching the recommendation:
+Show one menu: the recommended event first, marked `**(recommended)**`, then the two other
+events in the order `Comment only`, `Request changes`, `Approve` minus the recommended one, then
+`4 — Defer` and `5 — Cancel`:
 
 ```text
-REQUEST_CHANGES:
-1 — Request changes **(recommended)**
-2 — Comment only
-3 — Approve
-4 — Defer
-5 — Cancel
-
-APPROVE:
-1 — Approve **(recommended)**
-2 — Comment only
-3 — Request changes
-4 — Defer
-5 — Cancel
-
-COMMENT:
-1 — Comment only **(recommended)**
-2 — Request changes
-3 — Approve
+1 — {recommended event} **(recommended)**
+2 — {next remaining event}
+3 — {last remaining event}
 4 — Defer
 5 — Cancel
 ```
 
-Accept the number or an unambiguous action phrase. Keep head/base SHAs, capture time, raw
-mergeability, context hash, and snapshot/worktree details hidden by default; provide them only on
-explicit request or when an integrity/freshness problem requires operator action.
+Accept the number or an unambiguous action phrase. Keep SHAs, capture time, raw mergeability,
+context hash, and snapshot details hidden by default.
 
 `defer` copies the canonical body to `$ARTIFACTS/pr-review-final.md`, preserves that file, inline
-JSON, and context for `--resume-from-draft`, then explicitly removes the worktree and
-nonessential artifacts after every reviewer has joined. `cancel` explicitly removes all artifacts
-at the same terminal boundary. Operator edits require
-another complete preview.
+JSON, and context for `--resume-from-draft`, then explicitly removes the worktree and nonessential
+artifacts after every reviewer has joined. `cancel` explicitly removes all artifacts at the same
+terminal boundary. Operator edits require another complete preview.
 
-**`--auto-publish` path.** No menu is shown and no approval exists: the published event is
-exactly the recommendation's event, the anchor is taken from the canonical draft at validation
-time, and the pre-publish freshness comparison runs against the pre-dispatch capture. Apply the
-same bounded code/semantic restart and review-state reconciliation rules below without prompting.
-A capture failure, unresolvable moving code target, or anchor mismatch prevents publication; the
-auto path never publishes unverified bytes or an event other than the recommendation.
+**`--auto-publish` path.** No menu and no approval: the published event is exactly the
+recommendation, the anchor is taken from the canonical draft at validation time, and the same
+freshness rules below apply without prompting. A capture failure, moving target, or anchor
+mismatch prevents publication.
 
 ## Pre-publish freshness
 
 After approval and immediately before the GitHub write, run `refresh-context` again against the
 approved capture.
 
-- `next_action: continue`: proceed directly to the write. When the comparison reports
-  `mergeability_changed`,
-  add one informational drift line to the publish confirmation; it never blocks the write.
-- First `next_action: restart-technical-review`: invalidate approval, restart Gather once, and return to Preview
-  for renewed approval.
-- `restart-technical-review` again on the capture taken after that restart: stop without restarting further —
-  present the drift to the operator and keep the drafted review for a manual retry.
-- `next_action: reconcile-conversation`: invalidate only the approval, preserve technical results,
-  rerun same-author/prior-review detection and the single conversation reconciliation above, then
-  show the changed draft in a fresh Preview. Do not rerun unchanged specialists.
+- `next_action: continue`: write; a reported `mergeability_changed` is one informational line.
+- `next_action: restart-technical-review`: invalidate approval and restart Gather once; a second
+  one after that restart stops and keeps the draft for a manual retry.
+- `next_action: reconcile-conversation`: invalidate only the approval, run the single
+  conversation reconciliation, re-apply the persisted verifier return to the reconciled inline
+  set with `apply-verification` (a rejected coverage forces `COMMENT`), and re-preview without
+  rerunning specialists or the verifier.
 - Capture or comparison failure: invalidate approval and restart Gather with
   `freshness could not be verified — review not published`.
 
-Approval applies only to the displayed `context_hash` and the recorded draft hashes: recompute
-the SHA-256 of the canonical body and inline JSON immediately before the write and require
-equality with the approval anchor. A mismatch means the draft changed after approval — fail
-closed and re-preview; never publish unanchored bytes.
-Never describe `conflicting` or `indeterminate` mergeability as merge-ready.
-`clean` describes only the displayed captured head/base/time; it never asserts current external
-readiness. State that the external system can change after Team Harness's final local check.
+Recompute the SHA-256 of the canonical body and inline JSON immediately before the write and
+require equality with the approval anchor; a mismatch fails closed and re-previews. Never describe
+`conflicting` or `indeterminate` mergeability as merge-ready; `clean` describes only the captured
+head/base/time and never asserts current external readiness.
 
 ## Publish
 
-Map the operator's numeric or textual choice to `APPROVE`, `REQUEST_CHANGES`, or `COMMENT`.
-When the chosen event differs from the recommendation, rewrite the body's `Verdict:` line to the
-chosen event through the leaf-safe artifact rule, refresh the approval anchor to the rewritten
-bytes, and show the operator the updated verdict line before the write — the published body and
-event must never disagree. Submit exactly once:
+Map the operator's choice to `APPROVE`, `REQUEST_CHANGES`, or `COMMENT`. When the chosen event
+differs from the recommendation, rewrite the body's `Verdict:` line to the chosen event through
+the leaf-safe artifact rule, refresh the approval anchor to the rewritten bytes, and show the
+updated verdict line before the write — the published body and event must never disagree. Submit
+exactly once:
 
 ```bash
 jq -n \
@@ -683,16 +488,10 @@ jq -n \
 | gh api -X POST "repos/{owner}/{repo}/pulls/{number}/reviews" --input -
 ```
 
-Never split the body and inline comments across API calls. Check the exit status, report the
-exact error on failure, and run explicit coordinator-owned cleanup on every terminal path after
-all reviewer processes have joined. Never attach cleanup to the lifetime of a capture or
-materialization shell.
+Never split the body and inline comments across API calls. Report the exact error on failure and
+run the coordinator-owned cleanup on every terminal path.
 
-Final response:
-
-```text
-Review on PR #{number} published as {APPROVE | REQUEST CHANGES | COMMENT}.
-```
+Final response: `Review on PR #{number} published as {APPROVE | REQUEST CHANGES | COMMENT}.`
 
 ## No input
 

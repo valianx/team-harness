@@ -119,7 +119,7 @@ coordinator writes state, events, and gate records.
 For full reference coverage of every pipeline — including the refactor flow, database changes flow, test pipeline, research/spike, plan flow, acceptance gate semantics, gh-fallback degradation tiers, and standalone PR review — see [`docs/pipelines.md`](./pipelines.md).
 
 PR review selects one general lens and adds QA or security only from explicit or fail-closed diff
-signals; PR size never adds opinions. All four PR agents are read-only and return drafts inline for
+signals; PR size never adds opinions. All five PR agents are read-only and return drafts inline for
 coordinator-owned persistence. A clean result names the captured head, base, and time rather than
 claiming current GitHub readiness, and any final recapture mismatch restarts gathering.
 

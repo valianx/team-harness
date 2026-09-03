@@ -29,9 +29,7 @@ RETIRED_PHRASES = (
 
 # Shrink-only. A value names the change that removes the entry; the suite fails when an
 # exempted file no longer carries a phrase, so an exemption cannot outlive its reason.
-EXEMPT = {
-    "skills/review-pr/SKILL.md": "verify-review-findings",
-}
+EXEMPT: dict[str, str] = {}
 
 # Where the closed list is written down. A file stating the rule quotes every phrase by
 # construction, which is not the fork the rule is about.

@@ -13,6 +13,7 @@ import secrets
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Iterable
@@ -1698,15 +1699,6 @@ def command_same_author(args: argparse.Namespace) -> int:
 # failure modes: a reason that means "could not classify" is not evidence of safety, and
 # a later indeterminate producer inherits the floor without being enumerated here.
 REASONS_WAIVING_SECURITY = {"known-non-executable"}
-AGENT_CONTRACT_SIGNALS = {
-    "missing-coordinate",
-    "missing-return-field",
-    "agent-persistence-path",
-    "missing-read-tools",
-    "unverified-path-read",
-}
-
-
 def resolve_security_required(reason: str, triggers: list[str]) -> bool:
     """Pure function of the resolved reason and trigger list.
 
@@ -1741,215 +1733,307 @@ def command_select_security(args: argparse.Namespace) -> int:
     return 0
 
 
-def _contained_by(path: Path, roots: tuple[Path, ...]) -> bool:
-    return any(path == root or root in path.parents for root in roots)
+VERIFICATION_MODES = ("blocking-only", "all", "off")
+DEFAULT_MAX_SUGGESTIONS = 5
+POLICY_YAML_BLOCK_RE = re.compile(r"```ya?ml[ \t]*\n(.*?)\n```", re.DOTALL)
+POLICY_KEY_RE = re.compile(r"^\s*(verification|max_suggestions)\s*:\s*([^#\n]*?)\s*(?:#.*)?$")
+BLOCKING_PREFIX_RE = re.compile(r"^\s*\*\*Blocking:\s*", re.IGNORECASE)
+SUGGESTION_PREFIX_RE = re.compile(r"^\s*\*\*Suggestion:\s*", re.IGNORECASE)
+MAX_SUGGESTIONS_RE = re.compile(r"^[0-9]+$")
+REVIEW_AGENT_NAMES = (
+    "reviewer",
+    "pr-review-qa",
+    "pr-review-security",
+    "pr-review-verifier",
+    "reviewer-consolidator",
+)
 
 
-def _classify_contract_result(role: str, attempt: int, reason: str) -> dict[str, Any]:
-    if attempt == 1:
-        return {
-            "decision": "retry-contract",
-            "failure_kind": "agent-contract-invalid",
-            "reason": reason,
-            "preserve_snapshot": True,
-            "operator_decision_required": False,
-        }
-    if role == "specialist":
-        return {
-            "decision": "continue-comment",
-            "failure_kind": "agent-contract-invalid",
-            "reason": reason,
-            "lens_outcome": "absent after retry (agent contract)",
-            "forced_event": "COMMENT",
-            "preserve_snapshot": True,
-            "operator_decision_required": False,
-        }
-    return {
-        "decision": "fail-closed",
-        "failure_kind": "canonical-draft-unavailable",
-        "reason": reason,
-        "preserve_snapshot": True,
-        "operator_decision_required": False,
+def read_review_policy(policy_path: Path | None) -> dict[str, Any]:
+    """Read the verification bar and suggestion cap from the optional review policy."""
+    policy = {
+        "verification": "blocking-only",
+        "max_suggestions": DEFAULT_MAX_SUGGESTIONS,
+        "source": "default",
     }
-
-
-def classify_agent_failure(
-    *,
-    artifact_root: Path,
-    worktree: Path,
-    required_artifacts: list[Path],
-    required_directories: list[Path],
-    failed_path: Path | None,
-    contract_signal: str,
-    reviewed_sha_status: str,
-    context_hash_status: str,
-    snapshot_status: str,
-    freshness_status: str,
-    role: str,
-    attempt: int,
-) -> dict[str, Any]:
-    """Classify reviewer failures without converting TH contract defects into operator gates."""
-    if attempt not in {1, 2} or role not in {"general", "specialist", "consolidator"}:
-        raise ContextError("invalid agent-failure recovery coordinates")
-    if contract_signal != "none" and contract_signal not in AGENT_CONTRACT_SIGNALS:
-        raise ContextError("unknown agent contract signal")
-
-    for status in (reviewed_sha_status, context_hash_status):
-        if status not in {"match", "missing", "mismatch"}:
-            raise ContextError("invalid agent identity status")
-    if snapshot_status not in {"match", "mismatch"} or freshness_status not in {"current", "failed"}:
-        raise ContextError("invalid snapshot recovery status")
-
-    if "mismatch" in {reviewed_sha_status, context_hash_status}:
-        return {
-            "decision": "fail-closed",
-            "failure_kind": "snapshot-identity-failed",
-            "reason": "agent returned a different immutable snapshot identity",
-            "preserve_snapshot": True,
-            "operator_decision_required": False,
-        }
-    if snapshot_status != "match" or freshness_status != "current":
-        return {
-            "decision": "fail-closed",
-            "failure_kind": "snapshot-integrity-failed",
-            "reason": "snapshot bytes or freshness no longer match",
-            "preserve_snapshot": True,
-            "operator_decision_required": False,
-        }
-
+    if policy_path is None:
+        return policy
     try:
-        artifact_root_resolved, artifact_root_fd = _open_directory(artifact_root)
-        os.close(artifact_root_fd)
-        worktree_resolved, worktree_fd = _open_directory(worktree)
-        os.close(worktree_fd)
-    except (ContextError, OSError):
+        text = policy_path.read_text(encoding="utf-8")
+    except OSError as error:
+        raise ContextError(f"review policy could not be read: {policy_path}") from error
+    block = POLICY_YAML_BLOCK_RE.search(text)
+    if block is not None:
+        for line in block.group(1).splitlines():
+            match = POLICY_KEY_RE.match(line)
+            if not match:
+                continue
+            key, value = match.group(1), match.group(2).strip().strip("'\"")
+            if key == "verification":
+                if value not in VERIFICATION_MODES:
+                    raise ContextError(f"review policy verification must be one of {', '.join(VERIFICATION_MODES)}")
+                policy["verification"] = value
+            else:
+                if not MAX_SUGGESTIONS_RE.fullmatch(value):
+                    raise ContextError("review policy max_suggestions must be a non-negative integer")
+                policy["max_suggestions"] = int(value)
+            policy["source"] = "policy"
+    return policy
+
+
+def read_base_review_policy(snapshot_git: Path, base_oid: str) -> dict[str, Any]:
+    """Read the policy from the base commit so the reviewed PR cannot set its own bar."""
+    if not re.fullmatch(r"[0-9a-f]{40}", base_oid):
+        raise ContextError("base oid must be a full commit SHA")
+    git = ["git", "--git-dir", str(snapshot_git)]
+    if not run_text([*git, "ls-tree", base_oid, "--", ".team-harness/review-policy.md"]):
+        return read_review_policy(None)
+    shown = run_text([*git, "show", f"{base_oid}:.team-harness/review-policy.md"])
+    with tempfile.TemporaryDirectory() as directory:
+        policy_path = Path(directory) / "review-policy.md"
+        policy_path.write_text(shown, encoding="utf-8")
+        policy = read_review_policy(policy_path)
+    policy["source"] = "base-commit" if policy["source"] == "policy" else policy["source"]
+    return policy
+
+
+def command_policy(args: argparse.Namespace) -> int:
+    if args.snapshot_git is not None or args.base_oid is not None:
+        if args.snapshot_git is None or args.base_oid is None:
+            raise ContextError("policy needs both --snapshot-git and --base-oid")
+        print(json.dumps(read_base_review_policy(args.snapshot_git, args.base_oid), sort_keys=True))
+        return 0
+    policy_path = None if args.policy in (None, "none") else Path(args.policy)
+    print(json.dumps(read_review_policy(policy_path), sort_keys=True))
+    return 0
+
+
+def _finding_key(finding: dict[str, Any]) -> tuple[str, int, str]:
+    try:
+        return (str(finding["path"]), int(finding["line"]), str(finding["side"]))
+    except (KeyError, TypeError, ValueError) as error:
+        raise ContextError("inline finding lacks a complete path/line/side anchor") from error
+
+
+def _is_blocking(finding: dict[str, Any]) -> bool:
+    """Anything not explicitly labelled a Suggestion is verified as blocking."""
+    return not SUGGESTION_PREFIX_RE.match(str(finding.get("body", "")))
+
+
+def _demote_body(body: str) -> str:
+    if BLOCKING_PREFIX_RE.match(body):
+        return BLOCKING_PREFIX_RE.sub("**Suggestion: (unverified) ", body, count=1)
+    if SUGGESTION_PREFIX_RE.match(body):
+        return SUGGESTION_PREFIX_RE.sub("**Suggestion: (unverified) ", body, count=1)
+    return f"**Suggestion: (unverified)** {body.lstrip()}"
+
+
+def apply_verification(
+    inline: list[dict[str, Any]],
+    verifier: dict[str, Any] | None,
+    mode: str,
+) -> dict[str, Any]:
+    """Apply the verifier's statuses to the inline findings.
+
+    Unconfirmed findings are demoted to `(unverified)` suggestions, refuted findings are
+    dropped into the ledger, and confirmed findings pass unchanged. Verification never adds a
+    finding. An absent verifier leaves the findings untouched and forces `COMMENT`; a present
+    verifier must cover exactly the selected findings, so a partial return cannot demote a
+    blocker outside the absent-verifier path.
+    """
+    if mode not in VERIFICATION_MODES:
+        raise ContextError("unknown verification mode")
+    if not isinstance(inline, list) or not all(isinstance(item, dict) for item in inline):
+        raise ContextError("inline findings must be a JSON array of objects")
+    if mode == "off":
         return {
-            "decision": "fail-closed",
-            "failure_kind": "required-read-failed",
-            "reason": "review artifact root or frozen worktree is unreadable",
-            "preserve_snapshot": True,
-            "operator_decision_required": False,
+            "inline": inline,
+            "ledger": [],
+            "coverage": "verification off (policy)",
+            "forced_event": None,
+            "confirmed": 0,
+            "selected": 0,
         }
-
-    roots = (artifact_root_resolved, worktree_resolved)
-    required_resolved: set[Path] = set()
-    for artifact in required_artifacts:
-        candidate = artifact.resolve(strict=False)
-        if not _contained_by(candidate, roots):
-            return {
-                "decision": "fail-closed",
-                "failure_kind": "required-read-failed",
-                "reason": "required artifact escapes the supplied review roots",
-                "preserve_snapshot": True,
-                "operator_decision_required": False,
-            }
-        try:
-            metadata = artifact.lstat()
-            if artifact.is_symlink() or not stat.S_ISREG(metadata.st_mode):
-                raise OSError("not a regular non-symlink file")
-            descriptor = os.open(candidate, os.O_RDONLY | NOFOLLOW)
-            try:
-                os.read(descriptor, 1)
-            finally:
-                os.close(descriptor)
-        except OSError:
-            return {
-                "decision": "fail-closed",
-                "failure_kind": "required-read-failed",
-                "reason": "required supplied artifact is unreadable",
-                "preserve_snapshot": True,
-                "operator_decision_required": False,
-            }
-        required_resolved.add(candidate)
-
-    for directory in required_directories:
-        candidate = directory.resolve(strict=False)
-        if not _contained_by(candidate, roots):
-            return {
-                "decision": "fail-closed",
-                "failure_kind": "required-read-failed",
-                "reason": "required directory escapes the supplied review roots",
-                "preserve_snapshot": True,
-                "operator_decision_required": False,
-            }
-        try:
-            resolved, descriptor = _open_directory(directory)
-            os.close(descriptor)
-        except (ContextError, OSError):
-            return {
-                "decision": "fail-closed",
-                "failure_kind": "required-read-failed",
-                "reason": "required supplied directory is unreadable",
-                "preserve_snapshot": True,
-                "operator_decision_required": False,
-            }
-        required_resolved.add(resolved)
-
-    path_scope_mistake = False
-    if failed_path is not None:
-        candidate = failed_path.resolve(strict=False)
-        if candidate in required_resolved or candidate == worktree_resolved:
-            return {
-                "decision": "fail-closed",
-                "failure_kind": "required-read-failed",
-                "reason": "required supplied coordinate could not be read",
-                "preserve_snapshot": True,
-                "operator_decision_required": False,
-            }
-        if not _contained_by(candidate, (worktree_resolved,)):
-            return {
-                "decision": "fail-closed",
-                "failure_kind": "unclassified-agent-failure",
-                "reason": "failed path is outside the supplied review coordinates",
-                "preserve_snapshot": True,
-                "operator_decision_required": False,
-            }
-        if candidate.exists() or candidate.is_symlink():
-            return {
-                "decision": "fail-closed",
-                "failure_kind": "required-read-failed",
-                "reason": "verified existing worktree path could not be read",
-                "preserve_snapshot": True,
-                "operator_decision_required": False,
-            }
-        path_scope_mistake = True
-
-    missing_identity = "missing" in {reviewed_sha_status, context_hash_status}
-    if missing_identity or contract_signal != "none" or path_scope_mistake:
-        if missing_identity:
-            reason = "agent omitted a supplied identity echo"
-        elif path_scope_mistake:
-            reason = "agent attempted a nonexistent unsupplied and unverified worktree path"
+    selected = [finding for finding in inline if mode == "all" or _is_blocking(finding)]
+    selected_keys = [_finding_key(finding) for finding in selected]
+    if len(set(selected_keys)) != len(selected_keys):
+        raise ContextError("inline findings share one path:line side anchor, so verifier statuses would be ambiguous")
+    if verifier is None:
+        return {
+            "inline": inline,
+            "ledger": [],
+            "coverage": f"verified 0/{len(selected)} (verifier absent)",
+            "forced_event": "COMMENT",
+            "confirmed": 0,
+            "selected": len(selected),
+        }
+    statuses: dict[tuple[str, int, str], dict[str, Any]] = {}
+    for result in verifier.get("findings") or []:
+        if not isinstance(result, dict):
+            raise ContextError("verifier finding must be an object")
+        if result.get("status") not in {"confirmed", "unconfirmed", "refuted"}:
+            raise ContextError("verifier status must be confirmed, unconfirmed, or refuted")
+        key = _finding_key(result)
+        if key in statuses:
+            raise ContextError(f"verifier returned two statuses for {key[0]}:{key[1]} {key[2]}")
+        statuses[key] = result
+    if set(statuses) != set(selected_keys):
+        missing = len(set(selected_keys) - set(statuses))
+        unexpected = len(set(statuses) - set(selected_keys))
+        raise ContextError(
+            f"verifier coverage does not match the selected findings ({missing} missing, {unexpected} unexpected)"
+        )
+    selected_ids = {id(finding) for finding in selected}
+    output: list[dict[str, Any]] = []
+    ledger: list[dict[str, Any]] = []
+    confirmed = 0
+    for finding in inline:
+        if id(finding) not in selected_ids:
+            output.append(finding)
+            continue
+        result = statuses[_finding_key(finding)]
+        status = result["status"]
+        reason = str(result.get("evidence") or result.get("reason") or "no evidence given")
+        claim = str(finding.get("body", "")).splitlines()[0].strip("* ")
+        if status == "confirmed":
+            confirmed += 1
+            output.append(finding)
+        elif status == "refuted":
+            ledger.append({"source": "verifier", "finding": claim, "disposition": "dropped", "reason": f"verifier — {reason}"})
         else:
-            reason = f"agent violated contract: {contract_signal}"
-        return _classify_contract_result(role, attempt, reason)
-
+            output.append({**finding, "body": _demote_body(str(finding.get("body", "")))})
+            ledger.append({"source": "verifier", "finding": claim, "disposition": "demoted", "reason": f"verifier — {reason}"})
     return {
-        "decision": "fail-closed",
-        "failure_kind": "unclassified-agent-failure",
-        "reason": "agent failure did not identify an exact path or contract signal",
-        "preserve_snapshot": True,
-        "operator_decision_required": False,
+        "inline": output,
+        "ledger": ledger,
+        "coverage": f"verified {confirmed}/{len(selected)}",
+        "forced_event": None,
+        "confirmed": confirmed,
+        "selected": len(selected),
     }
 
 
-def command_classify_agent_failure(args: argparse.Namespace) -> int:
-    result = classify_agent_failure(
-        artifact_root=args.artifact_root,
-        worktree=args.worktree,
-        required_artifacts=args.required_artifact,
-        required_directories=args.required_directory,
-        failed_path=args.failed_path,
-        contract_signal=args.contract_signal,
-        reviewed_sha_status=args.reviewed_sha_status,
-        context_hash_status=args.context_hash_status,
-        snapshot_status=args.snapshot_status,
-        freshness_status=args.freshness_status,
-        role=args.role,
-        attempt=args.attempt,
-    )
+def write_artifact_leaf(root: Path, name: str, content: bytes) -> None:
+    """Write one artifact leaf through an exclusive temporary and atomic promotion."""
+    name = _safe_leaf(name)
+    temporary = f"tmp-{secrets.token_hex(8)}-{name}"
+    _, directory_fd = _open_directory(root)
+    try:
+        leaf_fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW, 0o644, dir_fd=directory_fd)
+        try:
+            view = memoryview(content)
+            while view:
+                view = view[os.write(leaf_fd, view):]
+            os.fsync(leaf_fd)
+        finally:
+            os.close(leaf_fd)
+    finally:
+        os.close(directory_fd)
+    promote_artifact(root, temporary, name)
+
+
+def command_apply_verification(args: argparse.Namespace) -> int:
+    inline = json.loads(safe_read_leaf(args.artifact_root, args.inline_name))
+    verifier = None
+    if args.verifier_name not in (None, "none"):
+        verifier = json.loads(safe_read_leaf(args.artifact_root, args.verifier_name))
+    result = apply_verification(inline, verifier, args.verification)
+    if args.output_name:
+        write_artifact_leaf(args.artifact_root, args.output_name, json.dumps(result["inline"], indent=2).encode("utf-8") + b"\n")
     print(json.dumps(result, sort_keys=True))
-    return 0 if result["decision"] != "fail-closed" else 30
+    return 0
+
+
+def format_lenses_line(lenses: list[str], verification: str | None) -> str:
+    """Compose the coordinator-owned coverage line."""
+    entries = [entry.strip() for entry in lenses if entry and entry.strip()]
+    if not entries:
+        raise ContextError("at least one lens outcome is required")
+    if verification:
+        entries.append(verification.strip())
+    return "Lenses: " + ", ".join(entries)
+
+
+def command_lenses_line(args: argparse.Namespace) -> int:
+    print(format_lenses_line(args.lens, args.verification))
+    return 0
+
+
+def _codex_agent_set_status(agents_dir: Path) -> dict[str, Any]:
+    missing: list[str] = []
+    invalid: list[str] = []
+    for name in REVIEW_AGENT_NAMES:
+        toml_path = agents_dir / f"{name}.toml"
+        if toml_path.is_symlink() or not toml_path.is_file():
+            missing.append(name)
+            continue
+        text = toml_path.read_text(encoding="utf-8", errors="replace")
+        markers = (
+            f'name = "{name}"',
+            'sandbox_mode = "read-only"',
+            f"# Semantic source: agents/{name}.md",
+            f"# Instruction source: runtime/codex/instructions/{name}.md",
+            "# Projection tier:",
+        )
+        if not all(marker in text for marker in markers):
+            invalid.append(name)
+    if not missing and not invalid:
+        status = "complete"
+    elif len(missing) == len(REVIEW_AGENT_NAMES):
+        status = "missing"
+    else:
+        status = "mixed"
+    return {"status": status, "missing": missing, "invalid": invalid, "agents_dir": str(agents_dir)}
+
+
+def _codex_agent_dirs(repo_root: Path, agents_dir: Path | None) -> list[Path]:
+    if agents_dir is not None:
+        return [agents_dir]
+    codex_home = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
+    return [repo_root / ".codex" / "agents", codex_home / "agents"]
+
+
+def _codex_agents_status(repo_root: Path, agents_dir: Path | None) -> dict[str, Any]:
+    """Report the first complete agent set among the project and global scopes."""
+    statuses = [(directory, _codex_agent_set_status(directory)) for directory in _codex_agent_dirs(repo_root, agents_dir)]
+    directory, status = next(((d, s) for d, s in statuses if s["status"] == "complete"), statuses[0])
+    return {**status, "agents_dir": str(directory), "searched": [str(d) for d, _ in statuses]}
+
+
+def preflight(repo_root: Path, runtime: str, agents_dir: Path | None) -> dict[str, Any]:
+    """Check the review prerequisites once and report every blocker."""
+    blockers: list[str] = []
+    try:
+        completed = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True, timeout=COMMAND_TIMEOUT_SECONDS)
+        gh_status = "authenticated" if completed.returncode == 0 else "unauthenticated"
+    except (OSError, subprocess.TimeoutExpired):
+        gh_status = "unavailable"
+    if gh_status != "authenticated":
+        blockers.append(f"gh {gh_status}")
+    gitignore = repo_root / ".gitignore"
+    ignored_before = gitignore.is_file() and any(
+        line.strip() in {"/workspaces", "/workspaces/"} for line in gitignore.read_text(encoding="utf-8", errors="replace").splitlines()
+    )
+    ensure_workspaces_ignored(repo_root)
+    codex_agents: dict[str, Any] | None = None
+    if runtime == "codex":
+        codex_agents = _codex_agents_status(repo_root, agents_dir)
+        if codex_agents["status"] != "complete":
+            blockers.append(f"codex review agents {codex_agents['status']}")
+    return {
+        "ok": not blockers,
+        "gh": gh_status,
+        "workspaces_ignore": "present" if ignored_before else "added",
+        "codex_agents": codex_agents,
+        "review_agents": list(REVIEW_AGENT_NAMES),
+        "blockers": blockers,
+    }
+
+
+def command_preflight(args: argparse.Namespace) -> int:
+    result = preflight(args.repo_root, args.runtime, args.agents_dir)
+    print(json.dumps(result, sort_keys=True))
+    return 0 if result["ok"] else 30
 
 
 def command_ensure_workspaces_ignore(args: argparse.Namespace) -> int:
@@ -2209,38 +2293,30 @@ def build_parser() -> argparse.ArgumentParser:
     security_parser.add_argument("--tier", type=int)
     security_parser.set_defaults(func=command_select_security)
 
-    recovery_parser = subparsers.add_parser("classify-agent-failure")
-    recovery_parser.add_argument("--artifact-root", required=True, type=Path)
-    recovery_parser.add_argument("--worktree", required=True, type=Path)
-    recovery_parser.add_argument(
-        "--required-artifact", action="append", required=True, type=Path
-    )
-    recovery_parser.add_argument(
-        "--required-directory", action="append", default=[], type=Path
-    )
-    recovery_parser.add_argument("--failed-path", type=Path)
-    recovery_parser.add_argument(
-        "--contract-signal",
-        choices=["none", *sorted(AGENT_CONTRACT_SIGNALS)],
-        default="none",
-    )
-    recovery_parser.add_argument(
-        "--reviewed-sha-status", choices=["match", "missing", "mismatch"], required=True
-    )
-    recovery_parser.add_argument(
-        "--context-hash-status", choices=["match", "missing", "mismatch"], required=True
-    )
-    recovery_parser.add_argument(
-        "--snapshot-status", choices=["match", "mismatch"], required=True
-    )
-    recovery_parser.add_argument(
-        "--freshness-status", choices=["current", "failed"], required=True
-    )
-    recovery_parser.add_argument(
-        "--role", choices=["general", "specialist", "consolidator"], required=True
-    )
-    recovery_parser.add_argument("--attempt", choices=[1, 2], type=int, required=True)
-    recovery_parser.set_defaults(func=command_classify_agent_failure)
+    policy_parser = subparsers.add_parser("policy")
+    policy_parser.add_argument("--policy", default="none")
+    policy_parser.add_argument("--snapshot-git", type=Path)
+    policy_parser.add_argument("--base-oid")
+    policy_parser.set_defaults(func=command_policy)
+
+    verification_parser = subparsers.add_parser("apply-verification")
+    verification_parser.add_argument("--artifact-root", required=True, type=Path)
+    verification_parser.add_argument("--inline-name", required=True)
+    verification_parser.add_argument("--verifier-name", default="none")
+    verification_parser.add_argument("--verification", choices=list(VERIFICATION_MODES), required=True)
+    verification_parser.add_argument("--output-name")
+    verification_parser.set_defaults(func=command_apply_verification)
+
+    lenses_parser = subparsers.add_parser("lenses-line")
+    lenses_parser.add_argument("--lens", action="append", required=True)
+    lenses_parser.add_argument("--verification")
+    lenses_parser.set_defaults(func=command_lenses_line)
+
+    preflight_parser = subparsers.add_parser("preflight")
+    preflight_parser.add_argument("--repo-root", required=True, type=Path)
+    preflight_parser.add_argument("--runtime", choices=["claude", "codex", "opencode"], required=True)
+    preflight_parser.add_argument("--agents-dir", type=Path)
+    preflight_parser.set_defaults(func=command_preflight)
 
     ignore_parser = subparsers.add_parser("ensure-workspaces-ignore")
     ignore_parser.add_argument("--repo-root", required=True, type=Path)

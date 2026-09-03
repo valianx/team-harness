@@ -5,7 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { constants as fsConstants } from "node:fs";
 import {
-  lstat, mkdir, open, readFile, realpath, rename, rm, unlink,
+  lstat, mkdir, open, readdir, readFile, realpath, rename, rm, unlink,
 } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
@@ -678,6 +678,55 @@ function stateMarkdown(value) {
 function findingsMarkdown(value) {
   const rows = Object.values(value.findings).sort((left, right) => left.id.localeCompare(right.id));
   return `# Findings ledger\n\n> Projection only. Rebuild from the v5 control log.\n\n| ID | Class | Severity | State | Summary |\n|---|---|---|---|---|\n${rows.map(item => `| ${item.id} | ${item.class} | ${item.severity} | ${item.state} | ${item.summary.replaceAll("|", "\\|")} |`).join("\n")}${rows.length ? "\n" : ""}`;
+}
+
+const TASK_CHECKBOX = /^(\s*[-*]\s+\[)[xX ](\])/gm;
+
+export function normalizeTaskCheckboxes(text) {
+  return text.replace(TASK_CHECKBOX, "$1 $2");
+}
+
+async function listChangeFiles(root, relative = "") {
+  const entries = await readdir(path.join(root, relative), { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const entryPath = relative ? `${relative}/${entry.name}` : entry.name;
+    if (entry.isSymbolicLink()) throw new Error("CHANGE_PATH_SYMLINK");
+    if (entry.isDirectory()) files.push(...await listChangeFiles(root, entryPath));
+    else if (entry.isFile()) files.push(entryPath);
+    else throw new Error("CHANGE_PATH_INVALID");
+  }
+  return files;
+}
+
+export async function openspecContentIdentity({ change_root: changeRoot }) {
+  try {
+    const root = await canonicalDirectory(changeRoot, "CHANGE_ROOT_INVALID").catch(() => { throw new Error("CHANGE_ROOT_INVALID"); });
+    const files = (await listChangeFiles(root)).sort();
+    if (files.length === 0) throw new Error("CHANGE_EMPTY");
+    const hash = createHash("sha256");
+    for (const relative of files) {
+      const raw = await readFile(path.join(root, relative));
+      const bytes = relative === "tasks.md" ? Buffer.from(normalizeTaskCheckboxes(raw.toString("latin1")), "latin1") : raw;
+      const name = Buffer.from(relative);
+      hash.update(`${name.length}\0`).update(name).update(`${bytes.length}\0`).update(bytes);
+    }
+    return { ok: true, identity: hash.digest("hex"), files, error_code: null };
+  } catch (error) {
+    const known = new Set(["CHANGE_ROOT_INVALID", "CHANGE_PATH_SYMLINK", "CHANGE_PATH_INVALID", "CHANGE_EMPTY"]);
+    return { ok: false, identity: null, files: [], error_code: known.has(error?.message) ? error.message : "CHANGE_READ_FAILED" };
+  }
+}
+
+export function taskProgressDelta({ pinned, current }) {
+  if (typeof pinned !== "string" || typeof current !== "string") return { ok: false, delta: null, error_code: "TASKS_INVALID" };
+  if (pinned === current) return { ok: true, delta: "none", error_code: null };
+  if (normalizeTaskCheckboxes(pinned) !== normalizeTaskCheckboxes(current)) return { ok: true, delta: "structural", error_code: null };
+  const before = pinned.split("\n");
+  const after = current.split("\n");
+  const complete = (line) => /^\s*[-*]\s+\[[xX]\]/.test(line);
+  const regression = before.some((line, index) => line !== after[index] && complete(line) && !complete(after[index]));
+  return { ok: true, delta: regression ? "regression" : "progress", error_code: null };
 }
 
 export async function rebuildControlProjections({ log_path: logPath, workspace, writer }) {

@@ -79,7 +79,9 @@ and tasks.
    narrow the request — and record it as a `design.oversize` event. Nothing in
    steps 5-7 exists until that decision is recorded; accept resumes the same
    pass.
-5. Compute a content identity over canonical OpenSpec artifacts.
+5. Compute the content identity with `openspecContentIdentity` (sorted paths and
+   bytes, checkbox state normalized); `taskProgressDelta` later tells authorized
+   ticks from regressions.
 6. Main generates read-only `01-plan.md` with observable outcome,
    included/excluded scope, approach, coherent work batches, material risks and
    decisions, preserved behavior, canonical links, and the pinned identity.
@@ -93,8 +95,8 @@ Nobody edits it manually.
 
 There is no automatic design review panel. An explicit `/th:plan-review` dispatches one surviving read-only `plan-reviewer`
 over canonical OpenSpec and projection fidelity. It creates no Gate authority
-and reports that no dedicated security specialist ran, with `/th:security` as
-the explicit follow-up when the operator wants that separate assessment.
+and reports that no security specialist ran; `/th:security` is the explicit
+follow-up.
 
 ## Implementation
 
@@ -221,10 +223,9 @@ authority/semantic/worktree/input/context identities and a different safe
 causal action. Replace unverifiable context; pause on unsafe ownership,
 integrity failure, unavailable prerequisites, or repeated causal identity.
 
-A workspace without `control/control.jsonl` has nothing to replay. Close it
+A workspace without `control/control.jsonl` has nothing to replay: close it
 administratively with one events entry and offer inline continuation or a
-fresh run. Current dispatch never imports legacy routing or accepts mixed
-writable schemas.
+fresh run. Mixed writable schemas fail closed.
 
 ## Retained safety floors
 

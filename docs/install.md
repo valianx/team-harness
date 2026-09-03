@@ -10,8 +10,8 @@ codex plugin add team-harness@team-harness
 ```
 
 Review and explicitly trust the plugin hooks, then start a new thread. Plugin
-installation is separate from the twelve-agent placement required by delegated
-pipeline and PR-review workflows; use `install apply --runtime codex --scope project` for the twelve
+installation is separate from the thirteen-agent placement required by delegated
+pipeline and PR-review workflows; use `install apply --runtime codex --scope project` for the thirteen
 generated TOML agents before delegation. Start from a clean `Main` thread and
 invoke `@Team-Harness init <task>` for lightweight intake without state or
 subagents. Invoke `@Team-Harness pipeline <task>` only for the full gated flow.
@@ -119,6 +119,7 @@ After installing, two optional scaffolds are available via `/th:bootstrap`:
 
 - `/th:bootstrap --scaffold-rereview-workflow` — adds `.github/workflows/team-harness-rereview.yml` to the consumer repo. The workflow posts a PR comment when new commits arrive on a PR that already has a team-harness review, nudging the operator to re-run `/review-pr`. On private repos, each run consumes ~1 GitHub Actions minute.
 - `/th:bootstrap --scaffold-review-policy` — adds `.team-harness/review-policy.md` with a starter review policy template. The `reviewer` agent reads this file when present and enforces the declared rules.
+  The same file may carry a fenced `yaml` block with `verification: blocking-only | all | off` (default `blocking-only`) and `max_suggestions: <n>` (default `5`); `/th:review-pr` reads both through `review_context.py policy` before dispatching the verifier.
 
 ## Invoking the bug-fix and feature pipelines
 

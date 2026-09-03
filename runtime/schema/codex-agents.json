@@ -10,7 +10,9 @@
   "project_defaults": {
     "default_subagent_model": "gpt-5.6-luna",
     "default_subagent_reasoning_effort": "max",
-    "project_doc_fallback_filenames": ["CLAUDE.md"],
+    "project_doc_fallback_filenames": [
+      "CLAUDE.md"
+    ],
     "features": {
       "multi_agent": true,
       "multi_agent_v2": true
@@ -24,30 +26,68 @@
     "external-read",
     "external-write"
   ],
-  "allowed_sandbox_modes": ["read-only", "workspace-write"],
-  "allowed_source_models": ["opus", "sonnet", "haiku"],
-  "allowed_source_efforts": ["medium", "high", "xhigh"],
-  "allowed_runtime_reasoning_efforts": ["low", "medium", "high", "xhigh", "max"],
+  "allowed_sandbox_modes": [
+    "read-only",
+    "workspace-write"
+  ],
+  "allowed_source_models": [
+    "opus",
+    "sonnet",
+    "haiku"
+  ],
+  "allowed_source_efforts": [
+    "medium",
+    "high",
+    "xhigh"
+  ],
+  "allowed_runtime_reasoning_efforts": [
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max"
+  ],
   "projection_tiers": [
     {
       "name": "opus",
-      "source_models": ["opus"],
-      "source_efforts": ["medium", "high", "xhigh"]
+      "source_models": [
+        "opus"
+      ],
+      "source_efforts": [
+        "medium",
+        "high",
+        "xhigh"
+      ]
     },
     {
       "name": "sonnet-high",
-      "source_models": ["sonnet"],
-      "source_efforts": ["high", "xhigh"]
+      "source_models": [
+        "sonnet"
+      ],
+      "source_efforts": [
+        "high",
+        "xhigh"
+      ]
     },
     {
       "name": "sonnet-medium",
-      "source_models": ["sonnet"],
-      "source_efforts": ["medium"]
+      "source_models": [
+        "sonnet"
+      ],
+      "source_efforts": [
+        "medium"
+      ]
     },
     {
       "name": "haiku",
-      "source_models": ["haiku"],
-      "source_efforts": ["medium", "high", "xhigh"]
+      "source_models": [
+        "haiku"
+      ],
+      "source_efforts": [
+        "medium",
+        "high",
+        "xhigh"
+      ]
     }
   ],
   "default_profile": "team-harness",
@@ -80,7 +120,11 @@
       "description": "Designs scoped solutions and produces acceptance-driven work plans.",
       "semantic_source": "agents/architect.md",
       "sandbox_mode": "workspace-write",
-      "capabilities": ["filesystem-read", "filesystem-write", "external-read"],
+      "capabilities": [
+        "filesystem-read",
+        "filesystem-write",
+        "external-read"
+      ],
       "instruction_source": "runtime/codex/instructions/architect.md",
       "output_path": ".codex/agents/architect.toml"
     },
@@ -89,7 +133,11 @@
       "description": "Implements one approved task within its declared file scope.",
       "semantic_source": "agents/implementer.md",
       "sandbox_mode": "workspace-write",
-      "capabilities": ["filesystem-read", "filesystem-write", "command-exec"],
+      "capabilities": [
+        "filesystem-read",
+        "filesystem-write",
+        "command-exec"
+      ],
       "instruction_source": "runtime/codex/instructions/implementer.md",
       "output_path": ".codex/agents/implementer.toml"
     },
@@ -98,7 +146,11 @@
       "description": "Authors and runs tests mapped to acceptance criteria.",
       "semantic_source": "agents/tester.md",
       "sandbox_mode": "workspace-write",
-      "capabilities": ["filesystem-read", "test-write", "command-exec"],
+      "capabilities": [
+        "filesystem-read",
+        "test-write",
+        "command-exec"
+      ],
       "instruction_source": "runtime/codex/instructions/tester.md",
       "output_path": ".codex/agents/tester.toml"
     },
@@ -107,7 +159,11 @@
       "description": "Cleans the approved changed production surface without changing behavior or tests.",
       "semantic_source": "agents/cleaner.md",
       "sandbox_mode": "workspace-write",
-      "capabilities": ["filesystem-read", "filesystem-write", "command-exec"],
+      "capabilities": [
+        "filesystem-read",
+        "filesystem-write",
+        "command-exec"
+      ],
       "instruction_source": "runtime/codex/instructions/cleaner.md",
       "output_path": ".codex/agents/cleaner.toml"
     },
@@ -116,7 +172,10 @@
       "description": "Validates delivered behavior against the approved acceptance criteria.",
       "semantic_source": "agents/qa.md",
       "sandbox_mode": "read-only",
-      "capabilities": ["filesystem-read", "command-exec"],
+      "capabilities": [
+        "filesystem-read",
+        "command-exec"
+      ],
       "instruction_source": "runtime/codex/instructions/qa.md",
       "output_path": ".codex/agents/qa.toml"
     },
@@ -125,7 +184,11 @@
       "description": "Audits changed behavior for concrete security regressions and risks.",
       "semantic_source": "agents/security.md",
       "sandbox_mode": "read-only",
-      "capabilities": ["filesystem-read", "command-exec", "external-read"],
+      "capabilities": [
+        "filesystem-read",
+        "command-exec",
+        "external-read"
+      ],
       "instruction_source": "runtime/codex/instructions/security.md",
       "output_path": ".codex/agents/security.toml"
     },
@@ -134,7 +197,10 @@
       "description": "Runs one bounded tester, QA, security, or adversary lens over an anchored project.",
       "semantic_source": "agents/inline-reviewer.md",
       "sandbox_mode": "read-only",
-      "capabilities": ["filesystem-read", "command-exec"],
+      "capabilities": [
+        "filesystem-read",
+        "command-exec"
+      ],
       "capability_profile": "inline-review-read-only",
       "instruction_source": "runtime/codex/instructions/inline-reviewer.md",
       "output_path": ".codex/agents/inline-reviewer.toml"
@@ -144,7 +210,12 @@
       "description": "Prepares release artifacts and delivery evidence after acceptance passes.",
       "semantic_source": "agents/delivery.md",
       "sandbox_mode": "workspace-write",
-      "capabilities": ["filesystem-read", "filesystem-write", "command-exec", "external-write"],
+      "capabilities": [
+        "filesystem-read",
+        "filesystem-write",
+        "command-exec",
+        "external-write"
+      ],
       "instruction_source": "runtime/codex/instructions/delivery.md",
       "output_path": ".codex/agents/delivery.toml"
     },
@@ -155,7 +226,11 @@
       "description": "Runs the architect role with the model explicitly selected for the active pipeline session.",
       "semantic_source": "agents/architect.md",
       "sandbox_mode": "workspace-write",
-      "capabilities": ["filesystem-read", "filesystem-write", "external-read"],
+      "capabilities": [
+        "filesystem-read",
+        "filesystem-write",
+        "external-read"
+      ],
       "instruction_source": "runtime/codex/instructions/architect.md",
       "output_path": ".codex/agents/pipeline-architect.toml"
     },
@@ -166,7 +241,11 @@
       "description": "Runs the implementer role with the model explicitly selected for the active pipeline session.",
       "semantic_source": "agents/implementer.md",
       "sandbox_mode": "workspace-write",
-      "capabilities": ["filesystem-read", "filesystem-write", "command-exec"],
+      "capabilities": [
+        "filesystem-read",
+        "filesystem-write",
+        "command-exec"
+      ],
       "instruction_source": "runtime/codex/instructions/implementer.md",
       "output_path": ".codex/agents/pipeline-implementer.toml"
     },
@@ -177,7 +256,11 @@
       "description": "Runs the tester role with the model explicitly selected for the active pipeline session.",
       "semantic_source": "agents/tester.md",
       "sandbox_mode": "workspace-write",
-      "capabilities": ["filesystem-read", "test-write", "command-exec"],
+      "capabilities": [
+        "filesystem-read",
+        "test-write",
+        "command-exec"
+      ],
       "instruction_source": "runtime/codex/instructions/tester.md",
       "output_path": ".codex/agents/pipeline-tester.toml"
     },
@@ -188,7 +271,11 @@
       "description": "Runs the cleaner role with the model explicitly selected for the active pipeline session.",
       "semantic_source": "agents/cleaner.md",
       "sandbox_mode": "workspace-write",
-      "capabilities": ["filesystem-read", "filesystem-write", "command-exec"],
+      "capabilities": [
+        "filesystem-read",
+        "filesystem-write",
+        "command-exec"
+      ],
       "instruction_source": "runtime/codex/instructions/cleaner.md",
       "output_path": ".codex/agents/pipeline-cleaner.toml"
     },
@@ -199,7 +286,10 @@
       "description": "Runs the QA role with the model explicitly selected for the active pipeline session.",
       "semantic_source": "agents/qa.md",
       "sandbox_mode": "read-only",
-      "capabilities": ["filesystem-read", "command-exec"],
+      "capabilities": [
+        "filesystem-read",
+        "command-exec"
+      ],
       "instruction_source": "runtime/codex/instructions/qa.md",
       "output_path": ".codex/agents/pipeline-qa.toml"
     },
@@ -210,7 +300,11 @@
       "description": "Runs the security role with the model explicitly selected for the active pipeline session.",
       "semantic_source": "agents/security.md",
       "sandbox_mode": "read-only",
-      "capabilities": ["filesystem-read", "command-exec", "external-read"],
+      "capabilities": [
+        "filesystem-read",
+        "command-exec",
+        "external-read"
+      ],
       "instruction_source": "runtime/codex/instructions/security.md",
       "output_path": ".codex/agents/pipeline-security.toml"
     },
@@ -221,7 +315,12 @@
       "description": "Runs the delivery role with the model explicitly selected for the active pipeline session.",
       "semantic_source": "agents/delivery.md",
       "sandbox_mode": "workspace-write",
-      "capabilities": ["filesystem-read", "filesystem-write", "command-exec", "external-write"],
+      "capabilities": [
+        "filesystem-read",
+        "filesystem-write",
+        "command-exec",
+        "external-write"
+      ],
       "instruction_source": "runtime/codex/instructions/delivery.md",
       "output_path": ".codex/agents/pipeline-delivery.toml"
     },
@@ -230,7 +329,11 @@
       "description": "Reviews an immutable pull-request snapshot for concrete merge blockers and suggestions.",
       "semantic_source": "agents/reviewer.md",
       "sandbox_mode": "read-only",
-      "capabilities": ["filesystem-read", "command-exec", "external-read"],
+      "capabilities": [
+        "filesystem-read",
+        "command-exec",
+        "external-read"
+      ],
       "capability_profile": "review-read-only",
       "instruction_source": "runtime/codex/instructions/reviewer.md",
       "output_path": ".codex/agents/reviewer.toml"
@@ -240,7 +343,10 @@
       "description": "Validates acceptance criteria against an immutable pull-request snapshot.",
       "semantic_source": "agents/pr-review-qa.md",
       "sandbox_mode": "read-only",
-      "capabilities": ["filesystem-read", "command-exec"],
+      "capabilities": [
+        "filesystem-read",
+        "command-exec"
+      ],
       "capability_profile": "review-read-only",
       "instruction_source": "runtime/codex/instructions/pr-review-qa.md",
       "output_path": ".codex/agents/pr-review-qa.toml"
@@ -250,17 +356,36 @@
       "description": "Audits an immutable pull-request snapshot for concrete security regressions.",
       "semantic_source": "agents/pr-review-security.md",
       "sandbox_mode": "read-only",
-      "capabilities": ["filesystem-read", "command-exec"],
+      "capabilities": [
+        "filesystem-read",
+        "command-exec"
+      ],
       "capability_profile": "review-read-only",
       "instruction_source": "runtime/codex/instructions/pr-review-security.md",
       "output_path": ".codex/agents/pr-review-security.toml"
+    },
+    {
+      "name": "pr-review-verifier",
+      "description": "Confirms or refutes each blocking finding of an immutable pull-request snapshot before preview.",
+      "semantic_source": "agents/pr-review-verifier.md",
+      "sandbox_mode": "read-only",
+      "capabilities": [
+        "filesystem-read",
+        "command-exec"
+      ],
+      "capability_profile": "review-read-only",
+      "instruction_source": "runtime/codex/instructions/pr-review-verifier.md",
+      "output_path": ".codex/agents/pr-review-verifier.toml"
     },
     {
       "name": "reviewer-consolidator",
       "description": "Consolidates PR-review lenses into one de-duplicated review draft.",
       "semantic_source": "agents/reviewer-consolidator.md",
       "sandbox_mode": "read-only",
-      "capabilities": ["filesystem-read", "command-exec"],
+      "capabilities": [
+        "filesystem-read",
+        "command-exec"
+      ],
       "capability_profile": "review-read-only",
       "instruction_source": "runtime/codex/instructions/reviewer-consolidator.md",
       "output_path": ".codex/agents/reviewer-consolidator.toml"

@@ -78,9 +78,8 @@ candidate. An absent optional or inferred path is skipped, not a transport failu
 
 If a required supplied artifact, the worktree coordinate, or a verified existing worktree leaf
 cannot actually be read, return `failure_kind: required-read-failed` and `failed_read_path` with
-the exact coordinate. If you accidentally attempt an unverified path and it is absent, recover
-inside this run: discard that candidate and continue from supplied artifacts. Never convert that
-mistake into `required-read-failed` or a generic filesystem transport failure.
+the exact coordinate. An absent unverified path is skipped, never reported as a read failure.
+A return that omits a required field, echoes a different identity, or reports a supplied artifact as unreadable is recorded `absent` by the coordinator and forces `COMMENT`; no correction is dispatched, so return complete and exact.
 
 Use the diff to choose relevant files; do not mechanically load every file in a large PR.
 Inspect complete file context for every candidate finding before reporting it.
