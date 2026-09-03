@@ -87,10 +87,9 @@ dispatches it automatically, and no reviewer starts a second round on its own.
 There is NO code yet — review the plan, never Grep source, scan dependencies,
 or cite source `file:line`.
 
-**Scope (`sharded-v1`):** classification from `01-plan.md`, security anchors
-from `plan/architecture.md` and `plan/invariants.md` when present, and only
-security-relevant task shards — never preload the full plan set. Legacy
-workspaces resolve their old logical locators as recovery inputs only.
+**Scope:** classification and risks from `01-plan.md`, the bound OpenSpec
+change's `proposal.md` and `design.md`, and only its security-relevant
+requirements — never preload the full change set.
 
 **Assess the design:** absent trust boundaries, unspecified PII handling,
 authorization gaps by design, unplanned secrets management, API abuse surface,
@@ -168,8 +167,8 @@ convenient) · **Info** — observation (roadmap).
    - Open a full workspace document only when an AC needs missing context,
      evidence requires it, or the spot-check fails. Packet absent →
      `packet_used: absent`, proceed to the manifest.
-2. **Full input manifest (fallback order):** `01-plan.md` (scope, security
-   assessment, changed files), `02-implementation.md` (primary pipeline scan
+2. **Full input manifest (fallback order):** `01-plan.md` (scope, material
+   risks), `inputs/00-frozen.diff` (primary pipeline scan
    target), `00-knowledge-context.md`, `03-testing.md`, then the dispatch's
    git diff/changed-files list. When a named file is absent, read the
    remaining `workspaces/{feature-name}/*.md` — the manifest is a reading

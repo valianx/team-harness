@@ -71,7 +71,7 @@ When the user asks to investigate, compare technologies, evaluate a migration, o
      2. Emit `research.round.start` event: `{"ts":"<ISO>","event":"research.round.start","round":<N>,"lanes":<K>}`.
      3. Compose follow-up angles ONLY from gate-passing gaps (one lane per gap). Clamp to ≤ 5 lanes for the round (anti-runaway guard). If gate-passing gaps exceed 5, dispatch 5 lanes covering the most material gaps and emit `research.round.skipped` event: `{"ts":"<ISO>","event":"research.round.skipped","round":<N>,"skipped_gap_ids":[...]}`.
      4. Dispatch `researcher` (haiku) lanes in parallel (fail-open: `research.lane.skipped` on dead lanes).
-     5. Re-dispatch `research-consolidator` to amend the SAME `research/00-research.md` in place (reconcile-don't-accrete — no `00-research-v2.md`).
+     5. Re-dispatch `research-consolidator` to amend the SAME `research/00-research.md` in place (reconcile-don't-accrete, never a `-v2` sibling).
      6. Re-dispatch `architect` in research mode to re-synthesize the SAME `research/00-research.md` in place.
      7. After architect returns, emit `research.gap.gate` event and re-evaluate the gate. Repeat from step 1 if the gate fires again AND `research_round < 3`.
 
@@ -137,7 +137,7 @@ When the operator asks to investigate how the codebase works, trace a flow in re
        - For each gap with `material:true AND code_closeable:true` → dispatch one `code-researcher` (sonnet) code lane.
        - Clamp to ≤5 lanes total for the round (anti-runaway guard). If gate-passing gaps exceed 5, dispatch 5 lanes covering the most material gaps and emit `research.round.skipped` event: `{"ts":"<ISO>","event":"research.round.skipped","round":<N>,"skipped_gap_ids":[...]}`.
     4. Dispatch web and code lanes in parallel (fail-open: `research.lane.skipped` on dead lanes).
-    5. Re-dispatch `research-consolidator` to amend the SAME `research/00-research.md` in place (reconcile-don't-accrete — no `00-research-v2.md`).
+    5. Re-dispatch `research-consolidator` to amend the SAME `research/00-research.md` in place (reconcile-don't-accrete, never a `-v2` sibling).
     6. Re-dispatch `architect` in research mode to re-synthesize the SAME `research/00-research.md` in place.
     7. After architect returns, emit `research.gap.gate` event and re-evaluate the gate. Repeat from step 1 if the gate fires again AND `research_round < 3`.
 
@@ -217,7 +217,7 @@ Two modes: `plan` (analysis only) and `plan-and-execute` (analysis + pipeline pe
 | File | Mode | Consumer | Purpose |
 |---|---|---|---|
 | `01-planning.md` | planning mode (`/th:plan`, `/th:plan plan-and-execute`) | coordinator (single-plan, multi-task dispatch) | break a broad scope into N tasks in one plan |
-| `01-plan.md` | design mode (normal pipeline) + **milestone build** (single-repo `type: plan`) | implementer + qa + plan-reviewer | merged architecture + task list (§ Architecture + § Task List); milestone-build home |
+| `01-plan.md` | design (normal pipeline) + **milestone build** (single-repo `type: plan`) | implementer + qa + plan-reviewer | coordinator projection: scope, batches, decisions, links to the bound OpenSpec change; milestone-build home |
 
 **Milestone build disambiguation.** A `type: plan` single-repo milestone build is a third, distinct consumer for `01-plan.md`. The architect writes the milestone decomposition INTO `01-plan.md` (Work Plan with milestones M0…MN). This is NOT `01-planning.md` (multi-task batch). See the milestone-build section below for the full contract.
 
@@ -253,9 +253,9 @@ A milestone build is when one project is decomposed into milestones (M0…MN) an
 
 **Milestone definition.** A milestone is an internal unit of work-division WITHIN ONE TASK that maps to ONE COMMIT on the single feature branch. Milestones are NOT deliverables and NOT PRs — they are commit-sized steps that (a) produce a clean granular history and (b) can be PARALLELIZED when independent. The task ships as ONE PR at the end after all milestones are complete.
 
-**PROHIBITED — per-milestone artifact splitting:** Per-milestone-suffixed filenames (e.g., `02-implementation-m{N}.md`, `03-testing-m1.md`) and `{NN}_{milestone}/` child folders (e.g., `01_m0-skeleton/`, `02_m1-api/`) are explicitly PROHIBITED. Agents that create these are in defect.
+**PROHIBITED — per-milestone artifact splitting:** Per-milestone-suffixed filenames (e.g., `-m{N}` stage suffixes) and `{NN}_{milestone}/` child folders (e.g., `01_m0-skeleton/`, `02_m1-api/`) are explicitly PROHIBITED. Agents that create these are in defect.
 
-**Stage files are FLAT, whole-task, and there is exactly ONE set per workspace.** No suffix of ANY kind is permitted on a stage filename. This prohibits not only per-milestone suffixes (`02-implementation-m{N}.md`) and `{NN}_{milestone}/` child folders, but ALSO any "second-cycle" / "second delivery cycle" suffix such as `02b-implementation.md`, `03b-testing.md`, `04b-*.md`. There is no "second delivery cycle" convention in team-harness — inventing an undocumented file-naming convention is itself a defect. One task = one workspace = one set of stage files (`02-implementation.md`, `03-testing.md`, `reviews/04-security.md`, `reviews/04-validation.md`), each whole-task. A second PR or a second pass within the same workspace REUSES these flat files; it never mints a parallel suffixed set.
+**Stage files are FLAT, whole-task, and there is exactly ONE set per workspace.** No suffix of ANY kind is permitted on a stage filename. This prohibits not only per-milestone suffixes (`-m{N}`) and `{NN}_{milestone}/` child folders, but ALSO any "second-cycle" / "second delivery cycle" suffix such as `03b-testing.md`, `04b-*.md`. There is no "second delivery cycle" convention in team-harness — inventing an undocumented file-naming convention is itself a defect. One task = one workspace = one set of stage files (`03-testing.md`, `reviews/04-security.md`, `reviews/04-validation.md`), each whole-task. A second PR or a second pass within the same workspace REUSES these flat files; it never mints a parallel suffixed set.
 
 **Operator-authority invariant — the pipeline never divides a task.** A single task's plan and its implementation are NEVER autonomously divided by the pipeline — not into multiple delivery groups, not into multiple stage-cycles, not into multiple workspaces. Dividing a scope into multiple workspaces is the OPERATOR's responsibility and decision. If the architect or the coordinator judges a scope too large for one task, it SURFACES that judgment to the operator (a decision in `01-plan.md § Review Summary → ### Decisions for human review`, or a STAGE-GATE STOP) — the operator decides whether to split into multiple workspaces. No agent splits a task's plan or implementation on its own authority.
 
@@ -278,7 +278,7 @@ Read together: a task is never SPLIT across delivery groups (anti-split), and a 
 
 **Same delivery flow alignment.** The consolidated batch ships through the same single Delivery prose dispatch and coordinator publication mechanics as a single task, with the same review → merge → next-session preflight-sweep lifecycle (`docs/worktree-discipline.md` Rule 7). There is no separate batch-delivery path. The only structural difference is that publication operates on the `batch/<name>-verify` integration branch (Step 5a) rather than a single-task branch.
 
-**Stage files are FLAT, whole-task documents.** `02-implementation.md`, `03-testing.md`, `reviews/04-security.md`, and `reviews/04-validation.md` cover the ENTIRE build in one file each — no per-milestone subsections. One workspace: one commit per milestone (in dependency order), accumulated on the single feature branch.
+**Stage files are FLAT, whole-task documents.** `03-testing.md`, `reviews/04-security.md`, and `reviews/04-validation.md` cover the ENTIRE build in one file each — no per-milestone subsections. One workspace: one commit per milestone (in dependency order), accumulated on the single feature branch.
 
 **Milestone Index (summary).** The plan's `00-state.md` `## Milestone Index` table tracks one row per milestone with a `Commit` column (commit sha per milestone). No per-milestone `PR` column. A single build-level PR is recorded once at the end.
 
@@ -303,16 +303,16 @@ The plan artifact for a milestone build is **`01-plan.md`** — the architect wr
   00-knowledge-context.md         ← KG results (if any)
   00-execution-events.md          ← event trace
   01-plan.md                      ← milestone breakdown w/ per-milestone DEPENDENCY annotations (independent vs depends-on-Mx)
-  02-implementation.md            ← FLAT whole-task implementer report (NO per-milestone subsections)
+  inputs/00-frozen.diff           ← one frozen candidate diff for the whole task
   03-testing.md                   ← FLAT whole-task tester report
   reviews/04-security.md                  ← FLAT whole-task security report (tier-gated)
   reviews/04-validation.md                ← FLAT whole-task qa report
   00-pipeline-summary.md          ← rollup
 ```
 
-One flat workspace. ONE file of each stage type, each covering the WHOLE TASK with no per-milestone subsections. NO child workspaces, NO `{NN}_{milestone-slug}/` sub-folders, NO suffixed files of any kind — e.g., `02-implementation-m1.md` and `02b-implementation.md` are both PROHIBITED. The milestone breakdown lives ONLY in `01-plan.md`.
+One flat workspace. ONE file of each stage type, each covering the WHOLE TASK with no per-milestone subsections. NO child workspaces, NO `{NN}_{milestone-slug}/` sub-folders, NO suffixed files of any kind; milestone and letter suffixes are PROHIBITED. The milestone breakdown lives ONLY in `01-plan.md`.
 
-The `02-implementation.md`, `03-testing.md`, `reviews/04-security.md`, and `reviews/04-validation.md` are FLAT, whole-task documents. They cover the entire build in one file — not split by milestone.
+The `03-testing.md`, `reviews/04-security.md`, and `reviews/04-validation.md` are FLAT, whole-task documents. They cover the entire build in one file — not split by milestone.
 
 ### Milestone execution: detect-and-continue by identity
 
@@ -884,7 +884,7 @@ When the user asks to document a service, database, API, library, infrastructure
 - Compose N distinct angles for the topic (e.g., `official-docs`, `known-issues`, `migration-guides`).
 - Dispatch each `researcher` with: `angle`, `topic`, `relevance_criteria`, and a per-lane `findings_file` path.
 - **Fail-open lane handling:** if a lane returns `status: failed` or `findings: 0`, record a `research.lane.skipped` event and continue.
-- After all lanes return, dispatch `research-consolidator` to merge and deduplicate findings into `workspaces/{feature}/research/research-findings-consolidated.md`.
+- After all lanes return, dispatch `research-consolidator` to merge and deduplicate findings into `workspaces/{feature}/research/00-research.md`.
 
 For codebase-only subjects (`service`, `database`, `api`, `infrastructure`) where external web research adds little value, skip the fan-out and proceed directly to Step 1b.
 
@@ -901,7 +901,7 @@ For codebase-only subjects (`service`, `database`, `api`, `infrastructure`) wher
 
 Instruction to architect: "Research mode. Investigate {topic} for documentation purposes. Produce `research/00-research.md` covering architecture, components, data flows, configuration, and key decisions. The output will be consumed by the documenter agent — be thorough but structured."
 
-When consolidated web findings are present (`research/research-findings-consolidated.md` exists): "Pre-digested consolidated web findings are in `workspaces/{feature}/research/research-findings-consolidated.md` — read that file as your primary external evidence base. You may spot-fetch to fill specific gaps the consolidator flagged."
+When consolidated web findings are present (`research/00-research.md` exists): "Pre-digested consolidated web findings are in `workspaces/{feature}/research/00-research.md` — read that file as your primary external evidence base. You may spot-fetch to fill specific gaps the consolidator flagged."
 
 **Multi-topic:** if 2+ topics, dispatch one architect research per topic in parallel (separate workspaces subfolders or sequential research rounds into the same `research/00-research.md` with clear section separation).
 

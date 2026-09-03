@@ -145,6 +145,19 @@ fi
 
 echo
 echo "############################################################"
+echo "# Suite 3h: every workspace artifact a contract reads has a producer"
+echo "############################################################"
+if [ -n "$PY" ] && $PY "$TESTS_DIR/test_workspace_artifacts.py"; then
+    echo "workspace-artifacts: PASS"
+elif [ -z "$PY" ]; then
+    echo "workspace-artifacts: FAIL (Python 3 not found)"
+    FAILED=$((FAILED + 1))
+else
+    echo "workspace-artifacts: FAIL"
+    FAILED=$((FAILED + 1))
+fi
+
+echo "############################################################"
 echo "# Suite 3f: every document pointer resolves"
 echo "############################################################"
 if [ -n "$PY" ] && $PY "$TESTS_DIR/test_reference_resolution.py"; then

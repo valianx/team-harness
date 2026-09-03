@@ -88,15 +88,14 @@ and tasks.
 7. Present Gate 1 and stop. Only the live reply bound to that presentation may
    append authority and enter implementation.
 
-The projection contains no copied AC/TC prose, exhaustive file/task graph,
-commands, seams, semantic overlay, dispatch schema, or permanent future task
-capsule. OpenSpec identity drift makes it stale and requires regeneration.
-Nobody edits it manually.
+The projection contains no copied AC/TC prose, file/task graph, commands,
+seams, overlay, dispatch schema, or future task capsule; identity drift makes
+it stale and requires regeneration, and nobody edits it manually.
 
-There is no automatic design review panel. An explicit `/th:plan-review` dispatches one surviving read-only `plan-reviewer`
-over canonical OpenSpec and projection fidelity. It creates no Gate authority
-and reports that no security specialist ran; `/th:security` is the explicit
-follow-up.
+No automatic design review panel exists. An explicit `/th:plan-review`
+dispatches one read-only `plan-reviewer` over canonical OpenSpec and projection
+fidelity; it creates no Gate authority, reports that no security specialist
+ran, and `/th:security` is the explicit follow-up.
 
 ## Implementation
 
@@ -137,8 +136,9 @@ tokens, and tool calls never route.
 
 ## Freeze and validation
 
-After implementation closes, assemble one committed candidate and compute its
-immutable identity.
+After implementation closes, assemble one committed candidate, compute its
+immutable identity, then write `inputs/00-frozen.diff` and `00-verify-packet.md`
+(`docs/verification-packet.md § "1. Build site"`).
 
 Main derives security impact from the frozen candidate through the canonical
 type-agnostic floor classifier in
@@ -183,11 +183,11 @@ replies release nothing; Main asks only for the unresolved choice or detail.
 After validation passes, prepare delivery prose for the exact accepted commit.
 When there is no closed-list exception, append the mechanical auto-ship release
 linked to Gate 1. Otherwise present Gate 3 and stop for `ship | amend | abort`.
-Push, PR mutation, merge, tag, release, and other outward writes still require
-the applicable live authority, hook decision, native permission, account route,
+Push, PR mutation, merge, tag, release, and other outward writes require the
+applicable live authority, hook decision, native permission, account route,
 and exact accepted identity.
 
-Delivery must not change the candidate or rerun tests. Any tree mismatch returns
+Delivery never changes the candidate or reruns tests; any tree mismatch returns
 to implementation → Freeze → validation.
 
 ## Failures

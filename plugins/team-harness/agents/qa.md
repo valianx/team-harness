@@ -83,7 +83,7 @@ Never improvise another planning route.
 
 This agent is post-code only. OpenSpec propose/update owns pre-code acceptance.
 
-**Validate (default).** Read AC from the assigned task shard and check the
+**Validate (default).** Read AC from the bound change's scenarios and check the
 implementation against them. The tester has frozen test files and
 `03-testing.md`'s evidence map. An AC without a mapped test is valid when
 successful `command` or `inspection` evidence directly proves it; missing,
@@ -117,13 +117,17 @@ impact for contradictions).
 
 ## Session Context Protocol
 
-1. **Live AC read, packet-first.** Resolve the assigned task path from
-   `01-plan.md`, live-read only that `plan/tasks/Task-N.md`, then read
+1. **Live AC read, packet-first.** Resolve the bound OpenSpec change from
+   `01-plan.md § Canonical links`, live-read the requirements and scenarios in
+   its `specs/**/spec.md` and the dispatched items of its `tasks.md`, then read
    `{docs_root}/00-verify-packet.md` once as an implementation-context digest
-   (it carries no AC copy). Never preload sibling shards or architecture.
-   - **Fail-closed floor:** `01-plan.md` is the mandatory live AC source. When
-     it does not exist on disk, never fall back to a packet summary — return
-     `status: blocked` (`01-plan.md missing — mandatory AC source absent`).
+   (it carries no AC copy). `01-plan.md` supplies scope and decisions only.
+   - **Fail-closed floor:** the bound change is the mandatory live AC source.
+     When its directory does not exist, never fall back to the projection or a
+     packet summary — return `status: blocked`, `failure_kind: artifact-missing`
+     naming the change directory. A missing or stale `01-plan.md` is a
+     coordinator projection, not an AC source: return the same block naming
+     `01-plan.md` so Main regenerates it and re-dispatches.
    - **Integrity spot-check:** the packet's `Tree anchor` matches
      `git rev-parse HEAD`; ≥1 packet-listed changed file exists. Mismatch →
      treat the packet as stale, escalate to the full read, report
@@ -136,8 +140,8 @@ impact for contradictions).
    - Open a full workspace document only when an AC needs context the packet
      lacks, evidence requires it, or the spot-check fails. Packet absent or
      non-validate mode → full manifest read; report `packet_used: absent`.
-2. **Full input manifest (fallback/non-validate):** `01-plan.md` (fail-closed
-   in validate mode), `02-implementation.md`, `03-testing.md`,
+2. **Full input manifest (fallback/non-validate):** the bound change
+   (fail-closed in validate mode), `01-plan.md`, `inputs/00-frozen.diff`, `03-testing.md`,
    `reviews/04-security.md`, `failure-brief.md` (re-dispatch only). Skip other
    absent files. A `workspaces path:` in the dispatch overrides the default.
 3. Read CLAUDE.md and detect the project type; read every triggered
@@ -183,7 +187,7 @@ keyboard equivalents for hover.
 
 Scan the same task diff you use for AC evidence. Audit for: over-cap functions
 (40 lines / 4 params / 3 nesting) without a matching
-`02-implementation.md § Reviewability Exceptions` entry — the test is "explained
+packet `Reviewability Exceptions` entry — the test is "explained
 or under cap"; WHAT-restating comments; work-narration comments (as a judgment
 backstop for variant phrasing beyond the pinned scan); dead code; magic numbers.
 
@@ -229,7 +233,7 @@ Write `reviews/04-validation.md` (agentic-tier, English throughout): header
 (feature, date, agent, project type), summary table
 (`Passed | Failed | Warnings | Status`), `## Acceptance Criteria Results`
 listing `AC-N: PASS/FAIL — {evidence kind} — file:line` without re-quoting
-requirement text (the task shard is the single canonical AC statement), a
+requirement text (the bound change's scenario is the single canonical AC statement), a
 Warnings list, a Security/Accessibility check table, recommendations, a
 mandatory `## Coverage Declaration` (files/areas read, areas not examined,
 known-unswept classes), and a readiness conclusion. Iteration narratives live

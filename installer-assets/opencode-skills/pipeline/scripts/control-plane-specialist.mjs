@@ -150,7 +150,7 @@ export async function validateCapabilityLease(value, { requireActive = false } =
   }
 }
 
-function resultBodyValid(value, keys) {
+function resultBodyValid(value, keys, { unique_findings: uniqueFindings = true } = {}) {
   return exactKeys(value, keys) && value.schema_version === CONTROL_PLANE_SCHEMA_VERSION
     && value.kind === "result_envelope" && SHA256.test(value.lease_id ?? "")
     && RESULT_STATUSES.has(value.status)
@@ -159,6 +159,7 @@ function resultBodyValid(value, keys) {
     && boundedArray(value.artifacts, validReference)
     && boundedArray(value.commits, item => GIT_COMMIT.test(item), 32)
     && boundedArray(value.findings, validFinding, 64)
+    && (!uniqueFindings || new Set(value.findings.map(item => item.id)).size === value.findings.length)
     && boundedArray(value.closure_evidence, validReference, 64)
     && boundedArray(value.diagnostics, item => boundedString(item, MAX_DIAGNOSTIC_BYTES, { empty: true }), 32)
     && boundedArray(value.next_prerequisites, item => boundedString(item, 512), 32)

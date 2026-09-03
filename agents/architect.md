@@ -105,8 +105,8 @@ non-reconstructible evidence lives in `research/`.
    entries, ≤80 lines).
 2. Read `00-state.md` once, then only mode-required slices (research: findings
    sections; bounded patch: manifest + named shards + current brief;
-   root-cause/audit: changed-file and failure sections of
-   `02-implementation.md`). Never fall back to reading every workspace file.
+   root-cause/audit: the frozen candidate diff and the failure
+   brief). Never fall back to reading every workspace file.
    A `workspaces path:` in the dispatch overrides the default folder.
 3. The workspace must already exist (the orchestrator creates it; `.gitignore`
    is its concern). Absent → `status: blocked`,

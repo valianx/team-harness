@@ -38,7 +38,7 @@ appears under, not to a level chosen ad hoc per document.
 | `verbatim` | Never paraphrased, never compressed, reproduced exactly as produced. | Code blocks and diffs; shell commands; file paths and identifiers; exact error/exception strings; status-block field names and enum values (e.g. `broke-it`, `could-not-break`, `APPROVE`, `REQUEST_CHANGES`); CWE/OWASP reference tokens (`CWE-{N}`); `file:line` locators. |
 | `tight` | A bounded prose budget PER ITEM; the item count is never capped. | Per-finding prose in `security`/`adversary`/`reviewer` pipeline-mode reports — Critical/High findings, per-control entries in adversary's report, reviewer's Critical findings. |
 | `bounded` | The overall document or section is a capped, replaceable snapshot — not an accumulating log. | `00-state.md` § Hot Context / § Agent Results; `00-execution-events.md` free-text fields (`summary`, `detail`); `changelog.d/*.md` fragments; `01-plan.md § Decisions for human review` (existing 7-bullet cap); `failure-brief.md` iteration entries (existing 5-10 line contract, see § 4 below). |
-| `standard` | Compact decision/evidence prose under the artifact budgets in § 6; it is not an uncapped fallback. | sharded plan summary/architecture prose; `02-implementation.md`; `03-testing.md`; `docs/*.md` reference documentation; any prose not assigned to one of the three classes above. |
+| `standard` | Compact decision/evidence prose under the artifact budgets in § 6; it is not an uncapped fallback. | plan projection prose; implementation report; `03-testing.md`; `docs/*.md` reference documentation; any prose not assigned to one of the three classes above. |
 
 **Reading order for a new artifact:** check `verbatim` first (is this an exact reproduction of
 something machine- or human-produced verbatim?), then `tight` (is this a per-item entry in a
@@ -120,16 +120,16 @@ total line or byte target.
 | Artifact | Hard budget / compact shape |
 |---|---|
 | `00-state.md` | ≤160 lines and ≤16 KB; replace fields and keep only the latest result per role. |
-| `01-plan.md` + `plan/**` | Follow `docs/plan-shards.md`: index ≤80 lines/12 KB, architecture ≤120 lines/20 KB, delivery ≤80 lines/12 KB, invariant prose ≤2 lines per item, and task fixed prose ≤30 lines plus ≤2 prose lines per AC. These are targets, never item-count ceilings. Above target emit `size_reason: required-items`. Do not persist raw exploration. |
+| `01-plan.md` | Compact projection of the bound OpenSpec change (`agents/ref-pipeline.md § "Design"`): outcome, scope, batches, risks, decisions, canonical links, pinned identity; no copied AC/TC prose, task graph, or commands. Above target emit `size_reason: required-items`. |
 | `reviews/01-plan-review.md` | Current snapshot only: fixed prose ≤120 lines, each finding ≤4 lines, each Panel Rounds entry exactly one table row. Replaced finding bodies are not retained. |
-| `02-implementation.md` | 5–30 lines and ≤8 KB; outcome, deviations, exceptions, one-line checks, and commit only. Git is the changed-file authority. |
+| `02-implementation.md` (spike flow only) | 5–30 lines and ≤8 KB; outcome, deviations, exceptions, one-line checks, and commit only. Git is the changed-file authority. |
 | `03-testing.md` | Fixed prose ≤40 lines plus one evidence-map row per AC and one line per authored test; one concise suite result. An ordinary single-project target is ≤80 lines/12 KB, not a ceiling. Never paste runner output. |
 | `reviews/04-validation.md` | Fixed prose ≤30 lines; one row per AC and ≤3 extra lines per failed AC. PASS entries are evidence pointers, not explanations. |
 | pipeline `reviews/04-security.md` | Fixed prose ≤20 lines plus one line per finding. Standalone audit mode remains audit-grade and is outside this pipeline budget. |
-| `reviews/04-adversary*.md` | Fixed prose ≤40 lines plus ≤6 lines per changed control. No duplicated security checklist or remediation history. |
+| `reviews/04-adversary.md` | Fixed prose ≤40 lines plus ≤6 lines per changed control. No duplicated security checklist or remediation history. |
 | delivery / summary artifacts | ≤60 lines and ≤12 KB; link to canonical evidence instead of restating it. |
 
-`inputs/*.diff`, generated diagrams, and other verbatim evidence are not model-authored report
+`inputs/00-frozen.diff`, generated diagrams, and other verbatim evidence are not model-authored report
 prose and do not count as output-budget violations. They still carry input cost: only a role
 whose decision requires the full evidence reads them in full.
 
@@ -142,8 +142,8 @@ Separate agents do not share context, so every dispatch must minimize cold reads
 2. Read `00-state.md` once per continuation. In normal phase work, read only `Current State`,
    `Hot Context`, and the latest relevant result. The event stream is queried by event type or
    tailed; it is never read from byte zero during ordinary continuation.
-3. Resolve the assigned task from `01-plan.md`, then read only its task shard and named
-   architecture/invariant anchors. Never preload sibling shards. Use `00-verify-packet.md` before implementation/testing reports and escape to a
+3. Resolve the assigned OpenSpec tasks from the bound change named in `01-plan.md § Canonical links`,
+   then read only those items and the requirements they cite. Never preload unrelated requirements. Use `00-verify-packet.md` before implementation/testing reports and escape to a
    source section only when a verdict-bearing fact requires it.
 4. Read each input once per dispatch. Re-read only a changed file or the exact range implicated
    by an error. After writing, verify headings, size, and the edited range; do not re-read the

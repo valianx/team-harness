@@ -149,6 +149,7 @@ try {
   assert.equal((await validateResultEnvelope({ ...result, lease_id: h("other") }, { lease, currentSequence: 2 })).error_code, "RESULT_IDENTITY_MISMATCH");
   assert.equal((await createResultEnvelope({ ...resultInput, changed_paths: ["outside.txt"] }, { lease, currentSequence: 2 })).error_code, "RESULT_SCOPE_VIOLATION");
   assert.equal((await createResultEnvelope({ ...resultInput, diagnostics: ["token=github_pat_0123456789abcdef"] }, { lease, currentSequence: 2 })).error_code, "RESULT_SCHEMA_INVALID");
+  assert.equal((await createResultEnvelope({ ...resultInput, findings: [resultInput.findings[0], { ...resultInput.findings[0], summary: "twice" }] }, { lease, currentSequence: 2 })).error_code, "RESULT_SCHEMA_INVALID");
   assert.equal((await createResultEnvelope(resultInput, { lease, currentSequence: 3 })).error_code, "RESULT_SEQUENCE_STALE");
 
   assert.equal((await acceptResultEnvelope({ log_path: logPath, result })).error_code, "CONTROL_WRITER_INVALID");
@@ -170,14 +171,17 @@ try {
   const projected = buildControlProjection(replay.records);
   assert.equal(projected.authority.decision, "approve");
   assert.equal(projected.accepted_results[result.result_id].status, "completed");
-  assert.equal(projected.findings["F-1"].state, "resolved");
+  assert.equal(projected.findings["implementer/F-1"].state, "resolved");
+  assert.equal(projected.findings["implementer/F-1"].lens, replay.records.find((record) => record.type === "lease_issued").payload.lease.role);
 
   assert.equal((await rebuildControlProjections({ log_path: logPath, workspace })).error_code, "CONTROL_WRITER_INVALID");
   const projectionWrite = await rebuildControlProjections({ log_path: logPath, workspace, writer: "main" });
   assert.equal(projectionWrite.ok, true);
   const firstState = await readFile(path.join(workspace, "00-state.md"), "utf8");
   assert.match(firstState, /Projection only/);
-  assert.match(await readFile(path.join(workspace, "reviews", "findings-ledger.md"), "utf8"), /F-1/);
+  const ledger = await readFile(path.join(workspace, "reviews", "findings-ledger.md"), "utf8");
+  assert.match(ledger, /\| ID \| Lens \| Class \|/);
+  assert.match(ledger, /\| F-1 \| implementer \|/);
   assert.equal((await rebuildControlProjections({ log_path: logPath, workspace, writer: "main" })).ok, true);
   assert.equal(await readFile(path.join(workspace, "00-state.md"), "utf8"), firstState);
 

@@ -301,7 +301,9 @@ rationale and subject of a decision, not phase timing or token counts; those rem
 the execution trace. The ledger records both gate numbers using the same `stage` and `phase` keys
 so audit readers can join the two files.
 
-Finding dispositions distinguish `accept`, `watch`, and `reject`. A structural contradiction is
+Finding dispositions distinguish `accept`, `watch`, and `reject`, and carry `lens`: the role of the
+lease under which the finding was accepted, copied from the findings-ledger projection and never
+from the specialist's own text. A structural contradiction is
 never converted into an accepted finding merely to advance the state. Gate releases remain valid
 only when the state field and ledger/event record agree with the live reply and nonce.
 
@@ -880,6 +882,7 @@ Every line is a JSON object. One JSON object per line, append-only, never rewrit
 | `phase` | conditional | Phase identifier (e.g. `1.6-plan-review`, `3-verify`, `3.5-acceptance-gate`). Required for internal-gate `gate-verdict` and for `disposition`. Shared JOIN key with `00-execution-events`. |
 | `decision` | conditional | The decision value. For `gate-verdict`: `pass`/`concerns`/`fail`. For `operator-approval`: `approved`/`approved-autonomous`/`rejected`/`edit`/`ship`/`amend`/`abort`. For `disposition`: `accept`/`watch`/`reject`. Required for all three event types. |
 | `subject` | conditional | What the disposition applies to (e.g. `SEC-finding: missing JWT signature verification`). Required for `disposition`. |
+| `lens` | conditional | For `disposition`: the specialist role whose lease produced the finding (`qa`, `tester`, `cleaner`, `security`, …), taken from the `Lens` column of `reviews/findings-ledger.md`. Required for `disposition` of a ledger finding. |
 | `rationale` | always | One free-text sentence (≤240 chars) — WHY this verdict/approval/disposition. `"no reason given"` is the explicit value when the operator gave none. **Secret prohibition applies** — the `rationale` field MUST NOT contain tokens, credentials, private URLs, or user-path identifiers. Use mechanical context only (same policy as `operation.*` `detail` fields). |
 | `action` | conditional | For `dry-run-enforced`: the deploy/migration action that was gated (e.g. `gcloud sql instances patch`, `prisma migrate deploy`). Required for `dry-run-enforced`. |
 | `dry_run_ref` | conditional | For `dry-run-enforced`: how the dry-run was performed (`--dry-run`, `--validate-only`, `plan-only`, `migrate diff`). Required for `dry-run-enforced`. |
