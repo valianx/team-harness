@@ -204,6 +204,9 @@ class ReviewContextTests(unittest.TestCase):
             policy.write_text("```yaml\nverification: sometimes\n```\n", encoding="utf-8")
             with self.assertRaisesRegex(MODULE.ContextError, "verification must be one of"):
                 MODULE.read_review_policy(policy)
+            policy.write_text("```yaml\nmax_suggestions: \u00b2\n```\n", encoding="utf-8")
+            with self.assertRaisesRegex(MODULE.ContextError, "non-negative integer"):
+                MODULE.read_review_policy(policy)
             completed = subprocess.run(
                 [sys.executable, str(SCRIPT), "policy", "--policy", "none"],
                 check=True, capture_output=True, text=True,
@@ -262,6 +265,23 @@ class ReviewContextTests(unittest.TestCase):
         self.assertEqual(every["coverage"], "verified 0/4")
         with self.assertRaisesRegex(MODULE.ContextError, "verifier status"):
             MODULE.apply_verification(inline, {"findings": [{"path": "a", "line": 1, "side": "RIGHT", "status": "maybe"}]}, "all")
+
+    def test_apply_verification_rejects_duplicate_anchors_and_labels_unknown_bodies(self):
+        inline, verifier = self.verification_fixture()
+        verifier["findings"].append(dict(verifier["findings"][0], status="refuted", evidence="second opinion"))
+        with self.assertRaisesRegex(MODULE.ContextError, "two statuses for src/a.ts:10 RIGHT"):
+            MODULE.apply_verification(inline, verifier, "blocking-only")
+        odd = [
+            {"path": "src/e.ts", "line": 5, "side": "RIGHT", "body": "**blocking: lower case**\n\nEvidence."},
+            {"path": "src/f.ts", "line": 6, "side": "RIGHT", "body": "Unlabelled claim.\n\nEvidence."},
+            {"path": "src/g.ts", "line": 7, "side": "RIGHT", "body": "**suggestion: style**"},
+        ]
+        result = MODULE.apply_verification(odd, {"findings": []}, "blocking-only")
+        self.assertEqual(result["coverage"], "verified 0/2")
+        self.assertTrue(result["inline"][0]["body"].startswith("**Suggestion: (unverified) lower case**"))
+        self.assertTrue(result["inline"][1]["body"].startswith("**Suggestion: (unverified)** Unlabelled claim."))
+        self.assertEqual(result["inline"][2], odd[2])
+        self.assertEqual(len(result["ledger"]), 2)
 
     def test_apply_verification_cli_writes_the_applied_inline_leaf(self):
         inline, verifier = self.verification_fixture()

@@ -1736,7 +1736,9 @@ VERIFICATION_MODES = ("blocking-only", "all", "off")
 DEFAULT_MAX_SUGGESTIONS = 5
 POLICY_YAML_BLOCK_RE = re.compile(r"```ya?ml[ \t]*\n(.*?)\n```", re.DOTALL)
 POLICY_KEY_RE = re.compile(r"^\s*(verification|max_suggestions)\s*:\s*([^#\n]*?)\s*(?:#.*)?$")
-BLOCKING_PREFIX_RE = re.compile(r"^\s*\*\*Blocking:\s*")
+BLOCKING_PREFIX_RE = re.compile(r"^\s*\*\*Blocking:\s*", re.IGNORECASE)
+SUGGESTION_PREFIX_RE = re.compile(r"^\s*\*\*Suggestion:\s*", re.IGNORECASE)
+MAX_SUGGESTIONS_RE = re.compile(r"^[0-9]+$")
 REVIEW_AGENT_NAMES = (
     "reviewer",
     "pr-review-qa",
@@ -1770,7 +1772,7 @@ def read_review_policy(policy_path: Path | None) -> dict[str, Any]:
                     raise ContextError(f"review policy verification must be one of {', '.join(VERIFICATION_MODES)}")
                 policy["verification"] = value
             else:
-                if not value.isdigit() or int(value) < 0:
+                if not MAX_SUGGESTIONS_RE.fullmatch(value):
                     raise ContextError("review policy max_suggestions must be a non-negative integer")
                 policy["max_suggestions"] = int(value)
             policy["source"] = "policy"
@@ -1791,7 +1793,16 @@ def _finding_key(finding: dict[str, Any]) -> tuple[str, int, str]:
 
 
 def _is_blocking(finding: dict[str, Any]) -> bool:
-    return bool(BLOCKING_PREFIX_RE.match(str(finding.get("body", ""))))
+    """Anything not explicitly labelled a Suggestion is verified as blocking."""
+    return not SUGGESTION_PREFIX_RE.match(str(finding.get("body", "")))
+
+
+def _demote_body(body: str) -> str:
+    if BLOCKING_PREFIX_RE.match(body):
+        return BLOCKING_PREFIX_RE.sub("**Suggestion: (unverified) ", body, count=1)
+    if SUGGESTION_PREFIX_RE.match(body):
+        return SUGGESTION_PREFIX_RE.sub("**Suggestion: (unverified) ", body, count=1)
+    return f"**Suggestion: (unverified)** {body.lstrip()}"
 
 
 def apply_verification(
@@ -1834,7 +1845,10 @@ def apply_verification(
             raise ContextError("verifier finding must be an object")
         if result.get("status") not in {"confirmed", "unconfirmed", "refuted"}:
             raise ContextError("verifier status must be confirmed, unconfirmed, or refuted")
-        statuses[_finding_key(result)] = result
+        key = _finding_key(result)
+        if key in statuses:
+            raise ContextError(f"verifier returned two statuses for {key[0]}:{key[1]} {key[2]}")
+        statuses[key] = result
     output: list[dict[str, Any]] = []
     ledger: list[dict[str, Any]] = []
     confirmed = 0
@@ -1852,11 +1866,7 @@ def apply_verification(
         elif status == "refuted":
             ledger.append({"source": "verifier", "finding": claim, "disposition": "dropped", "reason": f"verifier — {reason}"})
         else:
-            body = str(finding.get("body", ""))
-            demoted = BLOCKING_PREFIX_RE.sub("**Suggestion: (unverified) ", body, count=1) if _is_blocking(finding) else body
-            if not _is_blocking(finding) and not demoted.lstrip().startswith("**Suggestion: (unverified)"):
-                demoted = re.sub(r"^\s*\*\*Suggestion:\s*", "**Suggestion: (unverified) ", demoted, count=1)
-            output.append({**finding, "body": demoted})
+            output.append({**finding, "body": _demote_body(str(finding.get("body", "")))})
             ledger.append({"source": "verifier", "finding": claim, "disposition": "demoted", "reason": f"verifier — {reason}"})
     return {
         "inline": output,

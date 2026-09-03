@@ -55,7 +55,7 @@ $team-harness:setup
 The setup skill configures native Team Harness settings, optional MCP servers,
 workspace/language preferences, optional workspace-to-GitHub identity routes,
 and thirteen specialist agents: seven for the gated
-pipeline, one direct read-only inline reviewer, and four for immutable PR review. It preserves
+pipeline, one direct read-only inline reviewer, and five for immutable PR review. It preserves
 Codex's native permission and hook-trust prompts. It can also import every
 missing setting from an existing Claude Code or opencode Team Harness config;
 opaque values are copied directly and never displayed.
@@ -95,7 +95,7 @@ GitHub release; it does not protect against compromise of the release origin.
 Use `--scope global` instead when the thirteen agents should be available from your
 Codex user configuration rather than only this checkout. Seven agents are required
 by the gated `pipeline` workflow, `inline-reviewer` serves direct read-only
-reviews, and four agents are required by `review-pr`; lightweight `init` remains
+reviews, and five agents are required by `review-pr`; lightweight `init` remains
 available with the plugin alone.
 
 4. Start another Codex thread so newly configured MCP servers and installed
