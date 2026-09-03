@@ -39,8 +39,11 @@ recorded here.
 
 Exclusive-defect rows name the four lenses the v5 validation fan can dispatch. A
 cell counts findings whose `Lens` in `reviews/findings-ledger.md` is that lens
-and whose defect no other lens reported; a lens the run did not dispatch records
-`n/a — lens not dispatched`. A recorded run never leaves `pending-runs`.
+and whose defect no other lens reported, where two findings are the same defect
+when they share `class` and at least one `evidence_paths` entry; a lens the run
+did not dispatch records `n/a — lens not dispatched`. A recorded run never
+leaves `pending-runs`, and `tests/test_openspec_scope.py` rejects any other
+cell value in these rows.
 
 The per-run tree anchor is the full `tree_anchor` value defined in
 `docs/verification-packet.md § 1a`, recorded for the tree the run executed

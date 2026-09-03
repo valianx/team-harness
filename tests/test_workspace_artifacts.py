@@ -22,7 +22,7 @@ REGISTRY = ROOT / "tests" / "fixtures" / "workspace-artifacts.json"
 TOKEN = re.compile(
     r"`(?:\{docs_root\}/|\{workspaces?[^}]*\}/|workspaces/\{[^}]+\}/)?"
     r"((?:plan|reviews|inputs|research|control|sketches)/[A-Za-z0-9_.{}*-]+"
-    r"|\d\d-[a-z0-9-]+\.(?:md|jsonl|diff))`"
+    r"|\d\d-[a-z0-9-]+\.(?:md|jsonl|diff)|failure-brief\.md)`"
 )
 
 

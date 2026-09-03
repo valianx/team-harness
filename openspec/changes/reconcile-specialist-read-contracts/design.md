@@ -18,13 +18,15 @@ The implementer never writes `02-implementation.md` on the pipeline path (`agent
 
 ### 4. The lens is derived from the lease, not self-reported
 
-`buildControlProjection` keeps a `lease_roles` map from every `lease_issued` record and stamps `lens` on each projected finding from the accepted result's lease. A specialist cannot mislabel its own findings, and the value exists for every accepted result without a new envelope field. `findingsMarkdown` prints it as a `Lens` column. The decision ledger's `disposition` record gains a conditional `lens` field so a coordinator disposition of a finding stays joinable to the lens that raised it.
+`buildControlProjection` keeps a `lease_roles` map from every `lease_issued` record and stamps `lens` on each projected finding from the accepted result's lease. A specialist cannot mislabel its own findings, and the value exists for every accepted result without a new envelope field. Projected findings are keyed by `lens:id`, so two lenses reporting one finding ID keep separate rows instead of the later overwriting the earlier; `findingsMarkdown` prints the `Lens` column beside the ID. The decision ledger's `disposition` record gains a conditional `lens` field so a coordinator disposition of a finding stays joinable to the lens that raised it.
 
 ### 5. Baseline rows follow the dispatchable lens set
 
 `docs/benchmarks/pipeline-baseline.md` gets one exclusive-defect row per lens the v5 validation fan can dispatch — `qa`, `tester`, `cleaner`, `security` — and drops `adversary`, which the pipeline path no longer dispatches. `n/a — lens not dispatched` is the explicit cell for a run that did not dispatch the lens, so `pending-runs` disappears from a recorded run.
 
 ## Risks
+
+- Baseline comparison: this change alters the findings projection, a state contract, while `docs/benchmarks/pipeline-baseline.md` holds no recorded run. The comparison is recorded as pending; the three fixture runs are the operator's next step after this merges, and this change is what makes their exclusive-defect cells derivable.
 
 - Word ceilings: `agents/ref-pipeline.md` sits 3 words under its shrink-only ceiling and `agents/ref-special-flows.md` sits exactly on it; both edits trim elsewhere in the same file.
 - Registry drift: an artifact added later without a registry entry fails the test by design; the failure message names the token and the file.

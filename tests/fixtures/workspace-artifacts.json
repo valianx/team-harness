@@ -78,6 +78,9 @@
     "control/control.jsonl": {
       "producer": "agents/ref-pipeline.md"
     },
+    "failure-brief.md": {
+      "producer": "agents/qa.md"
+    },
     "inputs/00-frozen.diff": {
       "producer": "agents/ref-pipeline.md"
     },

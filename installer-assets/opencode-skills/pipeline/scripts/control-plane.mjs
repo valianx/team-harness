@@ -328,7 +328,7 @@ export function buildControlProjection(records) {
       const result = record.payload.result;
       projection.accepted_results[result.result_id] = result;
       const lens = projection.lease_roles[result.lease_id] ?? null;
-      for (const finding of result.findings) projection.findings[finding.id] = { ...finding, lens };
+      for (const finding of result.findings) projection.findings[`${lens ?? "unknown"}:${finding.id}`] = { ...finding, lens };
     }
     if (record.type === "transition") ({ phase: projection.phase, status: projection.status } = record.payload);
     if (record.type === "mechanical_release") projection.releases[record.payload.name] = record.payload.identity;
@@ -680,7 +680,7 @@ function stateMarkdown(value) {
 }
 
 function findingsMarkdown(value) {
-  const rows = Object.values(value.findings).sort((left, right) => left.id.localeCompare(right.id));
+  const rows = Object.values(value.findings).sort((left, right) => left.id.localeCompare(right.id) || String(left.lens).localeCompare(String(right.lens)));
   return `# Findings ledger\n\n> Projection only. Rebuild from the v5 control log.\n\n| ID | Lens | Class | Severity | State | Summary |\n|---|---|---|---|---|---|\n${rows.map(item => `| ${item.id} | ${item.lens ?? ""} | ${item.class} | ${item.severity} | ${item.state} | ${item.summary.replaceAll("|", "\\|")} |`).join("\n")}${rows.length ? "\n" : ""}`;
 }
 

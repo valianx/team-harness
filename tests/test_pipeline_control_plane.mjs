@@ -170,8 +170,8 @@ try {
   const projected = buildControlProjection(replay.records);
   assert.equal(projected.authority.decision, "approve");
   assert.equal(projected.accepted_results[result.result_id].status, "completed");
-  assert.equal(projected.findings["F-1"].state, "resolved");
-  assert.equal(projected.findings["F-1"].lens, replay.records.find((record) => record.type === "lease_issued").payload.lease.role);
+  assert.equal(projected.findings["implementer:F-1"].state, "resolved");
+  assert.equal(projected.findings["implementer:F-1"].lens, replay.records.find((record) => record.type === "lease_issued").payload.lease.role);
 
   assert.equal((await rebuildControlProjections({ log_path: logPath, workspace })).error_code, "CONTROL_WRITER_INVALID");
   const projectionWrite = await rebuildControlProjections({ log_path: logPath, workspace, writer: "main" });

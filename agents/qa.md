@@ -125,7 +125,9 @@ impact for contradictions).
    - **Fail-closed floor:** the bound change is the mandatory live AC source.
      When its directory does not exist, never fall back to the projection or a
      packet summary — return `status: blocked`, `failure_kind: artifact-missing`
-     naming the change directory.
+     naming the change directory. A missing or stale `01-plan.md` is a
+     coordinator projection, not an AC source: return the same block naming
+     `01-plan.md` so Main regenerates it and re-dispatches.
    - **Integrity spot-check:** the packet's `Tree anchor` matches
      `git rev-parse HEAD`; ≥1 packet-listed changed file exists. Mismatch →
      treat the packet as stale, escalate to the full read, report
