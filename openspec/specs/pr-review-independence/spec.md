@@ -38,57 +38,6 @@ workspace for recovery rather than delete evidence still in use.
 - **WHEN** the command process that materialized the snapshot exits or yields for longer than 30 seconds while a reviewer is still reading
 - **THEN** the review workspace remains intact and cleanup does not run until that reviewer and every other dispatched lens reaches a terminal result
 
-### Requirement: Reviewer path mistakes recover without weakening snapshot safety
-Reviewer agents SHALL read only coordinator-supplied artifacts and project leaves proven before content access to be existing, non-symlink regular files whose resolved paths remain inside the frozen worktree. This proof SHALL apply equally to entries from the changed-files artifact, directly affected context, and cited files. A deleted changed-file path SHALL NOT authorize a head-worktree read; reviewers SHALL obtain deleted-file evidence from the captured diff. Instruction-source markers, semantic-source markers, conventional filenames, unresolved imports, and optional coordinates set to `none` SHALL NOT be opened as project context. A nonexistent path outside the supplied and verified set SHALL be classified as an agent path-scope mistake rather than a filesystem transport failure.
-
-The same coordinator-owned correction SHALL apply to mechanically detectable reviewer contract defects, including claiming that a supplied coordinate is missing, omitting required return fields, selecting an unauthorized persistence path, rejecting the runtime's declared read transport, or reading an unverified inferred path. The coordinator SHALL rebuild the packet from captured coordinates, identify the violated rule, and retry once on the same immutable snapshot without an operator decision or gate. Contract correction SHALL NOT authorize snapshot rebuild, identity substitution, finding fabrication, or publication.
-
-The recovery classification SHALL be executable and deterministic. It SHALL validate every required dispatch artifact and every non-`none` required directory, the frozen worktree, the exact failed path when available, the contract signal, the returned snapshot identity, snapshot integrity and freshness, reviewer role, and attempt number. The caller SHALL explicitly supply the reviewed-SHA, context-hash, snapshot-integrity, and freshness results; the classifier SHALL NOT infer or default any missing result to a passing state. It SHALL emit only `retry-contract`, `continue-comment`, or `fail-closed`; an incomplete or malformed classification SHALL fail closed.
-
-After snapshot-integrity and freshness checks pass, a first mechanically detectable contract defect SHALL produce `retry-contract`. A repeated specialist-only contract defect SHALL produce `continue-comment`, mark that lens `absent after retry (agent contract)`, and force a `COMMENT` recommendation while allowing successful lenses to complete. A repeated general-review or consolidation defect that leaves no trustworthy canonical draft SHALL fail closed.
-
-A missing or mismatched snapshot identity, freshness or integrity failure, unreadable required supplied artifact, unreadable frozen worktree, unreadable verified-existing project leaf, path outside the permitted review roots, or otherwise unclassifiable failure SHALL fail closed. Recovery SHALL preserve the existing preview, operator publish approval, approved-draft hash, and publish-time freshness requirements.
-
-#### Scenario: Security reviewer infers an absent project path
-- **WHEN** the security reviewer attempts to read a nonexistent project path that the coordinator did not supply and the frozen worktree did not verify
-- **THEN** the coordinator preserves the immutable snapshot, automatically retries once with that path forbidden, and does not ask the operator to repair filesystem access
-
-#### Scenario: Reviewer omits a supplied identity echo
-- **WHEN** a reviewer receives the reviewed SHA and context hash but omits one from its return while the snapshot remains identical and fresh
-- **THEN** the coordinator automatically reissues a corrected packet on the same snapshot without an operator decision
-
-#### Scenario: Specialist repeats a contract defect
-- **WHEN** a specialist repeats a mechanically detectable contract defect after its automatic retry
-- **THEN** the coordinator marks the lens absent, continues with successful lenses, forces `COMMENT`, and retains the normal publication approval gate
-
-#### Scenario: Canonical reviewer repeats a contract defect
-- **WHEN** the general reviewer or consolidator repeats a contract defect and no trustworthy canonical draft remains
-- **THEN** the coordinator fails closed without fabricating findings or publishing a review
-
-#### Scenario: Required captured diff is unreadable
-- **WHEN** the coordinator-supplied diff cannot actually be read
-- **THEN** the review fails closed without previewing, approving, or publishing a draft
-
-#### Scenario: Snapshot identity or freshness fails
-- **WHEN** the returned snapshot identity differs or snapshot integrity or freshness no longer matches
-- **THEN** the review fails closed and the coordinator does not relabel the failure as an agent contract defect
-
-#### Scenario: Deleted changed file is reviewed
-- **WHEN** the changed-files artifact names a path deleted by the pull request
-- **THEN** the reviewer reads its evidence from the captured diff and never attempts to open that path in the frozen head worktree
-
-#### Scenario: Changed-file path is a symlink escape
-- **WHEN** a changed-files or cited-file path is a symlink or resolves outside the frozen worktree
-- **THEN** the reviewer does not read through it and the review cannot treat external content as snapshot evidence
-
-#### Scenario: Recovery has no workspace
-- **WHEN** the dispatch coordinate declares `Workspace Path: none`
-- **THEN** the coordinator omits workspace-directory validation while still validating every supplied required artifact and the frozen worktree
-
-#### Scenario: Recovery status input is omitted
-- **WHEN** a caller omits any reviewed-SHA, context-hash, snapshot-integrity, or freshness result
-- **THEN** the classifier rejects the invocation and cannot authorize `retry-contract` or `continue-comment`
-
 ### Requirement: QA lens cannot pass by silence
 The QA lens schema SHALL report coverage — `acs_evaluated`, non-verifiable ACs, and `lens_status: full|limited|absent` — with an absent or author-controlled-only oracle yielding `limited`, never a clean pass; severity assignment follows a declared rule; a missing coordinate blocks, matching the security lens.
 
@@ -120,3 +69,49 @@ The published body's verdict line SHALL match the chosen event (divergence force
 #### Scenario: The draft changes between preview and publish
 - **WHEN** the publish-time hash differs from the approved hash
 - **THEN** publish fails closed and re-previews
+
+### Requirement: Blocking findings are verified against the frozen worktree before preview
+After the canonical draft exists and before Preview, the coordinator SHALL dispatch one read-only `pr-review-verifier` with the inline findings, the captured diff, the frozen worktree, and the reviewed identity. For each Blocking finding the verifier SHALL return `confirmed` with a `file:line` citation and one sentence of evidence, `unconfirmed` with the reason, or `refuted` with the evidence that the cited behavior does not exist at the reviewed identity, and SHALL echo the reviewed identity. An unconfirmed Blocking SHALL be demoted to a Suggestion whose body begins with `(unverified)`. A Blocking whose cited behavior does not exist at the reviewed identity SHALL be dropped and recorded in the disposition ledger as `dropped: verifier — <reason>`. Verification SHALL NOT add findings. The coordinator SHALL append `verified k/n` to the `Lenses:` line; an absent verifier SHALL appear as `verified 0/n (verifier absent)` and force `COMMENT`.
+
+#### Scenario: A blocker cites behavior the code does not have
+- **WHEN** the verifier finds that the cited path and line at the reviewed identity do not exhibit the claimed defect
+- **THEN** the finding is dropped, the ledger records the verifier's reason, and the preview shows the remaining findings with `verified` counted on the coverage line
+
+#### Scenario: The verifier cannot confirm a blocker
+- **WHEN** the verifier returns `unconfirmed` for a Blocking finding
+- **THEN** the finding is published as a Suggestion prefixed `(unverified)` and counted as unverified on the coverage line
+
+#### Scenario: The verifier does not return
+- **WHEN** the verifier dispatch produces no valid return
+- **THEN** the coverage line reads `verified 0/n (verifier absent)`, the recommendation is `COMMENT`, and the normal preview and approval flow continues
+
+### Requirement: The review policy sets the verification bar
+`.team-harness/review-policy.md` MAY carry a fenced `yaml` block with `verification: blocking-only | all | off` and `max_suggestions: <n>`. Defaults SHALL be `blocking-only` and `5`. `all` SHALL verify Suggestions as well; `off` SHALL skip the verifier and SHALL print `verification off (policy)` on the coverage line.
+
+#### Scenario: A repository turns verification off
+- **WHEN** the policy declares `verification: off`
+- **THEN** no verifier is dispatched and the published `Lenses:` line states `verification off (policy)`
+
+### Requirement: The review skill fits the skill budget
+`skills/review-pr/SKILL.md` SHALL be under 500 lines. Mechanical steps that do not describe the operator-facing flow SHALL live in named `review_context.py` subcommands.
+
+#### Scenario: Lint measures the skill
+- **WHEN** `/th:lint` measures `skills/review-pr/SKILL.md`
+- **THEN** the line count is under 500 or the check fails naming the file
+
+### Requirement: Reviewers read only supplied coordinates and verified worktree leaves
+Reviewer agents SHALL read only coordinator-supplied artifacts and project leaves proven before content access to be existing, non-symlink regular files whose resolved paths remain inside the frozen worktree. A deleted changed-file path SHALL NOT authorize a head-worktree read; reviewers SHALL obtain deleted-file evidence from the captured diff. Instruction-source markers, semantic-source markers, conventional filenames, unresolved imports, and optional coordinates set to `none` SHALL NOT be opened as project context.
+
+A reviewer return that omits a required field, echoes an identity different from the dispatched one, or reports a supplied artifact as unreadable SHALL be recorded as `absent ({reason})` on the coverage line and SHALL force a `COMMENT` recommendation. The coordinator SHALL NOT rebuild the packet, classify the mistake, or dispatch a correction. A missing or mismatched snapshot identity, an integrity or freshness failure, or an unreadable frozen worktree SHALL fail closed as before. Preview, live publish approval, approved-draft hash, and publish-time freshness are unchanged.
+
+#### Scenario: A reviewer infers an absent project path
+- **WHEN** a reviewer attempts to read a path the coordinator did not supply and the frozen worktree does not contain
+- **THEN** the read is skipped as an absent optional path and the review continues on the supplied coordinates
+
+#### Scenario: A reviewer omits its identity echo
+- **WHEN** a lens return lacks the reviewed SHA or context hash
+- **THEN** the lens is recorded `absent (missing identity echo)`, successful lenses complete, and the recommendation is `COMMENT`
+
+#### Scenario: Snapshot identity or freshness fails
+- **WHEN** the returned identity differs or snapshot integrity or freshness no longer matches
+- **THEN** the review fails closed without preview or publication
