@@ -33,8 +33,14 @@ recorded here.
 | Correction rounds | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
 | Terminal state | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
 | Exclusive defects — `qa` | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
-| Exclusive defects — `adversary` | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
+| Exclusive defects — `tester` | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
+| Exclusive defects — `cleaner` | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
 | Exclusive defects — `security` | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
+
+Exclusive-defect rows name the four lenses the v5 validation fan can dispatch. A
+cell counts findings whose `Lens` in `reviews/findings-ledger.md` is that lens
+and whose defect no other lens reported; a lens the run did not dispatch records
+`n/a — lens not dispatched`. A recorded run never leaves `pending-runs`.
 
 The per-run tree anchor is the full `tree_anchor` value defined in
 `docs/verification-packet.md § 1a`, recorded for the tree the run executed

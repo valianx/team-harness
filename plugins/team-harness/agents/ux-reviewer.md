@@ -74,29 +74,29 @@ Read the `01-plan.md` manifest, UI-relevant architecture anchors, and affected t
 
 ### AC sink — assigned task shards
 
-**Primary AC sink:** enrich-mode AC MUST be pinned into the affected `plan/tasks/Task-N.md`, not only into `reviews/01-ux-review.md`. AC that exist only in the review are never evaluated by a gate.
+**Primary AC sink:** enrich-mode AC are returned in the status block as Given/When/Then scenarios for the coordinator to route into the bound OpenSpec change through an architect update; this agent writes only `reviews/01-ux-review.md`. AC that exist only in the review are never evaluated by a gate.
 
 **Procedure:**
 1. Write the full UX narrative (findings, checklist evaluation, existing patterns) in `reviews/01-ux-review.md`.
 2. Extract the recommended AC additions (Given/When/Then format) from `## Recommended AC Additions`.
-3. Append those AC to the affected task shard, using contiguous numbering after the architect's last AC.
+3. List those AC under `## Recommended AC Additions` in the status block; never edit the OpenSpec change or `01-plan.md`.
 
-**Resolution of prior contradiction:** the output field at the top of this mode (`Output: reviews/01-ux-review.md`) describes the UX narrative file. The text "append to the existing task's AC list" at the AC format section means append to `01-plan.md § Task List` — not exclusively to `reviews/01-ux-review.md`. Both files receive the AC: `reviews/01-ux-review.md` as narrative context, `01-plan.md § Task List` as the gate-binding pin. `01-plan.md § Task List` is the primary, authoritative AC sink.
+**Resolution of prior contradiction:** `reviews/01-ux-review.md` is the narrative file. The gate-binding pin is the bound change's `specs/**/spec.md`, which only the coordinator's architect dispatch updates.
 
 ### Mode: validate (Stage 3 — invoked in parallel with tester/qa/security)
 
 Read the implementation and validate against UI/UX criteria.
 
-**Input:** `01-plan.md § Task List` (live AC read, mandatory), `{docs_root}/00-verify-packet.md` (packet-first), `reviews/01-ux-review.md` (mandatory, preserved read), source code, `02-implementation.md` (depth-on-demand)
+**Input:** the bound change's UI/UX scenarios in `specs/**/spec.md`, resolved through `01-plan.md § Canonical links` (live AC read, mandatory), `{docs_root}/00-verify-packet.md` (packet-first), `reviews/01-ux-review.md` (mandatory, preserved read), source code, `inputs/00-frozen.diff` (depth-on-demand)
 **Output:** `workspaces/{feature}/reviews/04-ux-validation.md`
 
 **Live AC read + packet-first read (canonical schema: `docs/verification-packet.md`).**
 
-1. Live-read only the affected task shard — mandatory, never sourced from the packet. Then read `00-verify-packet.md` once as the implementation-context digest. Never preload sibling tasks.
+1. Live-read only the affected requirements' scenarios — mandatory, never sourced from the packet. Then read `00-verify-packet.md` once as the implementation-context digest. Never preload unrelated requirements.
 2. **Hard floor — preserved read.** `reviews/01-ux-review.md` (the Stage-1 UI/UX AC baseline) stays a MANDATORY read, untouched by the packet — always read it in full when it exists.
-3. **Integrity spot-check (mandatory, cheap):** the packet's `Tree anchor` matches `git rev-parse HEAD` / working-tree state; ≥1 packet-listed changed file exists on disk. On any mismatch → treat the packet as stale, escalate to a full read of `02-implementation.md`, report `packet_integrity: stale|mismatch`.
-4. **Depth-on-demand (never forbidden):** open `02-implementation.md` in full ONLY when (a) an AC references context the packet does not explain, (b) evidence beyond the packet is needed, or (c) the integrity spot-check fails.
-5. **Fallback (fail-open):** packet absent → read `02-implementation.md` directly, unchanged. Report `packet_used: absent`.
+3. **Integrity spot-check (mandatory, cheap):** the packet's `Tree anchor` matches `git rev-parse HEAD` / working-tree state; ≥1 packet-listed changed file exists on disk. On any mismatch → treat the packet as stale, escalate to a full read of `inputs/00-frozen.diff`, report `packet_integrity: stale|mismatch`.
+4. **Depth-on-demand (never forbidden):** open `inputs/00-frozen.diff` in full ONLY when (a) an AC references context the packet does not explain, (b) evidence beyond the packet is needed, or (c) the integrity spot-check fails.
+5. **Fallback (fail-open):** packet absent → read `inputs/00-frozen.diff` directly, unchanged. Report `packet_used: absent`.
 6. Read the actual source code (components, pages, styles) — unaffected by the packet.
 7. Validate each UI/UX criterion.
 8. Check for frontend best practices (see below).

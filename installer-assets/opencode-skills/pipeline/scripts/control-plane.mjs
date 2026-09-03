@@ -312,19 +312,23 @@ export async function appendControlEvent({ log_path: logPath, type, provenance, 
 export function buildControlProjection(records) {
   const projection = {
     sequence: 0, head: null, phase: "intake", status: "active", authority: null,
-    active_leases: {}, accepted_results: {}, findings: {}, releases: {},
+    active_leases: {}, lease_roles: {}, accepted_results: {}, findings: {}, releases: {},
   };
   for (const record of records) {
     projection.sequence = record.sequence;
     projection.head = record.event_id;
     if (record.type === "operator_authority") projection.authority = { event_id: record.event_id, ...record.payload };
-    if (record.type === "lease_issued") projection.active_leases[record.payload.lease.lease_id] = record.payload.lease;
+    if (record.type === "lease_issued") {
+      projection.active_leases[record.payload.lease.lease_id] = record.payload.lease;
+      projection.lease_roles[record.payload.lease.lease_id] = record.payload.lease.role;
+    }
     if (record.type === "lease_revoked") delete projection.active_leases[record.payload.lease_id];
     if (record.type === "lease_closed") delete projection.active_leases[record.payload.lease_id];
     if (record.type === "result_accepted") {
       const result = record.payload.result;
       projection.accepted_results[result.result_id] = result;
-      for (const finding of result.findings) projection.findings[finding.id] = finding;
+      const lens = projection.lease_roles[result.lease_id] ?? null;
+      for (const finding of result.findings) projection.findings[finding.id] = { ...finding, lens };
     }
     if (record.type === "transition") ({ phase: projection.phase, status: projection.status } = record.payload);
     if (record.type === "mechanical_release") projection.releases[record.payload.name] = record.payload.identity;
@@ -677,7 +681,7 @@ function stateMarkdown(value) {
 
 function findingsMarkdown(value) {
   const rows = Object.values(value.findings).sort((left, right) => left.id.localeCompare(right.id));
-  return `# Findings ledger\n\n> Projection only. Rebuild from the v5 control log.\n\n| ID | Class | Severity | State | Summary |\n|---|---|---|---|---|\n${rows.map(item => `| ${item.id} | ${item.class} | ${item.severity} | ${item.state} | ${item.summary.replaceAll("|", "\\|")} |`).join("\n")}${rows.length ? "\n" : ""}`;
+  return `# Findings ledger\n\n> Projection only. Rebuild from the v5 control log.\n\n| ID | Lens | Class | Severity | State | Summary |\n|---|---|---|---|---|---|\n${rows.map(item => `| ${item.id} | ${item.lens ?? ""} | ${item.class} | ${item.severity} | ${item.state} | ${item.summary.replaceAll("|", "\\|")} |`).join("\n")}${rows.length ? "\n" : ""}`;
 }
 
 const TASK_CHECKBOX = /^(\s*[-*]\s+\[)[xX ](\])/gm;

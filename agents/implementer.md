@@ -181,7 +181,7 @@ repository file. A mismatch blocks without reading the packet-derived path.
 Read only this manifest:
 
 1. **Runtime project instructions.** Use the `CLAUDE.md` already present in runtime context. Do not issue a second full-file read. Read a specific section only when the task needs a detail not already available.
-2. **Assigned plan shard.** Resolve the exact path from `01-plan.md § Task Index`, then read only that `plan/tasks/Task-N.md` plus named architecture/invariant anchors. Get ordering from `plan/delivery.md` only when the dispatch does not already provide it. Do not load sibling tasks or the full plan set. For legacy workspaces without the format marker, use the old section locator.
+2. **Assigned OpenSpec tasks.** Read only the `tasks.md` items the lease assigns from the bound change named in `01-plan.md § Canonical links`, plus the requirements and scenarios in its `specs/**/spec.md` that those items cite. `01-plan.md` supplies scope, batches, and decisions only. Do not load sibling tasks or the full change set.
 3. **Conditional evidence.**
    - `01-root-cause.md`: bug location and scope only, for fix/hotfix.
    - `03-testing.md`: named regression and task-relevant test plan only.
@@ -194,11 +194,11 @@ Read only this manifest:
    - No match is valid. Do not broaden into a full knowledge read.
 5. **Code evidence.** Inspect the target files and at most two local analogues per changed concern. Stop discovery once the local implementation shape is clear.
 
-Missing optional evidence is skipped. Missing workspace, `01-plan.md`, or a bounded patch's `failure-brief.md` returns `status: blocked`, `failure_kind: artifact-missing`.
+Missing optional evidence is skipped. Missing workspace, bound OpenSpec change, or a bounded patch's `failure-brief.md` returns `status: blocked`, `failure_kind: artifact-missing`.
 
 `mode: inline` is the only planless route. Its dispatch must contain literal scope; otherwise block. Inline work does not invent pipeline artifacts.
 
-Never write `02-implementation.md`, `01-plan.md`, `plan/**`, workspace state or
+Never write an implementation report, `01-plan.md`, OpenSpec change files, workspace state or
 events, testing artifacts, validation reports, or another report unless the
 exact path and operation appear in `workspace_write_coordinates` and the
 write-scope helper authorizes them. Normal implementation packets assign no
@@ -370,7 +370,7 @@ constraint_discovered: {ac, kind, description, proposed_resolution} | null
 issues: {blockers or "none"}
 ```
 
-Do not create or repeat `02-implementation.md`, the diff, tool chronology, or successful command output in chat. Main verifies `workspace_writes`, records a concise result event, and consolidates the report.
+Do not create an implementation report or repeat the diff, tool chronology, or successful command output in chat. Main verifies `workspace_writes`, records a concise result event, and consolidates the report.
 
 ## Liveness Probe
 

@@ -171,13 +171,16 @@ try {
   assert.equal(projected.authority.decision, "approve");
   assert.equal(projected.accepted_results[result.result_id].status, "completed");
   assert.equal(projected.findings["F-1"].state, "resolved");
+  assert.equal(projected.findings["F-1"].lens, replay.records.find((record) => record.type === "lease_issued").payload.lease.role);
 
   assert.equal((await rebuildControlProjections({ log_path: logPath, workspace })).error_code, "CONTROL_WRITER_INVALID");
   const projectionWrite = await rebuildControlProjections({ log_path: logPath, workspace, writer: "main" });
   assert.equal(projectionWrite.ok, true);
   const firstState = await readFile(path.join(workspace, "00-state.md"), "utf8");
   assert.match(firstState, /Projection only/);
-  assert.match(await readFile(path.join(workspace, "reviews", "findings-ledger.md"), "utf8"), /F-1/);
+  const ledger = await readFile(path.join(workspace, "reviews", "findings-ledger.md"), "utf8");
+  assert.match(ledger, /\| ID \| Lens \| Class \|/);
+  assert.match(ledger, /\| F-1 \| implementer \|/);
   assert.equal((await rebuildControlProjections({ log_path: logPath, workspace, writer: "main" })).ok, true);
   assert.equal(await readFile(path.join(workspace, "00-state.md"), "utf8"), firstState);
 

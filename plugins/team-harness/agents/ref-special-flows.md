@@ -217,7 +217,7 @@ Two modes: `plan` (analysis only) and `plan-and-execute` (analysis + pipeline pe
 | File | Mode | Consumer | Purpose |
 |---|---|---|---|
 | `01-planning.md` | planning mode (`/th:plan`, `/th:plan plan-and-execute`) | coordinator (single-plan, multi-task dispatch) | break a broad scope into N tasks in one plan |
-| `01-plan.md` | design mode (normal pipeline) + **milestone build** (single-repo `type: plan`) | implementer + qa + plan-reviewer | merged architecture + task list (§ Architecture + § Task List); milestone-build home |
+| `01-plan.md` | design (normal pipeline) + **milestone build** (single-repo `type: plan`) | implementer + qa + plan-reviewer | coordinator projection: scope, batches, decisions, links to the bound OpenSpec change; milestone-build home |
 
 **Milestone build disambiguation.** A `type: plan` single-repo milestone build is a third, distinct consumer for `01-plan.md`. The architect writes the milestone decomposition INTO `01-plan.md` (Work Plan with milestones M0…MN). This is NOT `01-planning.md` (multi-task batch). See the milestone-build section below for the full contract.
 

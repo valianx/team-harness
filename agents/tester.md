@@ -81,7 +81,7 @@ actually adds or modifies a comment.
 ## Discovery and reference routing
 
 Read the ACs, TCs, changed files, existing tests, test commands, and triggered
-`sketches/*.md`. Record `sketches_read`.
+`sketches/*`. Record `sketches_read`.
 
 For each AC and TC classify the strongest suitable evidence as `test`, `command`, or
 `inspection`. For a warranted test, select only the necessary test type:

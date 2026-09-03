@@ -86,9 +86,8 @@ Read each required input once:
 | Input | Use |
 |---|---|
 | `{docs_root}/00-state.md` | canonical v4 acceptance/Freeze state, accepted `freeze_commit_sha`/`freeze_tree_sha`, type, issue coordinates, committed version, diff composition, size result |
-| `{docs_root}/01-plan.md` | objective, approved ACs, architecture summary, manifest, task/status index, declared documentation/OpenAPI files |
-| `{docs_root}/plan/delivery.md` | dependencies, bases, version, PR grouping |
-| `{docs_root}/plan/invariants.md` | conditional atomic-sync invariants |
+| `{docs_root}/01-plan.md` | objective, scope, work batches, decisions, PR grouping, canonical links to the bound OpenSpec change |
+| bound change `tasks.md` and `specs/**/spec.md` | approved tasks, requirement and scenario names, declared documentation/OpenAPI files |
 | `{docs_root}/03-testing.md` | commands, results, AC-to-test evidence |
 | `{docs_root}/reviews/04-validation.md` | QA verdicts and evidence from the required v4 validation |
 
@@ -98,7 +97,7 @@ security column and risk section.
 There is no glob-all fallback. A missing v4 validation file, missing testing
 file, missing plan, or missing state is an upstream contract failure.
 
-Do not read `02-implementation.md`, repository source, README, CLAUDE.md,
+Do not read the frozen diff, repository source, README, CLAUDE.md,
 CHANGELOG.md, git history, or the diff. Pre-gate coordinates and reviewed evidence
 already describe the tree being published. If they are insufficient, report the
 specific missing coordinate instead of rediscovering the implementation.
@@ -125,8 +124,8 @@ Do not repair state fields. A missing or contradictory acceptance record returns
 
 ### 2. Check planned tracked artifacts
 
-From `plan/delivery.md` and its referenced task file lists, identify tracked documentation and OpenAPI files explicitly
-listed in approved task `Files:` or ACs. Confirm their reviewed evidence exists in
+From the bound change's `tasks.md` and the `01-plan.md` scope, identify tracked documentation and OpenAPI files explicitly
+named by approved tasks or scenarios. Confirm their reviewed evidence exists in
 `03-testing.md` and `reviews/04-validation.md`.
 
 This is a presence/evidence check, not an implementation review. If an approved
@@ -171,7 +170,7 @@ validation. Never repair the version during delivery.
 
 ### 4. Build the acceptance matrix
 
-Use the exact AC IDs from `01-plan.md`; never restate full AC prose. Each row uses
+Use the exact requirement and scenario names from the bound change's `specs/**/spec.md`; never restate scenario prose. Each row uses
 a gist of at most five words and cites existing evidence.
 
 Write `{docs_root}/inputs/acceptance-matrix.md`; QA evidence in
