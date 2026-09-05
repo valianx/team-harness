@@ -17,15 +17,18 @@ let count = 0;
 
 function invoke(hook, input, variables = { PLUGIN_ROOT: copy }, nodeAvailable = true) {
   assert.equal(typeof hook.commandWindows, "string");
-  const parsed = /^node --version >nul 2>&1 & if errorlevel 1 \(echo (.+) & exit \/b 0\) else \(node -e "([^"]+)" (.+)\)$/.exec(hook.commandWindows);
+  const parsed = /^for %N in \(node\.exe\) do \(if "%~\$PATH:N"=="" \(echo (.+)\) else \("%~\$PATH:N" -e "([^"]+)" (.+) & if errorlevel 1 echo \1\)\)$/.exec(hook.commandWindows);
   assert.ok(parsed, "Windows command must retain the tested Node bootstrap form");
   const env = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key.toLowerCase() === "nodefaultcurrentdirectoryinexepath") delete env[key];
+  }
   delete env.PLUGIN_ROOT;
   delete env.CLAUDE_PLUGIN_ROOT;
   Object.assign(env, variables);
   const pathKey = Object.keys(env).find(key => key.toLowerCase() === "path") || "PATH";
   env[pathKey] = nodeAvailable ? path.dirname(process.execPath) + path.delimiter + (env[pathKey] || "") : scratch;
-  const options = { env, input: typeof input === "string" ? input : JSON.stringify(input), encoding: "utf8", timeout: 15000, maxBuffer: 1024 * 1024 };
+  const options = { env, cwd: scratch, input: typeof input === "string" ? input : JSON.stringify(input), encoding: "utf8", timeout: 15000, maxBuffer: 1024 * 1024 };
   const result = process.platform === "win32"
     ? spawnSync(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", hook.commandWindows], { ...options, windowsVerbatimArguments: true })
     : spawnSync(process.execPath, ["-e", parsed[2], ...parsed[3].split(" ")], options);
@@ -45,6 +48,9 @@ try {
   await cp(path.join(plugin, "hooks"), path.join(copy, "hooks"), { recursive: true });
   assert.equal(hooks.length, 2);
   if (process.platform === "win32") denied(invoke(hooks[0], safe, { PLUGIN_ROOT: copy }, false));
+  // A repository-local command must not shadow the runtime selected through PATH.
+  await writeFile(path.join(scratch, "node.cmd"), "@echo WORKSPACE_NODE_EXECUTED\r\n@exit /b 0\r\n");
+  await writeFile(path.join(scratch, "node.exe"), "not an executable");
   denied(invoke(hooks[0], destructive));
   assert.equal(invoke(hooks[0], safe), null); count += 1;
   denied(invoke(hooks[0], destructive, { CLAUDE_PLUGIN_ROOT: copy }));
@@ -72,6 +78,12 @@ try {
   await writeFile(path.join(copy, "hooks/dist/gate-guard.cjs"), "process.stdout.write(JSON.stringify({hookSpecificOutput:{permissionDecision:'deny'}}));");
   denied(invoke(hooks[1], safe));
   const launcher = path.join(copy, "hooks/dist/codex-launcher.cjs");
+  for (const source of ["not valid javascript {", "module.exports = {};", "exports.run = () => { throw new Error('DO_NOT_REFLECT_LAUNCHER_ERROR'); };"]) {
+    await writeFile(launcher, source);
+    const result = invoke(hooks[0], safe);
+    denied(result);
+    assert.ok(!JSON.stringify(result).includes("DO_NOT_REFLECT_LAUNCHER_ERROR"));
+  }
   await rm(launcher);
   await mkdir(launcher);
   await writeFile(path.join(launcher, "index.js"), "process.stdout.write('must-not-execute');");

@@ -41,7 +41,7 @@ NON_FATAL_ALIAS_WARNING = (
     "Read-only file system (os error 30)"
 )
 HOOK_DIGESTS = {
-    "hooks/hooks.json": "79271ccc9c4c03282bb1f4b15a6ec526f7225879265f9a167bfa90bc038bc9bb",
+    "hooks/hooks.json": "a4c33f0da7ea325d1454f638582fdadf2afcc1c1394e96588302dbf14495a207",
     "hooks/dist/codex-launcher.cjs": "ff444bd8ae65a96f62113888b31248f4778b9116823e1af1a5a7212c572fca64",
     "hooks/run-codex-hook.sh": "6e13c288ceed9feba3493d1eb886237971b96818d3819b0279917bc71496ac5b",
     "hooks/dist/policy-block.cjs": "1970f768289b7d6fc375dc882671f4740d0499bdf81feffd756224ba1ddf809d",

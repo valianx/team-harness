@@ -80,7 +80,10 @@ hook-level `ask` and native permissions own approvals. Review
 `plugins/team-harness/hooks/hooks.json` and its scripts before trusting the
 checkout; never bypass hook trust for an unreviewed repository. Hooks provide a
 native Windows `commandWindows` override using Node, with the same deny-only
-decisions and no Bash dependency. Node must be available on PATH; the installer
+decisions and no Bash dependency. The launcher resolves node.exe from PATH to an
+absolute executable path, excluding the implicit current-directory search. PATH
+must identify a trusted Node installation. Malformed or throwing launchers deny
+the action without reflecting their errors. The installer
 beta's remaining shell workflows still require POSIX. An update can bridge paths that
 the current thread already knows, but newly added or renamed skills, agent or
 MCP declarations, and hook registrations still require a new Codex thread.
