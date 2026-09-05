@@ -36,6 +36,14 @@ Persist the comparison under the owned review run, validate it before use, and p
 
 ## Delivery
 
+The operator-reported Windows hook failure adds native `commandWindows` overrides to the Codex
+manifest. A TypeScript-authored, prebuilt Node adapter invokes the existing rule bundles with
+argv and retains their denial semantics. The bootstrap reads plugin-root environment variables
+inside JavaScript so shell metacharacters in installed paths are not interpolated into code.
+The installer verifies the new field and exact artifact hashes. A Windows CI job executes the
+literal override through cmd.exe; local portable tests do not claim native Windows execution.
+Reference: https://learn.chatgpt.com/docs/hooks (`commandWindows` and plugin-root variables).
+
 Operational recovery follows the operator's requested extension: Main must diagnose and repair
 contract, path and declared-prerequisite failures without another approval when deliverables and
 authority are unchanged. Strengthen the existing causal-recovery contract and carry it into

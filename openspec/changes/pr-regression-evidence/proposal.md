@@ -10,6 +10,7 @@ PR review can identify and independently inspect a suspected defect, but it curr
 - Supply optional anchored reproduction evidence to the existing independent verifier and incorporate the result into the existing PR review and coverage disclosure.
 - Preserve ordinary code review when reproduction is unavailable; disclose that limit. Deliver implementation, regression tests, documentation, generated distribution updates and release metadata in one PR.
 - Require autonomous diagnosis and repair of operational blockers across direct/spec and pipeline work when approved deliverables and authority remain unchanged.
+- Fix the operator-reported Windows installation failure with native `commandWindows` overrides, a TypeScript-authored Node launcher, verified installation hashes and Windows command tests.
 
 ## Capabilities
 
@@ -21,6 +22,7 @@ PR review can identify and independently inspect a suspected defect, but it curr
 
 - `pr-review-independence`: allow the existing read-only verifier to inspect optional reproduction evidence while retaining code-based causality checks and existing finding dispositions.
 - `pipeline-control-plane`: require operational repair attempts before pausing, preserving causal recovery and existing authority.
+- `codex-runtime-parity`: provide Windows hook commands that preserve existing deterministic denials without Bash.
 
 ## Impact
 

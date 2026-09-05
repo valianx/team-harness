@@ -36,6 +36,11 @@ they remain inconclusive. Send diagnostics to stderr. Successful command complet
 not establish that the assertion ran. Framework-specific reporters can be wrapped by this probe;
 never map every framework failure to the named assertion.
 
+Main must inspect the selected command and probe to establish that the command invokes the
+named assertion. The marker protocol trusts that reporter; it is not an execution attestation
+against a dishonest or broken wrapper. Reject ignored probes and untrusted/replaced executables;
+record relevant executable or dependency changes as non-comparable environment evidence.
+
 ## Capture and validate
 
 ```text
@@ -52,7 +57,7 @@ generated copies and evidence; do not clean them while reviewers are reading.
 
 The helper makes source-only copies from the captured merge-base and head, without checkout
 filters or hooks. Symlinks, submodules, individual blobs above 16 MiB, trees above 64 MiB or
-10,000 files, and preparation beyond its deadline are currently unavailable reproductions.
+10,000 files, Windows-ambiguous filenames and preparation beyond its deadline are unavailable reproductions.
 Tests needing Git metadata, LFS hydration, dependency installation or version-specific setup
 also need a supported external environment; never treat absent prerequisites as a regression.
 Main first attempts permitted repairs of declared prerequisites without changing the deliverable;

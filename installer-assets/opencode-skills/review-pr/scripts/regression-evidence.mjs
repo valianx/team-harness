@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { lstat, mkdir, mkdtemp, readFile, realpath, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, mkdir, mkdtemp, open, realpath, writeFile } from "node:fs/promises";
 import { devNull } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -15,12 +16,28 @@ const oid = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/;
 const text = (value) => typeof value === "string" && value.trim().length > 0 && value.length <= 8192;
 const ensure = (condition, reason) => { if (!condition) throw new Error(reason); };
 
-async function regular(file, limit = 1024 * 1024) {
-  const target = path.resolve(file);
+async function regular(inputPath, limit = 1024 * 1024) {
+  const target = path.resolve(inputPath);
   ensure(await realpath(target) === target, "symlink input is not supported");
   const stat = await lstat(target);
   ensure(stat.isFile() && stat.size <= limit, "input must be a bounded regular file");
-  return readFile(target);
+  const file = await open(target, constants.O_RDONLY | (constants.O_NOFOLLOW || 0));
+  try {
+    const opened = await file.stat();
+    ensure(opened.isFile() && opened.dev === stat.dev && opened.ino === stat.ino
+      && opened.size === stat.size && opened.mtimeMs === stat.mtimeMs, "input changed before reading");
+    const bytes = Buffer.alloc(stat.size + 1);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const { bytesRead } = await file.read(bytes, offset, bytes.length - offset, offset);
+      if (!bytesRead) break;
+      offset += bytesRead;
+    }
+    const after = await file.stat();
+    ensure(offset === stat.size && after.size === stat.size && after.mtimeMs === stat.mtimeMs,
+      "input changed while reading");
+    return bytes.subarray(0, offset);
+  } finally { await file.close(); }
 }
 
 async function inputs(requestPath) {
@@ -83,9 +100,14 @@ async function materialize(snapshot, revision, destination) {
     ensure(match, "execution copy contains unsupported symlink or submodule entries");
     const [, mode, object, relative] = match;
     const parts = relative.split("/");
-    ensure(!relative.includes("\\") && !relative.includes(":") && parts.every((part) => part && part !== "." && part !== ".." && part.toLowerCase() !== ".git"),
+    ensure(!relative.includes("\\") && parts.every((part) => part && !/[. ]$/.test(part)
+      && !/[\x00-\x1f<>:"|?*]/.test(part) && part.toLowerCase() !== ".git"
+      && !/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part)),
       "unsupported execution copy path");
     const file = path.join(destination, ...parts);
+    const confined = path.relative(destination, file);
+    ensure(confined && !path.isAbsolute(confined) && confined !== ".." && !confined.startsWith(`..${path.sep}`),
+      "execution copy path escapes destination");
     const content = await git(snapshot, ["cat-file", "blob", object], 16 * 1024 * 1024);
     bytes += content.length;
     ensure(bytes <= 64 * 1024 * 1024, "execution copy exceeds byte limit");

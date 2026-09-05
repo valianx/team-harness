@@ -174,6 +174,26 @@ process.exitCode = passed ? 0 : 1;
     }
     assert.equal(classifyComparison("pass", "fail", false), "inconclusive");
   });
+  await check("Windows-normalized paths never materialize outside the execution copy", async () => {
+    for (const filename of [".. /escape.txt", "trailing./setting.txt", "NUL.txt", "setting.txt "]) {
+      git("read-tree", base);
+      git("-c", "core.protectNTFS=false", "update-index", "--add", "--cacheinfo", `100644,${git("rev-parse", base + ":setting.txt")},${filename}`);
+      const tree = git("write-tree");
+      const revision = git("commit-tree", tree, "-p", base, "-m", "Windows path fixture");
+      execFileSync("git", ["--git-dir", path.join(run, "pr-review-snapshot.git"), "fetch", repository, revision], { stdio: "pipe" });
+      await json(contextPath, { ...context, head_oid: revision });
+      const { record } = await capture();
+      assert.equal(record.classification, "inconclusive");
+      assert.match(record.reason, /unsupported execution copy path/);
+      assert.equal(record.head, null);
+    }
+    await json(contextPath, context);
+  });
+  await check("oversized input is refused before probe execution", async () => {
+    await json(requestPath, request);
+    await writeFile(probePath, "x".repeat(1024 * 1024 + 1));
+    await assert.rejects(captureRegression(requestPath), /bounded regular file/);
+  });
   await check("CLI captures and validates the same bounded evidence", async () => {
     await json(requestPath, request);
     await writeFile(probePath, probe);

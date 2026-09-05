@@ -468,6 +468,7 @@ else
     run_node_suite "review-fan" "test_review_fan.mjs" "node not found — install Node.js to run this suite"
     run_node_suite "review-surface" "test_review_surface.mjs" "node not found — install Node.js to run this suite"
     run_node_suite "regression-evidence" "test_regression_evidence.mjs" "node not found — install Node.js to run this suite"
+    run_node_suite "codex-windows-hooks" "test_codex_windows_hooks.mjs" "node not found — install Node.js to run this suite"
 fi
 
 echo

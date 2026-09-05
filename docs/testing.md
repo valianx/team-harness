@@ -63,6 +63,7 @@ Everything below has inputs, outputs, and exit codes.
 | `test_security_scan.py` | Exact source allowlists for all five PR agents, optional Codex projection validation, read-only-tier Bash grants, hook injection patterns, secrets, and roster reachability |
 | `test_review_context.py` | PR security-selection reason enums, review-policy parsing, verifier demotion and drop application, coverage-line forms, preflight blockers, snapshot mergeability classification, hash/freshness comparison, rendering, and conversation capture behavior |
 | `test_regression_evidence.mjs` | Real base/head assertion comparisons, preexisting failures, inconclusive execution, deadlines, bounded diagnostics, stale/tampered evidence and unchanged operator checkout; no model calls |
+| `test_codex_windows_hooks.mjs` | Windows hook bootstrap and adapter decisions; on Windows executes literal `commandWindows` through `cmd.exe`, including paths with spaces and symbols. Registered in native Windows CI. |
 | `test_pipeline_control_plane.mjs` | Closed leases/results, actual Git scope reconciliation, Main-only mutation, safe specialist exports, canonical log replay/projections, causal recovery, Freeze quality, capsules, and the administrative close of a workspace without a control log (symlinked control or events paths refused) |
 | `test_permission_disjointness.py` | The permission-allowlist disjointness invariant (#18312 floor) |
 | `test_flow_event_schema_sync.py` | Cross-repo flow-event schema sync |

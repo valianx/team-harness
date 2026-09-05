@@ -11,6 +11,8 @@
 
 ## 3. Validation and single-PR delivery
 
+- [x] 3.0 Fix the operator-reported Windows hook failure with native commandWindows overrides, a TypeScript launcher, installation integrity checks and literal Windows command tests; validate the added scope and include it in the same PR.
+
 - [x] 3.1 Add fixture-based behavioral tests for introduced and preexisting assertion failures, successful head probes, intentional changes, unavailable or timed-out execution, stale or modified evidence, bounded diagnostics and preservation of ordinary code review.
 - [x] 3.2 Update usage documentation, synchronize generated distribution and Codex agent artifacts, and add the required version bump and changelog entry.
 - [x] 3.3 Run strict OpenSpec validation, scope checks, relevant focused suites, Codex generator checks and the complete repository suite; resolve failures and record evidence against the final committed change.

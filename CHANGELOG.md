@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.25.0] - 2026-09-05
 
+### Fixed
+
+- Codex hooks use a native Windows command override and preserve deterministic denials without requiring Bash.
+
 ### Added
 
 - PR reviews can compare bounded base/head assertion evidence to investigate suspected regressions.

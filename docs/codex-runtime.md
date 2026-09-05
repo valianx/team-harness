@@ -78,13 +78,15 @@ only deterministic-deny hooks (`policy-block` and the catastrophic branch of
 `gcp-guard`); approval-classifying guards are omitted because Codex has no
 hook-level `ask` and native permissions own approvals. Review
 `plugins/team-harness/hooks/hooks.json` and its scripts before trusting the
-checkout; never bypass hook trust for an unreviewed repository. Hooks and the
-installer beta currently require a POSIX shell. An update can bridge paths that
+checkout; never bypass hook trust for an unreviewed repository. Hooks provide a
+native Windows `commandWindows` override using Node, with the same deny-only
+decisions and no Bash dependency. Node must be available on PATH; the installer
+beta's remaining shell workflows still require POSIX. An update can bridge paths that
 the current thread already knows, but newly added or renamed skills, agent or
 MCP declarations, and hook registrations still require a new Codex thread.
 Hook commands prefer Codex's native
 `PLUGIN_ROOT`, accept the `CLAUDE_PLUGIN_ROOT` compatibility alias that Codex
-itself provides without requiring Claude Code, and recover a replacement
+itself provides without requiring Claude Code. POSIX commands also recover a replacement
 snapshot from the same Codex cache. When no plugin runtime can be resolved,
 the launcher reports the broken cache as a system message and leaves the
 decision to native Codex permissions instead of denying every tool call.
