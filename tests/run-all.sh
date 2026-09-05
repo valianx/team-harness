@@ -463,9 +463,11 @@ echo "############################################################"
 if ! command -v git >/dev/null 2>&1; then
     report_skip_or_fail "review-fan" "git not found — install Git to run this suite"
     report_skip_or_fail "review-surface" "git not found — install Git to run this suite"
+    report_skip_or_fail "regression-evidence" "git not found — install Git to run this suite"
 else
     run_node_suite "review-fan" "test_review_fan.mjs" "node not found — install Node.js to run this suite"
     run_node_suite "review-surface" "test_review_surface.mjs" "node not found — install Node.js to run this suite"
+    run_node_suite "regression-evidence" "test_regression_evidence.mjs" "node not found — install Node.js to run this suite"
 fi
 
 echo

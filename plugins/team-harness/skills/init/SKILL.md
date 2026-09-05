@@ -107,6 +107,11 @@ its snapshot, lens selection, consolidation, preview, or publication gate.
    instance activates the pipeline for the framed task, while its live `1`
    selects inline. This does not change the current three-choice mapping below.
 3. If there is no concrete task, ask what the operator needs and stop.
+   For a concrete task, Main diagnoses and repairs operational blockers (contract
+   format, paths, tools or declared dependencies), verifies the repair and resumes
+   without new approval when the deliverable and authority remain unchanged.
+   Use permitted isolated environments; consult only when no authorized repair
+   remains or the solution changes approved scope, acceptance or authority.
 4. Handle explanations, reviews of supplied material, repository inspection,
    and small bounded reversible changes directly in `Main`; inline is the
    default posture. For an implementation request, direct execution is eligible

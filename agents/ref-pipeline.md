@@ -221,7 +221,7 @@ Replay the valid log prefix and rebuild projections before routing. Preserve
 valid progress and prove the prior writer safe. Continue only with unchanged
 authority/semantic/worktree/input/context identities and a different safe
 causal action. Replace unverifiable context; pause on unsafe ownership,
-integrity failure, unavailable prerequisites, or repeated causal identity.
+integrity failure, prerequisites unavailable after repair, or repeated causal identity.
 
 A workspace without `control/control.jsonl` has nothing to replay: close it
 administratively with one events entry and offer inline continuation or a
