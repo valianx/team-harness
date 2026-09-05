@@ -2,45 +2,40 @@
 
 The cleaner checkpoint is a behavior-preserving cleanup pass inside the
 existing `implementation` phase. It runs once per repository candidate with an
-eligible changed production surface, after implementation and tester evidence
-are committed and before Freeze. A multi-repository pipeline launches one
-isolated cleaner per repository, each with its own worktree, allowlist,
-baseline anchor, candidate identity, and quality manifest; one cleaner never
-receives several projects. It adds no phase, gate, or architecture review.
+eligible changed production surface, after implementation closes and before
+Freeze. A multi-repository pipeline launches one isolated cleaner per
+repository, each with its own worktree, allowlist, baseline anchor, candidate
+identity, and quality manifest; one cleaner never receives several projects. It
+adds no phase, gate, or architecture review.
 
 ## Applicability
 
-The checkpoint applies when the workspace-local
-`.team-harness/quality.json` declares `test` and `test_contract.path_rules`.
-The manifest is operational state outside the product diff; a workspace nested
-below a checkout must keep it ignored and untracked. If either field is absent,
-the coordinator records
-`cleaner_evidence.status: not-applicable` with reason
-`repository-quality-manifest-incomplete`; it never invents repository
-commands.
+The checkpoint applies when Main can derive a deterministic non-empty
+production allowlist under `cleanerEligibility` in the control-plane helper.
+A quality manifest is not a cleaner prerequisite; its applicability belongs
+to the quality runner.
 
-The coordinator derives an exact allowlist of existing changed production
-files, stores its SHA-256, and excludes every path matched by
-`test_contract.path_rules`. Tests, fixtures, snapshots, manifests, generated
+Main derives the allowlist from the Git diff and repository evidence, stores
+its SHA-256, and excludes test paths using repository conventions and any
+available `test_contract.path_rules`. Paths whose production role cannot be
+established stay outside the grant. Tests, fixtures, snapshots, manifests, generated
 files, lockfiles, migrations, public schemas, pipeline state, and unrelated
 files remain outside the cleaner's authority. An empty allowlist is an
 evidenced no-op.
 
 ## Flow
 
-The coordinator must first finish every selected readiness and correction
-closure diagnostic, deduplicate the terminal findings by root cause, and close
-the resulting comprehensive package. A partial pass or a fix dispatched from
-only the first surfaced symptom is not cleaner-ready. Manifest corrections are
-complete before cleaner dispatch; changing the workspace manifest afterward
-creates a new manifest identity and invalidates the affected readiness evidence
-without adding it to the candidate tree.
+Pre-implementation checks cover prerequisites only. Main derives the allowlist
+and baseline from current facts, then issues the cleaner's capability lease
+immediately before dispatch. A manifest change after that point changes the
+inputs for the candidate and requires fresh validation.
 
 1. Commit the consolidated implementation candidate and require a clean tree.
 2. Persist the allowlist, its SHA-256, and the pre-cleanup candidate anchor
    (commit and tree) as the `baseline` record in `cleaner_evidence`.
-3. Dispatch one fresh `cleaner` with only that allowlist, the functional AC
-   summary, applicable TCs, and the quality manifest. The cleaner may simplify
+3. Dispatch one fresh `cleaner` with that allowlist, pointers to the canonical
+   OpenSpec intent and applicable test evidence, and any quality manifest under
+   its capability lease. The cleaner may simplify
    the approved production surface without changing behavior, dependencies,
    configuration, public contracts, or tests, then commits its bounded result
    or returns a justified no-op.
@@ -82,28 +77,23 @@ requires production, migration, test, documentation, or evidence authority, it
 commits the safe cleanup first and reports the remainder as complete
 implementer findings. A cleaner finding never triggers another cleaner pass.
 A `failed` or `blocked` return is persisted with its hashed result as
-`cleaner-failed` or `cleaner-blocked` and blocks Freeze for that attempt; a
-live operator recovery returns to implementation, applies an in-scope
-correction, commits a new candidate, and runs one fresh cleaner attempt for
-the new candidate/manifest identity.
+`cleaner-failed` or `cleaner-blocked` and blocks Freeze for that candidate.
+Causal recovery preserves valid progress; when it produces a new candidate or
+manifest identity, Main revalidates the lease inputs before any new cleaner
+dispatch.
 
-After the cleaner result and overreach-proof evidence are recorded, only a
-small repository-local remainder may become a cleaner handoff: exactly one
-repository/worktree, one coherent behavior-preserving objective, at most five
-finding IDs and eight files, already-approved scope, no DDL/migration,
-public-schema, security-control, external-environment or new decision, local
-closure checks, and a complete quality manifest. Anything larger preserves its
-commits and evidence but requires a newly activated pipeline decomposed by
-repository; it is never packed into one large implementer prompt.
+Work outside the cleaner's allowlist or authority remains with its owning role
+and is reported in the cleaner's `result_envelope`; the cleaner never dispatches
+that work or claims authorization. Main accepts the envelope only after
+validating its lease and changed paths.
 
-An eligible implementer package pauses with a fresh nonce and asks the
-operator to authorize one implementer pass. Neither normal nor autonomous
-Gate-1 approval authorizes that pass. The authorized implementer gets one
-terminal attempt; the handoff does not increment the pipeline `iteration`
-counter or consume its max-3 autonomous validation-correction budget. A non-zero closure
-result must include the exact command, exit code, and bounded diagnostic —
-`exit 1` alone is not evidence. Remaining work requires a new package and
-another live authorization; the cleaner still does not run again.
+Any failed or blocked result, or subsequent correction, follows
+`agents/_shared/coordinator-recovery.md`. Main preserves valid progress and
+revalidates authority, semantic identities, immutable inputs, context,
+canonical paths, and ownership before continuing or replacing a lease. A
+different safe causal action is required; repeated causal identity pauses. A
+semantic, scope, security-authority, or outward-effect change requires the
+applicable live operator decision.
 
 ## CRAP is measure-only
 

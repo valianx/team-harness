@@ -1,17 +1,25 @@
-# Observability — v3 Events and Coordination Records
+# Observability — v5 events and projections
 
-The local execution trace is the canonical machine-readable history of an activated pipeline.
-The state snapshot and decision ledger are separate coordinator-owned records:
+The hash-linked `control/control.jsonl` is the only durable authority for an activated
+pipeline. The local execution trace and the generated views are coordinator-owned
+observability surfaces:
 
 | Record | Purpose | Writer |
 |---|---|---|
-| `00-state.md` | Current v3 state, fields, checklist, agent results, next action | coordinator only |
+| `control/control.jsonl` | Operator authority, lease lifecycle, accepted results, transitions, and mechanical releases | Main only |
+| `00-state.md` | Replaceable v5 state projection (`sequence`, `head`, `phase`, `status`, authority, lease/result counts) | Main only |
 | `00-execution-events.jsonl` / `.md` | Append-only lifecycle and phase trace | coordinator only |
-| `00-decision-ledger.jsonl` / `.md` | Gate decisions, finding dispositions, dry-run evidence | coordinator only |
+| `00-decision-ledger.jsonl` / `.md` | Disposition and decision telemetry for flows that emit it | coordinator only |
 | `00-pipeline-summary.md` | Replaceable human summary | coordinator only |
+| `reviews/findings-ledger.md` | Replaceable findings projection | Main only |
+| `control-projection.json` | Machine-readable projection of the valid control-log prefix | Main only |
 
-Specialists return status blocks and artifact pointers. They never create, edit, or repair these
-records. The complete field schema is authoritative in `agents/_shared/orchestrator-state.md`.
+`00-execution-events` remains a trace and telemetry surface; it never authorizes a transition,
+lease, result, Gate, or release. `00-decision-ledger` remains telemetry for its
+explicit producers, including `apply-review`, and preserves historical records without
+becoming control authority. Specialists return one result envelope and never create, edit,
+or repair coordinator projections. The current projection contract is authoritative in
+`agents/_shared/orchestrator-state.md` and `skills/pipeline/scripts/control-plane.mjs`.
 
 ## 1. Canonical machine and trace events
 
@@ -29,7 +37,7 @@ successful tool call does not deserve an `operation.started` + `operation.succes
 pair. `operation.*` remains available for a long-running boundary whose recovery needs
 an explicit start marker, or for a failure that needs diagnosis. Never log reasoning,
 prompts, specialist prose, diffs, command output, or fields already recoverable from
-`00-state.md` or the named artifact.
+the control projection or the named artifact.
 
 Each append is one minified JSON object on one line. Use identifiers, enums, counts,
 durations, token figures, and artifact paths; optional free text follows the existing
@@ -50,14 +58,15 @@ loads the stream in full. These rules reduce model output and I/O; renaming `.md
 ## 2. Canonical machine and trace sequence
 
 
-Every activated v3 run uses one sequence:
+Every activated v5 run uses one sequence:
 
 ```text
 design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete
 ```
 
-Every `pipeline` run uses this canonical full v3 sequence. `inline` direct work is outside the
-machine and has no pipeline state, execution trace, decision ledger, summary, or gate events.
+Every `pipeline` run uses this canonical v5 sequence. `inline` direct work is outside the
+machine; mode-specific artifacts and traces follow their own documented contracts and never
+enter this pipeline sequence or release its Gates.
 Implementation checkpoints (evidence, hygiene, Freeze) and validation acceptance are trace details
 inside their named states; they are not persisted machine phases. A live tester, QA, or security
 request made while inline returns chat/bounded evidence only unless the operator explicitly asks
@@ -66,7 +75,7 @@ for a standalone artifact; that request does not activate pipeline observability
 The coordinator emits lifecycle events at every pipeline state transition and gate. Legacy tier,
 fast, simple, or profile markers never create an observability exemption or a pipeline trace.
 
-## 2. Event envelope
+## 3. Event envelope
 
 One JSON object per line, append-only. In Obsidian mode the same JSONL is wrapped in a fenced
 `jsonl` block. Coordinator-authored events contain `ts`, `event`, and `feature`; phase events
@@ -91,22 +100,21 @@ Core event names are:
 | Event | Meaning |
 |---|---|
 | `pipeline.start`, `pipeline.complete`, `pipeline.incomplete`, `pipeline.end` | Run lifecycle |
-| `phase.start`, `phase.end` | Named-state dispatch and completion; `phase` is one of the v3 states or a trace detail owned by that state |
+| `phase.start`, `phase.end` | Named-state dispatch and completion; `phase` is one of the v5 states or a trace detail owned by that state |
 | `agent.spawn`, `agent.close`, `agent.correction.spawn`, `agent.cleaner-handoff.spawn`, `agent.sla` | Specialist execution observations; all carry a concise observation and close records status; role/task labels are optional diagnostics |
-| `correction.decision`, `cleaner.handoff.decision` | The single authority record for a correction or cleaner handoff. It carries the complete package once and assigns `decision_ref`; downstream lifecycle observations carry only that reference |
-| `stage.gate`, `stage.gate.release` | Gate presentation and dual-record release |
+| `correction.decision`, `cleaner.handoff.decision` | Correction or handoff observations; `decision_ref` links related telemetry and never substitutes for authority in the control log |
+| `stage.gate`, `stage.gate.release` | Gate presentation and release observations; authority remains in the control log |
 | `gate`, `gate.pass`, `gate.fail` | Human-checkpoint marker or an internal verdict; never a release by itself |
 | `iteration.start` | Implementation/validation correction observation linked by `decision_ref`; new producers use `cause: verification` only. `convergence_counts` may be derived from the findings ledger for diagnostics but is not required. Historical `cause: operator` events remain readable but are not emitted for plan repairs, operator decisions, or explicit design work |
 | `artifact.missing`, `operation.started/success/failed` | Artifact and operation observability |
-| `checkpoint.confirmed` | Discover reasoning checkpoint evidence, not a gate |
 | `design.oversize` | The live decision on a design delta past `max_requirements_per_change` — `split`/`accept`/`narrow`, with the requirement count; recorded before any content identity, `01-plan.md`, or Gate 1 |
 | `stage2.hygiene` | Implementation hygiene scan result |
 | `kg_write` | One reason-coded knowledge write batch; no `kg.started` family |
 | `compaction.trigger` | Context-compaction breadcrumb |
 
-There is no `plan_structure` event in v3: the former deterministic plan-structure phase is
-retired. Plan validity is a minimum artifact check in `design`; a missing or malformed artifact
-gets one normal design correction.
+There is no `plan_structure` event in v5: the former deterministic plan-structure phase is
+retired. Design validates the bound OpenSpec change and the freshness of Main's read-only
+projection; invalid or missing artifacts return through the normal design correction path.
 
 ### Declared Codex agent lifecycle
 
@@ -128,7 +136,7 @@ fields and remain readable without migration.
 ## Flow Telemetry Emission
 
 Flow telemetry is a separate, opt-in cross-user plane. It is not the local execution trace, does
-not change the v3 state machine, and never carries gate releases or coordination state.
+not change the v5 state machine, and never carries gate releases or coordination state.
 
 ### Config gate
 
@@ -242,8 +250,9 @@ best-effort and does not affect authorization, state ownership, or gate decision
 ## 3. Free-text and security bounds
 
 Free-text fields are one compact clause, at most 120 characters, with control characters and
-secrets removed. The `checkpoint.confirmed` confirmatory text is the named additive exception
-(up to 280 characters, JSON-escaped). Never record credentials, private URLs, tokens, personal
+secrets removed. Historical `checkpoint.confirmed` payloads may retain their former
+280-character JSON-escaped text; current producers do not inherit that exception.
+Never record credentials, private URLs, tokens, personal
 paths, or untrusted instructions. Critical/High finding headlines and remediation pointers are
 retained even when the live response is concise.
 
@@ -274,38 +283,32 @@ events and projections but never edits them or treats a projected field as separ
 
 ## 5. Correction and staleness trace
 
-Validation findings are classified and routed as follows:
+Validation findings are classified and routed according to the current v5 recovery contract:
 
-- in-scope code, test, or documentation defect → implementation executor, unless the ratchet
-  (`agents/ref-pipeline.md`) records it as a sub-floor findings-ledger residual on
-  unchanged surface after a prior correction round;
-- missing evidence → tester;
-- correctable security finding → implementation plus delta audit;
-- ratchet-recorded findings-ledger residual → auto-ship citing the Gate-1 record, no further round;
-- structural contradiction → operator decision, then optional design re-open and new Gate 1.
+- an in-scope defect → the owning implementation or test role;
+- missing or stale evidence → the role that owns that evidence;
+- a correctable security finding → implementation followed by the required fresh audit;
+- a structural, semantic, scope, security-authority, or outward-effect contradiction → a live
+  operator decision.
 
-Mechanical plan defects are repaired by the coordinator; bounded operator decisions are
-transcribed by the coordinator. Both continue through implementation, Freeze, and validation
-without an architect dispatch, an iteration increment, or a new `iteration.start`. Only an
-explicit live operator request for architect work reopens design and prepares a new Gate 1.
-Every implementation/validation correction and tree change after Freeze emits a new
-implementation/validation sequence. No event from an older tree can be used as current Gate 3
-evidence. The trace records the correction cause and the new tree anchor; it does not rewrite
+Main accepts structured specialist results into the control log and projects the findings view.
+The findings view is evidence for routing and review; it never authorizes a transition or release.
+
+Main repairs projection defects from canonical inputs and applies causal recovery without
+using an iteration counter to choose the next action. A change to approved meaning, scope,
+acceptance, security authority, or outward effects requires the applicable live decision and
+fresh authority binding. Any changed candidate receives fresh quality, QA, and impact-required
+security evidence under `agents/ref-pipeline.md`; an older tree's verdict never authorizes the
+new candidate. The trace records the correction cause and new tree anchor without rewriting
 historical events.
 
 ## 6. Decision ledger
 
-The decision ledger is append-only and coordinator-owned. It records four event families:
-`gate-verdict`, `operator-approval`, `disposition`, and `dry-run-enforced`. It contains the
-rationale and subject of a decision, not phase timing or token counts; those remain exclusively in
-the execution trace. The ledger records both gate numbers using the same `stage` and `phase` keys
-so audit readers can join the two files.
-
-Finding dispositions distinguish `accept`, `watch`, and `reject`, and carry `lens`: the role of the
-lease under which the finding was accepted, copied from the findings-ledger projection and never
-from the specialist's own text. A structural contradiction is
-never converted into an accepted finding merely to advance the state. Gate releases remain valid
-only when the state field and ledger/event record agree with the live reply and nonce.
+The current v5 control log is the decision record. It stores the live operator authority,
+capability-lease lifecycle, accepted result envelopes, transitions, and mechanical releases. The
+findings ledger, Gate display, state snapshot, and trace are projections or telemetry; a mismatch
+is repaired from the valid control-log prefix. A structural contradiction is never converted into
+an accepted finding merely to advance the state.
 
 ## 7. Cross-user flow telemetry (optional)
 
@@ -316,11 +319,11 @@ contain diffs, code, AC text, file paths with user identifiers, secrets, or gate
 
 ## 8. Rendering and recovery
 
-`/th:pipelines` is a pure reader of state and events. It displays the named `phase`, gate pending,
-iteration, and `next_action`; it never displays or infers a route/profile value and never infers a
-release from a checklist row. `/th:trace` renders the event timeline and links to artifacts
-without copying their full content. Inline work and inline ad hoc reviews have no pipeline trace to
-render.
+`/th:pipelines` is a pure reader of the control-log projection and telemetry. It displays the
+named `phase` and status available in the generated view; it never displays or infers a
+route/profile value and never infers a release from a projection row. `/th:trace` renders the event
+timeline and links to artifacts without copying their full content. Inline work and inline ad hoc
+reviews have no pipeline trace to render.
 
 **Pairing redefinition within `project` (AC-5.2).** When one or more
 `subagent.start` lines in the trace carry a `project` key, same-agent-type
@@ -423,11 +426,11 @@ suggestion on failure — without event persistence.
 
 ## overview.md — initiative parent index (NOT an events file)
 
-When the `initiative` field in `00-state.md` is set, the coordinator also
+When the live operator has confirmed an initiative, the coordinator also
 maintains a parent-level `overview.md` at the initiative root. This file is
 **not an events file** and does not contain pipeline observability data. It is
 a living index — one row per project, updated by the coordinator at intake and
-again after its own Phase-4 mechanics resolve branch, version, PR, and status.
+again after delivery resolves branch, version, PR, and status.
 It shares the one coordinator root with `00-state.md` and the lifecycle stream.
 
 **What it is:**
@@ -458,8 +461,9 @@ fan-out with its consolidator and the parallel multi-project dispatch that spawn
 orchestrator instance per project — `agents/ref-pipeline.md` #2 forbids
 dispatching any coordinator, including another copy of itself, with no exception clause, and
 `agents/ref-dispatch-machinery.md § "Multi-project sequencing"` names serial execution as the
-derived consequence of that invariant, not an independent policy. One project runs to completion
-inside the same agent before the next one starts. The `00-leader-roster.md` file, the `fanout.*`
+derived consequence of that invariant, not an independent policy. Design joins the writable
+services before one Gate 1; approved service execution is serial in the recorded order. The
+`00-leader-roster.md` file, the `fanout.*`
 event family, and the two-tier `leader-recover`/`orchestrator-recover` split below all lose their
 subject with that retirement — nothing replaces them.
 
@@ -485,9 +489,9 @@ Service-scoped `phase.*` and agent events carry a `service` key in this same
 stream. Service directories may contain validation evidence but never a second
 gate stream. One consolidated Gate-1 event binds the ordered OpenSpec aggregate.
 
-**`/th:pipelines` and `/trace` rendering.** Both read the one coordinator
-`00-state.md § Current State`, its persisted workspace identity and ordered
-bindings, plus the lifecycle events above. They render the initiative as a
+**`/th:pipelines` and `/trace` rendering.** Both read the coordinator's generated
+control projection, bound workspace inputs and ordered service identities,
+plus the lifecycle events above. They render the initiative as a
 parent with service children. Execution is serial, so at most one service runs.
 
 **Mandatory + additive, not mandatory for single-project runs.** The initiative-level `00-execution-events` file is only written when `initiative` is set. Single-project runs (`initiative: null`) do not produce this file.
@@ -498,11 +502,14 @@ The following event types appear in `00-execution-events` in addition to the cor
 
 | Event | When emitted | Key fields |
 |-------|-------------|------------|
-| `gate` | When a human-checkpoint gate is reached (DOC-GATE, STAGE-GATE approval prompt) | `gate` (name), `action` (`stop`/`approved`) |
+| `gate` | When a current flow presents a human checkpoint; this observation never releases a v5 Gate | `gate` (name), `action` (`stop`/`approved`) |
 | `research.lane.skipped` | When a research fan-out lane returns no findings (fail-open) | `lane`, `angle`, `reason` |
 | `artifact.missing` | When an expected agent output file is absent after dispatch | `expected_file`, `agent`, `action` (`retry`/`escalate`) |
 | `stage2.hygiene` | When the code-hygiene scan completes (deterministic, orchestrator-run — see `docs/code-hygiene-gate.md § Layer 1`) | `verdict` (`pass`/`fail`), `extra.files` (int, on `fail`), `extra.count` (int, on `fail`) |
-| `checkpoint.confirmed` | When `th:orchestrator` obtains — or fails to obtain — the operator's live confirmation of the functional-clarity artifact at Discover Boundary B1, before dispatching `architect` (`docs/reasoning-checkpoint.md § "Attribution and failure direction"`) | `provenance` (`operator-live`/`inferred`), the confirmatory text (named exception to the Free-text field bound, see below) |
+
+Historical traces may contain `checkpoint.confirmed` for Discover Boundary B1 or `DOC-GATE`
+markers. They are compatibility data, not current v5 events or prerequisites for architect
+dispatch; interpret their original payload without emitting new copies during pipeline intake.
 
 Note: `checkpoint.confirmed` is written exclusively by `th:orchestrator`, on the same file it already initializes at Intake (`agents/ref-pipeline.md`). On a later `/th:recover`, the same agent reads and verifies the event but never repairs it.
 
@@ -564,11 +571,19 @@ Note: the `lane` field on `research.lane.skipped` names a **research fan-out lan
 
 ## 00-state.md bounded snapshot (`§ Agent Results` + `§ Hot Context`)
 
-`00-state.md § Agent Results` and `§ Hot Context` are **bounded, replaceable
-snapshots** (`docs/output-contract-patterns.md § 2` `bounded` intensity
-level) — current-state-only, never an accumulating append-log. All historical
-detail (what happened at each phase, over time) lives exclusively in
-`{events_file}`; `00-state.md` shows only where the pipeline is now.
+The following `§ Agent Results` and `§ Hot Context` rules describe the legacy v3
+bounded snapshot format and remain for readers of those workspaces. Current v5
+`00-state.md` is generated by `buildControlProjection` and `stateMarkdown` in
+`skills/pipeline/scripts/control-plane.mjs`; it contains no writable authority fields.
+Read the helper's projection rather than maintaining a second field schema in this
+document; `reviews/findings-ledger.md` and `control-projection.json` provide the
+corresponding findings and machine-readable views.
+
+In the legacy format, `00-state.md § Agent Results` and `§ Hot Context` were
+**bounded, replaceable snapshots** (`docs/output-contract-patterns.md § 2`
+`bounded` intensity level) — current-state-only, never an accumulating append-log.
+Historical detail lived exclusively in `{events_file}`; the snapshot showed only
+where that pipeline was then.
 
 **`§ Agent Results` — keyed upsert, not append.** Each row is keyed by
 `(agent, phase)`. A re-dispatch of the same `(agent, phase)` key across
@@ -591,20 +606,23 @@ re-tells what happened in a past iteration — each references the iteration by
 ID only (`Iteration {N}`), per `docs/output-contract-patterns.md § 5`. The
 narrative for a given round lives exclusively in `failure-brief.md`.
 
-**Does not weaken the observability floor.** This is a FORMAT bound on two
-`00-state.md` sections; it does not touch `{events_file}`'s mandatory
-`phase.*`/`gate.*` emission (inline direct work is outside that machine) and it does not change what `00-pipeline-summary.md`
-derives from the trace.
+**Does not weaken the legacy observability floor.** This format bound did not touch
+`{events_file}`'s mandatory `phase.*`/`gate.*` emission or the summary derived from
+that trace. It has no authority in the current v5 projection.
 
-Canonical source: `agents/ref-pipeline.md` (the upsert mechanic) and `§ "Agent Results"` (the schema template — the narrative "Hot
-Context" section this upsert once also maintained is retired, per that same section's own note);
-the two sites must not diverge.
+Current source: `skills/pipeline/scripts/control-plane.mjs` (`buildControlProjection`,
+`stateMarkdown`, and `findingsMarkdown`) plus `agents/_shared/orchestrator-state.md`.
+The keyed-upsert rules above remain only as historical format guidance; they must not be
+reintroduced as v5 state fields.
 
 ## Posture observability
 
-The live contract has two postures. `pipeline` uses the canonical v3 state machine and emits
-the local trace, ledger, summary, phase events, and gate events. `inline` is direct work outside
-that machine: it creates no pipeline state, workspace records, or gate events. A live ad-hoc
+The live contract has two postures. `pipeline` uses the canonical v5 state machine and emits
+the local trace while Main writes the control-log projections, phase events, and gate telemetry.
+The human summary and any decision-ledger telemetry emitted by a named flow remain
+non-authoritative. `inline` is direct work outside that machine: any
+mode-specific state or workspace records remain outside the v5 control plane and cannot release a
+Gate. A live ad-hoc
 tester, QA, or security review requested while inline returns bounded evidence only.
 
 Legacy `express`/`full` depth lanes, `lane` fields, `lane_autoselect`, and related fast/simple
@@ -618,7 +636,7 @@ not persisted as a route selector and never activates pipeline observability.
 
 ## Retired plan-structure event
 
-The former `plan_structure` event and Phase 1.5a automatic scan are superseded. Current v3
+The former `plan_structure` event and Phase 1.5a automatic scan are superseded. Current v5
 design performs one deterministic presence/coherence check before Gate 1, and explicit
 `/th:plan-review` may inspect plan shape. The historical event vocabulary and checks remain
 reference material only; they are not emitted, dispatched, or gate-releasing.
@@ -825,7 +843,11 @@ context only. Native cost requires the exact `pricing_identity` and active
 quote provenance defined in the native branch; no legacy event/frontmatter/static
 fallback can price it.
 
-**Session model override — distinct from the config-override whitelist.** The session model override (an operator utterance such as "use the bigger model for analysis this session") is recorded exclusively in `00-state.md § Current State` and applies only to analysis-tier dispatches (`architect`, the plan-review panel, consolidators) for the current session — it is never written to `~/.claude/.team-harness.json`. This is a **separate mechanism** from the session-scoped config override whitelist (CLAUDE.md §5), which governs `logs-mode`, `logs-path`, `logs-subfolder`, and `clickup.workspace_id`, and which continues to explicitly EXCLUDE `model`. The two must not be conflated: the config whitelist is about persisted-vs-session config keys reachable from `/th:setup`; the session model override is a dispatch-time-only instruction that never touches config and is discarded at session end. Full mechanism: `agents/ref-pipeline.md` § "Session model override".
+**Session model selection.** A live model preference follows the active runtime's
+supported configuration and dispatch rules. It does not introduce a writable model-override
+field in the generated `00-state.md`, reactivate a retired review panel, or change the
+cost-evidence rules above. Report the model and effort actually observed; an unverified
+preference is not proof that the runtime used that model.
 
 ### kg_write write-integrity rollup
 
@@ -838,8 +860,9 @@ The `/trace <feature>` skill is the canonical 30-second answer to "did this pipe
 ### Historical no-workspace note
 
 Legacy Tier-0/no-workspace markers are retained only for interpreting old traces. They are not a
-current pipeline exemption: every activated `pipeline` run creates its state, events, ledger, and
-summary. `inline` direct work is outside the machine and intentionally has none of those records.
+current pipeline exemption: every activated `pipeline` run creates its control log and generated
+projections and its local trace telemetry. `inline` direct work is outside the machine
+and intentionally has none of those records.
 
 ### Lightweight direct-mode exemptions (diagram, spike)
 
@@ -856,13 +879,21 @@ summary. `inline` direct work is outside the machine and intentionally has none 
 
 ## Decision Ledger
 
-`00-decision-ledger.{jsonl|md}` is a **new per-workspace append-only file** distinct from `00-execution-events.{jsonl|md}`. The two files answer different questions: `00-execution-events` answers "what happened, when, and how much?" (phase timing, durations, token counts, tool-counts, KG writes); `00-decision-ledger` answers "what was decided, why, and was a dangerous action gated?" (gate verdicts with rationale, operator approvals with reasoning, finding dispositions, and dry-run enforcement records).
+> **Telemetry and compatibility format.** This section documents
+> `00-decision-ledger.{jsonl|md}` for explicit producers such as `apply-review` and for
+> historical readers. Current v5 authority is `control/control.jsonl`; a ledger append
+> never authorizes work or substitutes for a canonical control event.
+
+`00-decision-ledger.{jsonl|md}` is per-workspace append-only telemetry distinct from
+`00-execution-events.{jsonl|md}`. The trace records timing and execution facts; the ledger
+records decision rationale and finding dispositions. Both can explain a run, while the
+control log alone determines its authority and transitions.
 
 **Anti-redundancy invariant (contract between the two files):** the decision-ledger records dispositions + rationale + dry-run enforcement ONLY. It NEVER records phase timing, durations, token counts, tool-counts, or KG write batches — those stay exclusively in `00-execution-events`. Where a gate fires, `00-execution-events` records the FIRING (timestamped, for the timeline) and the decision-ledger records the DECISION (verdict + rationale + disposition, for the audit). The two files JOIN on the shared `phase` / `stage` key.
 
 ### Purpose and scope
 
-The decision-ledger provides a durable audit trail of every judgement call made during a pipeline run:
+The decision-ledger preserves audit context for the following events when the named flow emits them:
 
 - **Gate verdicts** — why a plan-review or acceptance-gate passed, raised concerns, or failed.
 - **Operator approvals** — what the operator explicitly approved or rejected at each STAGE-GATE, and any reason they gave.
@@ -899,11 +930,10 @@ Mirrors `00-execution-events` exactly:
 - **Local mode:** raw `00-decision-ledger.jsonl` — append one JSON object per line.
 - **Obsidian mode:** `00-decision-ledger.md` — YAML frontmatter (`tags: [work-logs, {repo}, decision-ledger]`) + `# Decision Ledger` heading + ` ```jsonl ` fence, identical structure to `00-execution-events.md`.
 - The orchestrator is the **exclusive writer**; append-only `>>` with a here-doc; never rewritten.
-- **best-effort resilience:** if constructing or appending a ledger line fails, log the failure and continue — the pipeline NEVER hard-fails on a ledger emit error. The deterministic gate outcome and the `00-execution-events` trace remain the authoritative record.
-- Legacy no-workspace/Tier-0 traces may lack a decision ledger. Current `pipeline` runs always
-  attempt each coordinator-owned ledger append; an append failure is recorded in the authoritative
-  execution trace and may leave the ledger incomplete. `inline` direct work has no pipeline ledger
-  by definition.
+- **best-effort resilience:** if constructing or appending a ledger line fails, log the failure and continue. Telemetry failure never creates a control release; v5 authority remains in `control/control.jsonl`.
+- Legacy no-workspace/Tier-0 traces may lack a decision ledger. Current v5 `pipeline` runs use the
+  control log and generated projections. A flow with an explicit ledger producer may
+  still append non-authoritative telemetry, and historical records remain readable.
 
 ### Example lines
 
@@ -929,7 +959,6 @@ The two files are complementary — neither replaces the other:
 
 The decision-ledger is queryable with `jq` and uses the same `phase`/`stage` key as `00-execution-events` so the two files can be joined on a shared identifier.
 
-On `/th:recover`, the coordinator reads the state snapshot and current trace before acting. v2
-snapshots are mapped to the v3 named states by `skills/recover/SKILL.md`; migration records
-`state.migrated` on the first legitimate write and never synthesizes a gate release or repairs
-history.
+On `/th:recover`, current v5 recovery replays the valid control-log prefix and rebuilds its
+projections before acting. Legacy v2 snapshots and v3 decision ledgers are compatibility inputs
+only; they never synthesize a current Gate release or repair control-log history.

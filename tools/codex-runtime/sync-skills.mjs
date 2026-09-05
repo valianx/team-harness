@@ -381,7 +381,11 @@ async function syncSharedSetupAssets({ check, rootDir }) {
   if (check && stale) throw new Error("shared setup assets are stale");
 }
 
-async function syncClaudePackageAssets({ check, rootDir }) {
+function isOpenCodeScratchBundle(relativePath) {
+  return /^ts\/dist\/(?:opencode-plugin|[^/]+\.opencode)\.cjs$/.test(relativePath);
+}
+
+export async function syncClaudePackageAssets({ check, rootDir }) {
   const projections = [
     [join(rootDir, ".claude-plugin"), join(rootDir, "plugins/team-harness/.claude-plugin"), new Set(["plugin.json", "hooks.json"])],
     [join(rootDir, "agents"), join(rootDir, "plugins/team-harness/agents"), null],
@@ -390,9 +394,21 @@ async function syncClaudePackageAssets({ check, rootDir }) {
   ];
   let stale = false;
   for (const [sourceRoot, targetRoot, allowlist] of projections) {
+    const hooks = sourceRoot === join(rootDir, "hooks");
+    if (hooks) {
+      await assertSafeDestinationPath(rootDir, targetRoot, "directory");
+      for (const relativePath of (await walkFiles(targetRoot)).keys()) {
+        if (!isOpenCodeScratchBundle(relativePath)) continue;
+        stale = true;
+        if (check) process.stderr.write(`packaged local scratch bundle: ${relative(rootDir, join(targetRoot, relativePath))}\n`);
+        else await rm(join(targetRoot, relativePath));
+      }
+    }
     const files = await walkFiles(sourceRoot);
     for (const [relativePath, expected] of files) {
       if (allowlist !== null && !allowlist.has(relativePath)) continue;
+      // OpenCode test bundles are local scratch output; the runtime ships raw TS.
+      if (hooks && isOpenCodeScratchBundle(relativePath)) continue;
       const source = join(sourceRoot, relativePath);
       const target = join(targetRoot, relativePath);
       const sourceMode = (await lstat(source)).mode & 0o777;

@@ -36,28 +36,22 @@ Locate the needed section by heading; do not read this file in full.
 Triggered from `agents/ref-pipeline.md § Design` (the workspace-resolution
 step), before composing a fresh `docs_root`.
 
-**Milestone-continuity detect-and-continue (multi-milestone `type: plan` builds only).** Before composing a fresh `docs_root`, run this check: if the incoming task is a milestone execution (e.g., "implement M0", "build M2") that belongs to an existing plan, detect the plan workspace by identity and resume the SAME plan workspace instead of creating a new top-level sibling.
+**Milestone-continuity detect-and-continue (multi-milestone `type: plan` builds only).** Before composing a fresh `docs_root`, resolve a milestone against its existing OpenSpec change and TH workspace. Reuse that workspace; OpenSpec intent/content identity is semantic, while generated views are evidence.
 
 Detection algorithm:
 1. Extract the plan identity slug from the task description (e.g., "v1-mvp-build" from "implement M0 of v1-mvp-build").
-2. Glob `{base_path}/*_{plan-slug}/` (date-agnostic) and confirm by reading `00-state.md` frontmatter (`feature:` == `plan-slug`).
+2. Glob configured workspace candidates (date-agnostic) and confirm the bound OpenSpec change from its pin/projection. Do not use `00-state.md` frontmatter or a projection field as authority. Resume only with a valid v5 control-log prefix and identifiable OpenSpec content.
 3. On first confirmed match: set `plan_workspace = {matched-path}`; use `plan_workspace` as `docs_root` for this pipeline run. Do NOT create a `{NN}_{milestone-slug}/` sub-folder — milestones are commits within ONE flat workspace, not nested child workspaces.
-4. Update the plan's `00-state.md` milestone index (see **Milestone Index** below): replace the row for this milestone in-place (if it exists) or append it (if absent). Never duplicate a row for the same milestone slug.
+4. Reuse the OpenSpec change and generated views. Milestone progress is represented by `tasks.md` and existing summaries/projections; add no milestone index, authority field, or state schema.
 5. On no confirmed match OR if the task is not a milestone execution: fall through to the standard workspace creation below.
 
-**Milestone Index.** When a milestone build uses the plan workspace as `docs_root`, the plan's `00-state.md` carries a `## Milestone Index` table (one row per milestone, replace-in-place). The owning `th:orchestrator` maintains this table using a read-modify-write protocol identical to the initiative JOIN (read full `00-state.md`, replace the row for this milestone slug, write the whole file back):
-```text
-## Milestone Index
-| Milestone | Slug | Status | Commit |
-|-----------|------|--------|--------|
-| M0 | m0-skeleton | implementing | — |
-| M1 | m1-api | pending | — |
-```
-Status values: `pending` → `implementing` → `complete`. The `Commit` column records the commit sha after each milestone lands on the single feature branch. No per-milestone `PR` column — milestones are commits, not PRs. A single build-level PR is recorded once at the end (when ALL milestones are complete). Replace the row in-place; never append a duplicate row for the same slug.
+If an existing candidate has no control log, apply administrative close under `agents/ref-pipeline.md § Recovery`. An integrity failure pauses recovery; never convert or repair it through intake metadata.
 
-**Parallelization.** Independent milestone implementations MUST be PARALLELIZED whenever the `01-plan.md` dependency annotations allow, reusing the #285 in-message concurrent-`Task` mechanism at milestone granularity within ONE workspace. Dependent milestones serialize in dependency order. Each parallel lane works in an isolated worktree; at the convergence barrier the `th:orchestrator` applies each lane's diff as ONE COMMIT to the single feature branch in dependency order (committed serially, never concurrently). The result is one feature branch, one commit per milestone (in dependency order), ONE PR at the end.
+**Execution ownership.** One canonical worktree has one committing writer and one active writing lease; read-only leases may inspect immutable evidence concurrently. Dependent milestones serialize; Main may coalesce independent OpenSpec tasks when ownership permits. No mandatory parallel implementer fan-out or #285 lane merge exists in v5.
 
-This reuses the #283/#285 identity-keyed-resolution pattern: the plan workspace is the single home; the milestone index in the plan's `00-state.md` tracks per-milestone status and commit shas; stage files (`02-implementation.md`, `03-testing.md`, `reviews/04-security.md`, `reviews/04-validation.md`) are FLAT, whole-task documents covering the entire build — not split or suffixed per milestone.
+One workspace and one canonical OpenSpec change remain the semantic home. Generated plan, findings,
+acceptance, and summary views stay replaceable projections; they are not per-milestone authority
+files.
 
 ---
 
@@ -66,17 +60,23 @@ This reuses the #283/#285 identity-keyed-resolution pattern: the plan workspace 
 Triggered from `agents/ref-pipeline.md § Design` (the workspace-resolution
 step), only after the live operator confirms a non-null `initiative`.
 
-**CONDITIONAL — Initiative create-or-join (only when `initiative` is non-null in `00-state.md`).** If `initiative == null`, this step is a complete no-op — skip silently. Otherwise:
+**CONDITIONAL — Initiative create-or-join (only after the live operator selects a non-null binding).**
+The binding is workspace metadata for the canonical resolver, never a control-log event or
+`00-state.md` field. If none is selected, skip this step.
 
-**Find or create the overview file (date-agnostic JOIN rule):**
+**Find or create the initiative-root overview file (date-agnostic JOIN rule):**
 - Resolve `overview_path` using the **date-agnostic glob + frontmatter-confirm** rule (an initiative spans multiple days; the folder carries the day-1 date prefix, not today's):
   1. **Locate candidates by date-agnostic glob:**
      - Obsidian: glob `{logs-path}/{logs-subfolder}/{repo_base}/*_{slug}/overview.md` — the `*_` wildcard absorbs any `{YYYY-MM-DD}_` prefix so a day-30 run still matches the day-1 folder.
      - Local: glob `{common-parent-of-sibling-repos}/*_{slug}/overview.md` (the parent directory of the current cwd repo, confirmed at Step 6d-initiative).
   2. **Confirm by frontmatter:** for each candidate, read its `overview.md` frontmatter and confirm `initiative: {slug}` equals the target slug. The frontmatter slug is the authoritative key — it never changes.
   3. **JOIN on first confirmed match** — read-modify-write the existing `overview.md`. **CREATE only if no candidate confirms** — when creating, the new folder carries today's date prefix (`{YYYY-MM-DD}_{slug}`) which becomes the day-1 anchor for all subsequent runs.
-- **JOIN**: read the file, find the row for this project slug in `## Projects`. If the row exists, replace it in-place with the current values; if absent, append a new row. Never duplicate a row for the same project. This is idempotent: re-running the same project's pipeline updates its single row rather than accumulating rows.
-- **CREATE**: write the full `overview.md` template (`agents/ref-dispatch-machinery.md § "overview.md — you are the sole writer"`) with this project as the first row.
+- **JOIN**: read the file, find the row for this service/project slug in `## Projects`. If the row exists, replace it in-place; otherwise append one row. Never duplicate a row.
+- **CREATE**: write the full `overview.md` template (`agents/ref-dispatch-machinery.md § "overview.md — you are the sole writer"`) with this service/project as the first row.
+
+`overview.md` is descriptive join metadata, not operator authority, lease/Gate state, result
+acceptance, or recovery state. It never writes `control/control.jsonl`; a stale or missing
+overview cannot advance a pipeline.
 
 **Write the initial project row** (project, branch-at-Design, status):
 ```text
@@ -84,13 +84,13 @@ step), only after the live operator confirms a non-null `initiative`.
 ```
 Branch-at-Design is the current git branch if already on a feature branch, or `—` if still on main/develop (the branch is set by the delivery agent once the PR is opened).
 
-**Read-modify-write protocol:** read the full `overview.md`, edit only this project's row (or append it), update `updated:` in the frontmatter to today's date, and write the whole file back. Never write a partial payload. This is the cross-run join rule: keyed by `project` slug; replace-in-place if the row exists, append if absent.
+**Read-modify-write protocol:** read the full `overview.md`, edit only this service/project row (or append it), update `updated:` in the frontmatter, and write the whole file back. This is the join rule: rows are keyed by slug.
 
-**Concurrency/idempotency rule:** rows are keyed by `project` slug and are mutually independent — two concurrent runs editing different rows do not logically conflict. Last-writer-wins on the narrative sections (`## Review Summary`, `## Big-Picture Plan`, `## Functional Description`) is acceptable because those sections are descriptive, not a gate.
+**Concurrency/idempotency rule:** Main serializes overview updates at the single initiative root. Rows are keyed by `project` slug; replacing a row preserves the others. Descriptive content never grants authority.
 
 **Best-effort posture:** if the overview write fails (path unavailable, permission error, file locked), log one WARN line and continue — the per-project pipeline NEVER fails or blocks on an overview-write error. The WARN is the only signal; the operator resolves it manually if needed.
 
-**Obsidian mode:** if the `{YYYY-MM-DD}_{initiative}/` directory does not yet exist, create it before writing `overview.md`. The per-project workspace uses `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}/{project}/` from Step 2 (no `{date}_{feature}` leaf).
+**Workspace paths:** use `agents/ref-dispatch-machinery.md § Initiative path composition`. One initiative root owns control state and the overview; service children hold evidence, not independent pipeline state.
 
 ---
 
@@ -99,14 +99,16 @@ Branch-at-Design is the current git branch if already on a feature branch, or `�
 Triggered from `agents/ref-pipeline.md § Design` before workspace binding,
 after request framing and before initiative create-or-join.
 
-**Initiative detection + confirm (runs during Discover, after framing, before the intake survey).**
+**Initiative detection + confirm (during Design workspace resolution, before identity binding).**
 
-**Purpose:** detect whether this task is part of a multi-project initiative and, only with explicit operator confirmation, set the `initiative` slug that gates the path-resolution branch and the `overview.md` lifecycle.
+**Purpose:** detect a multi-project initiative and, after explicit operator confirmation, bind its
+slug for workspace path resolution and `overview.md`. This metadata creates no authority or state
+field.
 
 **Three detection signals** (any one *proposes*; none *auto-creates*; all three require confirmation):
 
 1. **Operator declaration (primary).** The operator explicitly names an initiative in the task — e.g. "this is part of the migration-2026 initiative", "junto con el backend repo". You extract the freeform label, slugify it to `[a-z0-9-]` max 60 chars (same rule as feature-name), and propose it.
-2. **Existing-initiative-folder inspection (join aid).** At Discover time, inspect for an existing `overview.md` using the date-agnostic glob: obsidian mode → glob `{logs-path}/{logs-subfolder}/{repo_base}/*_{slug}/overview.md` and confirm by `initiative:` frontmatter; local mode → glob `{common-parent-of-cwd-repo}/*_{slug}/overview.md` and confirm by frontmatter. A confirmed match surfaces a candidate to **join** — show the slug and ask the operator.
+2. **Existing-initiative-folder inspection (join aid).** During workspace resolution, inspect for an existing `overview.md` using the date-agnostic glob: obsidian mode → glob `{logs-path}/{logs-subfolder}/{repo_base}/*_{slug}/overview.md` and confirm by `initiative:` frontmatter; local mode → glob `{common-parent-of-cwd-repo}/*_{slug}/overview.md` and confirm by frontmatter. A confirmed match surfaces a candidate to **join** — show the slug and ask the operator.
 3. **Sibling-directory inspection (proposal aid only).** If the cwd repo's parent contains sibling repos (directories with their own `.git`), you may note this as a *prompt to ask* — never as an automatic trigger. **Generic-root guard:** if the parent directory basename matches any of `projects`, `repos`, `src`, `code`, `dev`, `work`, `git`, `home` (case-insensitive), do NOT propose initiative grouping on directory layout alone — a flat parent is not an initiative signal.
 
 **After any signal fires**, emit a confirmation prompt naming the proposed/joined initiative slug and the resulting overview location:
@@ -119,11 +121,13 @@ Keep this name (Y), enter a different name (type it), or skip the initiative (n)
 
 Then WAIT. Do NOT auto-advance. Do NOT set `initiative` or create any folder before an explicit operator response.
 
-- **On Y (accept proposed name):** set `initiative: {slug}` in `00-state.md § Current State`. Proceed to the initiative create-or-join step above during intake.
-- **On a different name typed by the operator:** re-slugify the operator's input to `[a-z0-9-]` max 60 chars (same rule as the feature-name slug). Set `initiative` to that re-slugified value. If an existing `overview.md` is found under the new slug (same date-agnostic join-aid inspection as detection signal 2), JOIN it; otherwise CREATE. Proceed to the initiative create-or-join step as usual. This path is also gated behind explicit operator input — it is a third explicit choice, not an auto-advance.
-- **On n (or no signal fires):** set `initiative: null` in `00-state.md § Current State`. Proceed exactly as today — zero behaviour change.
+- **On Y (accept proposed name):** pass `initiative: {slug}` to workspace identity, then run create-or-join; do not write it to `00-state.md` or the control log.
+- **On a different name typed by the operator:** re-slugify to `[a-z0-9-]` (max 60), pass it to workspace identity, then JOIN or CREATE the matching overview. This remains gated operator input, not auto-advance.
+- **On n (or no signal fires):** pass no initiative binding to workspace resolution. Proceed exactly as today — zero behaviour change.
 
-**Never auto-create.** No initiative folder, no `overview.md`, and no `initiative` state field is written without explicit operator confirmation. The confirmation prompt is the hard gate. This sub-step follows the same patient-intake / advance-signal model as the rest of Discover — it never dispatches a subagent and never auto-advances.
+**Never auto-create.** No initiative folder or `overview.md` is written without explicit
+confirmation. This sub-step never dispatches or advances automatically; a decline adds no
+control-log record.
 
 ---
 
@@ -183,7 +187,7 @@ intent — pipeline routing applies).
 | "cambia/cambiá el estado de task \<id\|name\> a \<status\>" / "set state of task \<id\|name\> to \<status\>" / "set status of task \<id\|name\> to \<status\>" | `clickup_update_task` | Before calling `clickup_update_task`, render a preview block showing the target task id and the new status value, then wait for explicit operator approval (edit/cancel vocabulary as in `skills/clickup/SKILL.md § "Comment preview gate"`). Pass status verbatim from operator (no enum validation — see Status pass-through note). |
 | "cerrame/cierra/close task \<id\|name\>" / "close task \<id\|name\>" | `clickup_update_task` | Before calling `clickup_update_task`, confirm with the operator: "Set task \<id\> to closed — proceed? [Y/n]". Default status `closed`. If MCP rejects, prompt operator for the workspace's actual closed-status name. |
 | "marca/marcá task \<id\|name\> como \<state\>" / "mark task \<id\|name\> as \<state\>" | `clickup_update_task` | Before calling `clickup_update_task`, render a preview block showing the target task id and the new state, then wait for explicit operator approval. Pass `<state>` verbatim. |
-| "rutea/ruteá task \<id\|name\> al pipeline" / "route task \<id\|name\> to pipeline" / "open task \<id\|name\> in the pipeline" | none (delegation) | Equivalent to `/th:clickup task <id>`. Run the skill's `task <id>` flow inline, then route the handoff payload back into `agents/ref-pipeline.md` as the gated pipeline. Record `clickup_task_id` (the routed `<id>`) and `clickup_task_url` (`https://app.clickup.com/t/<id>`) in `00-state.md § Current State` at intake, so Phase 5 can post the mandatory functional closing comment even after compaction/recovery. |
+| "rutea/ruteá task \<id\|name\> al pipeline" / "route task \<id\|name\> to pipeline" / "open task \<id\|name\> in the pipeline" | none (delegation) | Run `/th:clickup task <id>` and route the live-authorized handoff to `agents/ref-pipeline.md`. Preserve the task ID and URL as source context in the bound OpenSpec proposal for recovery and delivery; never add fields to generated `00-state.md`. Comment publication follows the skill's live approval contract. |
 | "muestra/mostrá task \<id\|name\>" / "show task \<id\|name\>" | `clickup_get_task` | Read-only; print summary. |
 
 **Name-vs-ID resolution.** When the operator references a task by name (not ID):

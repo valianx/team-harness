@@ -42,21 +42,32 @@ Each agent the pipeline dispatches via the Task tool starts its own isolated con
 - **Re-dispatch reuse window.** Re-dispatching the same agent type within 5 minutes reuses that agent's warm cache (the prefix bytes are identical). Iteration loops, patch-mode selective re-runs, and parallel same-agent lanes all benefit when they stay inside this window.
 - **The operator's top-level session.** `th:orchestrator` runs at the top level. On a subscription its session gets the 1-hour TTL, so the system prompt and CLAUDE.md stay cached across the full pipeline run.
 
-## Lane cost model — intra-task lane decomposition
+## Dispatch cost model — current v5
 
-There is exactly one coordinator per run, and it never spawns another coordinator — a multi-project initiative runs its projects **serially**, one Stage 1 → Stage 3 pass at a time inside the same agent (`agents/ref-dispatch-machinery.md § Multi-project sequencing`), so there is no N-orchestrator-instance fan-out cost to model any more. The lane concept that survives is narrower: **intra-task lane decomposition**, which parallelizes `implementer` dispatches **within** a single Stage 2 task, never across tasks or projects (`agents/ref-pipeline.md`). Each lane is a fully isolated `implementer` subagent conversation with its own system prompt, tool set, and cache; nothing in one lane's cache is visible to another.
+There is exactly one coordinator per run, and multi-project work executes
+serially in the recorded order (`agents/ref-dispatch-machinery.md §
+Multi-project sequencing`). Within a pipeline, Main forms one coherent same-owner
+worktree batch; implementer, tester, and cleaner writes are serialized, while
+read-only work may overlap only over immutable evidence
+(`agents/ref-pipeline.md`). Each dispatched specialist has its own conversation,
+tool set, and cache. The retired intra-task implementation-lane decomposition is
+not part of the current v5 dispatch contract and should not be used for cost
+estimates.
 
 ### Explicit activation and startup context
 
-The top-level `agents/orchestrator.md` kernel is 881 words. The 20.7K-word gated contract lives in `agents/ref-pipeline.md` and is absent from direct startup context. `/th:pipeline` loads its activation sections, then only the phase reached; `/th:recover` loads state and the current phase. A direct session therefore pays neither pipeline stage prose nor gate/delivery contracts. Once a phase is read, the host conversation retains it until compaction.
+Direct startup loads `agents/orchestrator.md`. The gated contract lives in
+`agents/ref-pipeline.md` and is loaded only after explicit pipeline activation or
+recovery; `/th:pipeline` loads the activation sections and then only the phase
+reached, while `/th:recover` loads state and the current phase. A direct session
+therefore pays neither pipeline-stage prose nor gate and delivery contracts.
+Once a phase is read, the host conversation retains it until compaction.
 
-**5-minute TTL — a subagent lane, not the top-level session.** Every lane runs as a subagent, so its cache uses the 5-minute write TTL — not the 1-hour TTL the top-level session may hold (`§ Subagents and cost`). Lane dispatch happens entirely inside Stage 2, with no STAGE-GATE pause between fire and consolidation, so the wall-clock exposure that used to matter for a cross-coordinator gate pause does not apply here: lanes fire, run, and are consolidated in one continuous pass.
-
-**N concurrent lanes → N `implementer`-tier cold starts.** `implementer` is `model: sonnet`, so N intra-task lanes are N sonnet cold starts, capped at `LANE_CAP = 5` concurrent lanes (`GLOBAL_ROUND_CONCURRENCY_CAP = 6` across inter-task and intra-task parallelism combined). The re-dispatch warm-reuse window (`§ Subagents and cost` — same agent type within 5 minutes reuses the warm prefix) does not rescue lanes fired in the same round: they start simultaneously, so none has written a cache the others can read yet. Lanes fired together therefore pay N independent cold-start cache-creations, not one cold + (N−1) warm.
-
-**Lane fan-out fires on a declared, mechanical precondition — no operator confirmation gate.** Unlike the retired multi-coordinator fan-out, intra-task lanes fire automatically when a task declares `Lane-decomposable: yes`, its `Files:` count is ≥ 8, and it declares ≥ 2 file-disjoint seams outside `frozen-contracts:` (`agents/ref-pipeline.md`). There is no lane-count-plus-cost confirmation step, because the decomposition is scoped to one task's own Stage 2 work and never crosses a STAGE-GATE.
-
-**Ask-class caveat (cost has no bearing on the gate stop).** The outward-action gate that each lane's coordinator publication push/merge passes through is `ask`-class, not `deny`-class — whether it actually stops depends on the session's permission posture, not on any cost setting. Full contract: `docs/dev-mode.md § Ask-class caveat` and `§ STAGE-GATE-3 presentation and the ask-class loosening (SEC-DR-G)`.
+**Subagent cache window.** A specialist dispatch runs as a subagent, so its cache
+uses the subagent policy described in `§ Subagents and cost`. Re-dispatch reuse
+is possible only when the same agent type retains an identical stable prefix
+within that window; causal recovery still requires the current lease and
+identity checks.
 
 ## Operator cost controls
 

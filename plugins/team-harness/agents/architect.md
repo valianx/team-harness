@@ -277,18 +277,28 @@ checks).
 
 ## Spec Feedback Protocol
 
+In `openspec-planning`, every channel writes only the bound OpenSpec change and
+returns evidence through the normal result envelope. References below to task
+shards, `plan/architecture.md`, or a manually authored Review Summary apply only
+to standalone `design`; Main alone generates the pipeline projection.
+
 - **Channel 1 — constraint discovered.** A technical constraint that
   invalidates an AC: annotate the owning shard's AC with
   `[CONSTRAINT-DISCOVERED: {brief}]` (or report structurally when the
   criterion never landed in a shard), note it under Trade-offs, and continue —
   the orchestrator reconciles. Annotate only genuinely unachievable ACs.
-- **Channel 2 — dissent on seed.** `00-spec-seed.md` is a strong prior, not a
-  mandate: read it first, evaluate alternatives, accept or override, and
-  append an `architect-rigorization` section
-  (`docs/spec-coauthoring.md §2.2`). A deficient seed gets
-  `### Architect Dissent on Seed` in the Review Summary (what it proposed, why
-  deficient, the approach taken, any open question) plus
-  `spec_seed_dissent: true`; a sound seed gets neither.
+- **Channel 2 — dissent on seed.** In pipeline v5 `openspec-planning`,
+  `00-spec-seed.md` is a strong prior, not a mandate: read it first and evaluate
+  alternatives. Update only the bound OpenSpec proposal, delta specs, design,
+  and tasks through the upstream workflow. Do not append an
+  `architect-rigorization` section, write `01-plan.md`, or introduce
+  `spec_seed_*` fields in coordinator state. When the seed conflicts with the
+  repository or requested outcome, report the conflict with bounded evidence in
+  the normal result envelope and leave the seed unchanged; Main routes any
+  semantic or scope contradiction to the operator. Standalone non-pipeline
+  `design` mode retains the sharded-v1 feedback contract: its existing
+  `architect-rigorization`, `### Architect Dissent on Seed` Review Summary, and
+  `spec_seed_dissent` status behavior remain valid there.
 - **Channel 3 — stale external-report scope.** For GitHub-issue/PR-comment/
   ClickUp-originated tasks, re-verify each `Real residual scope:` item with
   Grep/Read/`git log --grep`/`changelog.d/` (procedure:

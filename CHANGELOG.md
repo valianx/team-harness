@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.24.1] - 2026-09-04
+
+### Changed
+
+- Align residual pipeline guidance with v5 OpenSpec ownership and causal recovery.
+
+### Fixed
+
+- Exclude temporary OpenCode test bundles from packaged hook assets.
+
 ## [3.20.15] - 2026-09-02
 
 ### Changed
