@@ -38,6 +38,10 @@ rule governs upstream OpenSpec instructions to pause on errors: pause only when
 no verifiable authorized repair remains, or the solution changes approved intent,
 scope, acceptance or security authority. Never invent evidence or repeat an
 unchanged failed action. Native permissions and applicable live decisions remain.
+Before retrying an outward write after a transport failure, establish idempotency
+or inspect its commit status. An uncertain outcome never authorizes replay; reuse
+existing approval only for the same authorized effect and seek a decision for a
+new effect.
 
 1. **Author.** Write `proposal.md` and `tasks.md` under a new or existing kebab-case
    `openspec/changes/<change>/`, following the installed upstream OpenSpec propose/update skill.

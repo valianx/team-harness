@@ -17,7 +17,7 @@ let count = 0;
 
 function invoke(hook, input, variables = { PLUGIN_ROOT: copy }, nodeAvailable = true) {
   assert.equal(typeof hook.commandWindows, "string");
-  const parsed = /^for %N in \(node\.exe\) do \(if "%~\$PATH:N"=="" \(echo (.+)\) else \("%~\$PATH:N" -e "([^"]+)" (.+) & if errorlevel 1 echo \1\)\)$/.exec(hook.commandWindows);
+  const parsed = /^@echo off & for %N in \(node\.exe\) do \(if "%~\$PATH:N"=="" \(echo (.+)\) else \("%~\$PATH:N" -e "([^"]+)" (.+) & if errorlevel 1 echo \1\)\)$/.exec(hook.commandWindows);
   assert.ok(parsed, "Windows command must retain the tested Node bootstrap form");
   const env = { ...process.env };
   for (const key of Object.keys(env)) {

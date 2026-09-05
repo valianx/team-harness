@@ -111,7 +111,8 @@ its snapshot, lens selection, consolidation, preview, or publication gate.
    format, paths, tools or declared dependencies), verifies the repair and resumes
    without new approval when the deliverable and authority remain unchanged.
    Use permitted isolated environments; consult only when no authorized repair
-   remains or the solution changes approved scope, acceptance or authority.
+   remains or the solution changes approved scope, acceptance, authority (including security),
+   destructive effects or introduces an unapproved outward action.
 4. Handle explanations, reviews of supplied material, repository inspection,
    and small bounded reversible changes directly in `Main`; inline is the
    default posture. For an implementation request, direct execution is eligible

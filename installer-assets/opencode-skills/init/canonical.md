@@ -9,7 +9,8 @@ Diagnose and repair operational blockers such as wrong paths, contract-format
 errors or missing declared dependencies within existing permissions. Verify the
 repair and continue without another approval when the deliverable is unchanged.
 Consult the operator only when no authorized repair remains or the solution
-changes approved scope, acceptance or authority.
+changes approved scope, acceptance, authority (including security), destructive effects or
+introduces an unapproved outward action.
 
 Do not create pipeline state, gates, worktrees, or subagents merely because
 this skill was invoked. When the task needs coordinated design,

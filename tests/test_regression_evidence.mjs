@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, readFile, writeFile, rm, symlink } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, realpath, writeFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { captureRegression, validateRegression, classifyComparison } from "../skills/review-pr/scripts/regression-evidence.mjs";
 
-const root = await mkdtemp(path.join(tmpdir(), "th-regression-test-"));
+const root = await realpath(await mkdtemp(path.join(tmpdir(), "th-regression-test-")));
 const repository = path.join(root, "source");
 const token = "a".repeat(32);
 const run = path.join(root, `run-${token}`);

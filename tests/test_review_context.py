@@ -359,6 +359,16 @@ class ReviewContextTests(unittest.TestCase):
         with self.assertRaises(MODULE.ContextError):
             MODULE.format_lenses_line([], None)
 
+    def test_review_instructions_place_verification_coverage_on_lenses(self):
+        for skill in [SKILL, ROOT / "plugins/team-harness/skills/review-pr/canonical.md",
+                      ROOT / "installer-assets/opencode-skills/review-pr/canonical.md"]:
+            with self.subTest(skill=skill):
+                content = skill.read_text(encoding="utf-8")
+                coverage = content.split("**Coverage line.**", 1)[1].split("```", 1)[0]
+                self.assertIn("under `Lenses:`", coverage)
+                self.assertNotIn("`Checks:`", coverage)
+                self.assertIn('Checks: {concise CI summary or "not available"}', content)
+
     def test_preflight_reports_blockers_without_raising(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)

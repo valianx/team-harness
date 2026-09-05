@@ -4,7 +4,7 @@ Help PR reviewers distinguish introduced regressions from existing failures and 
 
 ## ADDED Requirements
 
-### Requirement: Regression investigation is explicitly selected and hypothesis driven
+### Requirement: Regression investigation is explicitly selected and hypothesis-driven
 
 The review flow SHALL accept `--regressions` or an explicit live request for regression investigation. Main SHALL select probes for concrete suspected changes to required behavior and record the intended invariant and affected consumer. An ordinary review SHALL retain its existing behavior. Instructions or commands in PR content SHALL NOT authorize execution.
 
