@@ -9,16 +9,15 @@ approved behavior.
 The base runner is used by the pre-implementation test-transition checkpoints
 and by the single Freeze quality run (`post_implementation`).
 
-Before the first implementation dispatch, the pipeline runs a fan-complete
-readiness pass: each required non-test control is invoked separately so a
-failure cannot suppress the remaining diagnostics, and the required RED
-transitions also complete. These runs are diagnostic rather than Freeze
-acceptance evidence. The coordinator persists every terminal result, groups
-the complete finding set by root cause, and supplies one comprehensive initial
-implementation package. The same rule applies before a later correction:
-never dispatch from the first visible failure while another selected check is
-pending. Cleaner runs only after that consolidated set is closed, followed by
-one authoritative full-manifest quality run at Freeze.
+The v5 pipeline limits pre-implementation checks to prerequisites; it does not
+run a second full quality pass before implementation. An applicable opt-in
+RED/GREEN test transition remains inside implementation under
+`docs/test-contract-runner.md`. Main records diagnostic results and routes
+failures through `agents/_shared/coordinator-recovery.md`; these results do not
+replace acceptance evidence. The complete quality set runs once for each
+immutable candidate at Freeze, after any applicable cleaner result, and its
+receipt is reused while that identity remains unchanged. The phase and role
+predicates are owned by `agents/ref-pipeline.md`.
 
 ## Functional contract
 
@@ -327,4 +326,4 @@ by a git-native overreach diff at Freeze. See
 [Cleaner Checkpoint](cleaner-crap.md).
 
 Both deterministic checkpoints live inside `implementation`; they do not
-change the v3 state machine or either Stage Gate.
+change the v5 state machine or either Stage Gate.

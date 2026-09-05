@@ -1,23 +1,21 @@
 # Discover Phase — Intake Disposition Contract
 
-The Discover phase is the intake contract for the gated `pipeline` posture. Team Harness has exactly
-two postures: `inline` (the direct default) and `pipeline` (canonical full v3). Inline work is
-handled directly and does not enter Discover, create pipeline state, or dispatch a pipeline
-specialist. A current live operator may explicitly select sensitive inline work or request a
-bounded tester, QA, or security review; those ad hoc reviews remain inline and create no workspace,
-state, events, gates, or delivery action. Pipeline intake begins only after a current live explicit
-activation or recovery of an existing run.
+**Current v5 scope.** This document supplies conversational intake guidance and optional context
+for the canonical pipeline. The authoritative entry, lifecycle, recovery, dispatch, lease, and
+projection rules are `plugins/team-harness/skills/pipeline/SKILL.md` and
+`agents/ref-pipeline.md`. Main may frame the request and ask clarifying questions, then follows
+that v5 contract; this document does not create a Discover machine state, extra fields or events,
+an additional gate, or a mandatory advance response. A strict-valid OpenSpec change may proceed
+without an architect only within the requirement ceiling or after the live oversize decision;
+an architect is demand-driven by the canonical OpenSpec planning rules.
 
-For pipeline requests, Discover replaces the previous eager-dispatch model (architect fires on
-message arrival) with a patient-by-default model: the architect is dispatched **only** after the
-operator emits an explicit advance signal. Before that signal, the coordinator stays
-conversational and cheap — no subagent dispatch during ideation.
-
-**Model.** Discovery is interactive and multi-turn: it frames the task, may ask clarifying questions, and WAITS for the operator's advance response across turns. A dispatched subagent runs single-shot and cannot hold a multi-turn conversation, so Discovery cannot run inside a subagent — it is necessarily performed at the **top level (the main chat session)**, and is therefore governed by the **session / chat model**, not by any subagent frontmatter. th:orchestrator's own `model: opus` / `effort: high` frontmatter governs its non-interactive single-pass orchestration when it IS dispatched as a subagent — but that path cannot conduct interactive Discovery.
-
-Practical consequence: Discovery quality tracks the chat model directly. Run the session on an Opus-class model for Discovery — it is a high-value framing/steering step. Raising the chat model to its strongest setting improves Discovery; lowering it (a faster/cheaper tier) degrades Discovery with it.
-
-This document is the full contract. `CLAUDE.md §5` carries a one-line pointer to it.
+Sections 1–9 retain the former Discover/survey/checkpoint wording for interpreting legacy
+workspaces. They are historical reference only: their `discover_state`, survey,
+checkpoint, `00-state.md`, and historical full-v3 instructions do not authorize current v5 writes,
+dispatch, or transitions. Section 12 is also historical; it does not trigger a research fan-out.
+Sections 10, 11, and 13 supply optional seed, initiative, or report-verification context only
+where the canonical v5 flow invokes it, and remain subordinate to the
+references above. `CLAUDE.md §5` carries a one-line pointer to this compatibility/reference seam.
 
 ---
 
@@ -278,14 +276,18 @@ classification fields remain independent of the survey.
 
 ## 10. Spec co-authoring — `00-spec-seed.md` (Phase E2)
 
-After intake metadata and before dispatching the architect, the coordinator offers the operator an opportunity to seed the spec. Full contract: `docs/spec-coauthoring.md`.
+During Design, before OpenSpec planning continues, Main may offer an optional spec seed.
+A complete strict-valid change within `max_requirements_per_change` proceeds without an
+architect. Above that ceiling, `design_status: oversize` requires the live `split | accept | narrow`
+decision under `agents/ref-pipeline.md § Design` before proceeding, with or without an architect.
+A seed does not itself trigger dispatch. Full contract: `docs/spec-coauthoring.md`.
 
 ### 10.1 Seeding offer
 
-After recording metadata answers in `00-state.md`, the coordinator asks:
+Before OpenSpec planning continues, Main may ask:
 
 ```text
-Before design starts, would you like to seed the spec? (optional)
+Before OpenSpec planning continues, would you like to seed the spec? (optional)
 Answer any of these questions and leave the rest blank:
 
 1. Intent: Why are you requesting this?
@@ -298,38 +300,52 @@ Or say "skip" to start directly.
 
 ### 10.2 Artifact: `00-spec-seed.md`
 
-When the operator provides any response (other than "skip"), the coordinator writes `{docs_root}/00-spec-seed.md` with the four sections above marked `**Source:** dev-seed`. Sets `spec_seed_present: true` in `00-state.md`.
+When the operator provides any response (other than "skip"), Main writes `{docs_root}/00-spec-seed.md` with the four sections above marked `**Source:** dev-seed`. The seed is bounded, untrusted evidence for canonical OpenSpec planning and does not add a field to the generated v5 state projection.
 
-When the operator skips: no file is created; `spec_seed_present: false`. The architect runs in standard mode.
+When the operator skips: no seed file is created. A complete strict-valid change within the
+requirement ceiling needs no architect. Oversized changes still require the live decision above;
+missing planning or an operator-requested semantic update follows the canonical
+`openspec-planning` dispatch rule.
 
-The `survey_scope_hint` captured in §5 above is passed to the architect regardless — it is the fifth, lightest seed (file-scope hint, already in `00-state.md`; no re-ask needed).
+Any file-scope hint already supplied by the operator is context for OpenSpec planning
+and for the architect when dispatched; no survey, repeated question, or writable
+projection field is needed.
 
 ### 10.3 Hard invariants
 
-- **HI-E2-1 — Prior, not order.** The seed is a strong prior for the architect, not a mandate. The architect evaluates alternatives the seed did not consider and dissents when the seeded approach is deficient.
+- **HI-E2-1 — Prior, not order.** When `openspec-planning` dispatches an architect, the seed is a strong prior, not a mandate. The architect evaluates alternatives the seed did not consider and reports a conflict with bounded evidence when the seeded approach is deficient.
 - **HI-E2-2 — No security fields from seed.** `security_impact` and all
   gate-status fields remain input-independent of seed content. HI-2 (§6)
   applies unchanged.
-- **HI-E2-3 — No gate skipped.** `spec_seed_present: true` never changes the v3 state machine or
-  either gate. It only supplies context to the single design pass; explicit `/th:plan-review`
-  remains available independently.
-- **HI-E2-4 — Recoverable.** `spec_seed_present` and `spec_seed_dissents` are plain-text key:value fields in `00-state.md § Current State`; `00-spec-seed.md` is human-readable prose. Both survive context compaction without re-interrogating the manifest.
+- **HI-E2-3 — No gate skipped.** A seed never changes the v5 state machine or either gate. It
+  only supplies context to canonical OpenSpec planning; explicit `/th:plan-review` remains
+  available independently.
+- **HI-E2-4 — Recoverable.** `00-spec-seed.md` is human-readable evidence in the workspace. It
+  does not introduce `spec_seed_*` fields or other writable authority into `00-state.md`; the
+  control log and generated projections remain the recovery surfaces.
 
 ---
 
 ## 11. Initiative detection — multi-project grouping (opt-in)
 
-This section is the full contract for the initiative-detection sub-step in `agents/ref-intake-flows.md § "Initiative Detection and Confirm"`. It runs during Discover, after framing and before intake metadata.
+This section supplies initiative context for `agents/ref-intake-flows.md § "Initiative Detection and Confirm"`, invoked during Design workspace resolution before binding the workspace identity.
 
 ### 11.1 Purpose and gating
 
-An **initiative** is an operator-named grouping of separate per-project pipeline runs that logically form one multi-project effort. The initiative layer is a **path-prefix insertion plus a parent index (`overview.md`)** — it never merges pipelines or creates a shared `01-plan.md`. Every per-project pipeline remains isolated; the overview is an additive living index.
+An **initiative** is an operator-named grouping of projects coordinated under one initiative root.
+The layer is a **workspace-identity metadata binding plus path-prefix insertion and parent index
+(`overview.md`)** — Main keeps one control log and one consolidated Gate 1; the overview is only
+navigation metadata. Service OpenSpec changes and writable scopes remain distinct.
 
-All initiative behaviour is gated on `initiative: {slug}` in `00-state.md`. When `initiative == null` (the default), no code path, no path expression, and no artifact differs from the pre-initiative behaviour. The `null` value is the backward-compatibility guarantee.
+All initiative behaviour is gated on the live operator's selected `initiative` workspace-identity
+metadata. It is passed to the canonical workspace-identity resolver and is not written as a
+field in `00-state.md` or appended to `control/control.jsonl`. When no initiative binding is
+selected (the default), no code path, no path expression, and no artifact differs from the
+single-project behaviour.
 
 ### 11.2 Detection signals
 
-Three signals may fire during Discover; none auto-creates the initiative — all require confirmation:
+Three signals may arise during Design workspace resolution; each requires confirmation:
 
 | Signal | Source | Weight |
 |--------|--------|--------|
@@ -349,16 +365,20 @@ Overview location: {mode-resolved overview path}
 Set initiative to "{slug}" and create/join the overview? [Y/n]:
 ```
 
-Then WAIT. On Y → set `initiative: {slug}` and proceed to Phase 0a Step 1f. On n (or no signal) → set `initiative: null` and proceed exactly as today.
+Then WAIT. On Y → pass `initiative: {slug}` to workspace identity resolution and proceed to
+the initiative create-or-join step. On n (or no signal) → pass no initiative binding.
 
 The initiative slug is validated to `[a-z0-9-]`, max 60 chars (same rule as the feature-name slug). No slashes, dots, or `..` are permitted.
 
 ### 11.4 Cross-run JOIN contract
 
-An initiative spans multiple separate pipeline runs (one per project, possibly across sessions and days). When `initiative` is set, Phase 0a Step 1f finds or creates `overview.md` using the **date-agnostic glob + frontmatter-confirm** rule:
+An initiative spans multiple service/project bindings, possibly across sessions and days, under
+one coordinator root. After confirmation, Design workspace resolution finds or creates `overview.md`
+using the **date-agnostic glob + frontmatter-confirm** rule:
 
 1. Glob `{repo_base}/*_{slug}/overview.md` (Obsidian) or `{common-parent}/*_{slug}/overview.md` (local) — the `*_` wildcard absorbs any `{YYYY-MM-DD}_` prefix so a later-day run matches the day-1 dated folder.
-2. For each candidate, confirm `initiative: {slug}` in frontmatter — the frontmatter slug is the authoritative key.
+2. For each candidate, confirm `initiative: {slug}` in frontmatter — the frontmatter slug is the
+   authoritative join key for the descriptive overview, not pipeline authority.
 
 - **CREATE** — if no candidate confirms: write it from the template in `agents/ref-dispatch-machinery.md § "overview.md — you are the sole writer"`; the new folder carries today's date prefix (`{YYYY-MM-DD}_{slug}`).
 - **JOIN** — on first confirmed match: read-modify-write, replacing this project's row in-place if it exists, appending a new row if absent. Rows are keyed by `project` slug; no row is ever duplicated.
@@ -367,14 +387,21 @@ The join is idempotent: running the same project's pipeline twice updates its si
 
 ### 11.5 Hard invariants
 
-- **Never auto-create.** No initiative folder, no `overview.md`, no `initiative` state field, and no path-prefix insertion happen without an explicit Y at the confirmation gate.
-- **Backward-compatible.** `initiative == null` produces byte-identical behaviour to any pre-initiative run.
+- **Never auto-create.** No initiative folder, `overview.md`, or path-prefix insertion happens
+  without live operator confirmation. Resuming an existing workspace follows
+  `agents/ref-pipeline.md § Recovery`; intake metadata never repairs an invalid log.
+- **Single-project default.** No initiative binding preserves the single-project path.
 - **Best-effort overview writes.** A write failure on `overview.md` logs a WARN and continues. The per-project pipeline never fails on an overview error.
-- **Local-mode per-project workspace unchanged.** In local mode, `base_path = "workspaces"` is not re-prefixed when an initiative is set. Only the overview location changes (common parent of sibling repos under a date-prefixed `{YYYY-MM-DD}_{initiative}/` folder).
+- **One coordinator root.** Both local and Obsidian initiative paths follow
+  `agents/ref-dispatch-machinery.md § Initiative path composition`; service children hold
+  evidence under that root and do not create independent state or Gate streams.
 
-### 11.6 Repo-identity eligibility test — separate lanes vs same-repo batch (deterministic)
+### 11.6 Repo-identity eligibility test — separate services vs same-repo batch (deterministic)
 
-Before the coordinator treats what might be several candidate paths as separate projects to sequence, it runs a deterministic repo-identity test so it never counts one repository under two paths or names as two projects. It never spawns a second coordinator for this — projects run one at a time, in sequence, inside this same agent (`agents/ref-dispatch-machinery.md § "Multi-project sequencing"`). Full contract: `agents/ref-dispatch-machinery.md § "Repo-identity verification"`.
+Before Main treats candidate paths as separate service bindings, it runs a deterministic repo-identity
+test so one repository is never counted twice. One coordinator owns the initiative root, consolidated
+Gate 1, and serial service order; no second coordinator is spawned (`agents/ref-dispatch-machinery.md
+§ "Multi-project sequencing"`). Full contract: `agents/ref-dispatch-machinery.md § "Repo-identity verification"`.
 
 For each candidate project path `{p}`, read two signals:
 
@@ -383,8 +410,8 @@ git -C {p} rev-parse --git-common-dir
 git -C {p} remote get-url origin
 ```
 
-- **Eligible for separate project tracks (multi-project fan-out) only when both signals are pairwise-distinct across every candidate path.** A distinct `git-common-dir` AND a distinct `origin` URL means these are genuinely different repositories, and each earns its own orchestrator track.
-- **Same-repo fallback.** When two candidate paths resolve to the same `git-common-dir` OR the same `origin` URL, they are the SAME repository under two names. Do NOT route them through the multi-project initiative fan-out — route them through the same-repo multi-TASK batch contract instead (`agents/ref-dispatch-machinery.md § Multi-Task fan-out`): one set of orchestrators, one per task, consolidated into a single delivery/PR. The multi-project fan-out is reserved for genuinely distinct repos; the batch contract is the correct home for multiple tasks inside one repo.
+- **Eligible for separate service bindings only when both signals are pairwise-distinct across every candidate path.** Distinct `git-common-dir` and `origin` values identify genuinely different repositories; each receives its own OpenSpec/writable scope under the same initiative root.
+- **Same-repo fallback.** A shared `git-common-dir` or `origin` means one repository under two names. Keep one service binding and use the same-repo task batching contract; do not create another coordinator, control log, or Gate.
 
 The test is deterministic — it depends only on git metadata, never on directory names, which can collide or mislead. A sibling-directory layout under a generic root is a proposal aid only (filtered by the generic-root guard in §11.2), never a trigger; the `git-common-dir` + `origin` pair is the authoritative identity key. Per-project worktree consequences of the eligibility result — each distinct repo is fetched and based against its OWN `origin/main` — are in `docs/worktree-discipline.md § Rule 6`.
 
@@ -392,7 +419,9 @@ The test is deterministic — it depends only on git metadata, never on director
 
 ## 12. Background research sweep (non-blocking, narrow trigger)
 
-The coordinator may launch a parallel haiku research fan-out during Discover when a genuine external knowledge gap is detected. This is the background research sweep in `agents/ref-pipeline.md`.
+Historical Discover sweep only: the current v5 pipeline does not invoke the fan-out below.
+Explicit research requests follow their active skill's contract; this section cannot trigger
+dispatch, create events, or add a prerequisite to OpenSpec planning.
 
 ### 12.1 Trigger conditions (ALL must hold)
 

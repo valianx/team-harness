@@ -121,8 +121,12 @@ Fetch a single task and optionally route it to the team-harness pipeline.
    Description: <description>
    Acceptance Criteria: <AC from custom field, or empty>
    ClickUp ID: <id>
+   ClickUp URL: <resolved task URL>
    Suggested branch: feat/clickup-<id>-<title-slug>
    ```
+   Use the task URL returned by MCP, or `https://app.clickup.com/t/<id>` when absent.
+   Retain both ID and URL in the bound OpenSpec proposal as source context before
+   downstream pipeline work, following the closing-comment contract below.
    Where `title-slug` = title lowercased, non-alphanumeric characters replaced with hyphens, collapsed and trimmed, maximum 30 characters, no trailing hyphen.
 7. Print:
    ```
@@ -288,7 +292,10 @@ The agent cannot reliably attach local files. `clickup_attach_task_file` accepts
 
 Any task that originated from ClickUp — started via `task <id>`, or routed from a ClickUp task into the team-harness pipeline (see `agents/ref-pipeline.md` Step 6c "route task" intent) — MUST be closed with a functional comment on that ClickUp task when the work completes. The comment describes what was done in terms of the effect for the user / SAC / operations, following the rules in § "Comments". This is not optional: a ClickUp-originated task left without a closing comment is incomplete work.
 
-When the task is routed through the pipeline, the orchestrator persists the originating task reference in `00-state.md § Current State` (`clickup_task_id` and `clickup_task_url`) at intake, so the closing comment can be posted at delivery (Phase 5) even after context compaction or a recovery resume.
+When the task enters an explicitly activated pipeline, retain its ID and URL as source context
+in the bound OpenSpec proposal. Recovery and delivery read that canonical context; Main never
+adds task-reference fields to generated `00-state.md`. Posting the closing comment still
+requires the live approval specified below.
 
 - The comment is previewed and approved before posting (see § "Comment preview gate (mandatory)").
 - The comment is posted once and correct (the MCP cannot edit it afterward).

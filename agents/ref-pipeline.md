@@ -49,7 +49,7 @@ Specialist dispatch uses two closed primitives:
   diagnostics, next prerequisites, observed log sequence, context identity.
 
 Use the packaged control-plane helper for canonical hashing, path containment,
-append/replay, projection, lease lifecycle, predicates, and conversion. Main
+append/replay, projection, lease lifecycle, and predicates. Main
 issues and accepts; specialists never write coordinator state. Duplicate result
 identity is idempotent. Unknown fields, unsafe/symlink paths, secret-shaped
 content, stale sequence, forged hash, or ownership conflict fail closed.
@@ -64,8 +64,8 @@ and tasks.
    workspace, load only the applicable sections of
    `agents/ref-intake-flows.md`: milestone continuity for a named plan
    milestone, initiative detection/confirmation before binding an initiative,
-   and initiative create-or-join after confirmation. Then replay/convert the
-   selected workspace.
+   and initiative create-or-join after confirmation. Then replay the selected
+   workspace.
 2. Count `### Requirement:` headers across the bound change's `specs/*/spec.md`
    against `max_requirements_per_change` in `openspec/config.yaml`; past it,
    step 4 applies with or without architect. If the complete bound change

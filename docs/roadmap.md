@@ -95,7 +95,19 @@ These four are native to the harness, carry no infrastructure assumptions, and h
 
 These are improvements to the harness's own pipeline, surfaced by running it on itself.
 
-**First adoption slice.** Among the proposed execution checks, start only with the three highest-signal, lowest-overhead controls: a tester materializes the approved behavioral contract before implementation, a behavior-preserving cleaner runs after green tests, and CRAP is measured on changed and new functions. Mutation analysis and post-implementation architecture review remain follow-on experiments rather than default steps; baseline the first slice's token cost, elapsed time, defect detection, rework, and CRAP delta before deciding whether either earns a place in the standard path. The functional-first Stage 1 change is a planning-contract improvement and does not add another specialist dispatch.
+**Status after v5 simplification.** The first-adoption designs below record the
+motivation for the quality runner, optional RED/GREEN evidence, and cleaner/CRAP
+support that now exist. Their older unconditional dispatch sequence, sharded
+planning inputs, and duplicate quality checkpoints are superseded by
+`agents/ref-pipeline.md`; they are not current runtime instructions. OpenSpec
+owns acceptance intent, implementer owns ordinary tests, and additional tester,
+cleaner, and security work follows the current predicates.
+
+Mutation analysis and post-implementation architecture review remain proposed
+experiments, not default steps. Complete the current measurements in
+`docs/benchmarks/pipeline-baseline.md` before deciding whether either adds useful
+defect detection at an acceptable cost. A mutation pilot should initially
+report results for changed logic before any blocking threshold is considered.
 
 ### Make first-slice quality evidence tool-owned
 

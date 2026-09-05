@@ -149,6 +149,7 @@ def main() -> None:
         ["node", "tools/codex-runtime/test_generate.mjs"],
         ["node", "tools/codex-runtime/sync-hooks.mjs", "--check"],
         ["node", "tools/codex-runtime/sync-skills.mjs", "--check"],
+        ["node", "tests/test_codex_package_assets.mjs"],
         ["node", "tools/codex-runtime/validate-marketplace.mjs"],
         ["node", "tools/codex-runtime/test_validate_marketplace.mjs"],
     ):

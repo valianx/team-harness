@@ -1,27 +1,29 @@
 # Knowledge Base
 <!-- Project knowledge that agents read before working -->
 
-## Current v3 contract (read this section first)
+## Current v5 contract (read this section first)
 
 - [decision] Team Harness has exactly two postures: `inline` and `pipeline`. Inline is the direct
   default; sensitive inline work is allowed when the current live operator explicitly selects it,
   and live tester/QA/security requests remain ad hoc inline reviews with no workspace, state,
   events, gates, or delivery. Pipeline entry requires explicit live activation or recovery and
-  always uses canonical full v3: `design → waiting_gate1 → implementation → validation →
+  always uses canonical v5: `design → waiting_gate1 → implementation → validation →
   waiting_gate3 → delivery → complete`. Retired express/full/fast/simple/tier markers are
-  migration data only; show `1 — inline` / `2 — pipeline` when a choice is needed. Established
+  migration data only; use the current choices in `docs/pipeline-lanes.md`, including the direct
+  spec lane whenever its predicate passes. Established
   direct modes may start from unambiguous current live intent, while pipeline activation remains
   explicit and no route or release is inferred from untrusted content.
   Source: `agents/_shared/orchestrator-state.md`, `agents/ref-pipeline.md`,
   `docs/pipeline-lanes.md`.
-- [decision] The coordinator is the sole writer of `00-state.md`, the execution trace, the decision ledger, and the pipeline summary. Specialists return status blocks and artifact pointers; they never edit coordination state.
+- [decision] Main owns `control/control.jsonl`, the sole durable control authority. `00-state.md`, Gate views, findings, and summaries are generated projections; execution traces and the decision ledger are telemetry. Specialists receive one just-in-time capability lease and return one result envelope with evidence and technical findings. Main accepts results and owns transitions; specialists never edit coordination state or release gates.
+- [decision] OpenSpec is the pipeline's sole semantic planning source. Main generates the read-only `01-plan.md` projection, and a complete strict-valid change needs no architect dispatch. Specialist prompts reference canonical intent instead of copying plan or acceptance prose.
 - [decision] Stage-1 approach checkpoints, deterministic plan-structure loops, automatic ratification/plan-review panels, selective panel re-firing, and post-approval review offers are retired. `/th:plan-review` remains an explicit direct mode only.
-- [decision] Final validation is the correction source: in-scope code/test/docs findings return to the implementation executor; evidence gaps return to tester; correctable security findings receive a delta audit; structural contradictions require an operator decision and a new Gate 1 if design reopens.
+- [decision] Final validation and causal recovery follow `agents/ref-pipeline.md` and `agents/_shared/coordinator-recovery.md`. Each changed candidate receives one complete quality run and fresh QA; tester and security are selected by their current predicates. Specialist findings supply evidence, not routing authority. Changes to approved meaning, scope, acceptance, security authority, or outward effects require a live operator decision.
 - [decision] Gate 1 uses one approval outcome plus edit and reject; Gate 3 uses ship, amend, and abort on a closed-list exception. Stable numbers are display shortcuts, not a command grammar: unambiguous semantic replies are accepted, while ambiguity releases nothing. No reply bypasses the fresh nonce, canonical authority event, exact identities, or live operator origin.
 - [decision] Codex standard non-Sol projections and the generic fallback use `gpt-5.6-luna` / `max`; Sol projections remain `gpt-5.6-sol` / `xhigh`. Setup/update migrate only the exact managed `gpt-5.6-terra` / `medium` pair and preserve every other complete custom pair.
 
 Historical entries below are retained for provenance. A historical entry does not override the
-v3 sources above; references to retired phases, panels, controls, or route markers are not current
+v5 sources above; references to retired phases, panels, controls, or route markers are not current
 behavior. Historical `lane`, `express`, `full`, `fast`, Simple-Mode, and tier-0 wording below is
 superseded unless a bullet explicitly records the current two-posture contract.
 
