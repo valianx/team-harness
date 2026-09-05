@@ -3,6 +3,8 @@
 
 ## Current v5 contract (read this section first)
 
+- [decision] PR regression probes provide bounded assertion observations; the existing verifier owns causality judgment, and Main repairs operational blockers within unchanged deliverables and authority. → `skills/review-pr/references/regression-probes.md`, `agents/_shared/coordinator-recovery.md`
+
 - [decision] Team Harness has exactly two postures: `inline` and `pipeline`. Inline is the direct
   default; sensitive inline work is allowed when the current live operator explicitly selects it,
   and live tester/QA/security requests remain ad hoc inline reviews with no workspace, state,

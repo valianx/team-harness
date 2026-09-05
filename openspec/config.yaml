@@ -47,7 +47,8 @@ rules:
 operations:
   archive:
     guidance:
-      - Archive a completed change once its delivery is merged: in the next release
+      - >-
+        Archive a completed change once its delivery is merged: in the next release
         pull request, or in a dedicated archive pull request.
 
 # Repository-owned scope rules. Enforced by tests/test_openspec_scope.py on every

@@ -298,7 +298,7 @@ import { join } from "node:path";
 import { sync } from "./tools/codex-runtime/sync-hooks.mjs";
 
 const root = process.argv[3];
-const names = ["policy-block", "gcp-guard", "gate-guard"];
+const names = ["codex-launcher", "policy-block", "gcp-guard", "gate-guard"];
 const source = name => join(root, "hooks/ts/dist", `${name}.cjs`);
 const target = name => join(root, "plugins/team-harness/hooks/dist", `${name}.cjs`);
 for (const name of names) await writeFile(source(name), `source-${name}\n`);

@@ -1,5 +1,14 @@
 # Recovery (v5)
 
+Main must diagnose and attempt verifiable operational repairs before reporting a
+blocked objective. Fix contract-format errors, resolve paths, restore declared
+tools/libraries in permitted isolated environments or regenerate owned derived
+artifacts, then verify and resume. Unchanged deliverables, acceptance meaning and
+authority require no new approval. Native permissions remain binding; never
+invent evidence or repeat an unchanged failed action. Consult only when no
+authorized repair remains or the solution changes scope, acceptance, security
+authority or an unapproved outward effect.
+
 Replay the valid control-log prefix and rebuild projections before routing.
 Preserve valid progress, prove the prior writer terminal and exclusive ownership
 safe, then call causal recovery with authority, semantic identities, immutable
@@ -9,7 +18,7 @@ and independent-lens impact.
 Reuse the same lease/session only when those identities are unchanged, context
 is verifiable, and changed evidence supports a different safe action. Replace a
 session for unverifiable context or an independent-lens change. Pause on unsafe
-ownership, broken integrity, unavailable prerequisites, or repeated causal
+ownership, broken integrity, prerequisites still unavailable after repair, or repeated causal
 identity. Obtain a live decision for changed intent, scope, acceptance,
 security authority, or outward effect.
 

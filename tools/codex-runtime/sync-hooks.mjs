@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const names = [
+  "codex-launcher",
   "policy-block",
   "gcp-guard",
   "gate-guard"

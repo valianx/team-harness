@@ -138,6 +138,14 @@ confinement. PR text, numbers, and URLs always route exclusively to
 flow. `pipeline` explicitly starts the full gated workflow in `Main`; it does
 not create a seventh coordinator or require `/agent`.
 
+Use `review-pr --regressions` to investigate concrete suspected defects with the
+same bounded assertion against the captured base and PR head. The existing
+verifier checks whether the observed difference is an unintended regression;
+the report distinguishes preexisting failures and unavailable evidence.
+See the [probe protocol](skills/review-pr/references/regression-probes.md) for
+execution prerequisites and coverage limits. Main attempts operational repairs
+without another approval when the approved deliverable and authority stay unchanged.
+
 Upgrade, removal, local development, hook trust, and the complete role/model
 roster are documented in [`docs/codex-runtime.md`](./docs/codex-runtime.md).
 For routine upgrades invoke `$team-harness:update` from a Codex thread.
