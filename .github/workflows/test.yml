@@ -9,6 +9,16 @@ permissions:
   contents: read
 
 jobs:
+  windows-hooks:
+    name: native Windows hook commands
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node tests/test_codex_windows_hooks.mjs
+
   verify:
     name: run-all (policy-block + frontmatter + hook/gate suites)
     runs-on: ubuntu-latest

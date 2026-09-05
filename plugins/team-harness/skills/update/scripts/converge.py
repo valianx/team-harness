@@ -41,7 +41,8 @@ NON_FATAL_ALIAS_WARNING = (
     "Read-only file system (os error 30)"
 )
 HOOK_DIGESTS = {
-    "hooks/hooks.json": "1dc8a618a90981885a7006e9fe9b156e4ae10f05b9ecb64ecd150372596101eb",
+    "hooks/hooks.json": "a4c33f0da7ea325d1454f638582fdadf2afcc1c1394e96588302dbf14495a207",
+    "hooks/dist/codex-launcher.cjs": "ff444bd8ae65a96f62113888b31248f4778b9116823e1af1a5a7212c572fca64",
     "hooks/run-codex-hook.sh": "6e13c288ceed9feba3493d1eb886237971b96818d3819b0279917bc71496ac5b",
     "hooks/dist/policy-block.cjs": "1970f768289b7d6fc375dc882671f4740d0499bdf81feffd756224ba1ddf809d",
     "hooks/dist/gcp-guard.cjs": "1016604dbb885fa5dd58410c33a068f0c1979a3b2bc7a6b7da54b9c7268c8acc",
@@ -486,9 +487,11 @@ def validate_hooks(plugin: Path) -> dict[str, object]:
         if not isinstance(hooks_list, list) or len(hooks_list) != 1:
             raise ConvergenceError("HOOK_MANIFEST_INVALID")
         hook = hooks_list[0]
-        if not isinstance(hook, dict) or set(hook) != {"type", "command", "timeout", "statusMessage"}:
+        if not isinstance(hook, dict) or set(hook) != {"type", "command", "commandWindows", "timeout", "statusMessage"}:
             raise ConvergenceError("HOOK_MANIFEST_INVALID")
         if hook["type"] != "command" or not isinstance(hook["command"], str) or hook["timeout"] != 10:
+            raise ConvergenceError("HOOK_MANIFEST_INVALID")
+        if not isinstance(hook["commandWindows"], str) or not hook["commandWindows"].strip():
             raise ConvergenceError("HOOK_MANIFEST_INVALID")
     return {"status": "current", "adapterCount": 2, "restartRequired": False}
 

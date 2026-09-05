@@ -33,6 +33,16 @@ specialist by default.
 
 ## Flow
 
+Main repairs operational failures before treating the objective as blocked. A
+wrong path, malformed contract, missing tool/library or recoverable transport
+error is not a new approval step when its repair preserves the approved
+deliverable and authority. Diagnose, restore declared prerequisites in a permitted
+isolated environment or regenerate derived inputs, verify, and continue. This
+rule governs upstream OpenSpec instructions to pause on errors: pause only when
+no verifiable authorized repair remains, or the solution changes approved intent,
+scope, acceptance or security authority. Never invent evidence or repeat an
+unchanged failed action. Native permissions and applicable live decisions remain.
+
 1. **Author.** Write `proposal.md` and `tasks.md` under a new or existing kebab-case
    `openspec/changes/<change>/`, following the installed upstream OpenSpec propose/update skill.
    Add `design.md` or a `specs/**/spec.md` delta only when the task touches an existing specced
