@@ -339,7 +339,7 @@ content:
 
 ```
 agent: architect
-mode: design | research | audit | planning | root-cause | consolidation
+mode: openspec-planning | design | research | audit | planning | root-cause | consolidation
 sub_mode: light-root-cause | full-root-cause | null   # root-cause only
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory on failed/blocked; taxonomy: agents/ref-pipeline.md § Failures

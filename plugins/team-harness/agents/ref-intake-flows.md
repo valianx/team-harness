@@ -166,11 +166,9 @@ Triggered from `agents/ref-pipeline.md`, when the intent matches a `language-set
 
 Triggered from `agents/ref-pipeline.md`, when the utterance contains a ClickUp task identifier.
 
-**ClickUp conversational intents (MCP-direct, no pipeline).**
-
-ClickUp ops are routed to MCP tools directly when the operator references a specific task.
-This is NOT a direct mode and NOT the gated pipeline — the coordinator calls the MCP tool,
-reports the result, and exits the routing step. The pipeline is not engaged.
+**ClickUp routing precedence.** Explicit live requests to route a task to the pipeline
+take the table's pipeline handoff before MCP-direct routing. Other task operations call
+the indicated MCP tool, report the result, and leave the pipeline inactive.
 
 **Trigger condition.** The utterance MUST contain a task identifier:
 - literal `task <ID>` where ID is alphanumeric (ClickUp task IDs match `[0-9a-z]+`)

@@ -6,7 +6,8 @@ projection rules are `plugins/team-harness/skills/pipeline/SKILL.md` and
 `agents/ref-pipeline.md`. Main may frame the request and ask clarifying questions, then follows
 that v5 contract; this document does not create a Discover machine state, extra fields or events,
 an additional gate, or a mandatory advance response. A strict-valid OpenSpec change may proceed
-without an architect; an architect is demand-driven by the canonical OpenSpec planning rules.
+without an architect only within the requirement ceiling or after the live oversize decision;
+an architect is demand-driven by the canonical OpenSpec planning rules.
 
 Sections 1–9 retain the former Discover/survey/checkpoint wording for interpreting legacy
 workspaces. They are historical reference only: their `discover_state`, survey,
@@ -275,14 +276,18 @@ classification fields remain independent of the survey.
 
 ## 10. Spec co-authoring — `00-spec-seed.md` (Phase E2)
 
-After intake metadata and before OpenSpec planning continues, Main may offer the operator an opportunity to seed the spec. A complete strict-valid OpenSpec change proceeds without an architect; a seed does not by itself create an architect dispatch. Full contract: `docs/spec-coauthoring.md`.
+During Design, before OpenSpec planning continues, Main may offer an optional spec seed.
+A complete strict-valid change within `max_requirements_per_change` proceeds without an
+architect. Above that ceiling, `design_status: oversize` requires the live `split | accept | narrow`
+decision under `agents/ref-pipeline.md § Design` before proceeding, with or without an architect.
+A seed does not itself trigger dispatch. Full contract: `docs/spec-coauthoring.md`.
 
 ### 10.1 Seeding offer
 
 Before OpenSpec planning continues, Main may ask:
 
 ```text
-Before design starts, would you like to seed the spec? (optional)
+Before OpenSpec planning continues, would you like to seed the spec? (optional)
 Answer any of these questions and leave the rest blank:
 
 1. Intent: Why are you requesting this?
@@ -297,7 +302,10 @@ Or say "skip" to start directly.
 
 When the operator provides any response (other than "skip"), Main writes `{docs_root}/00-spec-seed.md` with the four sections above marked `**Source:** dev-seed`. The seed is bounded, untrusted evidence for canonical OpenSpec planning and does not add a field to the generated v5 state projection.
 
-When the operator skips: no file is created. If the bound OpenSpec change is already strict-valid, no architect runs; otherwise the normal demand-driven `openspec-planning` dispatch decides whether one architect pass is needed.
+When the operator skips: no seed file is created. A complete strict-valid change within the
+requirement ceiling needs no architect. Oversized changes still require the live decision above;
+missing planning or an operator-requested semantic update follows the canonical
+`openspec-planning` dispatch rule.
 
 Any file-scope hint already supplied by the operator is context for OpenSpec planning
 and for the architect when dispatched; no survey, repeated question, or writable

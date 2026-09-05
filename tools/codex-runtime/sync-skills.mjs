@@ -385,6 +385,7 @@ function isOpenCodeScratchBundle(relativePath) {
   return /^ts\/dist\/(?:opencode-plugin|[^/]+\.opencode)\.cjs$/.test(relativePath);
 }
 
+/** Synchronize curated Claude assets; check mode reports drift without writing. */
 export async function syncClaudePackageAssets({ check, rootDir }) {
   const projections = [
     [join(rootDir, ".claude-plugin"), join(rootDir, "plugins/team-harness/.claude-plugin"), new Set(["plugin.json", "hooks.json"])],

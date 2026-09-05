@@ -121,8 +121,12 @@ Fetch a single task and optionally route it to the team-harness pipeline.
    Description: <description>
    Acceptance Criteria: <AC from custom field, or empty>
    ClickUp ID: <id>
+   ClickUp URL: <resolved task URL>
    Suggested branch: feat/clickup-<id>-<title-slug>
    ```
+   Use the task URL returned by MCP, or `https://app.clickup.com/t/<id>` when absent.
+   Retain both ID and URL in the bound OpenSpec proposal as source context before
+   downstream pipeline work, following the closing-comment contract below.
    Where `title-slug` = title lowercased, non-alphanumeric characters replaced with hyphens, collapsed and trimmed, maximum 30 characters, no trailing hyphen.
 7. Print:
    ```

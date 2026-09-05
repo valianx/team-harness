@@ -1,6 +1,6 @@
 # Spec Co-Authoring — Design Input Contract
 
-This document defines the optional spec seed collected during Discover. It complements the
+This document defines the optional spec seed collected during Design, before OpenSpec planning continues. It complements the
 canonical v5 machine in `agents/ref-pipeline.md`; it does not add a state, a gate, or a review
 loop. OpenSpec remains the only semantic planning source. Main is the sole writer of the
 control log and its generated projections. Standalone non-pipeline architect design continues to
@@ -10,11 +10,13 @@ use its own sharded plan contract.
 
 Before OpenSpec planning continues, Main may ask whether the operator
 wants to seed the spec. The offer is optional and can be answered with `skip`. A complete,
-strict-valid OpenSpec change proceeds without an architect; a seed does not by itself require an
-architect dispatch:
+strict-valid OpenSpec change within `max_requirements_per_change` proceeds without an architect.
+An oversized change first requires the live `split | accept | narrow` decision under
+`agents/ref-pipeline.md § Design`, even when no architect runs. A seed does not itself
+require an architect dispatch:
 
 ```text
-Before design starts, do you want to seed the spec? (optional)
+Before OpenSpec planning continues, do you want to seed the spec? (optional)
 1. Intent: why is this needed?
 2. Approach: how would you do it? (optional)
 3. Decomposition: what parts would you split out?
