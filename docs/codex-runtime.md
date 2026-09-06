@@ -230,7 +230,7 @@ standard installed specialists:
 
 | Claude role metadata | Codex model | Effort |
 |---|---|---|
-| `opus` | `gpt-5.6-sol` | `xhigh` |
+| `opus` | `gpt-6-astra` | `xhigh` |
 | `sonnet` + `high` or `xhigh` | `gpt-5.6-luna` | `max` |
 | `sonnet` + `medium` | `gpt-5.6-luna` | `max` |
 | `haiku` | `gpt-5.6-luna` | `max` |

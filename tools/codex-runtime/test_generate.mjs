@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { cp, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join, sep } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { generate, render } from "./generate.mjs";
@@ -75,7 +75,7 @@ const second = await render();
 assert.equal(first.files.size, 42);
 assert.deepEqual([...first.files], [...second.files], "identical inputs must render identical bytes");
 
-const agentOutputs = [...first.files].filter(([path]) => path.includes("/.codex/agents/"));
+const agentOutputs = [...first.files].filter(([path]) => path.includes(`${sep}${join(".codex", "agents")}${sep}`));
 assert.equal(agentOutputs.length, 20);
 for (const [path, content] of agentOutputs) {
   assert.match(content, /^name = /m);
@@ -88,10 +88,10 @@ for (const [path, content] of agentOutputs) {
 }
 
 const packagedAgentOutputs = [...first.files].filter(([path]) =>
-  path.includes("/plugins/team-harness/skills/setup/assets/agents/"));
+  path.includes(`${sep}${join("plugins", "team-harness", "skills", "setup", "assets", "agents")}${sep}`));
 assert.equal(packagedAgentOutputs.length, 20);
 for (const [path, content] of agentOutputs) {
-  const name = path.split("/").at(-1);
+  const name = basename(path);
   assert.equal(
     first.files.get(join(root, "plugins/team-harness/skills/setup/assets/agents", name)),
     content,
@@ -142,9 +142,9 @@ assert.match(projectConfig, /^default_subagent_reasoning_effort = "max"$/m);
 assert.doesNotMatch(projectConfig, /gpt-5\.6-terra/, "project fallback retains Terra");
 assert.doesNotMatch(projectConfig, /^\[shell_environment_policy\]$/m);
 
-for (const name of ["architect", "qa", "security"]) {
+for (const name of ["architect", "qa", "security", "pr-review-verifier"]) {
   const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
-  assert.match(content, /^model = "gpt-5\.6-sol"$/m);
+  assert.match(content, /^model = "gpt-6-astra"$/m);
   assert.match(content, /^model_reasoning_effort = "xhigh"$/m);
 }
 for (const name of [
@@ -315,12 +315,12 @@ for (const workflow of ["tmux", "background"]) {
 assert.doesNotMatch(pipelineIdentityDocs[1], /obsidian-direct/,
   "Codex pipeline retains the retired obsidian-direct mode");
 const standardPipelineMatrix = {
-  architect: ["pipeline-architect", "gpt-5.6-sol", "xhigh"],
+  architect: ["pipeline-architect", "gpt-6-astra", "xhigh"],
   implementer: ["pipeline-implementer", "gpt-5.6-luna", "max"],
   tester: ["pipeline-tester", "gpt-5.6-luna", "max"],
   cleaner: ["pipeline-cleaner", "gpt-5.6-luna", "max"],
-  qa: ["pipeline-qa", "gpt-5.6-sol", "xhigh"],
-  security: ["pipeline-security", "gpt-5.6-sol", "xhigh"],
+  qa: ["pipeline-qa", "gpt-6-astra", "xhigh"],
+  security: ["pipeline-security", "gpt-6-astra", "xhigh"],
   delivery: ["pipeline-delivery", "gpt-5.6-luna", "max"],
 };
 for (const [role, [agentType, model, effort]] of Object.entries(standardPipelineMatrix)) {
@@ -336,8 +336,8 @@ assert.match(roster, /@Team-Harness init <request>/);
 assert.match(roster, /@Team-Harness pipeline <request>/);
 assert.match(roster, /\$sync-codex-agents/);
 assert.match(roster, /\| Agent \| Canonical Claude model \| Canonical source effort \| Codex model \| Codex effort \| Codex availability \|/);
-assert.match(roster, /\| `architect` \| `opus` \| `xhigh` \| `gpt-5\.6-sol` \| `xhigh` \| installed custom agent \|/);
-assert.match(roster, /\| `qa` \| `opus` \| `xhigh` \| `gpt-5\.6-sol` \| `xhigh` \| installed custom agent \|/);
+assert.match(roster, /\| `architect` \| `opus` \| `xhigh` \| `gpt-6-astra` \| `xhigh` \| installed custom agent \|/);
+assert.match(roster, /\| `qa` \| `opus` \| `xhigh` \| `gpt-6-astra` \| `xhigh` \| installed custom agent \|/);
 assert.match(roster, /\| `adversary` \| `sonnet` \| `xhigh` \| `gpt-5\.6-luna` \| `max` \| not shipped in Codex beta \|/);
 assert.match(roster, /\| `implementer` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
 assert.match(roster, /\| `cleaner` \| `sonnet` \| `medium` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
@@ -345,11 +345,11 @@ assert.match(roster, /\| `inline-reviewer` \| `sonnet` \| `high` \| `gpt-5\.6-lu
 assert.match(roster, /\| `reviewer` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
 assert.match(roster, /\| `pr-review-qa` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
 assert.match(roster, /\| `pr-review-security` \| `sonnet` \| `high` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
-assert.match(roster, /\| `pr-review-verifier` \| `opus` \| `high` \| `gpt-5\.6-sol` \| `xhigh` \| installed custom agent \|/);
+assert.match(roster, /\| `pr-review-verifier` \| `opus` \| `high` \| `gpt-6-astra` \| `xhigh` \| installed custom agent \|/);
 assert.match(roster, /\| `reviewer-consolidator` \| `sonnet` \| `medium` \| `gpt-5\.6-luna` \| `max` \| installed custom agent \|/);
 assert.match(roster, /\| `researcher` \| `haiku` \| `medium` \| `gpt-5\.6-luna` \| `max` \| not shipped in Codex beta \|/);
-assert.match(roster, /\| `orchestrator` \| `opus` \| `high` \| `gpt-5\.6-sol` \| `xhigh` \| Main via `init` \/ `pipeline` skills \|/);
-assert.match(roster, /\| `agent-builder` \| `opus` \| `xhigh` \| `gpt-5\.6-sol` \| `xhigh` \| not shipped in Codex beta \|/);
+assert.match(roster, /\| `orchestrator` \| `opus` \| `high` \| `gpt-6-astra` \| `xhigh` \| Main via `init` \/ `pipeline` skills \|/);
+assert.match(roster, /\| `agent-builder` \| `opus` \| `xhigh` \| `gpt-6-astra` \| `xhigh` \| not shipped in Codex beta \|/);
 assert.doesNotMatch(roster, /qa-plan/, "generated Codex roster exposes the removed planning-QA role");
 await assert.rejects(readFile(join(root, "agents/qa-plan.md")), /ENOENT/);
 await assert.rejects(readFile(join(root, "plugins/team-harness/agents/qa-plan.md")), /ENOENT/);
@@ -375,7 +375,7 @@ try {
   await writeFile(source, content.replace("model: sonnet\neffort: high", "model: opus\neffort: high"));
   const projected = await render({ rootDir: opusOtherFixture });
   const output = projected.files.get(join(opusOtherFixture, ".codex/agents/implementer.toml"));
-  assert.match(output, /^model = "gpt-5\.6-sol"$/m);
+  assert.match(output, /^model = "gpt-6-astra"$/m);
   assert.match(output, /^model_reasoning_effort = "xhigh"$/m);
 } finally {
   await rm(opusOtherFixture, { recursive: true, force: true });

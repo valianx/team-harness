@@ -92,8 +92,8 @@ frontmatter and applies the operator-approved mapping:
 
 | Canonical model/effort | Codex model/effort |
 |---|---|
-| `opus` + `xhigh` | `gpt-5.6-sol` + `xhigh` |
-| other `opus` | `gpt-5.6-sol` + `xhigh` |
+| `opus` + `xhigh` | `gpt-6-astra` + `xhigh` |
+| other `opus` | `gpt-6-astra` + `xhigh` |
 | non-`opus` | `gpt-5.6-luna` + `max` |
 
 The generated per-role roster is committed at `.codex/README.md` and checked by
@@ -124,7 +124,7 @@ Include:
 - progressively loaded coordinator instructions;
 - `architect`, `implementer`, `tester`, `cleaner`, `qa`, `security`, and `delivery`;
 - Markdown-to-TOML custom-agent rendering;
-- deterministic Sol/Luna model and effort projection;
+- deterministic Astra/Luna model and effort projection;
 - the minimum pipeline skills;
 - Memory and Context7 MCP configuration;
 - targeted installation, activation, dispatch, and update smoke tests; and

@@ -96,7 +96,7 @@
       "inherit_parent": false,
       "tiers": {
         "opus": {
-          "model": "gpt-5.6-sol",
+          "model": "gpt-6-astra",
           "reasoning_effort": "xhigh"
         },
         "sonnet-high": {
