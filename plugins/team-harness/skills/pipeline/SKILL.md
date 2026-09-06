@@ -32,12 +32,12 @@ activation. The standard matrix is:
 
 | Role | Agent type | Model / effort |
 |---|---|---|
-| architect | pipeline-architect | gpt-5.6-sol / xhigh |
+| architect | pipeline-architect | gpt-6-astra / xhigh |
 | implementer | pipeline-implementer | gpt-5.6-luna / max |
 | tester | pipeline-tester | gpt-5.6-luna / max |
 | cleaner | pipeline-cleaner | gpt-5.6-luna / max |
-| qa | pipeline-qa | gpt-5.6-sol / xhigh |
-| security | pipeline-security | gpt-5.6-sol / xhigh |
+| qa | pipeline-qa | gpt-6-astra / xhigh |
+| security | pipeline-security | gpt-6-astra / xhigh |
 | delivery | pipeline-delivery | gpt-5.6-luna / max |
 
 A live operator may select one available model/effort pair for Main and all

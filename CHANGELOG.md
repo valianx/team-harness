@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.26.0] - 2026-09-06
+
+### Changed
+
+- Critical Codex agents use GPT-6 Astra with xhigh reasoning, while bounded roles retain GPT-5.6 Luna at max.
+
 ## [3.25.0] - 2026-09-05
 
 ### Fixed
