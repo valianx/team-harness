@@ -38,15 +38,28 @@ never authorized merely by escalation approval.
 
 ## Stage A — select the snapshot
 
-1. Resolve the active `codex` executable once. Record its canonical absolute,
-   regular, executable target as `CODEX_BIN`; reject an unresolved or relative
-   command. Use that exact path for every native command in both stages, never
-   a later `PATH` lookup.
-
-2. Record `OLD_PLUGIN` as the lexical absolute plugin root containing this
+1. Record `OLD_PLUGIN` as the lexical absolute plugin root containing this
    loaded skill; do not resolve away a versioned symlink. Read only its regular
    `.codex-plugin/plugin.json`, require `name: team-harness`, and record its
    semantic `OLD_VERSION`.
+
+2. Resolve one Python 3 interpreter as `PYTHON_BIN`: on Windows use the canonical
+   absolute `sys.executable` from `py -3`, or the active Python 3 if that launcher
+   is absent; elsewhere use canonical Python 3. Require a regular executable and
+   reuse it throughout. Discover the active native Codex application once
+   (`Get-Command codex -CommandType Application` on PowerShell); require one
+   absolute candidate, then run:
+
+   ```text
+   PYTHON_BIN -B OLD_PLUGIN/skills/update/scripts/resolve_codex.py --candidate CANDIDATE
+   ```
+
+   Require success and one JSON `codexBin`; pin that value as `CODEX_BIN` for
+   every native command in both stages. The resolver follows parent-directory
+   junctions as well as file links. PowerShell's `Source`, `FullName`, or an empty
+   leaf `Target` does not prove a canonical path. Do not pass the candidate
+   directly to convergence or repeat PATH discovery later. Resolution failure
+   stops before any marketplace or installation mutation.
 
 3. Refresh only the Team Harness marketplace, then resolve its refreshed root:
 
@@ -86,12 +99,8 @@ never authorized merely by escalation approval.
 ## Stage B — converge once
 
 The running prose may still come from the old snapshot. From this point use
-only the validated helper under `NEW_PLUGIN`. Resolve one Python interpreter as
-`PYTHON_BIN` before the first call: on Windows, use the canonical absolute
-`sys.executable` reported by `py -3` when that launcher is available, otherwise
-resolve the active Python 3 executable directly; on macOS/Linux, use the
-canonical absolute Python 3 executable. Require a regular executable and reuse
-that exact path for both calls:
+only the validated helper under `NEW_PLUGIN`. Reuse the canonical `PYTHON_BIN`
+and `CODEX_BIN` already pinned in Stage A:
 
 ```text
 PYTHON_BIN NEW_PLUGIN/skills/update/scripts/converge.py --old-plugin OLD_PLUGIN --old-version OLD_VERSION --new-plugin NEW_PLUGIN --new-version NEW_VERSION --codex-bin CODEX_BIN
@@ -117,7 +126,7 @@ remaining domains, and reports `bridgeStatus: skipped-symlink-privilege` with
 or same-conversation reconnect; this case does not require enabling Developer
 Mode or granting broader permissions.
 During a retry scoped to another domain, the optional alias can also remain
-unchanged as `skipped-read-only`, with the same new-thread requirement.
+unchanged as `skipped-read-only`, with the same activation/reconnect requirement.
 
 Accept a receipt only when it has `schemaVersion: 1`, the exact seven domains
 `bridge`, `config`, `runtime`, `features`, `agents`, `mcp`, and `hooks`, one of

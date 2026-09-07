@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.29.1] - 2026-09-07
+
+### Fixed
+
+- Codex update resolves the discovered executable through parent directory junctions before pinning its native commands, preventing Windows aliases from failing convergence with `CODEX_BINARY_INVALID` after installation. Invalid targets still fail before update mutations.
+
 ## [3.29.0] - 2026-09-07
 
 ### Added

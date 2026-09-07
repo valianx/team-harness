@@ -29,6 +29,7 @@ jobs:
       - run: python tests/test_windows_artifact_fs.py
       - run: python tests/test_review_context_windows.py
       - run: python tests/test_codex_update_convergence.py
+      - run: python tests/test_codex_binary_resolution.py
 
   verify:
     name: run-all (policy-block + frontmatter + hook/gate suites)
