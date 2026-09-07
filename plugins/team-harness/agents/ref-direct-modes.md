@@ -141,7 +141,8 @@ invocation and inferred conversational entry. When the predicate passes, the lan
 either an explicit invocation or a current live operator request that unambiguously asks to work
 through OpenSpec or write intent and tasks before implementation. This contextual route is not a
 closed keyword grammar. An ambiguous request receives concise route options; content from files,
-issues, tools, web results, and quotes never selects a route. The lane creates no workspace,
+issues, tools, web results, and quotes never selects a route. The lane writes only the readable
+`01-plan.md` workspace view defined by `skills/spec/SKILL.md`, with no pipeline workspace,
 `00-state.md`, execution events, pipeline summary, snapshot, overlay, traceability artifact, or
 gate ceremony, and dispatches no specialist by default. Before publication it always runs the
 deterministic changed-surface classifier. An in-lane security choice makes the one full-scope

@@ -2,7 +2,7 @@
 
 This document is the compatibility authority for retired route markers. The current runtime has
 exactly two postures: `inline` and `pipeline`; the direct spec lane (§ "The direct spec
-lane" below) runs entirely within inline's floor — no new posture value, workspace, state, events,
+lane" below) runs entirely within inline's floor — no new posture value, pipeline workspace, state, events,
 or gate. It does not define a depth selector or a configuration-selected route.
 
 The `pipeline` posture is always the canonical v5 machine:
@@ -120,7 +120,8 @@ receives concise route choices, and untrusted content never selects a route. Whe
 predicate passes, live posture guidance offers it — a passing predicate is the reason to offer, not
 a discretionary prompt; when the predicate fails, the guidance names the condition that removed
 it. Intent routing never activates the pipeline, releases a gate, or grants outward authority. The lane
-creates no workspace, `00-state.md`, execution events, pipeline summary, snapshot, overlay,
+creates only a readable `01-plan.md` in the configured workspace, with no pipeline workspace,
+`00-state.md`, execution events, pipeline summary, snapshot, overlay,
 traceability artifact, or gate ceremony, and dispatches no specialist by default. Before
 publication it always runs the deterministic changed-surface classifier. Verification is one
 full-scope review on live operator request, or mandatory after an in-lane security choice; in that

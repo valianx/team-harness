@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.27.0] - 2026-09-07
+
+### Added
+
+- The spec lane keeps a concise work plan with progress and source links in the operator's configured workspace.
+
 ## [3.26.2] - 2026-09-07
 
 ### Fixed
