@@ -3,6 +3,8 @@
 
 ## Current v5 contract (read this section first)
 
+- [pattern] The spec lane keeps a readable `01-plan.md` in the configured workspace; OpenSpec owns intent/tasks and the view creates no pipeline state.
+
 - [constraint] PR review artifacts use handle-relative Windows filesystem operations or POSIX directory descriptors; platform compatibility must preserve no-follow and pinned-file identity checks.
 
 - [decision] PR regression probes provide bounded assertion observations; the existing verifier owns causality judgment, and Main repairs operational blockers within unchanged deliverables and authority. → `skills/review-pr/references/regression-probes.md`, `agents/_shared/coordinator-recovery.md`

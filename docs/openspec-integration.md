@@ -6,7 +6,8 @@ pipeline's Design phase (`@Team-Harness pipeline <task>`) retains both gates, st
 routing, Freeze, validation, correction authority, and delivery, exactly as below. The coordinator-
 only `/th:spec` lane (`skills/spec/SKILL.md`, `docs/pipeline-lanes.md § "The direct spec lane"`)
 authors the same `proposal.md`/`tasks.md` (and `design.md`/spec deltas when a specced capability is
-touched) directly, with one conversational approval and no workspace, state, or gate ceremony. Neither entry point adds a third OpenSpec lifecycle or a lane-specific artifact
+touched) directly, with one conversational approval and a lightweight workspace `01-plan.md`
+reading view; it creates no pipeline state or gate ceremony. Neither entry point adds a third OpenSpec lifecycle or a lane-specific artifact
 layout; archive treats a change from either origin identically.
 
 ## Canonical source model
@@ -24,7 +25,7 @@ coordinates or become writable implicitly.
 
 Every `#### Scenario:` in the change's delta specs is an acceptance criterion and validation
 reads it directly. Dispatch prompts carry pointers to canonical coordinates, never copied
-normative text; the operator projection `01-plan.md` links to the change and copies nothing.
+normative text; the operator projection `01-plan.md` links to canonical acceptance criteria instead of duplicating them.
 
 ## Single-pass Design
 
@@ -114,7 +115,7 @@ artifacts into the workspace.
 Recovery replays the valid prefix of `control/control.jsonl` and rebuilds projections before
 routing; it never asks the operator to re-enter a workflow command. A workspace without a control
 log is closed administratively with one events entry and offered inline continuation or a fresh
-run. Source drift makes the projection stale and routes back to Design; a valid completed Design
+run. A spec-only reading view is not a pipeline recovery target. Source drift makes the pipeline projection stale and routes back to Design; a valid completed Design
 resumes at Gate 1.
 
 OpenSpec `sync` and `archive` remain outside implementation authority. They are offered only after
