@@ -340,7 +340,7 @@ export async function openSpecInvocation(change, {
   // Windows npx.cmd is a batch shim, not an execFile executable. Run npm's
   // JavaScript entrypoint with Node so paths and arguments never enter a shell.
   const pathKey = Object.keys(env).find((key) => key.toLowerCase() === "path");
-  const directories = [path.dirname(node), ...(env[pathKey] ?? "").split(path.delimiter)];
+  const directories = [...(env[pathKey] ?? "").split(path.delimiter), path.dirname(node)];
   for (const directory of new Set(directories)) {
     if (!path.isAbsolute(directory)) continue;
     try {
@@ -353,8 +353,8 @@ export async function openSpecInvocation(change, {
   return fail("OPENSPEC_RUNTIME_UNAVAILABLE");
 }
 
-export async function validateOpenSpec(root, change) {
-  const invocation = await openSpecInvocation(change);
+export async function validateOpenSpec(root, change, options) {
+  const invocation = await openSpecInvocation(change, options);
   try {
     await run(invocation.command, invocation.args, {
       cwd: root, maxBuffer: 1024 * 1024, windowsHide: true, timeout: 120000,

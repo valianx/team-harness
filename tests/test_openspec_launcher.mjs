@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { openSpecInvocation } from "../skills/verify/scripts/review-fan.mjs";
+import { openSpecInvocation, validateOpenSpec } from "../skills/verify/scripts/review-fan.mjs";
 
 const run = promisify(execFile);
 const scratch = await mkdtemp(path.join(tmpdir(), "th npx & spaces ' "));
@@ -19,12 +19,7 @@ try {
   const invocation = await openSpecInvocation(change, {
     platform: "win32", node: process.execPath, env: { Path: directory },
   });
-  // Installed Node may have a real bundled npm; use a fixture node location to
-  // select the PATH candidate, then execute the resulting script with real Node.
-  const selected = await openSpecInvocation(change, {
-    platform: "win32", node: path.join(scratch, "absent-node", "node.exe"), env: { Path: directory },
-  });
-  const result = await run(process.execPath, selected.args, {
+  const result = await run(invocation.command, invocation.args, {
     cwd: scratch, encoding: "utf8", windowsHide: true,
   });
   assert.equal(result.stderr, "");
@@ -32,6 +27,11 @@ try {
     args: ["--yes", "@fission-ai/openspec@1.9.0", "validate", change, "--strict"], cwd: scratch,
   });
   assert.equal(invocation.command, process.execPath);
+  await validateOpenSpec(scratch, change, { platform: "win32", env: { Path: directory } });
+  await writeFile(cli, "process.exit(2);\n");
+  await assert.rejects(validateOpenSpec(scratch, change, {
+    platform: "win32", env: { Path: directory },
+  }), /CHANGE_NOT_VALIDATED/);
   await assert.rejects(openSpecInvocation(change, {
     platform: "win32", node: path.join(scratch, "missing", "node.exe"), env: { Path: "." },
   }), /OPENSPEC_RUNTIME_UNAVAILABLE/);
@@ -39,7 +39,7 @@ try {
   const posix = await openSpecInvocation(change, { platform: "linux" });
   assert.equal(posix.command, "npx");
   assert.deepEqual(posix.args, JSON.parse(result.stdout).args);
-  console.log("openspec-launcher: PASS (native argv, spaces/symbols, missing npm, invalid input, POSIX)");
+  console.log("openspec-launcher: PASS (native execution, validation failure, spaces/symbols, missing npm, invalid input, POSIX)");
 } finally {
   await rm(scratch, { recursive: true, force: true });
 }

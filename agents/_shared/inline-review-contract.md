@@ -150,18 +150,15 @@ an exact SHA-256 byte digest match with the trusted packaged
 field-mismatched, or digest-mismatched definition fails closed as `untrusted`
 or `unavailable`; Main does not dispatch it.
 
-The digest proves the on-disk definition, not loaded bytes. Main records
-`profile_session` only when the selected managed role is available to native
-dispatch with the read-only boundary and the current backend loaded that
-verified definition, either at startup or through a verified reload/reconnect.
-The marker records the digest, selected scope, backend and activation basis;
-it is not an in-memory byte attestation. A new conversation is not required.
-No-op setup/sync and changes to other roles do not invalidate a known-current
-profile. A changed selected definition or scope invalidates its activation
-basis: use the installed reload workflow and preserve this conversation when
-reconnecting. If activation or the native read-only boundary is unverified,
-return `unavailable` with that specific missing evidence, not a blanket demand
-for a new chat. No hook-derived loaded-profile attestation is claimed.
+Disk hashes do not attest loaded bytes. Record `profile_session` (digest, scope,
+backend, activation basis) only when native read-only dispatch is available and
+the backend loaded the verified definition at startup or through verified
+reload/reconnect. No-op setup/sync and other-role changes preserve known-current
+activation. Changed selected bytes or scope invalidate it: use installed reload,
+preserving the conversation when reconnecting. Unverified activation or native
+read-only enforcement returns `unavailable`, naming the missing evidence.
+A new conversation is not required. Neither this marker nor hooks attest
+in-memory profile bytes.
 
 `review-pr` is a separate fenced flow. An intent to review a PR, a PR number,
 or a PR URL is classified to `review-pr` before this contract is considered.
