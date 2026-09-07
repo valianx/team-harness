@@ -32,6 +32,7 @@ if __name__ == "__main__":
         "test_prepare_run_cleans_its_owned_partial_run_on_materialize_failure",
         "test_apply_verification_cli_writes_the_applied_inline_leaf",
         "test_artifact_promotion_rejects_temporary_inode_swap",
+        "test_artifact_promotion_uses_pinned_inode_when_source_name_swaps",
         "test_artifact_promotion_links_portably_without_procfs",
         "test_refresh_context_promotes_review_state_without_rebuilding_technical_state",
         "test_refresh_context_keeps_old_artifacts_when_semantic_context_changes",
