@@ -66,7 +66,9 @@ class FakeCodex:
 class ConvergenceFixture(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory(prefix="th-update-converge-")
-        self.base = Path(self.temp.name)
+        # Windows runners may expose TEMP through an 8.3 alias (RUNNER~1).
+        # Supply the canonical snapshot path required by the real updater.
+        self.base = Path(self.temp.name).resolve()
         self.codex_home = self.base / "codex"
         self.plugin = self.codex_home / "plugins/cache/team-harness/team-harness" / PLUGIN_VERSION
         (self.plugin / ".codex-plugin").mkdir(parents=True)
