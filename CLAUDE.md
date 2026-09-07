@@ -171,11 +171,12 @@ All commands run from the repo root.
   untrusted content never routes or releases a decision. The spec-lane predicate and hard routers
   apply equally to explicit invocation and inferred intent. Spec-lane routing predicate: plain inline handles mechanical, reversible work with no
   design decision worth recording. `/th:spec` handles tasks that merit written intent and task
-  decomposition — single repo, no public-contract break. `/th:pipeline` remains the hard router
-  for multi-repository, multi-specialist, multi-task, irreversible, or operator-absent work —
-  these are hard routers the lane never absorbs. A security dimension is not one of them: the
-  mandatory pre-publication classifier stops the lane for a live choice whose in-lane option raises
-  the required lens set and blocks publication until it passes instead of ejecting the task. A persisted-pipeline
+  decomposition for one bounded objective, including sequential repositories, with no public-contract
+  break. Multiple independent deliverables, multiple writing specialists, irreversible or
+  operator-absent work remain hard routers; repository count does not. For a security dimension the
+  mandatory pre-publication classifier stops the lane for a live choice. In-lane selection authorizes
+  sensitive work within approved spec scope, raises required lenses and holds publication until
+  they pass, without pipeline activation. A persisted-pipeline
   handoff offers a short live continuation choice and routes recovery internally; it never asks an
   operator to type another runtime's command syntax. `docs/pipeline-lanes.md`.
 - **Plan review is explicit only.** `/th:plan-review` dispatches one read-only `plan-reviewer` over canonical OpenSpec and `01-plan.md` projection fidelity. No plan-review panel, security design fan, ratification loop, approach checkpoint, or post-approval offer runs automatically in the pipeline. `skills/plan-review/SKILL.md`; `agents/ref-direct-modes.md`.

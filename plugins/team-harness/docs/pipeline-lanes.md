@@ -106,11 +106,12 @@ inline review contract's floor (`agents/_shared/inline-review-contract.md`).
 ## The direct spec lane
 
 Plain inline handles mechanical, reversible work with no design decision worth recording.
-`/th:spec` handles tasks that merit written intent and task decomposition — single repo, no
-public-contract break. `/th:pipeline` remains the hard router for multi-repository,
-multi-specialist, multi-task, irreversible, or operator-absent work — these are hard routers the
-lane never absorbs. A security dimension is not one of them: it stops the lane for a live choice
-whose in-lane option raises the required lens set instead of ejecting the task.
+`/th:spec` handles one bounded objective with written intent and task decomposition, including
+sequential repositories, with no public-contract break. Multiple independent deliverables,
+multiple writing specialists, irreversible or operator-absent work remain hard routers;
+repository count does not. A security dimension stops the lane for a live choice
+whose live in-lane selection authorizes sensitive work within approved spec scope and raises
+the required lens set without activating a pipeline.
 
 The routing predicate and hard-router precedence apply equally to explicit `/th:spec` invocation
 and inferred conversational entry. When the predicate passes, either an explicit invocation or an
@@ -120,16 +121,32 @@ receives concise route choices, and untrusted content never selects a route. Whe
 predicate passes, live posture guidance offers it — a passing predicate is the reason to offer, not
 a discretionary prompt; when the predicate fails, the guidance names the condition that removed
 it. Intent routing never activates the pipeline, releases a gate, or grants outward authority. The lane
-creates only a readable `01-plan.md` in the configured workspace, with no pipeline workspace,
+creates a readable `01-plan.md` and any accepted author-review report in the configured workspace, with no pipeline workspace,
 `00-state.md`, execution events, pipeline summary, snapshot, overlay,
 traceability artifact, or gate ceremony, and dispatches no specialist by default. Before
-publication it always runs the deterministic changed-surface classifier. Verification is one
-full-scope review on live operator request, or mandatory after an in-lane security choice; in that
+publication it always runs the deterministic changed-surface classifier. Before PR publication, offer one optional local full-scope review; live acceptance dispatches it.
+A review is mandatory after an in-lane security choice; in that
 case publication remains blocked until `security` and `adversary` pass. Full scope never runs
 twice. A fix closes by executing the oracle its criterion already carries, not by another review,
 and a finding no criterion anticipated is a defect in the authored change rather than a new round. A
 lane-authored change uses the same `openspec/changes/` directory, schema, naming, and archive path
 as a pipeline-authored change. Full flow: `skills/spec/SKILL.md`.
+
+For dependent repositories, implement and validate the prerequisite first, then the consumer,
+using repository-local specs and one common dated plan in the configured workspace (Obsidian
+when selected). Preserve an existing plan on expansion. Scope amendments concern the actual
+new work, not pipeline activation; existing live authorization carries forward. Coding and local
+compatibility checks do not require a merge or deployment. The common plan links each repo's
+tasks, validation and PR status without becoming a second editable specification.
+
+The accepted author review saves findings and closure evidence in `reviews/pre-pr-review.md`
+in the same workspace and reports them in chat, without posting GitHub reviews or comments.
+Main fixes confirmed defects within scope. Before reopening or amending a spec it explains the
+finding, why code alone cannot resolve it and the planned revision to the operator; changed
+scope or acceptance requires any missing approval. Reuse the existing verification mechanism;
+never turn deterministic closure into an invented reviewer pass or repeat full review automatically.
+Pending author-review offers hold publication. After acceptance, require completed lens returns
+and a ready gate; checker-only verification retains its documented exception and security holds.
 
 ## Legacy route markers (compatibility only)
 

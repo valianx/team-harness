@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.28.0] - 2026-09-07
+
+### Added
+
+- The spec lane offers local reviewer agents before PR publication, keeps findings in the operator workspace, and communicates spec revisions before repairing beyond approved intent.
+
+### Fixed
+
+- Bounded spec work can proceed across dependent repositories sequentially with one dated workspace plan instead of requiring a pipeline.
+
 ## [3.27.0] - 2026-09-07
 
 ### Added
