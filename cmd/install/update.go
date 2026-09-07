@@ -247,10 +247,10 @@ func applyUpdateDiff(diff PlanDiff, cfgPath string, placer *opencodePlacer) {
 	// in runUpdateCommand, which would have exited non-zero on an invalid
 	// selection before applyUpdateDiff was ever called.
 
-	// AC-4 / AC-6: restart-to-activate honesty block.
+	// Installation and activation are separate; reload verifies the live host.
 	fmt.Println()
-	fmt.Println("Asset files updated on disk. Restart opencode to activate —")
-	fmt.Println("the update is NOT live in any running opencode session until you restart.")
+	fmt.Println("Asset files updated on disk. Use /th-reload to verify activation in this conversation.")
+	fmt.Println("If the host cannot reload, reconnect opencode and resume the same session.")
 }
 
 // confirmApply prompts the operator for [Y/n] and returns true when the

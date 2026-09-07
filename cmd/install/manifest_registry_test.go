@@ -419,7 +419,7 @@ func TestBuildOpencodeManifests_NestedReferencesEmitted(t *testing.T) {
 // AC-5: the expected command components are emitted
 // ---------------------------------------------------------------------------
 
-// TestBuildOpencodeManifests_CommandComponentPresent verifies that the two
+// TestBuildOpencodeManifests_CommandComponentPresent verifies that the
 // supported opencode commands are emitted from their canonical sources.
 func TestBuildOpencodeManifests_CommandComponentPresent(t *testing.T) {
 	_, components, err := buildOpencodeManifests()
@@ -434,13 +434,13 @@ func TestBuildOpencodeManifests_CommandComponentPresent(t *testing.T) {
 		}
 	}
 
-	if len(cmdComponents) != 2 {
-		t.Fatalf("expected exactly 2 kind:command components, got %d", len(cmdComponents))
-	}
-
 	want := map[string]string{
 		"{config_root}/commands/th-modes.md":  "installer-assets/opencode-commands/th-modes.md",
+		"{config_root}/commands/th-reload.md": "installer-assets/opencode-commands/th-reload.md",
 		"{config_root}/commands/th-update.md": "installer-assets/opencode-commands/th-update.md",
+	}
+	if len(cmdComponents) != len(want) {
+		t.Fatalf("expected exactly %d kind:command components, got %d", len(want), len(cmdComponents))
 	}
 	for _, cmd := range cmdComponents {
 		if len(cmd.Emits.Files) != 1 {
