@@ -86,7 +86,7 @@ def link_target(path: Path) -> Path:
     return raw_target.resolve(strict=False)
 
 
-def bridge_result(old_plugin: Path, new_plugin: Path) -> dict[str, object]:
+def bridge_result(old_plugin: Path, new_plugin: Path, *, apply: bool = True) -> dict[str, object]:
     new_snapshot, version = validate_new_snapshot(new_plugin)
     cache_parent = new_snapshot.parent
 
@@ -135,11 +135,33 @@ def bridge_result(old_plugin: Path, new_plugin: Path) -> dict[str, object]:
             )
         status = "relinked"
 
+    if not apply:
+        return outcome(
+            "skipped-read-only",
+            restart_required=True,
+            oldPlugin=str(old_plugin),
+            newPlugin=str(new_snapshot),
+            version=version,
+        )
+
     temporary = old_plugin.with_name(
         f".{old_plugin.name}.team-harness-link-{os.getpid()}"
     )
     try:
-        temporary.symlink_to(new_snapshot.name, target_is_directory=True)
+        try:
+            temporary.symlink_to(new_snapshot.name, target_is_directory=True)
+        except OSError as exc:
+            # Windows ERROR_PRIVILEGE_NOT_HELD is not a sandbox write denial.
+            # The alias is optional: a new thread can use the installed path.
+            if getattr(exc, "winerror", None) != 1314:
+                raise
+            return outcome(
+                "skipped-symlink-privilege",
+                restart_required=True,
+                oldPlugin=str(old_plugin),
+                newPlugin=str(new_snapshot),
+                version=version,
+            )
         os.replace(temporary, old_plugin)
     finally:
         if os.path.lexists(temporary):

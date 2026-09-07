@@ -110,6 +110,14 @@ native argv, bounded output and timeouts, preserve opaque/operator-owned
 configuration and custom agent defaults, reject unmanaged conflicts and unsafe
 files, and never read another runtime's config or touch pipeline helper bundles.
 
+If Windows cannot create the optional snapshot alias because the symlink
+privilege is unavailable, the helper preserves the old path, verifies the
+remaining domains, and reports `bridgeStatus: skipped-symlink-privilege` with
+`restartRequired: true`. Open a new thread after convergence; this case does
+not require enabling Developer Mode or granting broader permissions.
+During a retry scoped to another domain, the optional alias can also remain
+unchanged as `skipped-read-only`, with the same new-thread requirement.
+
 Accept a receipt only when it has `schemaVersion: 1`, the exact seven domains
 `bridge`, `config`, `runtime`, `features`, `agents`, `mcp`, and `hooks`, one of
 the overall statuses `current | converged | pending-approval |

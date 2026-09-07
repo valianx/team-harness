@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.26.2] - 2026-09-07
+
+### Fixed
+
+- Codex updates on Windows continue verifying the new snapshot when the old-path alias cannot be created without a symlink privilege, and request a new thread instead of failing in the bridge domain.
+- Domain-scoped update retries can preserve an optional snapshot alias without writing outside the approved domain.
+
 ## [3.26.1] - 2026-09-07
 
 ### Fixed

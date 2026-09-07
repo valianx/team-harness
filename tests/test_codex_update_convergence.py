@@ -66,7 +66,9 @@ class FakeCodex:
 class ConvergenceFixture(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory(prefix="th-update-converge-")
-        self.base = Path(self.temp.name)
+        # Windows runners may expose TEMP through an 8.3 alias (RUNNER~1).
+        # Supply the canonical snapshot path required by the real updater.
+        self.base = Path(self.temp.name).resolve()
         self.codex_home = self.base / "codex"
         self.plugin = self.codex_home / "plugins/cache/team-harness/team-harness" / PLUGIN_VERSION
         (self.plugin / ".codex-plugin").mkdir(parents=True)
@@ -145,6 +147,80 @@ class ConvergenceFixture(unittest.TestCase):
         self.assertEqual(receipt["recoveryInvocation"], "$team-harness:update")
         runtime_text = (self.codex_home / "config.toml").read_text(encoding="utf-8")
         self.assertNotIn("sandbox_mode", runtime_text)
+
+    def test_missing_windows_symlink_privilege_preserves_bridge_and_checks_all_domains(self) -> None:
+        self.converge(FakeCodex(), authorize_runtime=True)
+        args = self.args()
+        args.old_plugin = str(self.plugin.with_name("0.0.0"))
+        args.old_version = "0.0.0"
+        denied = OSError(errno.EINVAL, "controlled symlink privilege failure")
+        denied.winerror = 1314
+        native = FakeCodex()
+        with mock.patch.object(Path, "symlink_to", side_effect=denied):
+            receipt = CONVERGE.validate_receipt(CONVERGE.run_convergence(args, native_runner=native))
+        self.assertEqual(receipt["status"], "current")
+        self.assertIsNone(receipt["failedDomain"])
+        self.assertEqual(receipt["domains"]["bridge"], {
+            "status": "preserved",
+            "bridgeStatus": "skipped-symlink-privilege",
+            "restartRequired": True,
+        })
+        self.assertTrue(receipt["restartRequired"])
+        self.assertEqual(receipt["changedDomains"], [])
+        for name in CONVERGE.DOMAIN_NAMES[1:]:
+            self.assertEqual(receipt["domains"][name]["status"], "current", name)
+        self.assertFalse(os.path.lexists(args.old_plugin))
+        self.assertEqual(list(self.plugin.parent.glob(".*.team-harness-link-*")), [])
+        self.assertIn((CODEX_BIN, "mcp", "list", "--json"), native.calls)
+
+    def test_bridge_permission_and_unknown_errors_still_fail_closed(self) -> None:
+        args = self.args()
+        args.old_plugin = str(self.plugin.with_name("0.0.0"))
+        args.old_version = "0.0.0"
+        for error, code, retry in (
+            (PermissionError(errno.EACCES, "protected cache"), "WRITE_PROTECTED", True),
+            (OSError(errno.EIO, "unknown filesystem failure"), "DOMAIN_FAILED", False),
+        ):
+            with self.subTest(code=code), mock.patch.object(Path, "symlink_to", side_effect=error):
+                receipt = CONVERGE.validate_receipt(CONVERGE.run_convergence(args, native_runner=FakeCodex()))
+                self.assertEqual(receipt["status"], "partial-convergence")
+                self.assertEqual(receipt["failedDomain"], "bridge")
+                self.assertEqual(receipt["domains"]["bridge"]["errorCode"], code)
+                self.assertEqual(receipt["domains"]["bridge"]["retryWithEscalation"], retry)
+                self.assertEqual(receipt["domains"]["config"]["status"], "not-run")
+
+    def test_config_retry_preserves_optional_bridge_without_writing_outside_scope(self) -> None:
+        self.converge(FakeCodex(), authorize_runtime=True)
+        settings = self.codex_home / ".team-harness.json"
+        settings.write_text("{}", encoding="utf-8")
+        args = self.args(escalation_domain="config")
+        args.old_plugin = str(self.plugin.with_name("0.0.0"))
+        args.old_version = "0.0.0"
+        with mock.patch.object(Path, "symlink_to", side_effect=AssertionError("bridge must remain read-only")):
+            receipt = CONVERGE.validate_receipt(CONVERGE.run_convergence(args, native_runner=FakeCodex()))
+        self.assertEqual(receipt["status"], "converged")
+        self.assertEqual(receipt["changedDomains"], ["config"])
+        self.assertEqual(receipt["domains"]["bridge"]["bridgeStatus"], "skipped-read-only")
+        self.assertTrue(receipt["restartRequired"])
+        self.assertEqual(receipt["domains"]["hooks"]["status"], "current")
+        self.assertFalse(os.path.lexists(args.old_plugin))
+
+    def test_native_missing_old_snapshot_bridge_reports_restart_when_unavailable(self) -> None:
+        self.converge(FakeCodex(), authorize_runtime=True)
+        args = self.args()
+        args.old_plugin = str(self.plugin.with_name("0.0.0"))
+        args.old_version = "0.0.0"
+        receipt = CONVERGE.validate_receipt(CONVERGE.run_convergence(args, native_runner=FakeCodex()))
+        self.assertIsNone(receipt["failedDomain"])
+        bridge = receipt["domains"]["bridge"]
+        if bridge["bridgeStatus"] == "skipped-symlink-privilege":
+            self.assertEqual(os.name, "nt")
+            self.assertTrue(receipt["restartRequired"])
+            self.assertFalse(os.path.lexists(args.old_plugin))
+        else:
+            self.assertEqual(bridge["bridgeStatus"], "linked")
+            self.assertEqual(Path(args.old_plugin).resolve(), self.plugin.resolve())
+        self.assertEqual(receipt["domains"]["hooks"]["status"], "current")
 
     def test_feature_repair_is_conditional_and_verified(self) -> None:
         native = FakeCodex(features={"multi_agent": False, "multi_agent_v2": True})
