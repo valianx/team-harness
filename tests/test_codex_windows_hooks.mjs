@@ -9,6 +9,16 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const plugin = path.join(root, "plugins/team-harness");
 const manifest = JSON.parse(await readFile(path.join(plugin, "hooks/hooks.json"), "utf8"));
 const hooks = manifest.hooks.PreToolUse.flatMap(group => group.hooks);
+if (process.platform !== "win32") {
+  process.stdout.write("codex-windows-hooks: SKIP (native PowerShell coverage runs in Windows CI)\n");
+  process.exit(0);
+}
+const windowsPowerShell = path.join(process.env.SystemRoot, "System32/WindowsPowerShell/v1.0/powershell.exe");
+const discovery = spawnSync(windowsPowerShell, ["-NoProfile", "-NonInteractive", "-Command",
+  "(Get-Command pwsh.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source"],
+  { encoding: "utf8", timeout: 10000, windowsHide: true });
+assert.equal(discovery.status, 0, `PowerShell 7 is required: ${discovery.stderr}`);
+const shells = [discovery.stdout.trim(), windowsPowerShell];
 const scratch = await mkdtemp(path.join(tmpdir(), "th hooks & windows "));
 const copy = path.join(scratch, "plugin with spaces & symbols");
 const safe = { tool_name: "Bash", tool_input: { command: "git status" } };
@@ -17,26 +27,26 @@ let count = 0;
 
 function invoke(hook, input, variables = { PLUGIN_ROOT: copy }, nodeAvailable = true) {
   assert.equal(typeof hook.commandWindows, "string");
-  const parsed = /^@echo off & for %N in \(node\.exe\) do \(if "%~\$PATH:N"=="" \(echo (.+)\) else \("%~\$PATH:N" -e "([^"]+)" (.+) & if errorlevel 1 echo \1\)\)$/.exec(hook.commandWindows);
-  assert.ok(parsed, "Windows command must retain the tested Node bootstrap form");
   const env = { ...process.env };
-  for (const key of Object.keys(env)) {
-    if (key.toLowerCase() === "nodefaultcurrentdirectoryinexepath") delete env[key];
-  }
   delete env.PLUGIN_ROOT;
   delete env.CLAUDE_PLUGIN_ROOT;
   Object.assign(env, variables);
   const pathKey = Object.keys(env).find(key => key.toLowerCase() === "path") || "PATH";
   env[pathKey] = nodeAvailable ? path.dirname(process.execPath) + path.delimiter + (env[pathKey] || "") : scratch;
   const options = { env, cwd: scratch, input: typeof input === "string" ? input : JSON.stringify(input), encoding: "utf8", timeout: 15000, maxBuffer: 1024 * 1024 };
-  const result = process.platform === "win32"
-    ? spawnSync(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", hook.commandWindows], { ...options, windowsVerbatimArguments: true })
-    : spawnSync(process.execPath, ["-e", parsed[2], ...parsed[3].split(" ")], options);
-  assert.equal(result.error, undefined, String(result.error));
-  assert.equal(result.status, 0, result.stderr);
   let output;
-  assert.doesNotThrow(() => { output = result.stdout.trim() ? JSON.parse(result.stdout) : null; },
-    `invalid hook response: stdout=${result.stdout} stderr=${result.stderr}`);
+  for (const shell of shells) {
+    const result = spawnSync(shell, ["-NoProfile", "-NonInteractive", "-Command", hook.commandWindows],
+      { ...options, windowsHide: true });
+    assert.equal(result.error, undefined, String(result.error));
+    assert.equal(result.status, 0, `${shell}: ${result.stderr}`);
+    assert.equal(result.stderr.trim(), "", `${shell}: unexpected stderr`);
+    let current;
+    assert.doesNotThrow(() => { current = result.stdout.trim() ? JSON.parse(result.stdout) : null; },
+      `invalid hook response: stdout=${result.stdout} stderr=${result.stderr}`);
+    if (shell === shells[0]) output = current;
+    else assert.deepEqual(current, output, "PowerShell versions must return the same decision");
+  }
   return output;
 }
 function denied(result) {
@@ -47,7 +57,7 @@ function denied(result) {
 try {
   await cp(path.join(plugin, "hooks"), path.join(copy, "hooks"), { recursive: true });
   assert.equal(hooks.length, 2);
-  if (process.platform === "win32") denied(invoke(hooks[0], safe, { PLUGIN_ROOT: copy }, false));
+  denied(invoke(hooks[0], safe, { PLUGIN_ROOT: copy }, false));
   // A repository-local command must not shadow the runtime selected through PATH.
   await writeFile(path.join(scratch, "node.cmd"), "@echo WORKSPACE_NODE_EXECUTED\r\n@exit /b 0\r\n");
   await writeFile(path.join(scratch, "node.exe"), "not an executable");
@@ -88,7 +98,7 @@ try {
   await mkdir(launcher);
   await writeFile(path.join(launcher, "index.js"), "process.stdout.write('must-not-execute');");
   assert.match(invoke(hooks[0], safe).systemMessage, /plugin runtime missing/); count += 1;
-  process.stdout.write(`codex-windows-hooks: ${count} checks PASS (${process.platform === "win32" ? "literal commandWindows through cmd.exe" : "portable bootstrap/adapter; cmd.exe covered by Windows CI"})\n`);
+  process.stdout.write(`codex-windows-hooks: ${count} checks PASS in each of PowerShell 7 and Windows PowerShell\n`);
 } finally {
   await rm(scratch, { recursive: true, force: true });
 }

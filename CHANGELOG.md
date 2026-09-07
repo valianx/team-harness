@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.28.1] - 2026-09-07
+
+### Fixed
+
+- Codex Windows hooks use PowerShell syntax instead of sending cmd batch commands to PowerShell, which caused both hooks to exit with parser errors. Native regression coverage executes the shipped commands in PowerShell 7 and Windows PowerShell.
+- Codex setup and update install the bundled PR review verifier alongside the other 19 agents; regression coverage checks the complete packaged roster and repairs a missing verifier in both global and project scopes.
+
 ## [3.28.0] - 2026-09-07
 
 ### Added

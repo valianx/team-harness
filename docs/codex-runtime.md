@@ -79,7 +79,8 @@ only deterministic-deny hooks (`policy-block` and the catastrophic branch of
 hook-level `ask` and native permissions own approvals. Review
 `plugins/team-harness/hooks/hooks.json` and its scripts before trusting the
 checkout; never bypass hook trust for an unreviewed repository. Hooks provide a
-native Windows `commandWindows` override using Node, with the same deny-only
+native Windows `commandWindows` override written for PowerShell and using Node,
+tested through both PowerShell 7 and Windows PowerShell with the same deny-only
 decisions and no Bash dependency. The launcher resolves node.exe from PATH to an
 absolute executable path, excluding the implicit current-directory search. PATH
 must identify a trusted Node installation. Malformed or throwing launchers deny

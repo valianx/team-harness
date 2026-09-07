@@ -412,6 +412,39 @@ class ConvergenceFixture(unittest.TestCase):
         finally:
             CONVERGE.NATIVE_TIMEOUT_SECONDS = previous
 
+    def test_agent_cli_installs_every_bundled_role_and_repairs_missing_verifier(self) -> None:
+        script = self.plugin / "skills/setup/scripts/manage_agents.py"
+        bundled = self.plugin / "skills/setup/assets/agents"
+        expected = {asset.stem: asset.read_bytes() for asset in bundled.glob("*.toml")}
+        self.assertIn("pr-review-verifier", expected)
+        for scope in ("global", "project"):
+            with self.subTest(scope=scope):
+                def run(command: str) -> dict[str, object]:
+                    result = subprocess.run(
+                        [sys.executable, str(script), command, "--scope", scope],
+                        text=True, capture_output=True, timeout=20, check=False,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    return json.loads(result.stdout)
+
+                inspected = run("inspect")
+                self.assertEqual({row["role"] for row in inspected["agents"]}, set(expected))
+                installed = run("sync")
+                self.assertEqual(set(installed["changed"]), set(expected))
+                self.assertTrue(installed["restartRequired"])
+                for row in installed["agents"]:
+                    self.assertEqual(row["status"], "current")
+                    self.assertEqual(Path(row["path"]).read_bytes(), expected[row["role"]])
+                verifier = Path(installed["directory"]) / "pr-review-verifier.toml"
+                verifier.unlink()
+                repaired = run("sync")
+                self.assertEqual(repaired["changed"], ["pr-review-verifier"])
+                self.assertTrue(repaired["restartRequired"])
+                self.assertEqual(verifier.read_bytes(), expected["pr-review-verifier"])
+                current = run("sync")
+                self.assertEqual(current["changed"], [])
+                self.assertFalse(current["restartRequired"])
+
     def test_existing_helper_clis_remain_compatible(self) -> None:
         env = os.environ.copy()
         scripts = self.plugin / "skills/setup/scripts"

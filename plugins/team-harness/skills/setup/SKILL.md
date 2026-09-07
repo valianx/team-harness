@@ -220,7 +220,7 @@ migration, and preserve every unrelated value.
    `pipeline-security`, and `pipeline-delivery`; the seven corresponding logical
    role identities retain their standard projections for other bounded skills.
    The direct inline review set is `inline-reviewer`; the PR-review
-   set is `reviewer`, `pr-review-qa`, `pr-review-security`, and
+   set is `reviewer`, `pr-review-qa`, `pr-review-security`, `pr-review-verifier`, and
    `reviewer-consolidator`. Missing files are installed and stale Team Harness-managed
    files are refreshed automatically. A same-name unmanaged file is a blocking
    conflict: report it and do not overwrite it. Writes outside the repository
