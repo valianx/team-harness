@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.29.0] - 2026-09-07
+
+### Added
+
+- The reload skill for Codex and OpenCode refreshes installed workflow instructions, attempts host-supported activation, and distinguishes verified runtime components from pending reconnect requirements while preserving the conversation. OpenCode also exposes `/th-reload`.
+
+### Changed
+
+- Successful Codex and OpenCode updates now follow installation verification with the reload workflow, so an on-disk update no longer implies that running hooks or agents changed.
+
 ## [3.28.1] - 2026-09-07
 
 ### Fixed

@@ -97,7 +97,7 @@ that exact path for both calls:
 PYTHON_BIN NEW_PLUGIN/skills/update/scripts/converge.py --old-plugin OLD_PLUGIN --old-version OLD_VERSION --new-plugin NEW_PLUGIN --new-version NEW_VERSION --codex-bin CODEX_BIN
 ```
 
-This is the only post-install call before operator input. It validates and
+This is the only post-install convergence call before operator input. It validates and
 bridges the running snapshot path, attests every imported helper before
 execution, ensures native Team Harness settings,
 classifies the persistent runtime profile, enables only missing multi-agent
@@ -113,8 +113,9 @@ files, and never read another runtime's config or touch pipeline helper bundles.
 If Windows cannot create the optional snapshot alias because the symlink
 privilege is unavailable, the helper preserves the old path, verifies the
 remaining domains, and reports `bridgeStatus: skipped-symlink-privilege` with
-`restartRequired: true`. Open a new thread after convergence; this case does
-not require enabling Developer Mode or granting broader permissions.
+`restartRequired: true`. After convergence, the reload skill handles activation
+or same-conversation reconnect; this case does not require enabling Developer
+Mode or granting broader permissions.
 During a retry scoped to another domain, the optional alias can also remain
 unchanged as `skipped-read-only`, with the same new-thread requirement.
 
@@ -167,11 +168,14 @@ the fingerprint is not reusable for a different snapshot or proposal.
   changed domains, and `$team-harness:update` as the exact retry. Never roll
   back a bridge, config, feature, agent, or other completed idempotent write.
 
-Ask for a new Codex thread only when `restartRequired` is true or the release
-adds or renames declarations Codex indexes at thread creation (skills, agents,
-MCP servers, or hook registrations). Otherwise state that the current thread
-can continue on its already-known paths. Never claim that discovery metadata
-or an already-running MCP process hot-reloaded.
+After `current` or `converged`, load `../reload/SKILL.md` from the validated new
+snapshot and execute it for the current conversation. This activation pass
+does not repeat installation-domain inspections or alter the receipt. Report
+the installation result and activation outcome separately. `restartRequired`
+remains unresolved until active-host evidence proves the relevant components
+loaded; a successful skill reread cannot clear it for agents or hooks. Prefer
+reconnecting and resuming the same conversation over creating a new thread.
+Do not run reload after a pending approval, partial result, or invalid receipt.
 
 An equal-version run still executes Stage B: update remains the supported
 repair command as well as the version updater.

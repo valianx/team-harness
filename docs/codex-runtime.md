@@ -46,6 +46,14 @@ performs no domain writes; a stale domain is repaired only when classification
 requires it. The helper returns one closed receipt, so the coordinator does not
 repeat each inspection after convergence.
 
+After a successful update, `$team-harness:reload` attempts session activation
+separately. It refreshes requested skill instructions and uses only reload
+controls exposed by the current backend. It verifies native components before
+reporting them active; installed manifests, skill discovery, queued refreshes,
+and manual hook tests do not prove that a running conversation uses new hooks.
+Hosts without suitable controls receive a reconnect-and-resume remedy for the
+same conversation. See [reload](../skills/reload/SKILL.md) for runtime procedures.
+
 Persistent runtime-profile changes remain a live operator decision. The first
 pass completes the automatically authorized domains and returns a short
 redacted summary; an unambiguous `yes`, `no`, or natural-language adjustment is
@@ -251,7 +259,9 @@ managed `gpt-5.6-terra` / `medium` pair to `gpt-5.6-luna` / `max`, with a
 backup. Any other complete operator-selected pair is preserved as
 `custom-preserved`. A
 fallback or named-role change reports `restartRequired: true`; the active Codex
-thread must be replaced because it does not hot-reload its agent registry.
+runtime must reload those roles or reconnect and resume the same conversation.
+The reload skill reports whether the active host can perform and verify that
+transition; rereading a TOML file alone does not clear the requirement.
 
 Generated project configuration and global setup/update also include
 `CLAUDE.md` in `project_doc_fallback_filenames`. Existing ordered fallback names
