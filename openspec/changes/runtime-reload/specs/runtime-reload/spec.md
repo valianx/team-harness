@@ -33,6 +33,14 @@ interrupting other active work. Reconnect SHALL retain the existing conversation
 - **WHEN** recycling the instance would interrupt another session
 - **THEN** reload leaves recycling pending and does not call instance disposal
 
+#### Scenario: Some components refresh while another needs reconnecting
+- **WHEN** the installed target is valid and some resources refresh but a required component needs the current runtime to reconnect
+- **THEN** reload reports reconnect-required with both verified and pending components, preserving the conversation
+
+#### Scenario: Components remain pending without a reconnect requirement
+- **WHEN** the installed target is valid and activation evidence remains pending without requiring a reconnect
+- **THEN** reload reports partial and does not claim full activation
+
 ### Requirement: Successful updates attempt session activation separately
 Codex and OpenCode update SHALL invoke reload after a successful installation or
 current-version verification. The installation result SHALL remain authoritative

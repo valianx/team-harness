@@ -55,10 +55,12 @@ Report in the operator's language:
 
 - Installed target version and root; observed active version, or `unknown`.
 - Components verified active, resources reread only, and components pending.
-- One outcome: `active` only when every relevant component has fresh active-host
-  evidence; `partial` when some resources refreshed but others remain pending;
-  `reconnect-required` when activation needs the existing runtime to reconnect;
-  `blocked` for invalid target identity or an unavailable requested installation.
+- One outcome, in this precedence order: `blocked` for invalid target identity
+  or an unavailable requested installation; `reconnect-required` whenever any
+  required component needs the existing runtime to reconnect, even if others
+  refreshed; `active` only when every relevant component has fresh active-host
+  evidence; otherwise `partial` for pending components without a reconnect
+  requirement.
 - The smallest remaining action, with the same conversation ID when available.
 
 Do not infer `active` from the absence of reported errors. Keep installation
