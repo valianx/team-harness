@@ -49,7 +49,7 @@ HOOK_DIGESTS = {
     "hooks/dist/gate-guard.cjs": "405d76c700ec7f225fd7935d16946fea16064a76b7b06b0951b33ab81006aa52",
 }
 HELPER_DIGESTS = {
-    "skills/update/scripts/bridge_snapshot.py": "bb2a8c751cd5fb5609e701cf2f72f43f553d93f06d5f74b089a0eb45cc983ead",
+    "skills/update/scripts/bridge_snapshot.py": "6fffc361df2b0465020cedb793c7f63503666d980a26a9fcf5e3747069819e6e",
     "skills/setup/scripts/manage_config.py": "49175207918335c7323deeb0cb38a6253c78b6595cd724c6b15e1c5ae46f4d31",
     "skills/setup/scripts/manage_runtime.py": "b96d3b25a82a039020954869e47b96001b6c957ae6578723f74f386c6a53f774",
     "skills/setup/scripts/manage_agents.py": "a70921b53baeab04c69cc377fbfc019f62ce000596fee3b06e90cc38acf71843",
@@ -658,6 +658,7 @@ def validate_receipt(receipt: object) -> dict[str, object]:
     bridge_status = domains["bridge"].get("bridgeStatus")
     if bridge_status is not None and bridge_status not in {
         "same-snapshot", "current", "linked", "relinked", "skipped-existing-path",
+        "skipped-symlink-privilege", "skipped-read-only",
     }:
         raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
     if domains["agents"].get("scope") is not None and domains["agents"]["scope"] not in {"project", "global"}:
@@ -781,19 +782,12 @@ def run_convergence(
             return False
 
     def bridge_operation() -> dict[str, object]:
-        if not may_mutate("bridge"):
-            new_snapshot, _ = helpers["bridge"].validate_new_snapshot(new_plugin)
-            if old_plugin == new_snapshot:
-                return {"status": "current", "bridgeStatus": "same-snapshot", "restartRequired": False}
-            if old_plugin.is_symlink() and helpers["bridge"].link_target(old_plugin) == new_snapshot:
-                return {"status": "current", "bridgeStatus": "current", "restartRequired": False}
-            raise ConvergenceError("ESCALATION_SCOPE_EXCEEDED")
-        result = helpers["bridge"].bridge_result(old_plugin, new_plugin)
+        result = helpers["bridge"].bridge_result(old_plugin, new_plugin, apply=may_mutate("bridge"))
         status = result.get("status")
         if status == "skipped-unmanaged-symlink":
             raise ConvergenceError("UNMANAGED_BRIDGE_SYMLINK")
         mapped = "changed" if status in {"linked", "relinked"} else "current"
-        if status == "skipped-existing-path":
+        if status in {"skipped-existing-path", "skipped-symlink-privilege", "skipped-read-only"}:
             mapped = "preserved"
         return {
             "status": mapped,

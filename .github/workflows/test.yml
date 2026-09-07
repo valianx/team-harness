@@ -26,6 +26,7 @@ jobs:
       - run: node tests/test_th_update_windows.mjs
       - run: python tests/test_windows_artifact_fs.py
       - run: python tests/test_review_context_windows.py
+      - run: python tests/test_codex_update_convergence.py
 
   verify:
     name: run-all (policy-block + frontmatter + hook/gate suites)
