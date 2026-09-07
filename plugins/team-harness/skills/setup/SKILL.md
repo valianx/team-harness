@@ -194,7 +194,7 @@ migration, and preserve every unrelated value.
    `workspace-write`, `on-request`, `auto_review`, sandbox network access, the
    standard Go/uv/npm caches, `${CODEX_HOME:-$HOME/.codex}/tmp`, and the active
    Obsidian Team Harness subtree. It never adds `.git` or a command rule. A
-   changed runtime config requires a new Codex session before it is effective.
+   changed runtime config requires verified activation before it is effective.
 
    When `inspect` reports `projectConfigShadowing: true`, the checked-out
    tree's `.codex/config.toml` declares its own `writable_roots` (or is
@@ -227,10 +227,12 @@ migration, and preserve every unrelated value.
    use Codex's native permission prompt. Do not use or download the separate Go
    installer; the marketplace snapshot is the source of these agent bytes.
    Inspect and sync output includes `runtimeConfig`, `runtimeConfigChanged`, and
-   `restartRequired`. When sync changes any role, model fallback, or project
-   document fallback, require a new Codex thread before declaring the runtime
-   ready; Codex loads its agent registry and project instruction chain only at
-   session start.
+   `restartRequired`. When sync changes a role or fallback, use the installed
+   `../reload/SKILL.md` activation procedure after setup finishes. Verify affected
+   components before declaring them ready; reconnect and resume this conversation
+   when the host cannot reload them. No-op sync or updates to other roles do not
+   invalidate an already verified reviewer profile. Never require a new chat
+   solely because setup ran.
 
 8. Configure selected MCP servers after `codex mcp list --json`. Preserve an
    existing registration unless the operator explicitly requests replacement.
@@ -261,9 +263,9 @@ migration, and preserve every unrelated value.
     `codex features list` only when step 4 ran. Report one compact result:
     native config path, workspace/language, agent scope and twenty agent statuses,
     GitHub route count when configured, feature-flag status when checked, MCP registrations, hook
-    verification/trust, global execution-default status, whether a new thread is
-    required, and for Obsidian whether the writable-root grant still requires
-    that restart. Also report that ordinary Git/push/PR approval requests route
+    verification/trust, global execution-default status, pending activation or
+    same-conversation reconnect, and for Obsidian whether the writable-root grant
+    is effective. Also report that ordinary Git/push/PR approval requests route
     through automatic review, while force-push remains denied. Never print
     imported opaque values, secrets, or environment-variable values.
 

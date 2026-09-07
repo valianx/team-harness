@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Reload"
+  short_description: "Team Harness Reload workflow"
+  default_prompt: "Use $team-harness:reload for this request."

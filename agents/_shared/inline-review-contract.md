@@ -150,15 +150,15 @@ an exact SHA-256 byte digest match with the trusted packaged
 field-mismatched, or digest-mismatched definition fails closed as `untrusted`
 or `unavailable`; Main does not dispatch it.
 
-The digest proves only the on-disk definition, never an already-loaded Codex
-profile. Main therefore dispatches only from a fresh Codex session that loaded
-the verified managed profile. It records `profile_session` in the in-memory
-review package only after that lifecycle condition holds; the marker records
-the verified digest and fresh-session condition, not an in-memory byte attestation.
-Any install, setup, agent sync, mismatch, or scope change requires
-an explicit restart before inline dispatch; a current session fails closed as
-`unavailable`. No shipped Codex hook observes session start or loaded agent
-bytes, so no hook-derived loaded-profile attestation is claimed.
+Disk hashes do not attest loaded bytes. Record `profile_session` (digest, scope,
+backend, activation basis) only when native read-only dispatch is available and
+the backend loaded the verified definition at startup or through verified
+reload/reconnect. No-op setup/sync and other-role changes preserve known-current
+activation. Changed selected bytes or scope invalidate it: use installed reload,
+preserving the conversation when reconnecting. Unverified activation or native
+read-only enforcement returns `unavailable`, naming the missing evidence.
+A new conversation is not required. Neither this marker nor hooks attest
+in-memory profile bytes.
 
 `review-pr` is a separate fenced flow. An intent to review a PR, a PR number,
 or a PR URL is classified to `review-pr` before this contract is considered.

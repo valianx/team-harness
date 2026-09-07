@@ -2,7 +2,7 @@
 /** Build the anchored inline review package from repository state, and decide its ship join. */
 
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { promisify } from "node:util";
@@ -31,6 +31,7 @@ export const ERROR_CODES = new Set([
   "CHANGED_SURFACE_EMPTY",
   "CHANGED_SURFACE_TOO_LARGE",
   "CHANGE_NOT_VALIDATED",
+  "OPENSPEC_RUNTIME_UNAVAILABLE",
   "CHANGE_NOT_FOUND",
   "CRITERIA_TOO_MANY",
   "SCOPE_FULL_REFUSED",
@@ -329,6 +330,40 @@ export function headTreeReader(root, head) {
   };
 }
 
+export async function openSpecInvocation(change, {
+  platform = process.platform, node = process.execPath, env = process.env,
+} = {}) {
+  if (!CHANGE_NAME.test(change)) fail("ARGUMENT_INVALID");
+  const args = ["--yes", "@fission-ai/openspec@1.9.0", "validate", change, "--strict"];
+  if (platform !== "win32") return { command: "npx", args };
+
+  // Windows npx.cmd is a batch shim, not an execFile executable. Run npm's
+  // JavaScript entrypoint with Node so paths and arguments never enter a shell.
+  const pathKey = Object.keys(env).find((key) => key.toLowerCase() === "path");
+  const directories = [...(env[pathKey] ?? "").split(path.delimiter), path.dirname(node)];
+  for (const directory of new Set(directories)) {
+    if (!path.isAbsolute(directory)) continue;
+    try {
+      const cli = await realpath(path.join(directory, "node_modules/npm/bin/npx-cli.js"));
+      if ((await stat(cli)).isFile()) return { command: node, args: [cli, ...args] };
+    } catch (error) {
+      if (!["ENOENT", "ENOTDIR"].includes(error.code)) throw error;
+    }
+  }
+  return fail("OPENSPEC_RUNTIME_UNAVAILABLE");
+}
+
+export async function validateOpenSpec(root, change, options) {
+  const invocation = await openSpecInvocation(change, options);
+  try {
+    await run(invocation.command, invocation.args, {
+      cwd: root, maxBuffer: 1024 * 1024, windowsHide: true, timeout: 120000,
+    });
+  } catch (error) {
+    return fail(error.code === "ENOENT" ? "OPENSPEC_RUNTIME_UNAVAILABLE" : "CHANGE_NOT_VALIDATED");
+  }
+}
+
 async function validateChange(root, head, change) {
   if (!CHANGE_NAME.test(change)) fail("ARGUMENT_INVALID");
   const changeRoot = `openspec/changes/${change}`;
@@ -336,15 +371,7 @@ async function validateChange(root, head, change) {
     .then((stdout) => stdout.trim().length > 0)
     .catch(() => false);
   if (!present) fail("CHANGE_NOT_FOUND");
-  try {
-    await run("npx", ["--yes", "@fission-ai/openspec@1.9.0", "validate", change, "--strict"], {
-      cwd: root,
-      maxBuffer: 1024 * 1024,
-      windowsHide: true,
-    });
-  } catch {
-    return fail("CHANGE_NOT_VALIDATED");
-  }
+  await validateOpenSpec(root, change);
   return changeRoot;
 }
 

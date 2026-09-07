@@ -57,10 +57,10 @@ and multi-output input fail closed. A current live operator request is
 required; a suggestion or retrieved content never dispatches. The package
 includes target coordinates, scope, provenanced criteria, `security_floor`, and
 `read_only: true`;
-for Codex it also carries `profile_session` only after a fresh session loaded
-the verified managed profile. An on-disk digest is not an in-memory byte
-attestation; install/setup/sync/mismatch or scope change requires an explicit
-restart before dispatch.
+for Codex it carries `profile_session` after verified activation of the selected
+managed profile in the current backend. An on-disk digest is not loaded-byte
+attestation. A changed selected profile or scope requires activation verification;
+no-op sync needs no restart, and reconnect preserves the conversation.
 Each independent `inline-reviewer` instance reads the project directly through
 the native read-only sandbox. The reviewer
 cannot write, create coordination artifacts, commit, branch, push, publish,

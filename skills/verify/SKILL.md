@@ -31,8 +31,18 @@ push, or delivery record. It never publishes.
    endpoints are not commits, derives the changed surface from the repository, binds the change's
    validated requirements as `written-intent` criteria, classifies the security floor, and resolves
    the required lens set. Every refusal comes from the script; none of it is operator discipline.
+   On Windows the helper runs npm's `npx-cli.js` through Node, keeping arguments
+   literal. `OPENSPEC_RUNTIME_UNAVAILABLE` means npm's launcher could not be
+   resolved; `CHANGE_NOT_VALIDATED` means validation failed or timed out. Repair
+   the reported prerequisite without substituting an unbound manual validation.
+   Main's validator may populate the package-manager cache; reviewers themselves
+   never run it, install packages, or access the network.
 2. **Dispatch.** Dispatch one `inline-reviewer` instance per lens in `required_lenses`, each
-   carrying the emitted package. Several lenses are one review, not several specialists.
+   carrying the emitted package. For Codex, Main first verifies the selected
+   profile under the shared contract and adds `profile_session` in memory; the
+   filesystem-based package helper cannot attest native activation. If that
+   evidence is unavailable, report the missing prerequisite without dispatching.
+   Several lenses are one review, not several specialists.
    When the package reports `fully_verified: true`, every changed path was proven by a green
    checker: report the surface as fully checker-verified, naming those checkers, and dispatch
    no lens rather than reviewing an empty surface.

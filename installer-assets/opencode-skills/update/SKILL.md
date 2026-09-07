@@ -13,5 +13,8 @@ curl -fsSL https://valianx.github.io/team-harness/update-opencode.sh | bash -s -
 
 Do not substitute the full installer or bypass SHA256 verification. Report
 exactly one result: `already current`, `updated`, or `installed ahead`. When
-files changed, state that a new opencode session is required to rediscover
-updated agents, skills, and commands.
+the result is `updated` or `already current`, load the native `reload` skill
+and execute its activation procedure for this conversation. Keep the updater's
+installation result separate from reload's active/pending components. Preserve
+the same session on reconnect; do not equate updated files with a live reload.
+Do not activate after a failed updater or `installed ahead` result.

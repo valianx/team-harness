@@ -85,10 +85,12 @@ delivery record for this review.
 The package carries `mode: inline-review`, canonical `repository_root`,
 immutable commit/range coordinates, scope, provenanced `criteria`,
 `changed_surface`, both lens lists, the current `lens`, `security_floor`,
-`read_only: true`, and `profile_session`. For Codex, verify the managed
-definition and dispatch only from a fresh session that loaded it; an on-disk
-digest is not an in-memory byte attestation, and install/setup/sync/mismatch or
-scope change requires an explicit restart. Pass the same anchored package to one
+`read_only: true`, and `profile_session`. For Codex, follow
+`_shared/inline-review-contract.md`: require verified profile activation at
+startup or reload/reconnect, preserving the conversation. No-op sync and
+other-role changes preserve known-current activation. Missing activation or
+native read-only evidence returns `unavailable`; disk hashes cannot attest
+loaded bytes. Pass the same anchored package to one
 independent `inline-reviewer` instance per selected lens. The reviewer reads
 the project directly through the native read-only sandbox; there is no isolated
 runner, captured-content manifest, or precaptured-evidence fallback.

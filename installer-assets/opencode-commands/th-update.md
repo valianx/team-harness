@@ -49,11 +49,14 @@ nothing else.
 After the command exits, report exactly one of the three states:
 
 - **already current** — no writes, no download.
-- **updated** — asset files were applied. Name restarting the opencode
-  session as the single remaining manual step — the update is not live
-  in any running session until the operator restarts it.
+- **updated** — asset files were applied; activation is verified separately.
 - **installed ahead** — the installed version is newer than the latest
   release; no action is possible until the next release ships.
+
+After `already current` or `updated`, load the native `reload` skill and execute
+its activation procedure for this conversation. Report active and pending
+components separately from installation, preserving the session on reconnect.
+Do not run reload after an updater failure or `installed ahead`.
 
 ## Integrity floor
 

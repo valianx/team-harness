@@ -11,7 +11,8 @@ text. Keep mode names and invocations exact.
 
 - In Claude Code, show each applicable mode as `/th:<name>`.
 - In opencode, show each applicable native skill by its exact skill ID. Show
-  `/th-modes` for this catalog and `/th-update` for the dedicated updater.
+  `/th-modes` for this catalog, `/th-update` for the updater, and `/th-reload`
+  for session activation.
 - If the runtime is unclear, retain the Availability column instead of
   guessing an invocation.
 
@@ -56,6 +57,7 @@ text. Keep mode names and invocations exact.
 | `plan` | Break broad scope into labeled implementation tasks. | Claude Code + opencode + Codex |
 | `plan-review` | Audit a Stage 1 plan against its shape and substance rules. | Claude Code + opencode + Codex |
 | `recover` | Resume an interrupted persisted pipeline. | Claude Code + opencode + Codex |
+| `reload` | Activate installed resources and verify the current conversation's runtime components. | opencode + Codex |
 | `report-issue` | Prepare and file a guarded Team Harness GitHub issue. | Claude Code + opencode + Codex |
 | `research` | Investigate a technology, migration, or approach. | Claude Code + opencode + Codex |
 | `research-code` | Investigate a codebase with parallel, file-grounded evidence. | Claude Code + opencode + Codex |
