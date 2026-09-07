@@ -85,6 +85,9 @@ Resolve `{owner}/{repo}` from the URL or `gh repo view`. Resolve the bundled hel
    Codex and opencode installs
 5. `./skills/review-pr/scripts/review_context.py`
 
+Keep the bundled `scripts/` directory intact: on Windows the helper loads
+`windows_artifact_fs.py` for handle-relative artifact access and rejects reparse
+points. POSIX uses directory descriptors with no-follow checks.
 Do not recreate the helper inline; then run the prerequisite check once:
 
 ```bash

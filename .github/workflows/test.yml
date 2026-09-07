@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   windows-hooks:
-    name: native Windows hook commands
+    name: native Windows hooks and filesystem
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,7 +19,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
       - run: node tests/test_codex_windows_hooks.mjs
+      - run: node tests/test_th_update_windows.mjs
+      - run: python tests/test_windows_artifact_fs.py
+      - run: python tests/test_review_context_windows.py
 
   verify:
     name: run-all (policy-block + frontmatter + hook/gate suites)

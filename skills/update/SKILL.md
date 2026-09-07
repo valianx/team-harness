@@ -238,7 +238,10 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
            $sw.Flush()
            $fs.Flush($true)   # fsync parity: flush OS write buffers to disk before rename
            $sw.Dispose(); $sw = $null; $fs = $null   # Dispose also closes the underlying FileStream
-           if (Test-Path $claudeMd) { [System.IO.File]::Replace($tmpFile, $claudeMd, $null) } else { Move-Item $tmpFile $claudeMd }
+           if (Test-Path $claudeMd) {
+               # Use a typed .NET null; PowerShell binds a bare $null as an empty backup path.
+               [System.IO.File]::Replace($tmpFile, $claudeMd, [NullString]::Value)
+           } else { Move-Item $tmpFile $claudeMd }
        } catch {
            if ($sw) { try { $sw.Dispose() } catch {} }
            elseif ($fs) { try { $fs.Dispose() } catch {} }
