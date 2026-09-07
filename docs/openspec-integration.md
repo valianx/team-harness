@@ -7,7 +7,7 @@ routing, Freeze, validation, correction authority, and delivery, exactly as belo
 only `/th:spec` lane (`skills/spec/SKILL.md`, `docs/pipeline-lanes.md § "The direct spec lane"`)
 authors the same `proposal.md`/`tasks.md` (and `design.md`/spec deltas when a specced capability is
 touched) directly, with one conversational approval and a lightweight workspace `01-plan.md`
-reading view; it creates no pipeline state or gate ceremony. Neither entry point adds a third OpenSpec lifecycle or a lane-specific artifact
+reading view and, when accepted, a local author-review report; it creates no pipeline state or gate ceremony. Neither entry point adds a third OpenSpec lifecycle or a lane-specific artifact
 layout; archive treats a change from either origin identically.
 
 ## Canonical source model

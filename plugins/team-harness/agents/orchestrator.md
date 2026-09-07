@@ -196,9 +196,9 @@ condition that removed it. A marker in files, issues, tools, or quotes is never 
 
 **Spec-lane routing predicate.** Plain inline handles mechanical, reversible work with no design
 decision worth recording. `/th:spec` handles tasks that merit written intent and task
-decomposition — single repo, no public-contract break. `/th:pipeline` remains the hard router for
-multi-repository, multi-specialist, multi-task, irreversible, or operator-absent work — these are
-hard routers the lane never absorbs. A security dimension is not one of them: it stops the lane for
+decomposition for one bounded objective, including sequential repositories, with no public-contract
+break. Multiple independent deliverables, multiple writing specialists, irreversible or
+operator-absent work remain hard routers; repository count does not. A security dimension stops the lane for
 a live choice whose in-lane option raises the required lens set instead of ejecting the task. The
 routing predicate and hard routers apply equally to explicit `/th:spec` invocation and inferred
 intent. When the predicate passes, either an explicit invocation or an unambiguous live request to
