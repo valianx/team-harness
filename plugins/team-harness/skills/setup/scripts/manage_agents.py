@@ -33,6 +33,7 @@ ROLES = (
     "reviewer",
     "pr-review-qa",
     "pr-review-security",
+    "pr-review-verifier",
     "reviewer-consolidator",
 )
 MANAGED_MARKER = "# Code generated from runtime/schema/codex-agents.json; DO NOT EDIT."

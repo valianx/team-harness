@@ -22,7 +22,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - run: node tests/test_codex_windows_hooks.mjs
+      - name: Hook commands in PowerShell 7 and Windows PowerShell
+        run: node tests/test_codex_windows_hooks.mjs
       - run: node tests/test_th_update_windows.mjs
       - run: python tests/test_windows_artifact_fs.py
       - run: python tests/test_review_context_windows.py

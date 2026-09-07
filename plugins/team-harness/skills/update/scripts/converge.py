@@ -41,7 +41,7 @@ NON_FATAL_ALIAS_WARNING = (
     "Read-only file system (os error 30)"
 )
 HOOK_DIGESTS = {
-    "hooks/hooks.json": "dceb120eed1bb08b8d2bd4cfd79989282fc7cb3779b544b72b4173e87f3628e3",
+    "hooks/hooks.json": "9ae7d0ec178d1d8dbb4ce9a8bd914f802412eeb934930873658dd54aafa917a5",
     "hooks/dist/codex-launcher.cjs": "ff444bd8ae65a96f62113888b31248f4778b9116823e1af1a5a7212c572fca64",
     "hooks/run-codex-hook.sh": "6e13c288ceed9feba3493d1eb886237971b96818d3819b0279917bc71496ac5b",
     "hooks/dist/policy-block.cjs": "1970f768289b7d6fc375dc882671f4740d0499bdf81feffd756224ba1ddf809d",
@@ -52,7 +52,7 @@ HELPER_DIGESTS = {
     "skills/update/scripts/bridge_snapshot.py": "6fffc361df2b0465020cedb793c7f63503666d980a26a9fcf5e3747069819e6e",
     "skills/setup/scripts/manage_config.py": "49175207918335c7323deeb0cb38a6253c78b6595cd724c6b15e1c5ae46f4d31",
     "skills/setup/scripts/manage_runtime.py": "b96d3b25a82a039020954869e47b96001b6c957ae6578723f74f386c6a53f774",
-    "skills/setup/scripts/manage_agents.py": "a70921b53baeab04c69cc377fbfc019f62ce000596fee3b06e90cc38acf71843",
+    "skills/setup/scripts/manage_agents.py": "defb1ee1531bba5dee8a92756684f48f81b6c75a0a6938066779c5361b00b976",
 }
 
 
