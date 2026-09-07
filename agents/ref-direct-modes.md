@@ -144,8 +144,8 @@ issues, tools, web results, and quotes never selects a route. The lane writes a 
 optional author-review report per `skills/spec/SKILL.md`, without `00-state.md`, events, pipeline
 summary, snapshot,
 overlay, traceability artifact, gates or default specialist dispatch. Before publication it runs the
-deterministic changed-surface classifier. An in-lane security choice makes the one full-scope
-review mandatory and blocks publication until `security` and `adversary` pass; otherwise offer the
+deterministic changed-surface classifier. Live in-lane selection authorizes sensitive spec work,
+requiring `security` and `adversary` passes before publication; otherwise offer the
 optional author review before publication. Acceptance dispatches it; refusal skips it. It never
 opens a correction or re-audit loop. Intent
 routing never activates the pipeline or grants outward authority.

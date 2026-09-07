@@ -38,6 +38,10 @@ The lane SHALL state its routing predicate: plain inline for mechanical, reversi
 - **WHEN** the approved scope or implementation reveals that the change touches an authentication surface
 - **THEN** the lane stops and presents the three-way choice rather than ejecting, because a hard router would contradict the capability that owns the security stop
 
+#### Scenario: The operator selects sensitive work within the spec lane
+- **WHEN** the live operator chooses `1 — raise the bar in-lane`
+- **THEN** that choice authorizes security-sensitive development within approved spec scope without pipeline activation, retaining required security reviews and all other authority boundaries
+
 #### Scenario: A lane task grows a second specialist need
 - **WHEN** the task turns out to require a second specialist that writes
 - **THEN** the lane stops and offers `/th:pipeline`, carrying the authored change over
@@ -72,15 +76,19 @@ For one bounded objective without a public-contract break, the coordinator SHALL
 - **THEN** the initiating repository's configured workspace hosts the common plan without turning path topology into a pipeline requirement
 
 ### Requirement: Authors may request a local review before PR publication
-The coordinator SHALL offer an optional review of the committed candidate before publishing its PR, naming the reviewer lenses and local report destination. Live acceptance SHALL dispatch the existing read-only inline-review mechanism per repository; refusal SHALL skip only the optional review. Required security checks SHALL remain applicable. Main SHALL report findings in chat and the common workspace, preserve reviewed commit identities and lens limitations, and fix confirmed in-scope defects without publishing GitHub reviews or comments. The plan and accepted review report SHALL be permitted reading artifacts without pipeline activation.
+The coordinator SHALL offer an optional review of the committed candidate before publishing its PR, naming the reviewer lenses and local report destination. A pending choice SHALL hold publication. Live acceptance SHALL dispatch the existing read-only inline-review mechanism per repository unless the package reports `fully_verified: true`, in which case Main SHALL report checker evidence without dispatching empty reviewer work. Otherwise, publication SHALL wait for every required lens to complete and `review-fan.mjs gate` to resolve ready. Failed, unavailable, stale or unresolved results SHALL NOT count as passes. Refusal SHALL skip only the optional review. Required security checks SHALL remain applicable, including on the checker-only path. Main SHALL report findings in chat and the common workspace, preserve reviewed commit identities and lens limitations, and fix confirmed in-scope defects without publishing GitHub reviews or comments. The plan and accepted review report SHALL be permitted reading artifacts without pipeline activation.
 
 #### Scenario: The operator accepts reviewer agents
 - **WHEN** the operator accepts the local author-review offer
-- **THEN** Main dispatches the required read-only lenses over each anchored candidate, consolidates their evidence, saves reviews/pre-pr-review.md in the same workspace, links it from the plan and reports results before repairs
+- **THEN** Main dispatches required read-only lenses for candidates not fully checker-verified, consolidates their evidence, saves reviews/pre-pr-review.md in the same workspace, links it from the plan and reports results before repairs; publication waits for completed required lenses and a ready gate
+
+#### Scenario: Checkers verify the complete candidate
+- **WHEN** an accepted review package reports `fully_verified: true`
+- **THEN** Main reports the checker evidence without dispatching empty reviewer work or claiming agent passes, and retains applicable security checks and publication holds
 
 #### Scenario: The operator declines or has not answered
 - **WHEN** the offer is declined or remains unanswered
-- **THEN** no optional reviewer is dispatched; a refusal records the review as skipped and allows otherwise authorized publication, while silence remains pending and neither waives security requirements
+- **THEN** no optional reviewer is dispatched; a refusal records the review as skipped and allows otherwise authorized publication, while silence holds publication but permits independent preparation, and neither waives security requirements
 
 #### Scenario: A finding is a code defect within approved intent
 - **WHEN** evidence confirms a defect whose repair preserves approved scope and criteria

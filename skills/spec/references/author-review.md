@@ -4,8 +4,9 @@ When the implementation is ready to prepare its PR, offer one concise choice in 
 language, after classifying the candidate: review it with agents, or skip the optional review and continue
 publication. State the proposed lenses (`tester`, `qa`, `security`) and that results stay in
 chat and the configured workspace. An existing live acceptance or refusal for this delivery
-settles the choice; do not ask again per repository. Silence is not acceptance. Continue
-independent preparation while awaiting the answer. Mandatory security-floor choices and checks
+settles the choice; do not ask again per repository. Silence is not acceptance or refusal.
+While the choice is pending, continue independent preparation but hold PR publication.
+Mandatory security-floor choices and checks
 still apply when optional review is declined; record the optional review as skipped, not passed.
 
 Acceptance authorizes this local review and ordinary fixes within the approved scope. It does
@@ -28,6 +29,11 @@ their supporting evidence against the anchored candidate before changing code. P
 disagreements and coverage limits. Reviewers do not edit files or publish anything. Main writes
 `reviews/pre-pr-review.md` in the existing common workspace and links it from `01-plan.md`.
 In Obsidian mode both remain there, without a repository-local duplicate.
+
+An accepted review holds publication until every required lens completes and `gate` resolves
+`ready`. Failed, unavailable, stale or unresolved returns never count as a pass. The existing
+`fully_verified: true` checker-only path avoids empty dispatch; report its checker evidence
+and retain any applicable security hold. An explicit refusal skips only the optional review.
 
 The report names each repository and reviewed base/head, lens outcomes, coverage/limitations,
 findings with severity and file/line evidence, and their dispositions. Show the concise result in

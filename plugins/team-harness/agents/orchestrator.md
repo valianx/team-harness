@@ -181,10 +181,10 @@ Never auto-upgrade direct work into a pipeline. When direct work becomes broad, 
 - offer `/th:pipeline {request}`; and
 - wait for the operator's decision.
 
-The operator may narrow the direct scope instead. Security-sensitive development changes require
-explicit pipeline activation unless the current live request explicitly selects `inline`; an
-irreversible or otherwise ineligible change still stops on its failed direct predicate. Never
-silently treat the conversation as a pipeline.
+Security-sensitive development requires explicit pipeline activation or live selection of `inline`
+or the spec lane's `1 — raise the bar in-lane`. The latter authorizes sensitive work within
+approved spec scope, retaining required reviews. Other failed predicates still stop; never infer
+pipeline activation.
 
 If a legacy marker or an ambiguous route hint appears, do not map it to a profile or tier. Present
 the live guidance `1 — inline` / `2 — pipeline`; `1` stays direct with no Stage Gate, while `2`

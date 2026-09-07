@@ -85,8 +85,9 @@ new effect.
 
    A reviewed closure pass over a fix runs only on an explicit live operator request, with the
    prior review anchor; the script refuses a second full scope. The lane opens no other review.
-6. **Publish.** Open the pull request under the repository's existing conventions (branch naming,
-   commit style, outward-action approval). When the in-lane security path applies, publication is
+6. **Publish.** First satisfy the author-review decision and completion conditions in
+   [author-review.md](references/author-review.md); a pending offer holds publication. Open the
+   pull request under existing branch, commit and outward-action conventions. When the in-lane security path applies, publication is
    blocked until both `security` and `adversary` pass with no blocker.
 7. **Archive.** Check the pull request state once. When it reports merged, offer
    `openspec archive <change>` behind a one-line Y/n; on acceptance, run it on a branch delivered
@@ -166,7 +167,9 @@ reports `security_floor.applies`, present the matching category it named and thr
 3 — narrow scope
 ```
 
-Choice `1` keeps the work here with `security` and `adversary` in the required lens set, and the
+Live choice `1` explicitly authorizes security-sensitive development within the approved spec
+scope, satisfying the direct-mode sensitivity decision without activating a pipeline. It keeps
+`security` and `adversary` in the required lens set, and the
 coordinator holds publication until `review-fan.mjs gate` resolves ready. No hook covers
 `gh pr create`, so that hold is coordinator discipline rather than an enforced gate — the enforced
 part is the classification, which the script derives from the diff and cannot be talked out of.

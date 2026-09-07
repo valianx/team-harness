@@ -110,7 +110,8 @@ Plain inline handles mechanical, reversible work with no design decision worth r
 sequential repositories, with no public-contract break. Multiple independent deliverables,
 multiple writing specialists, irreversible or operator-absent work remain hard routers;
 repository count does not. A security dimension stops the lane for a live choice
-whose in-lane option raises the required lens set instead of ejecting the task.
+whose live in-lane selection authorizes sensitive work within approved spec scope and raises
+the required lens set without activating a pipeline.
 
 The routing predicate and hard-router precedence apply equally to explicit `/th:spec` invocation
 and inferred conversational entry. When the predicate passes, either an explicit invocation or an
@@ -144,6 +145,8 @@ Main fixes confirmed defects within scope. Before reopening or amending a spec i
 finding, why code alone cannot resolve it and the planned revision to the operator; changed
 scope or acceptance requires any missing approval. Reuse the existing verification mechanism;
 never turn deterministic closure into an invented reviewer pass or repeat full review automatically.
+Pending author-review offers hold publication. After acceptance, require completed lens returns
+and a ready gate; checker-only verification retains its documented exception and security holds.
 
 ## Legacy route markers (compatibility only)
 
