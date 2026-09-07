@@ -3,6 +3,8 @@
 
 ## Current v5 contract (read this section first)
 
+- [constraint] PR review artifacts use handle-relative Windows filesystem operations or POSIX directory descriptors; platform compatibility must preserve no-follow and pinned-file identity checks.
+
 - [decision] PR regression probes provide bounded assertion observations; the existing verifier owns causality judgment, and Main repairs operational blockers within unchanged deliverables and authority. → `skills/review-pr/references/regression-probes.md`, `agents/_shared/coordinator-recovery.md`
 
 - [decision] Team Harness has exactly two postures: `inline` and `pipeline`. Inline is the direct

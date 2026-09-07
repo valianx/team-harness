@@ -19,6 +19,20 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
+if os.name == "nt":
+    import importlib.util
+
+    _backend_spec = importlib.util.spec_from_file_location(
+        "_th_windows_artifact_fs", Path(__file__).with_name("windows_artifact_fs.py")
+    )
+    assert _backend_spec and _backend_spec.loader
+    artifact_fs = importlib.util.module_from_spec(_backend_spec)
+    sys.modules[_backend_spec.name] = artifact_fs
+    _backend_spec.loader.exec_module(artifact_fs)
+else:
+    artifact_fs = os
+
+
 SCHEMA_VERSION = 3
 COMMAND_TIMEOUT_SECONDS = 60
 _capture_deadline: float | None = None
@@ -43,8 +57,9 @@ SAFE_LEAF_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 REVIEW_PARENT_RE = re.compile(r"^pr-review-([1-9][0-9]*)$")
 REVIEW_RUN_RE = re.compile(r"^run-([a-f0-9]{32})$")
 REVIEW_OWNER_FILE = ".team-harness-review-owner.json"
-NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
-DIRECTORY = getattr(os, "O_DIRECTORY", 0)
+NOFOLLOW = getattr(artifact_fs, "NOFOLLOW", getattr(os, "O_NOFOLLOW", 0))
+DIRECTORY = getattr(artifact_fs, "DIRECTORY", getattr(os, "O_DIRECTORY", 0))
+REPARSE_POINT = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
 
 
 def _safe_leaf(name: str) -> str:
@@ -53,23 +68,40 @@ def _safe_leaf(name: str) -> str:
     return name
 
 
+def _is_link(path: Path) -> bool:
+    try:
+        value = path.lstat()
+    except FileNotFoundError:
+        return False
+    return stat.S_ISLNK(value.st_mode) or bool(getattr(value, "st_file_attributes", 0) & REPARSE_POINT)
+
+
 def _open_directory(path: Path) -> tuple[Path, int]:
-    if path.is_symlink():
+    before = path.lstat()
+    if stat.S_ISLNK(before.st_mode) or getattr(before, "st_file_attributes", 0) & REPARSE_POINT:
         raise ContextError("artifact directory must not be a symlink")
     resolved = path.resolve(strict=True)
     try:
-        fd = os.open(resolved, os.O_RDONLY | DIRECTORY | NOFOLLOW)
+        fd = artifact_fs.open(resolved, os.O_RDONLY | DIRECTORY | NOFOLLOW)
     except OSError as error:
         raise ContextError("cannot open trusted artifact directory") from error
-    if not stat.S_ISDIR(os.fstat(fd).st_mode):
+    try:
+        opened = os.fstat(fd)
+    except OSError as error:
+        os.close(fd)
+        raise ContextError("cannot inspect trusted artifact directory") from error
+    if not stat.S_ISDIR(opened.st_mode):
         os.close(fd)
         raise ContextError("trusted artifact root is not a directory")
+    if (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
+        os.close(fd)
+        raise ContextError("artifact directory changed before secure open")
     return resolved, fd
 
 
 def _regular_stat_at(directory_fd: int, name: str) -> os.stat_result:
     try:
-        value = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        value = artifact_fs.stat(name, dir_fd=directory_fd, follow_symlinks=False)
     except OSError as error:
         raise ContextError("cannot inspect artifact leaf") from error
     if not stat.S_ISREG(value.st_mode):
@@ -83,7 +115,7 @@ def safe_read_leaf(root: Path, name: str, *, limit: int = 2_000_000) -> bytes:
     try:
         before = _regular_stat_at(directory_fd, name)
         try:
-            leaf_fd = os.open(name, os.O_RDONLY | NOFOLLOW, dir_fd=directory_fd)
+            leaf_fd = artifact_fs.open(name, os.O_RDONLY | NOFOLLOW, dir_fd=directory_fd)
         except OSError as error:
             raise ContextError("cannot open artifact leaf without following links") from error
         try:
@@ -114,7 +146,7 @@ def promote_artifact(root: Path, temporary_name: str, final_name: str) -> None:
     try:
         before = _regular_stat_at(directory_fd, temporary_name)
         try:
-            temporary_fd = os.open(
+            temporary_fd = artifact_fs.open(
                 temporary_name,
                 os.O_RDONLY | NOFOLLOW,
                 dir_fd=directory_fd,
@@ -127,7 +159,7 @@ def promote_artifact(root: Path, temporary_name: str, final_name: str) -> None:
             if not stat.S_ISREG(pinned.st_mode) or (before.st_dev, before.st_ino) != (pinned.st_dev, pinned.st_ino):
                 raise ContextError("temporary artifact changed before promotion")
             try:
-                final = os.stat(final_name, dir_fd=directory_fd, follow_symlinks=False)
+                final = artifact_fs.stat(final_name, dir_fd=directory_fd, follow_symlinks=False)
             except FileNotFoundError:
                 final = None
             except OSError as error:
@@ -139,7 +171,7 @@ def promote_artifact(root: Path, temporary_name: str, final_name: str) -> None:
                 raise ContextError("temporary artifact changed during promotion")
             staging = f"tmp-pinned-{secrets.token_hex(16)}"
             try:
-                os.link(
+                artifact_fs.link(
                     temporary_name,
                     staging,
                     src_dir_fd=directory_fd,
@@ -150,9 +182,9 @@ def promote_artifact(root: Path, temporary_name: str, final_name: str) -> None:
                 raise ContextError("cannot link pinned temporary artifact") from error
             staged = _regular_stat_at(directory_fd, staging)
             if (staged.st_dev, staged.st_ino) != (pinned.st_dev, pinned.st_ino):
-                os.unlink(staging, dir_fd=directory_fd)
+                artifact_fs.unlink(staging, dir_fd=directory_fd)
                 raise ContextError("pinned staging artifact identity mismatch")
-            os.replace(
+            artifact_fs.replace(
                 staging,
                 final_name,
                 src_dir_fd=directory_fd,
@@ -162,17 +194,17 @@ def promote_artifact(root: Path, temporary_name: str, final_name: str) -> None:
             if (promoted.st_dev, promoted.st_ino) != (pinned.st_dev, pinned.st_ino):
                 raise ContextError("promoted artifact identity mismatch")
             try:
-                leftover = os.stat(temporary_name, dir_fd=directory_fd, follow_symlinks=False)
+                leftover = artifact_fs.stat(temporary_name, dir_fd=directory_fd, follow_symlinks=False)
             except FileNotFoundError:
                 leftover = None
             if leftover is not None and (leftover.st_dev, leftover.st_ino) == (pinned.st_dev, pinned.st_ino):
-                os.unlink(temporary_name, dir_fd=directory_fd)
+                artifact_fs.unlink(temporary_name, dir_fd=directory_fd)
         except OSError as error:
             raise ContextError("cannot atomically promote artifact leaf") from error
         finally:
             if staging is not None:
                 try:
-                    os.unlink(staging, dir_fd=directory_fd)
+                    artifact_fs.unlink(staging, dir_fd=directory_fd)
                 except FileNotFoundError:
                     pass
             os.close(temporary_fd)
@@ -190,7 +222,7 @@ def ensure_workspaces_ignored(repo_root: Path) -> None:
             mode = _regular_stat_at(directory_fd, name).st_mode & 0o777
         except ContextError:
             try:
-                existing = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+                existing = artifact_fs.stat(name, dir_fd=directory_fd, follow_symlinks=False)
             except FileNotFoundError:
                 current = b""
                 mode = 0o644
@@ -210,7 +242,7 @@ def ensure_workspaces_ignored(repo_root: Path) -> None:
         updated += b"/workspaces/\n"
         temporary = f".gitignore.team-harness-{secrets.token_hex(8)}"
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW
-        temporary_fd = os.open(temporary, flags, mode, dir_fd=directory_fd)
+        temporary_fd = artifact_fs.open(temporary, flags, mode, dir_fd=directory_fd)
         try:
             view = memoryview(updated)
             while view:
@@ -218,7 +250,7 @@ def ensure_workspaces_ignored(repo_root: Path) -> None:
             os.fsync(temporary_fd)
         finally:
             os.close(temporary_fd)
-        os.replace(temporary, name, src_dir_fd=directory_fd, dst_dir_fd=directory_fd)
+        artifact_fs.replace(temporary, name, src_dir_fd=directory_fd, dst_dir_fd=directory_fd)
     finally:
         os.close(directory_fd)
 
@@ -304,7 +336,7 @@ def create_review_run(repo_root: Path, pr: int) -> dict[str, Any]:
         marker = json.dumps(_review_owner(pr, token), sort_keys=True).encode("utf-8") + b"\n"
         directory, directory_fd = _open_directory(artifact_root)
         try:
-            marker_fd = os.open(
+            marker_fd = artifact_fs.open(
                 REVIEW_OWNER_FILE,
                 os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW,
                 0o600,
@@ -319,7 +351,7 @@ def create_review_run(repo_root: Path, pr: int) -> dict[str, Any]:
                 os.close(marker_fd)
         except Exception:
             try:
-                os.unlink(REVIEW_OWNER_FILE, dir_fd=directory_fd)
+                artifact_fs.unlink(REVIEW_OWNER_FILE, dir_fd=directory_fd)
             except FileNotFoundError:
                 pass
             os.close(directory_fd)
@@ -337,7 +369,7 @@ def _temporary_leaf(artifact_root: Path, prefix: str) -> Path:
         for _ in range(8):
             name = f"{prefix}.{secrets.token_hex(8)}"
             try:
-                leaf_fd = os.open(
+                leaf_fd = artifact_fs.open(
                     name,
                     os.O_RDWR | os.O_CREAT | os.O_EXCL | NOFOLLOW,
                     0o600,
@@ -357,12 +389,12 @@ def _discard_artifact_leaf(artifact_root: Path, name: str) -> None:
     _, directory_fd = _open_directory(artifact_root)
     try:
         try:
-            metadata = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+            metadata = artifact_fs.stat(name, dir_fd=directory_fd, follow_symlinks=False)
         except FileNotFoundError:
             return
         if not stat.S_ISREG(metadata.st_mode):
             raise ContextError("temporary artifact is not a regular file")
-        os.unlink(name, dir_fd=directory_fd)
+        artifact_fs.unlink(name, dir_fd=directory_fd)
     finally:
         os.close(directory_fd)
 
@@ -373,7 +405,7 @@ def _write_existing_leaf(path: Path, content: bytes) -> None:
     name = _safe_leaf(path.name)
     try:
         before = _regular_stat_at(directory_fd, name)
-        leaf_fd = os.open(name, os.O_WRONLY | os.O_TRUNC | NOFOLLOW, dir_fd=directory_fd)
+        leaf_fd = artifact_fs.open(name, os.O_WRONLY | os.O_TRUNC | NOFOLLOW, dir_fd=directory_fd)
         try:
             opened = os.fstat(leaf_fd)
             if (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
@@ -442,7 +474,7 @@ def find_resumable_review_run(repo_root: Path, pr: int) -> dict[str, Any]:
     parent = _review_parent(repo_root, pr, create=False)
     candidates: list[dict[str, Any]] = []
     for child in parent.iterdir():
-        if not REVIEW_RUN_RE.fullmatch(child.name) or child.is_symlink() or not child.is_dir():
+        if not REVIEW_RUN_RE.fullmatch(child.name) or _is_link(child) or not child.is_dir():
             continue
         try:
             resolved, descriptor = _open_directory(child)
@@ -470,18 +502,18 @@ def find_resumable_review_run(repo_root: Path, pr: int) -> dict[str, Any]:
 
 
 def _remove_tree_contents(directory_fd: int) -> None:
-    with os.scandir(directory_fd) as entries:
+    with artifact_fs.scandir(directory_fd) as entries:
         for entry in entries:
-            metadata = entry.stat(follow_symlinks=False)
+            metadata = artifact_fs.stat(entry.name, dir_fd=directory_fd, follow_symlinks=False)
             if stat.S_ISDIR(metadata.st_mode):
-                child_fd = os.open(entry.name, os.O_RDONLY | DIRECTORY | NOFOLLOW, dir_fd=directory_fd)
+                child_fd = artifact_fs.open(entry.name, os.O_RDONLY | DIRECTORY | NOFOLLOW, dir_fd=directory_fd)
                 try:
                     _remove_tree_contents(child_fd)
                 finally:
                     os.close(child_fd)
-                os.rmdir(entry.name, dir_fd=directory_fd)
+                artifact_fs.rmdir(entry.name, dir_fd=directory_fd)
             elif stat.S_ISREG(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
-                os.unlink(entry.name, dir_fd=directory_fd)
+                artifact_fs.unlink(entry.name, dir_fd=directory_fd)
             else:
                 raise ContextError("review run contains an unexpected special file")
 
@@ -496,23 +528,23 @@ def cleanup_review_run(repo_root: Path, artifact_root: Path, owner_token: str) -
 
     snapshot = run / "pr-review-snapshot.git"
     worktree = run / "pr-review-worktree"
-    if worktree.exists() or worktree.is_symlink():
-        if worktree.is_symlink() or not snapshot.is_dir() or snapshot.is_symlink():
+    if worktree.exists() or _is_link(worktree):
+        if _is_link(worktree) or not snapshot.is_dir() or _is_link(snapshot):
             raise ContextError("cannot prove ownership of the frozen worktree")
         run_text([
             "git", "--git-dir", str(snapshot), "worktree", "remove", str(worktree),
         ])
-        if worktree.exists() or worktree.is_symlink():
+        if worktree.exists() or _is_link(worktree):
             raise ContextError("frozen worktree cleanup did not complete")
 
-    parent_fd = os.open(expected_parent, os.O_RDONLY | DIRECTORY | NOFOLLOW)
+    parent_fd = artifact_fs.open(expected_parent, os.O_RDONLY | DIRECTORY | NOFOLLOW)
     try:
-        pinned_fd = os.open(run.name, os.O_RDONLY | DIRECTORY | NOFOLLOW, dir_fd=parent_fd)
+        pinned_fd = artifact_fs.open(run.name, os.O_RDONLY | DIRECTORY | NOFOLLOW, dir_fd=parent_fd)
         try:
             _remove_tree_contents(pinned_fd)
         finally:
             os.close(pinned_fd)
-        os.rmdir(run.name, dir_fd=parent_fd)
+        artifact_fs.rmdir(run.name, dir_fd=parent_fd)
     finally:
         os.close(parent_fd)
 
@@ -616,7 +648,7 @@ def run_to_leaf(
     try:
         before = _regular_stat_at(directory_fd, name)
         try:
-            leaf_fd = os.open(name, os.O_WRONLY | os.O_TRUNC | NOFOLLOW, dir_fd=directory_fd)
+            leaf_fd = artifact_fs.open(name, os.O_WRONLY | os.O_TRUNC | NOFOLLOW, dir_fd=directory_fd)
         except OSError as error:
             raise ContextError("cannot open temporary artifact without following links") from error
         try:
@@ -933,7 +965,7 @@ def git_snapshot(
     base_oid: str,
     head_oid: str,
 ) -> dict[str, str]:
-    if snapshot_dir.is_symlink():
+    if _is_link(snapshot_dir):
         raise ContextError("snapshot repository must not be a symlink")
     if snapshot_dir.exists():
         if not snapshot_dir.is_dir():
@@ -1568,7 +1600,7 @@ def materialize_review_artifacts(
     head_oid = context.get("head_oid")
     if not all(isinstance(value, str) and value for value in (base_ref, head_ref, head_oid)):
         raise ContextError("context is missing immutable Git refs for materialization")
-    if worktree.is_symlink() or worktree.exists():
+    if _is_link(worktree) or worktree.exists():
         raise ContextError("frozen worktree path already exists; remove it before retrying")
 
     configure_deadline(deadline_epoch)
@@ -1622,7 +1654,7 @@ def materialize_review_artifacts(
         if (
             cleanup_timeout is not None
             and worktree.exists()
-            and not worktree.is_symlink()
+            and not _is_link(worktree)
         ):
             try:
                 cleanup = subprocess.run(
@@ -1919,7 +1951,7 @@ def write_artifact_leaf(root: Path, name: str, content: bytes) -> None:
     temporary = f"tmp-{secrets.token_hex(8)}-{name}"
     _, directory_fd = _open_directory(root)
     try:
-        leaf_fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW, 0o644, dir_fd=directory_fd)
+        leaf_fd = artifact_fs.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW, 0o644, dir_fd=directory_fd)
         try:
             view = memoryview(content)
             while view:
@@ -1964,7 +1996,7 @@ def _codex_agent_set_status(agents_dir: Path) -> dict[str, Any]:
     invalid: list[str] = []
     for name in REVIEW_AGENT_NAMES:
         toml_path = agents_dir / f"{name}.toml"
-        if toml_path.is_symlink() or not toml_path.is_file():
+        if _is_link(toml_path) or not toml_path.is_file():
             missing.append(name)
             continue
         text = toml_path.read_text(encoding="utf-8", errors="replace")

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.26.1] - 2026-09-07
+
+### Fixed
+
+- Windows updates can atomically replace existing Claude managed instructions without an empty backup-path error.
+- PR reviews on Windows can prepare and manage verified artifacts using native directory handles.
+
 ## [3.26.0] - 2026-09-06
 
 ### Changed

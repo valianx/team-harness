@@ -46,6 +46,67 @@ def context(**overrides):
 
 
 class ReviewContextTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "nt", "Windows junction regression")
+    def test_windows_junctions_cannot_be_used_as_snapshot_or_cleanup_worktree(self):
+        with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as external:
+            repo = Path(directory)
+            outside = Path(external)
+            sentinel = outside / "keep.txt"
+            sentinel.write_bytes(b"outside")
+            owned = MODULE.create_review_run(repo, 34)
+            run = Path(owned["artifact_root"])
+            snapshot = run / "pr-review-snapshot.git"
+            worktree = run / "pr-review-worktree"
+            for junction, ordinary in ((worktree, snapshot), (snapshot, worktree)):
+                with self.subTest(junction=junction.name):
+                    ordinary.mkdir()
+                    subprocess.run(
+                        ["cmd", "/d", "/c", "mklink", "/J", str(junction), str(outside)],
+                        check=True, capture_output=True,
+                    )
+                    try:
+                        with patch.object(MODULE, "run_text") as git:
+                            with self.assertRaisesRegex(MODULE.ContextError, "ownership"):
+                                MODULE.cleanup_review_run(repo, run, owned["owner_token"])
+                            if junction == snapshot:
+                                with self.assertRaisesRegex(MODULE.ContextError, "symlink"):
+                                    MODULE.git_snapshot(repo, snapshot, "origin", 34, "base", "head")
+                            git.assert_not_called()
+                        self.assertEqual(sentinel.read_bytes(), b"outside")
+                    finally:
+                        os.rmdir(junction)
+                        ordinary.rmdir()
+            MODULE.cleanup_review_run(repo, run, owned["owner_token"])
+
+    def test_command_output_writes_and_promotes_a_pinned_artifact(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            name = MODULE._temporary_leaf(root, "command").name
+            result = MODULE.run_to_leaf(
+                root, name,
+                [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'diff\\x00\\r\\n')"],
+            )
+            self.assertEqual(result, 0)
+            MODULE.promote_artifact(root, name, "diff.bin")
+            self.assertEqual(MODULE.safe_read_leaf(root, "diff.bin"), b"diff\x00\r\n")
+            self.assertFalse((root / name).exists())
+
+    def test_directory_replacement_before_open_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            root = base / "artifacts"
+            root.mkdir()
+            original_open = MODULE.artifact_fs.open
+
+            def swap_then_open(path, flags, **kwargs):
+                root.rename(base / "original")
+                root.mkdir()
+                return original_open(path, flags, **kwargs)
+
+            with patch.object(MODULE.artifact_fs, "open", side_effect=swap_then_open):
+                with self.assertRaisesRegex(MODULE.ContextError, "directory changed"):
+                    MODULE._open_directory(root)
+
     def test_review_runs_are_isolated_and_cleanup_is_owner_bound(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
@@ -707,14 +768,14 @@ class ReviewContextTests(unittest.TestCase):
             temporary.write_text("safe", encoding="utf-8")
             outside = root / "outside"
             outside.write_text("secret", encoding="utf-8")
-            real_replace = MODULE.os.replace
+            real_replace = MODULE.artifact_fs.replace
 
             def swap_then_replace(source, destination, **kwargs):
                 temporary.unlink()
                 temporary.symlink_to(outside)
                 return real_replace(source, destination, **kwargs)
 
-            with patch.object(MODULE.os, "replace", side_effect=swap_then_replace):
+            with patch.object(MODULE.artifact_fs, "replace", side_effect=swap_then_replace):
                 MODULE.promote_artifact(root, "tmp-body", "review.md")
 
             self.assertEqual((root / "review.md").read_text(encoding="utf-8"), "safe")
@@ -725,7 +786,7 @@ class ReviewContextTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "tmp-body").write_text("safe", encoding="utf-8")
-            real_link = MODULE.os.link
+            real_link = MODULE.artifact_fs.link
 
             def portable_link(source, destination, **kwargs):
                 self.assertEqual(source, "tmp-body")
@@ -733,7 +794,7 @@ class ReviewContextTests(unittest.TestCase):
                 self.assertEqual(kwargs["src_dir_fd"], kwargs["dst_dir_fd"])
                 return real_link(source, destination, **kwargs)
 
-            with patch.object(MODULE.os, "link", side_effect=portable_link):
+            with patch.object(MODULE.artifact_fs, "link", side_effect=portable_link):
                 MODULE.promote_artifact(root, "tmp-body", "review.md")
 
             self.assertEqual((root / "review.md").read_text(encoding="utf-8"), "safe")
