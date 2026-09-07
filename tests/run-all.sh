@@ -205,7 +205,7 @@ echo
 echo "############################################################"
 echo "# Suite 3h: Codex update single-pass convergence"
 echo "############################################################"
-if [ -n "$PY" ] && $PY "$TESTS_DIR/test_codex_update_convergence.py"; then
+if [ -n "$PY" ] && $PY "$TESTS_DIR/test_codex_update_convergence.py" && $PY "$TESTS_DIR/test_codex_binary_resolution.py"; then
     echo "codex-update-convergence: PASS"
 elif [ -z "$PY" ]; then
     echo "codex-update-convergence: FAIL (Python 3 not found)"
