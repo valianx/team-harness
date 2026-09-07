@@ -11,12 +11,18 @@ do not distinguish activation from disk state or preserve session continuity.
 - Use only exposed controls of the active backend for supported refreshes.
 - Verify each component independently and preserve the existing conversation on reconnect.
 - Run activation after successful update, keeping its result separate from installation verification.
+- Reconcile local-review readiness with verified profile activation rather than a new conversation requirement.
+- Repair the Windows OpenSpec launcher used to bind review criteria.
 
 ## Capabilities
 
 ### New Capabilities
 
 - `runtime-reload`: capability-aware activation of an installed Team Harness version.
+
+### Modified Capabilities
+
+- `codex-runtime-parity`: portable review prerequisites and reviewer activation.
 
 ## Non-Goals
 

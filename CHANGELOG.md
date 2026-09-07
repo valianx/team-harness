@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Successful Codex and OpenCode updates now follow installation verification with the reload workflow, so an on-disk update no longer implies that running hooks or agents changed.
 
+### Fixed
+
+- Local Codex reviews use verified activation of the selected reviewer profile instead of requiring a new conversation after every setup or agent sync.
+- Inline review packages invoke the pinned OpenSpec CLI through Node on Windows instead of attempting to execute the npx batch shim directly.
+
 ## [3.28.1] - 2026-09-07
 
 ### Fixed

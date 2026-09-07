@@ -35,6 +35,12 @@ Native hook trust remains a separate condition. Report a changed hook requiring
 trust through the host's native hooks UI; do not trust hashes on the operator's
 behalf or describe an untrusted/skipped hook as active.
 
+For local inline reviews, activation is specific to the selected reviewer
+profile and scope. Preserve its verified activation basis when setup made no
+change to that definition; installing another agent does not invalidate it.
+If it changed, verify its activation through this backend or reconnect and
+resume this thread. A new conversation ID is not an acceptance criterion.
+
 Sources checked 2026-09-07:
 
 - [Codex App Server](https://learn.chatgpt.com/docs/app-server): skill cache refresh,

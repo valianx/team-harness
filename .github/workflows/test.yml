@@ -24,6 +24,7 @@ jobs:
           python-version: '3.13'
       - name: Hook commands in PowerShell 7 and Windows PowerShell
         run: node tests/test_codex_windows_hooks.mjs
+      - run: node tests/test_openspec_launcher.mjs
       - run: node tests/test_th_update_windows.mjs
       - run: python tests/test_windows_artifact_fs.py
       - run: python tests/test_review_context_windows.py
