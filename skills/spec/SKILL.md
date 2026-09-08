@@ -63,6 +63,10 @@ new effect.
    second gate.
 4. **Implement.** Work inline on a feature branch, checking off each `tasks.md` item as it lands,
    monotonically. Refresh the plan's progress from those tasks; create no state file or event trace.
+   Apply `docs/testing.md § Selected test evidence`: required omitted tests leave their scenario
+   unverified even after exit zero; unrelated optional skips do not erase sufficient evidence.
+   For a bug fix, optionally use [before/after evidence](references/author-review.md#optional-fix-evidence)
+   when it adds useful proof without a new runner or mandatory review.
 5. **Classify and validate.** Before publication, build the anchored package for the committed
    branch with `skills/verify/scripts/review-fan.mjs`; this deterministic step always classifies
    the completed changed surface and binds the validated requirements as `written-intent`

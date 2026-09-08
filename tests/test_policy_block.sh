@@ -54,8 +54,60 @@ assert_deny "home shorthand" \
     '{"tool_name":"Bash","tool_input":{"command":"rm -r -f ~"}}'
 assert_deny "bare wildcard" \
     '{"tool_name":"Bash","tool_input":{"command":"rm -Rf *"}}'
+assert_deny "single-quoted glob before recursive-force flags" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm '\''*'\'' -rf /"}}'
+assert_deny "double-quoted argument before recursive-force flags" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm \"x\" -rf /"}}'
+assert_deny "interposed argument before HOME destination" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm \"x\" -rf $HOME"}}'
+assert_deny "interposed argument before braced HOME destination" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm \"x\" -fr ${HOME}"}}'
+assert_deny "quoted glob before reverse recursive-force flags" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm '\''*.log'\'' -fr ~"}}'
+assert_deny "unquoted interposed glob before recursive-force flags" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm *.log -fr /"}}'
+assert_deny "bare wildcard destination after interposed argument" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm \"x\" -rf *"}}'
+assert_deny "plain interposed argument before recursive-force flags" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x -rf /"}}'
+assert_deny "plain interposed argument before reverse recursive-force flags" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x -fr /"}}'
+assert_deny "plain interposed argument before bare wildcard destination" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x -rf *"}}'
+assert_deny "plain interposed argument before flags and option terminator" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x -rf -- /"}}'
 assert_none "scoped temporary directory" \
     '{"tool_name":"Bash","tool_input":{"command":"rm -rf /tmp/team-harness-fixture"}}'
+assert_none "interposed glob with benign relative target" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm '\''*'\'' -rf relative-fixture"}}'
+assert_none "plain interposed argument with benign relative target" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x -rf relative-fixture"}}'
+assert_none "option terminator keeps later flag text as an operand" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm -- x -rf /"}}'
+assert_none "option terminator itself is not an interposed operand" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm -- -rf /"}}'
+assert_none "quoted option terminator itself is not an interposed operand" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm \"--\" -rf /"}}'
+assert_none "semicolon separates harmless echo arguments" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x;echo -rf /"}}'
+assert_none "logical operator separates harmless echo arguments" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x&&echo -rf /"}}'
+assert_none "pipeline separates harmless echo arguments" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x|echo -rf /"}}'
+assert_none "comment text is not an interposed operand" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm #comment -rf /"}}'
+assert_none "escaped space keeps flag text inside a filename" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x\\ -rf /"}}'
+assert_none "escaped space keeps reverse flag text inside a filename" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x\\ -fr /"}}'
+assert_none "newline separates a later flag-looking command" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x\n-rf /"}}'
+assert_none "CRLF separates a later reverse flag-looking command" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x\r\n-fr /"}}'
+assert_deny "tabs preserve plain-operand argument boundaries" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm\tx\t-fr\t/"}}'
+assert_none "interposed word without recursive-force flag" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm '\''x'\'' rufus /"}}'
 assert_none "destructive text used as data" \
     '{"tool_name":"Bash","tool_input":{"command":"echo \"rm -rf /\" >> audit.log"}}'
 

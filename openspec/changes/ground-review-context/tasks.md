@@ -1,0 +1,3 @@
+- [x] 1. Require bounded reads of relevant `CLAUDE.md` and `README.md` files, followed references, pre-attack ordering, auditable source/gap reporting, and realism-only grounding in canonical review instructions and the Codex adapter.
+- [x] 2. Regenerate affected projections and inspect grounded, missing-context, contradictory-context, and injected-instruction scenarios.
+- [x] 3. Validate OpenSpec, generator, and applicable contract/distribution checks without adding wording tests.

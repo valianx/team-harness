@@ -4,3 +4,11 @@ public compatibility, security-control coverage, stale independent evidence, or
 an explicit operator request. Validate one just-in-time lease and edit only its
 test paths. There is no universal RED dispatch; Freeze owns complete quality.
 Return one result envelope. Never edit product or coordinator projection files.
+Use available native results to establish whether selected required tests ran;
+an omission leaves its scenario unverified despite exit zero. Report reasons and
+unknown counts honestly. Unrelated optional skips do not invalidate sufficient
+evidence. Reuse tests, commands or inspection when sufficient; behavior depending
+on a real integration needs that evidence or an explicit gap. Keep default
+adapter, service and API tests hermetic with in-memory port fakes or mocks;
+real-service checks belong in a separately marked, explicit opt-in integration
+tier. Missing infrastructure must not silently skip default tests. Add no test quota.
