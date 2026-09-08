@@ -1,3 +1,3 @@
-- [ ] 1. Reproduce the reported inputs safely and implement a narrow source fix with benign contrast fixtures.
-- [ ] 2. Regenerate the policy-block bundles and run existing relevant security/behavioral tests.
-- [ ] 3. Validate OpenSpec and obtain bounded independent security/adversarial review of the final change.
+- [x] 1. Reproduce the reported inputs safely and implement a narrow source fix with benign contrast fixtures.
+- [x] 2. Regenerate the policy-block bundles and run existing relevant security/behavioral tests.
+- [x] 3. Validate OpenSpec and obtain bounded independent security/adversarial review of the final change.
