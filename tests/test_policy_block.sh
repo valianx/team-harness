@@ -96,6 +96,16 @@ assert_none "pipeline separates harmless echo arguments" \
     '{"tool_name":"Bash","tool_input":{"command":"rm x|echo -rf /"}}'
 assert_none "comment text is not an interposed operand" \
     '{"tool_name":"Bash","tool_input":{"command":"rm #comment -rf /"}}'
+assert_none "escaped space keeps flag text inside a filename" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x\\ -rf /"}}'
+assert_none "escaped space keeps reverse flag text inside a filename" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x\\ -fr /"}}'
+assert_none "newline separates a later flag-looking command" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x\n-rf /"}}'
+assert_none "CRLF separates a later reverse flag-looking command" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x\r\n-fr /"}}'
+assert_deny "tabs preserve plain-operand argument boundaries" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm\tx\t-fr\t/"}}'
 assert_none "interposed word without recursive-force flag" \
     '{"tool_name":"Bash","tool_input":{"command":"rm '\''x'\'' rufus /"}}'
 assert_none "destructive text used as data" \
