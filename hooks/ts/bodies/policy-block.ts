@@ -64,10 +64,10 @@ const CATASTROPHIC_DELETE_PATTERNS: ReadonlyArray<RegExp> = [
   /^\s*rm\s+\S*[fF]\S*[rR]\S*\s+(?:--\s+)?(?:\/|~|\$\{?HOME\}?)(?:\s|$)/i,
   /^\s*rm\s+-r\b.*\s+-f\b.*\s+(?:--\s+)?(?:\/|~|\$\{?HOME\}?)(?:\s|$)/i,
   /^\s*rm\s+\S*[rR]\S*[fF]\S*\s+(?:--\s+)?\*(?:\s|$)/i,
-  // Match one simple quoted/glob argument before exact combined recursive-force
-  // flags; this remains a bounded pattern, not shell tokenization.
-  /^\s*rm\s+(?:'[^'\r\n]*'|"[^"\r\n]*"|[^\s'"]*\*[^\s'"]*)\s+-[rR][fF]\s+(?:--\s+)?(?:\/|~|\$\{?HOME\}?|\*)(?:\s|$)/i,
-  /^\s*rm\s+(?:'[^'\r\n]*'|"[^"\r\n]*"|[^\s'"]*\*[^\s'"]*)\s+-[fF][rR]\s+(?:--\s+)?(?:\/|~|\$\{?HOME\}?|\*)(?:\s|$)/i,
+  // Match one simple argument before exact recursive-force flags, excluding
+  // the option terminator. This is a bounded pattern, not shell tokenization.
+  /^\s*rm\s+(?:'(?!--')[^'\r\n]*'|"(?!--")[^"\r\n]*"|[^\s'"]*\*[^\s'"]*|(?!--(?:\s|$)|#)[^\s'";|&]+)\s+-[rR][fF]\s+(?:--\s+)?(?:\/|~|\$\{?HOME\}?|\*)(?:\s|$)/i,
+  /^\s*rm\s+(?:'(?!--')[^'\r\n]*'|"(?!--")[^"\r\n]*"|[^\s'"]*\*[^\s'"]*|(?!--(?:\s|$)|#)[^\s'";|&]+)\s+-[fF][rR]\s+(?:--\s+)?(?:\/|~|\$\{?HOME\}?|\*)(?:\s|$)/i,
 ];
 
 // Scan Bash only when the command visibly transports or persists inline

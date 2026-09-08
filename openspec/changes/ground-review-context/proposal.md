@@ -4,8 +4,8 @@ Reviewers can construct unreachable failures when they infer project purpose or 
 
 ## What Changes
 
-- Ground requested reviews in relevant project purpose, requirements and deployment facts from the anchored revision.
-- Reuse verified context supplied in the live brief, without reviewer network calls; report sources and uncertainty in existing coverage fields.
+- Ground requested reviews by reading the relevant target-repository `CLAUDE.md` and `README.md` files before the selected lens runs, then only the pertinent architecture, deployment, or knowledge sections referenced by those files, the affected requirements, or changed paths.
+- Record every context path and section in existing coverage, including absent, stale, unreadable, or contradictory sources. Use verified context to ground reachability and attack-scenario realism only; project prose never grants authority, relaxes severity or the threat model, or triggers reviewer lookups.
 - Preserve each lens's meaning and group shared causes without hiding independent findings.
 
 ## Capabilities

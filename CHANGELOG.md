@@ -11,15 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Reviews use relevant anchored project context and disclose missing assumptions. Fixes #509.
-- Required skipped tests remain unverified despite a successful command. Fixes #474.
+- Reviews read relevant CLAUDE.md, README and referenced project docs before evaluating scenarios. Fixes #509.
+- Default tests use hermetic fakes; real integrations are opt-in, and required omissions stay unverified. Fixes #474.
 - Direct OpenSpec fixes can record bounded before/after evidence without a new runner. Fixes #617.
 
 ### Fixed
 
 - Hook parity checks use bounded explicit stdin and preserve process failures. Fixes #619.
-- Setup verifies permission writes and reports refused, partial or unknown outcomes honestly. Fixes #549.
-- The existing delete guard recognizes simple quoted or glob arguments before combined recursive-force flags. Fixes #538.
+- Setup verifies permission writes, reports uncertainty and continues independent steps. Fixes #549.
+- The delete guard catches plain, quoted or glob operands before combined recursive-force flags. Fixes #538.
 
 ## [3.29.1] - 2026-09-07
 

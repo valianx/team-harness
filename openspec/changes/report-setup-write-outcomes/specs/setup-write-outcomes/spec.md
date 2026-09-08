@@ -13,4 +13,4 @@ Setup SHALL distinguish operator decline from a refused or failed approved confi
 
 #### Scenario: A later step fails after partial progress
 - **WHEN** some configuration operation may have succeeded but final verification is unavailable or fails
-- **THEN** setup reports the known partial or unknown result and does not claim that nothing changed or that all rules were provisioned
+- **THEN** setup reports the known partial or unknown result, continues independent steps without retrying the write, and does not claim that nothing changed or that all rules were provisioned

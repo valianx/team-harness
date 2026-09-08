@@ -44,10 +44,13 @@ scenario unverified even when the command exits zero. If the output cannot prove
 execution, state that limit. An unrelated optional skip does not invalidate
 otherwise sufficient evidence; distinguish it from the selected required checks.
 
-Reuse sufficient existing tests, commands, or inspection. Prefer isolated tests
-when they demonstrate the behavior; database transactions and other behavior
-depending on real integration need relevant integration evidence or an explicit
-gap. This rule adds no test quota, universal full-suite run, or specialist dispatch.
+Reuse sufficient existing tests, commands, or inspection. Keep default adapter,
+service and API tests hermetic with in-memory port fakes or mocks; real services
+belong in a separately marked, explicit opt-in integration tier. Missing Docker,
+databases or caches must not silently skip the default suite. Database transactions
+and other behavior depending on real integration still need relevant integration
+evidence or an explicit gap; mocks do not prove those boundaries. This rule adds
+no test quota, universal full-suite run, or specialist dispatch.
 
 ## What is tested
 

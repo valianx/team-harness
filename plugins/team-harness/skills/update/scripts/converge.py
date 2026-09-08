@@ -44,7 +44,7 @@ HOOK_DIGESTS = {
     "hooks/hooks.json": "9ae7d0ec178d1d8dbb4ce9a8bd914f802412eeb934930873658dd54aafa917a5",
     "hooks/dist/codex-launcher.cjs": "ff444bd8ae65a96f62113888b31248f4778b9116823e1af1a5a7212c572fca64",
     "hooks/run-codex-hook.sh": "6e13c288ceed9feba3493d1eb886237971b96818d3819b0279917bc71496ac5b",
-    "hooks/dist/policy-block.cjs": "afcef73dd493c1d04ac51594d02c4a6fed78c7e7b2701de71a162eac83210dea",
+    "hooks/dist/policy-block.cjs": "8dec4b44ff34b617f6146f16364b99d8ddb2ca8ca6b0d090d52868a173727529",
     "hooks/dist/gcp-guard.cjs": "1016604dbb885fa5dd58410c33a068f0c1979a3b2bc7a6b7da54b9c7268c8acc",
     "hooks/dist/gate-guard.cjs": "405d76c700ec7f225fd7935d16946fea16064a76b7b06b0951b33ab81006aa52",
 }

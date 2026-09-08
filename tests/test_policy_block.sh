@@ -68,12 +68,34 @@ assert_deny "unquoted interposed glob before recursive-force flags" \
     '{"tool_name":"Bash","tool_input":{"command":"rm *.log -fr /"}}'
 assert_deny "bare wildcard destination after interposed argument" \
     '{"tool_name":"Bash","tool_input":{"command":"rm \"x\" -rf *"}}'
+assert_deny "plain interposed argument before recursive-force flags" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x -rf /"}}'
+assert_deny "plain interposed argument before reverse recursive-force flags" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x -fr /"}}'
+assert_deny "plain interposed argument before bare wildcard destination" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x -rf *"}}'
+assert_deny "plain interposed argument before flags and option terminator" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x -rf -- /"}}'
 assert_none "scoped temporary directory" \
     '{"tool_name":"Bash","tool_input":{"command":"rm -rf /tmp/team-harness-fixture"}}'
 assert_none "interposed glob with benign relative target" \
     '{"tool_name":"Bash","tool_input":{"command":"rm '\''*'\'' -rf relative-fixture"}}'
-assert_none "unquoted interposed argument stays outside narrow fix" \
-    '{"tool_name":"Bash","tool_input":{"command":"rm x -rf /"}}'
+assert_none "plain interposed argument with benign relative target" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x -rf relative-fixture"}}'
+assert_none "option terminator keeps later flag text as an operand" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm -- x -rf /"}}'
+assert_none "option terminator itself is not an interposed operand" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm -- -rf /"}}'
+assert_none "quoted option terminator itself is not an interposed operand" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm \"--\" -rf /"}}'
+assert_none "semicolon separates harmless echo arguments" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x;echo -rf /"}}'
+assert_none "logical operator separates harmless echo arguments" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x&&echo -rf /"}}'
+assert_none "pipeline separates harmless echo arguments" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x|echo -rf /"}}'
+assert_none "comment text is not an interposed operand" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm #comment -rf /"}}'
 assert_none "interposed word without recursive-force flag" \
     '{"tool_name":"Bash","tool_input":{"command":"rm '\''x'\'' rufus /"}}'
 assert_none "destructive text used as data" \

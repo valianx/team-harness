@@ -1,6 +1,6 @@
 "use strict";
 
-// shim/normalized-v1.ts
+// hooks/ts/shim/normalized-v1.ts
 var MAX_PAYLOAD_BYTES = 1048576;
 var MAX_NESTING_DEPTH = 64;
 var VALID_EVENTS = /* @__PURE__ */ new Set([
@@ -13,7 +13,7 @@ var VALID_EVENTS = /* @__PURE__ */ new Set([
   "Task"
 ]);
 
-// shim/shim.ts
+// hooks/ts/shim/shim.ts
 var ShimRejectError = class extends Error {
   constructor(message) {
     super(message);
@@ -154,7 +154,7 @@ function outboundCC(d) {
   process.exit(0);
 }
 
-// bodies/policy-block.ts
+// hooks/ts/bodies/policy-block.ts
 function deny(reason) {
   return {
     decision: "deny",
@@ -194,10 +194,10 @@ var CATASTROPHIC_DELETE_PATTERNS = [
   /^\s*rm\s+\S*[fF]\S*[rR]\S*\s+(?:--\s+)?(?:\/|~|\$\{?HOME\}?)(?:\s|$)/i,
   /^\s*rm\s+-r\b.*\s+-f\b.*\s+(?:--\s+)?(?:\/|~|\$\{?HOME\}?)(?:\s|$)/i,
   /^\s*rm\s+\S*[rR]\S*[fF]\S*\s+(?:--\s+)?\*(?:\s|$)/i,
-  // Match one simple quoted/glob argument before exact combined recursive-force
-  // flags; this remains a bounded pattern, not shell tokenization.
-  /^\s*rm\s+(?:'[^'\r\n]*'|"[^"\r\n]*"|[^\s'"]*\*[^\s'"]*)\s+-[rR][fF]\s+(?:--\s+)?(?:\/|~|\$\{?HOME\}?|\*)(?:\s|$)/i,
-  /^\s*rm\s+(?:'[^'\r\n]*'|"[^"\r\n]*"|[^\s'"]*\*[^\s'"]*)\s+-[fF][rR]\s+(?:--\s+)?(?:\/|~|\$\{?HOME\}?|\*)(?:\s|$)/i
+  // Match one simple argument before exact recursive-force flags, excluding
+  // the option terminator. This is a bounded pattern, not shell tokenization.
+  /^\s*rm\s+(?:'(?!--')[^'\r\n]*'|"(?!--")[^"\r\n]*"|[^\s'"]*\*[^\s'"]*|(?!--(?:\s|$)|#)[^\s'";|&]+)\s+-[rR][fF]\s+(?:--\s+)?(?:\/|~|\$\{?HOME\}?|\*)(?:\s|$)/i,
+  /^\s*rm\s+(?:'(?!--')[^'\r\n]*'|"(?!--")[^"\r\n]*"|[^\s'"]*\*[^\s'"]*|(?!--(?:\s|$)|#)[^\s'";|&]+)\s+-[fF][rR]\s+(?:--\s+)?(?:\/|~|\$\{?HOME\}?|\*)(?:\s|$)/i
 ];
 function bashCarriesInlineContent(command) {
   const curlData = /\bcurl\b.*(?:--data(?:-[a-z]+)?\b|\s-d\b|--json\b|\s-F\b|--form\b)/i.test(command);
@@ -231,7 +231,7 @@ function evaluate(input) {
   return none();
 }
 
-// entry/policy-block.cc.ts
+// hooks/ts/entry/policy-block.cc.ts
 var PARSE_FAILURE_MESSAGES = [
   "SEC-07: payload is not valid JSON",
   "SEC-07: payload must be a JSON object"

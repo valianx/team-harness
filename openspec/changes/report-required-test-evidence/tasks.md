@@ -1,3 +1,3 @@
 - [x] 1. Add the bounded evidence rule to existing guidance and its direct author/reviewer entry points.
-- [x] 2. Inspect required-skip, optional-skip and unknown-output scenarios; preserve existing evidence types.
-- [x] 3. Sync projections and validate the change and applicable checks.
+- [ ] 2. Inspect hermetic-default, required-skip, optional-skip and unknown-output scenarios; preserve existing evidence types.
+- [ ] 3. Sync projections and validate the change and applicable checks.

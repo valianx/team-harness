@@ -16,7 +16,11 @@ Main and test authors SHALL use available native results to identify execution, 
 - **THEN** the summary states the missing evidence without inventing counts or execution
 
 ### Requirement: Evidence remains proportional to the changed behavior
-Authors SHALL reuse existing tests and sufficient command or inspection evidence. They SHALL prefer isolated tests when sufficient and retain real integration evidence for behavior that depends on that boundary. This rule SHALL create no universal per-scenario registry, parser, full-suite obligation or specialist dispatch.
+Authors SHALL reuse existing tests and sufficient command or inspection evidence. The default adapter, service and API suite SHALL be hermetic, using in-memory port fakes or mocks. Real-service checks SHALL be separately marked and explicitly opt-in, while behavior depending on a real integration SHALL retain that evidence or an explicit acceptance gap. This rule SHALL create no universal per-scenario registry, parser, full-suite obligation or specialist dispatch.
+
+#### Scenario: Default tests run without external infrastructure
+- **WHEN** Docker, databases or caches are unavailable
+- **THEN** default adapter, service and API tests execute with in-memory port fakes or mocks rather than skipping for missing infrastructure; real-service checks run only through the separately selected integration tier
 
 #### Scenario: A database behavior needs a real integration check
 - **WHEN** a changed transaction or database behavior cannot be demonstrated by the existing isolated tests

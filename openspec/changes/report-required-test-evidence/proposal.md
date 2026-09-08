@@ -7,6 +7,7 @@ A successful test process can omit the very test needed to demonstrate a change.
 - Report execution and omission of tests selected by the change's requirements or live request, using available native runner evidence.
 - Preserve command or inspection evidence when sufficient, and retain real integrations when the behavior needs them.
 - Keep unavailable counts unknown and distinguish relevant omissions from unrelated optional skips.
+- Keep default adapter, service and API tests hermetic; mark real-service checks as an explicit opt-in tier.
 
 ## Capabilities
 
