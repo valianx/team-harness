@@ -1,6 +1,6 @@
 "use strict";
 
-// hooks/ts/shim/normalized-v1.ts
+// shim/normalized-v1.ts
 var MAX_PAYLOAD_BYTES = 1048576;
 var MAX_NESTING_DEPTH = 64;
 var VALID_EVENTS = /* @__PURE__ */ new Set([
@@ -13,7 +13,7 @@ var VALID_EVENTS = /* @__PURE__ */ new Set([
   "Task"
 ]);
 
-// hooks/ts/shim/shim.ts
+// shim/shim.ts
 var ShimRejectError = class extends Error {
   constructor(message) {
     super(message);
@@ -154,7 +154,7 @@ function outboundCC(d) {
   process.exit(0);
 }
 
-// hooks/ts/bodies/policy-block.ts
+// bodies/policy-block.ts
 function deny(reason) {
   return {
     decision: "deny",
@@ -231,7 +231,7 @@ function evaluate(input) {
   return none();
 }
 
-// hooks/ts/entry/policy-block.cc.ts
+// entry/policy-block.cc.ts
 var PARSE_FAILURE_MESSAGES = [
   "SEC-07: payload is not valid JSON",
   "SEC-07: payload must be a JSON object"
