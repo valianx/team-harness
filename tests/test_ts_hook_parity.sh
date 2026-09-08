@@ -561,23 +561,18 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Section 6 — Non-mutation proof (AC-14, SEC-DR-F)
-# Simulates the opencode callback pattern. The output.args object must be
-# byte-identical before and after the gate runs. Uses the opencode TS module
-# directly via Bun (or Node if Bun absent, as a fallback structural proof).
+# Section 6 — Entry output contract check (AC-14, SEC-DR-F)
+# Runs the CC entry with explicit payloads and checks decision/absence plus
+# that the command value does not appear in its output.
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Section 6: Non-mutation proof (AC-14) ---"
 
-# We test this using an inline Node script that imports the opencode entry module
-# equivalents, exercises the shim, and checks output.args byte-identity.
+# We test this with an inline Node script that drives the CC entry through its
+# stdin/stdout contract with explicit input and a bounded child process.
 NON_MUTATION_SCRIPT=$(cat <<'JSEOF'
-// Inline non-mutation test (CJS): exercises the built dev-guard.cjs bundle
-// by feeding it payloads and verifying output.args byte-identity (AC-14).
-// Uses child_process to drive the entry and inspect the output object.
-//
-// Also validates the structural non-mutation invariant by building a test-
-// version of the opencode adapter inline (CJS-compatible, no ESM imports).
+// Inline entry output test (CJS): exercises the built dev-guard.cjs bundle
+// with explicit payloads and checks decision/absence plus command-value output.
 
 'use strict';
 
@@ -596,14 +591,28 @@ let failed = 0;
 // ---------------------------------------------------------------------------
 function runGate(payload) {
   try {
-    return execFileSync(process.execPath, [TS_CJS], {
-      input: JSON.stringify(payload),
-      encoding: 'utf8',
-      timeout: 5000,
-    });
-  } catch (err) {
-    return err.stdout || '';
+    return {
+      output: execFileSync(process.execPath, [TS_CJS], {
+        input: JSON.stringify(payload),
+        encoding: 'utf8',
+        timeout: 5000,
+      }),
+      error: null,
+    };
+  } catch (error) {
+    return {
+      output: error.stdout || '',
+      error,
+    };
   }
+}
+
+function formatGateError(error) {
+  const timedOut = error && (error.code === 'ETIMEDOUT' || error.killed === true);
+  if (timedOut) return 'timed out after 5000ms';
+  if (error && error.signal) return `terminated by ${error.signal}`;
+  if (error && error.status !== undefined) return `exited with status ${error.status}`;
+  return 'failed to execute';
 }
 
 function testNonMutationViaEntry(label, payload, expectDecision) {
@@ -613,7 +622,14 @@ function testNonMutationViaEntry(label, payload, expectDecision) {
   // In NEITHER case should the raw command value appear in the decision JSON
   // (the reason names the action class, not the arg value).
   const rawCmd = payload.tool_input && payload.tool_input.command ? payload.tool_input.command : '';
-  const out = runGate(payload);
+  const result = runGate(payload);
+  if (result.error) {
+    console.error(`FAIL: ${label} — gate ${formatGateError(result.error)}`);
+    failed++;
+    return;
+  }
+
+  const out = result.output;
   const hasDecision = out.includes('"permissionDecision"');
   const leaksCmd = rawCmd && out.includes(rawCmd);
 
@@ -638,68 +654,16 @@ function testNonMutationViaEntry(label, payload, expectDecision) {
   console.log(`PASS: ${label} — output correct, command value not leaked`);
 }
 
-// ---------------------------------------------------------------------------
-// Approach 2: Inline simulation of inboundOpencode + evaluate logic using
-// the pure JS functions exported from the bundle (CJS require).
-// Verifies the output.args object is byte-identical before/after the shim call.
-// ---------------------------------------------------------------------------
-let shimModule;
-try {
-  shimModule = require(TS_CJS);
-} catch (e) {
-  // The bundle is a self-contained entry (not a library exporting shim fns).
-  // Fall back to the structural argument: the bundle only writes to stdout and
-  // exits — it has no mechanism to write back to any args object passed by the caller.
-  shimModule = null;
-}
-
-if (shimModule && typeof shimModule.inboundOpencode === 'function') {
-  // If the shim exports are accessible (unlikely for an entry bundle, but test if available).
-  function testNonMutation(label, toolName, args, expectThrow) {
-    const input = { tool: toolName, args: { ...args } };
-    const output = { args: { ...args } };
-    const argsBefore = JSON.stringify(output.args);
-    try {
-      const norm = shimModule.inboundOpencode(input, output);
-      const dec = shimModule.evaluate ? shimModule.evaluate(norm) : { decision: 'none', reason: '', mutations: null };
-      shimModule.outboundOpencode(dec);
-      const argsAfter = JSON.stringify(output.args);
-      if (argsBefore !== argsAfter) {
-        console.error(`FAIL: ${label} — mutation detected (before=${argsBefore} after=${argsAfter})`);
-        failed++;
-      } else {
-        console.log(`PASS: ${label} — args byte-identical`);
-      }
-    } catch (err) {
-      const argsAfter = JSON.stringify(output.args);
-      if (argsBefore !== argsAfter) {
-        console.error(`FAIL: ${label} — mutation on throw path`);
-        failed++;
-      } else {
-        console.log(`PASS: ${label} — args byte-identical (throw path)`);
-      }
-    }
-  }
-  testNonMutation('covered: git push', 'Bash', { command: 'git push origin main' }, true);
-  testNonMutation('non-covered: git status', 'Bash', { command: 'git status' }, false);
-  testNonMutation('ClickUp no-command', 'mcp__server__clickup_update_task', { taskId: 'abc' }, true);
-} else {
-  // Entry bundle is not a library — verify structurally via CC entry:
-  // The entry reads stdin and writes to stdout only. It has no reference to any
-  // external `output` object. The structural invariant holds by architecture:
-  // the entry calls shim.inboundCC → evaluate → shim.outboundCC and exits.
-  // There is no path from entry to any caller-provided `output` object.
-  console.log('PASS: structural non-mutation — entry bundle has no output.args write path (architecture invariant)');
-  console.log('PASS: verifying via CC entry drive test...');
-  testNonMutationViaEntry('covered: git push (arg-not-in-output)', {
-    tool_name: 'Bash',
-    tool_input: { command: 'git push origin __SENTINEL_VALUE_12345__' }
-  }, true /* expectDecision */);
-  testNonMutationViaEntry('non-covered: git status (arg-not-in-output)', {
-    tool_name: 'Bash',
-    tool_input: { command: 'git status __SENTINEL_67890__' }
-  }, false /* expectDecision */);
-}
+// Use the bounded child process because this entry drains stdin to EOF; direct
+// loading would inherit the caller's open stdin.
+testNonMutationViaEntry('covered: git push (arg-not-in-output)', {
+  tool_name: 'Bash',
+  tool_input: { command: 'git push origin __SENTINEL_VALUE_12345__' }
+}, true /* expectDecision */);
+testNonMutationViaEntry('non-covered: git status (arg-not-in-output)', {
+  tool_name: 'Bash',
+  tool_input: { command: 'git status __SENTINEL_67890__' }
+}, false /* expectDecision */);
 
 if (failed > 0) {
   console.error('\nNon-mutation test FAILED: ' + failed + ' failures');
@@ -715,7 +679,7 @@ MUTATION_SCRIPT_FILE=$(mktemp --suffix=".cjs" 2>/dev/null || mktemp)
 printf '%s\n' "$NON_MUTATION_SCRIPT" > "$MUTATION_SCRIPT_FILE"
 
 # Run with REPO_ROOT injected so the CJS script can locate the bundle.
-MUTATION_OUT=$(REPO_ROOT="$REPO_ROOT" node "$MUTATION_SCRIPT_FILE" 2>&1 || true)
+MUTATION_OUT=$(REPO_ROOT="$REPO_ROOT" node "$MUTATION_SCRIPT_FILE" 2>&1)
 MUTATION_EXIT=$?
 
 rm -f "$MUTATION_SCRIPT_FILE"
@@ -724,7 +688,7 @@ rm -f "$MUTATION_SCRIPT_FILE"
 MUTATION_PASS=$(echo "$MUTATION_OUT" | grep -c "^PASS:" || true)
 MUTATION_FAIL=$(echo "$MUTATION_OUT" | grep -c "^FAIL:" || true)
 
-if [ "${MUTATION_FAIL:-0}" -eq 0 ] && [ "${MUTATION_PASS:-0}" -gt 0 ]; then
+if [ "$MUTATION_EXIT" -eq 0 ] && [ "${MUTATION_FAIL:-0}" -eq 0 ] && [ "${MUTATION_PASS:-0}" -gt 0 ]; then
     PASS=$((PASS + 1))
     echo "  [PASS] AC-14: non-mutation proof (${MUTATION_PASS} checks passed)"
     if [ "$VERBOSE" -eq 1 ]; then

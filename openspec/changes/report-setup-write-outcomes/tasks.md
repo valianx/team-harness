@@ -1,0 +1,3 @@
+- [ ] 1. Define verified, refused/failed and partial/unknown reporting at the active setup/provisioning sites.
+- [ ] 2. Inspect decline, refusal and partial-failure scenarios without changing permission policy.
+- [ ] 3. Sync packaged skills and run applicable setup/distribution validation.

@@ -254,7 +254,7 @@ Review the diff, not the whole repository:
 - changed code preserves existing security, error, resource, and compatibility behavior;
 - comments satisfy § Comments;
 - deliberate reviewability exceptions are recorded; and
-- the targeted check was actually run and its result is reported honestly.
+- the targeted check actually ran and its result follows `docs/testing.md § Selected test evidence`: required omissions leave the scenario unverified; unknown counts stay unknown.
 
 Fix an in-scope defect found in this pass. Do not start a new repository exploration.
 

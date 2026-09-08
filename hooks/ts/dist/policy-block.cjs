@@ -193,7 +193,11 @@ var CATASTROPHIC_DELETE_PATTERNS = [
   /^\s*rm\s+\S*[rR]\S*[fF]\S*\s+(?:--\s+)?(?:\/|~|\$\{?HOME\}?)(?:\s|$)/i,
   /^\s*rm\s+\S*[fF]\S*[rR]\S*\s+(?:--\s+)?(?:\/|~|\$\{?HOME\}?)(?:\s|$)/i,
   /^\s*rm\s+-r\b.*\s+-f\b.*\s+(?:--\s+)?(?:\/|~|\$\{?HOME\}?)(?:\s|$)/i,
-  /^\s*rm\s+\S*[rR]\S*[fF]\S*\s+(?:--\s+)?\*(?:\s|$)/i
+  /^\s*rm\s+\S*[rR]\S*[fF]\S*\s+(?:--\s+)?\*(?:\s|$)/i,
+  // Match one simple quoted/glob argument before exact combined recursive-force
+  // flags; this remains a bounded pattern, not shell tokenization.
+  /^\s*rm\s+(?:'[^'\r\n]*'|"[^"\r\n]*"|[^\s'"]*\*[^\s'"]*)\s+-[rR][fF]\s+(?:--\s+)?(?:\/|~|\$\{?HOME\}?|\*)(?:\s|$)/i,
+  /^\s*rm\s+(?:'[^'\r\n]*'|"[^"\r\n]*"|[^\s'"]*\*[^\s'"]*)\s+-[fF][rR]\s+(?:--\s+)?(?:\/|~|\$\{?HOME\}?|\*)(?:\s|$)/i
 ];
 function bashCarriesInlineContent(command) {
   const curlData = /\bcurl\b.*(?:--data(?:-[a-z]+)?\b|\s-d\b|--json\b|\s-F\b|--form\b)/i.test(command);

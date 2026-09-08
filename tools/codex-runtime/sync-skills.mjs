@@ -119,6 +119,7 @@ export const claudePackageDocs = [
   "permission-provisioning.md",
   "pipeline-lanes.md",
   "plan-shards.md",
+  "testing.md",
   "verification-packet.md",
   "worktree-discipline.md",
 ];

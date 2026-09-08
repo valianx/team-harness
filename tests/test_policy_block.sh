@@ -54,8 +54,28 @@ assert_deny "home shorthand" \
     '{"tool_name":"Bash","tool_input":{"command":"rm -r -f ~"}}'
 assert_deny "bare wildcard" \
     '{"tool_name":"Bash","tool_input":{"command":"rm -Rf *"}}'
+assert_deny "single-quoted glob before recursive-force flags" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm '\''*'\'' -rf /"}}'
+assert_deny "double-quoted argument before recursive-force flags" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm \"x\" -rf /"}}'
+assert_deny "interposed argument before HOME destination" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm \"x\" -rf $HOME"}}'
+assert_deny "interposed argument before braced HOME destination" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm \"x\" -fr ${HOME}"}}'
+assert_deny "quoted glob before reverse recursive-force flags" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm '\''*.log'\'' -fr ~"}}'
+assert_deny "unquoted interposed glob before recursive-force flags" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm *.log -fr /"}}'
+assert_deny "bare wildcard destination after interposed argument" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm \"x\" -rf *"}}'
 assert_none "scoped temporary directory" \
     '{"tool_name":"Bash","tool_input":{"command":"rm -rf /tmp/team-harness-fixture"}}'
+assert_none "interposed glob with benign relative target" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm '\''*'\'' -rf relative-fixture"}}'
+assert_none "unquoted interposed argument stays outside narrow fix" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm x -rf /"}}'
+assert_none "interposed word without recursive-force flag" \
+    '{"tool_name":"Bash","tool_input":{"command":"rm '\''x'\'' rufus /"}}'
 assert_none "destructive text used as data" \
     '{"tool_name":"Bash","tool_input":{"command":"echo \"rm -rf /\" >> audit.log"}}'
 

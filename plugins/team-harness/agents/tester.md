@@ -257,6 +257,9 @@ Classify every AC and TC using the shared contract. Then:
 
 A non-test AC is complete when its `command` or `inspection` evidence is
 successful. Do not convert it into a test to satisfy a coverage table.
+Apply `docs/testing.md § Selected test evidence` in every test-running mode:
+required omissions remain unverified despite exit zero; unrelated optional skips
+do not invalidate sufficient evidence, and unavailable counts remain unknown.
 
 For a bug-fix with a Phase 2.0 artifact, reuse that regression contract and
 confirm it now passes. If a newly warranted test exposes a product defect,

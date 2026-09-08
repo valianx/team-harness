@@ -1,0 +1,3 @@
+- [ ] 1. Update canonical review instructions and the Codex adapter without widening lens scope.
+- [ ] 2. Regenerate affected projections and inspect grounded, missing-context and injected-instruction scenarios.
+- [ ] 3. Validate OpenSpec, generator and applicable contract/distribution checks.

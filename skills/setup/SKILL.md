@@ -201,11 +201,13 @@ The obsidian vault sits outside the current project's working tree, so every sub
 
    Add these rules to ~/.claude/settings.json? [y/N]
    ```
-5. **On `n`/Enter (decline):** write nothing. Continue to Step 3.5.
-6. **On `y` (confirm):** merge-write-whole-document to `~/.claude/settings.json` — back up the existing file to `settings.json.bak` (`0o600`, single rolling backup, skipped if the file does not yet exist), read the full JSON (start from `{}` if the file does not exist), append the two `Edit`/`Write` rules plus the `.git/` deny pair and the read-only allowlist set to `permissions.allow`/`permissions.deny` and the base to `permissions.additionalDirectories`, deduplicating against any entry that already covers this exact base, preserve every other key untouched, then write the merged document to a temp file (`0o600`) and rename it atomically over the target.
-7. Report the rules added and the target file:
+5. **On `n`/Enter (operator decline):** write nothing. Report that provisioning was declined for this run and continue to Step 3.5. This is distinct from a native runtime refusal or failed write; neither is recorded as an operator decline or retried within the same run.
+6. **On `y` (confirm):** merge-write-whole-document to `~/.claude/settings.json` — back up the existing file to `settings.json.bak` (`0o600`, single rolling backup, skipped if the file does not yet exist), read the full JSON (start from `{}` if the file does not exist), append the two `Edit`/`Write` rules plus the `.git/` deny pair and the read-only allowlist set to `permissions.allow`/`permissions.deny` and the base to `permissions.additionalDirectories`, deduplicating against any entry that already covers this exact base, preserve every other key untouched, then write the merged document to a temp file (`0o600`) and rename it atomically over the target. Re-read and parse the target after the rename and verify every requested entry before reporting success.
+   - If the native runtime refuses or reports failure before verification, report provisioning as unconfirmed, name `~/.claude/settings.json` as the pending target, do not repeat the refused write or widen permissions, and continue to Step 3.5.
+   - If verification is unavailable or fails after the write may have partially succeeded, report the known partial or unknown state and the entries that are present or unconfirmed. Do not claim that nothing changed or that all rules were provisioned, and do not retry.
+7. **Only after verification succeeds**, report the rules provisioned and verified and the target file:
    ```text
-   Permission rules added to ~/.claude/settings.json:
+   Permission rules provisioned and verified in ~/.claude/settings.json:
      Edit(//{base}/**)
      Write(//{base}/**)
      additionalDirectories: //{base}
@@ -219,7 +221,7 @@ The obsidian vault sits outside the current project's working tree, so every sub
 
 This sub-step never adds a rule for an outward action (`git push`, `gh pr *`, any GitHub/ClickUp API write, any form of `gh api`) — the read-only allowlist set is disjoint from dev-guard's outward-action catalogue by construction (`docs/permission-provisioning.md § "Read-only allowlist — disjointness invariant"`, enforced by `tests/test_permission_disjointness.py`); the `Edit`/`Write`/`additionalDirectories` rules stay scoped strictly to the obsidian workspace base resolved in Step 3. Outward actions stay gated exclusively by `dev-guard` (CLAUDE.md).
 
-**Existing-install coverage.** This is a KEYS-once offer — an operator who already ran `/th:setup` before this sub-step existed, or who declined it here, is covered by a second, recurring offer during pipeline activation (site B — detects a missing rule on every pipeline start in obsidian mode and re-offers it there). See `plugins/team-harness/skills/pipeline/references/activation.md § Workspace and repository identity` and `docs/permission-provisioning.md § Provisioning sites`.
+**Existing-install coverage.** Active pipeline activation consumes this same contract before the first write to a workspace outside the repository root. It performs the already-present check, shows the bounded delta, and requires the documented live confirmation; it does not create a separate provisioning schema or allowlist. See `plugins/team-harness/skills/pipeline/references/activation.md § Workspace and repository identity` and `docs/permission-provisioning.md § Provisioning surfaces`.
 
 ### 3b. Configure GitHub identity routes (gated)
 

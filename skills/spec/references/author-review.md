@@ -40,6 +40,28 @@ findings with severity and file/line evidence, and their dispositions. Show the 
 chat before starting repairs. Keep the original findings and append closure evidence and corrected
 commit references; never relabel a newer commit as reviewed by agents that inspected the old one.
 
+## Optional fix evidence
+
+For a bounded fix, Main may run the same assertion or probe against the exact base
+and candidate revisions using native execution in disposable isolated copies.
+Keep the operator's checkout intact. Select a safe probe, explicit input, bounded
+output and a process timeout before executing either revision; this adds no runner,
+dependency installation, specialist dispatch or universal acceptance gate.
+The assertion must be runnable at both revisions: use an existing test or supply
+the same reproducible external probe to both copies. A test missing at base is
+inconclusive, not a failure caused by the bug.
+
+Record both revisions, the identical probe/command and assertion, relevant environment,
+exit/result and bounded diagnostics in the existing plan or review report. Only
+base FAIL caused by the target bug followed by candidate PASS supports a demonstrated
+fix. Both PASS means no reproduction; both FAIL means no demonstrated fix.
+Infrastructure errors, unrelated failures or unrelated timeouts are inconclusive.
+A timeout is target evidence only when the probe specifically reproduces that hang.
+
+The PR `regression-evidence.mjs` helper classifies base PASS / head FAIL as a possible
+introduced regression; head PASS alone does not demonstrate a fix. Do not fabricate
+its required PR context or owner token to use it as a standalone fix verifier.
+
 ## Repair
 
 Fix confirmed in-scope defects directly, including useful nonblocking corrections; record why a

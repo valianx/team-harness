@@ -2,7 +2,7 @@
 
 By default, every subagent `Edit`/`Write` into a path outside the current session's working directory prompts for approval, and that approval does not persist across dispatches. This is expected friction for a one-off change. It is a repeated tax for two recurring, low-risk surfaces this pipeline already trusts: the operator's own obsidian workspace vault, and a work-surface repo (e.g. a git worktree) the pipeline itself created. Permission provisioning closes that gap by writing local Claude Code permission rules — once, gated, and reported — so future dispatches into those surfaces stop prompting.
 
-This document is the canonical contract. Every provisioning site in the codebase (`skills/setup/SKILL.md`, `agents/ref-pipeline.md`) implements exactly this mechanism; do not introduce a variant mechanism at a new site.
+This document is the canonical contract. The setup flow (`skills/setup/SKILL.md`) and active pipeline activation reference (`plugins/team-harness/skills/pipeline/references/activation.md`) consume this mechanism; do not introduce a variant mechanism.
 
 ## The `//` double-slash anchor
 
@@ -27,7 +27,7 @@ An `Edit`/`Write` rule alone is not sufficient for a path outside the cwd — Cl
 
 ## Merge-write-whole-document contract
 
-Both provisioning sites write to a Claude Code settings file (`~/.claude/settings.json` or `.claude/settings.local.json`) using the same discipline already established for `~/.claude/.team-harness.json` (`skills/setup/SKILL.md:166`), and — for the backup + atomic-write sequence — the same discipline already established for `~/.claude.json` (`skills/setup/SKILL.md:121-127`):
+Provisioning writes under this contract target a Claude Code settings file (`~/.claude/settings.json` or `.claude/settings.local.json`) and use the same discipline already established for `~/.claude/.team-harness.json` (`skills/setup/SKILL.md:166`), and — for the backup + atomic-write sequence — the same discipline already established for `~/.claude.json` (`skills/setup/SKILL.md:121-127`):
 
 1. Read the full JSON document (or start from `{}` if the target file does not exist yet).
 2. **Back up before writing.** If the target file already exists, copy it to `{file}.bak` (`settings.json.bak` / `settings.local.json.bak` — a single rolling backup, each write overwrites the previous one) at `0o600` from the moment of creation. Skipped when the target file does not yet exist — there is nothing to preserve.
@@ -50,11 +50,11 @@ Before any rule is constructed from a resolved `base`/`path`, this contract vali
 - A filesystem top-level directory — fewer than 2 non-empty path segments below root (depth < 2).
 - Contains a `..` path-traversal segment or a glob metacharacter (`*`, `?`, `[`, `]`).
 
-This floor runs on the RESOLVED value, after normalization and before rule construction — it is the mechanism that guarantees "never a bare root rule" at the value level (a mis-resolved `base` of `/` or `~` would otherwise still pass the template-level guarantee in "Scoping" below, since the resulting rule string never literally matches the bare-root needle `//**`). Both provisioning sites (`skills/setup/SKILL.md` § 3a, `agents/ref-pipeline.md` step 7 parts a and b) apply this floor identically before presenting any gate.
+This floor runs on the RESOLVED value, after normalization and before rule construction — it is the mechanism that guarantees "never a bare root rule" at the value level (a mis-resolved `base` of `/` or `~` would otherwise still pass the template-level guarantee in "Scoping" below, since the resulting rule string never literally matches the bare-root needle `//**`). The setup flow and active pipeline activation apply this floor before presenting any gate.
 
 ## `.git/` exclusion invariant
 
-A provisioned scope never covers `.git/`. Alongside every `Edit`/`Write` allow rule this contract writes for a base, it also writes the matching deny pair — `Edit(//{base}/.git/**)` and `Write(//{base}/.git/**)` in `permissions.deny` — in the same write. Claude Code's permission model resolves deny over allow, so this pairing holds even though the allow rule's `**` glob would otherwise match paths under `.git/`. This closes a local code-execution vector: for a cross-repo work-surface, an unprompted write to `{path}/.git/hooks/pre-commit` would execute arbitrary shell on the tree's next `git commit` — outside the `dev-guard` outward-action gate, which gates `git push`/`gh`, not `git commit`. Both provisioning sites apply this pairing identically, for every base/path they provision (obsidian workspace included).
+A provisioned scope never covers `.git/`. Alongside every `Edit`/`Write` allow rule this contract writes for a base, it also writes the matching deny pair — `Edit(//{base}/.git/**)` and `Write(//{base}/.git/**)` in `permissions.deny` — in the same write. Claude Code's permission model resolves deny over allow, so this pairing holds even though the allow rule's `**` glob would otherwise match paths under `.git/`. This closes a local code-execution vector: for a cross-repo work-surface, an unprompted write to `{path}/.git/hooks/pre-commit` would execute arbitrary shell on the tree's next `git commit` — outside the `dev-guard` outward-action gate, which gates `git push`/`gh`, not `git commit`. The setup flow and active pipeline activation apply this pairing identically, for every base/path they provision (obsidian workspace included).
 
 ## Confirmation gate
 
@@ -76,7 +76,7 @@ Every rule this contract writes is scoped strictly to `{base}/**` for a single, 
 
 ## Read-only allowlist — disjointness invariant
 
-Both provisioning sites offer one additional class of `permissions.allow` rules in the same gated Y/n write as the `Edit`/`Write`/`additionalDirectories` triad above: a positive list of inert `Bash(...)` commands, four prefix-safe `gh` read verbs, `gh auth switch`, and the `mcp__memory__*` Knowledge Graph tool family. Unlike the `Edit`/`Write` rules, these are NOT scoped to `{base}/**` — Claude Code's `Bash` and MCP-tool permission rules match on a command/tool-name prefix, not on a filesystem path, so they apply wherever the session runs rather than only inside a provisioned base. This section is the canonical definition of that set (invariant (c)). **`skills/setup/SKILL.md` § 3a reproduces the set identically** — that is a real second copy, and a divergence there is a defect. **`plugins/team-harness/skills/pipeline/references/activation.md` § Workspace and repository identity does not reproduce the set** — it delegates by pointer back to this section rather than restating the commands inline. Invariant (c) is therefore a delegation invariant at that site, not a byte-identity one: what must hold is that the pointer resolves and that no inline restatement drifts from this canonical list, never that two copies of the list stay byte-equal.
+The setup flow offers one additional class of `permissions.allow` rules in the same gated Y/n write as the `Edit`/`Write`/`additionalDirectories` triad above: a positive list of inert `Bash(...)` commands, four prefix-safe `gh` read verbs, `gh auth switch`, and the `mcp__memory__*` Knowledge Graph tool family. Unlike the `Edit`/`Write` rules, these are NOT scoped to `{base}/**` — Claude Code's `Bash` and MCP-tool permission rules match on a command/tool-name prefix, not on a filesystem path, so they apply wherever the session runs rather than only inside a provisioned base. This section is the canonical definition of that set (invariant (c)). **`skills/setup/SKILL.md` § 3a reproduces the set identically** — that is a real second copy, and a divergence there is a defect. **`plugins/team-harness/skills/pipeline/references/activation.md` § Workspace and repository identity delegates to this section** rather than restating or widening the commands inline. Invariant (c) is therefore a delegation invariant at the active activation reference, not a byte-identity requirement.
 
 ### The governing constraint — Claude Code issue #18312
 
@@ -117,31 +117,28 @@ No form of `gh api` — `Bash(gh api:*)`, `Bash(gh api graphql:*)`, `Bash(gh api
 
 ## Rule report
 
-Every write under this contract — confirmed at either site — reports back to the operator:
+Every provisioning attempt under this contract reports back to the operator:
 
-- The exact rules added (`Edit(...)`, `Write(...)`, `additionalDirectories: ...`).
-- The target settings file the rules were written to.
+- The exact rules added or confirmed (`Edit(...)`, `Write(...)`, `additionalDirectories: ...`).
+- The target settings file and the observed outcome.
+
+After an approval, a success report is allowed only after the target is re-read, parses, and contains every requested entry. A native runtime refusal or execution failure is reported as unconfirmed and is not recorded as an operator decline; do not repeat the same refused write or widen permissions. If verification is unavailable or fails after partial progress may have occurred, report the known entries and the remaining partial or unknown state without claiming that nothing changed or that all rules were provisioned. Continue independent setup steps.
 
 This is the audit/revert surface: the operator can locate and remove any rule this contract added by reading the reported file and rule strings.
 
 ## Decline semantics
 
-A decline never widens access and never re-prompts within the same run:
+A live operator decline never widens access and never re-prompts within the same run. Under `/th:setup` § 3a, nothing is written; a later setup invocation may offer the same bounded rules again. Active pipeline activation follows the same no-write-on-decline behavior when it applies this contract before the first write to an out-of-repository workspace. A native runtime refusal or execution failure is not a decline, is not recorded as one, and is not retried within the same run; a later independent run may offer the bounded gate again.
 
-- **`/th:setup` § 3a (site A):** on decline, nothing is written; the operator can re-run `/th:setup` (or the targeted `/th:setup workspace`) at any time to be offered again.
-- **Coordinator Intake step 7 (site B):** on decline, nothing is written; the decline is recorded in `00-state.md § Current State` as `permission_provisioning_decline: obsidian | cross-repo | both` — a session-scoped decision. The current pipeline run does not re-offer; the next pipeline run may offer again (declines do not persist across runs).
+## Provisioning surfaces
 
-## Provisioning sites
+The same contract serves two active consumers and preserves the existing destinations:
 
-Two surfaces, two destinations, matched to the lifecycle of the underlying data:
+| Consumer | Where | Destination | Trigger |
+|---|---|---|---|
+| **Setup** | `skills/setup/SKILL.md` § 3a, after workspace output mode selects obsidian | `~/.claude/settings.json` (user, cross-project) | Operator runs `/th:setup` in obsidian mode |
+| **Pipeline activation** | `plugins/team-harness/skills/pipeline/references/activation.md` § Workspace and repository identity | `~/.claude/settings.json` for the obsidian workspace base; `.claude/settings.local.json` (project-local, gitignored) for cross-repo work-surface paths | Before the first write to a workspace outside the repository root |
 
-| Site | Where | Destination | Lifecycle | Trigger |
-|---|---|---|---|---|
-| **A — Setup (KEYS-once)** | `skills/setup/SKILL.md` § 3a, after the Step 3 obsidian workspace configuration | `~/.claude/settings.json` (user, cross-project) | Set once at configuration time | Operator runs `/th:setup` in obsidian mode |
-| **B — Coordinator Intake (existing-install / recurring)** | `agents/ref-pipeline.md` step 7 | (a) `~/.claude/settings.json` for the obsidian workspace base — same destination as site A; (b) `.claude/settings.local.json` (project-local, gitignored) for cross-repo work-surface paths | (a) covers an install that never re-runs `/th:setup`, or a prior decline; (b) is per-pipeline, revertible | Every pipeline run, in obsidian mode (a) or when the pipeline declares an out-of-cwd work-surface path (b) |
-
-Site B exists because `/th:setup` is a one-time configuration step that most operators never re-run after their first install — an operator who installed before this mechanism existed, or who declined the offer at setup time, would otherwise never be covered. Site B closes that gap by re-checking on every pipeline run and re-offering only when the rules are genuinely missing (see "Confirmation gate" above — already-present rules are a silent pass-through, not a repeated prompt).
-
-The `.claude/settings.local.json` destination for cross-repo rules (site B, part b) is chosen because it is gitignored, project-local, and already governs the repository the operator has confided the pipeline to — it never needs a merge-write against the operator's global `~/.claude/settings.json`.
+The activation reference performs the already-present check, shows the exact bounded allow/deny/additional-directory delta, and requires documented live confirmation. It delegates the canonical allowlist and outcome contract here rather than restating them. The project-local destination remains gitignored and revertible; the user-scoped destination retains its cross-project blast-radius disclosure.
 
 `settings.json`/`settings.local.json` are Claude Code's own configuration files, not a team-harness config file — writing to them does not violate the "single config file — `~/.claude/.team-harness.json`" rule (CLAUDE.md §5).
