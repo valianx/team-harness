@@ -22,7 +22,7 @@ The anchored review package SHALL be constructed by an executable that derives t
 
 ### Requirement: A security dimension stops for a live three-way choice
 
-Before publication, the guided lane's executable package producer SHALL classify the completed changed surface against the canonical security-floor categories. A true or unresolved classification MUST stop the lane and present the matching category together with three live options: raise the bar in-lane, take the pipeline, or narrow the scope. The lane MUST NOT absorb the security dimension on its own authority and MUST NOT eject to the pipeline without offering the in-lane option when no hard router applies. If the operator raises the bar in-lane, `security` and `adversary` become mandatory lenses without requiring a later explicit review request. The original review gate SHALL resolve ready only when every required lens passes with no blocker. After completed reviews and in-scope repairs, the coordinator MAY continue authorized author publication under `spec-direct-lane` when all security and adversary blockers have sufficient finding-specific closure evidence at the corrected commit. Original non-pass verdicts SHALL remain unchanged; failed execution, incomplete coverage, missing or untrusted returns and unresolved blockers SHALL still hold publication.
+Before publication, the guided lane's executable package producer SHALL classify the completed changed surface against the canonical security-floor categories. A true or unresolved classification MUST stop the lane and present the matching category together with three live options: raise the bar in-lane, take the pipeline, or narrow the scope. The lane MUST NOT absorb the security dimension on its own authority and MUST NOT eject to the pipeline without offering the in-lane option when no hard router applies. If the operator raises the bar in-lane, `security` and `adversary` become mandatory lenses without requiring a later explicit review request. The original review gate SHALL resolve ready only when every required lens passes with no blocker. After completed reviews and in-scope repairs, the coordinator MAY continue authorized author publication under `spec-direct-lane` only when every actual publication blocker across all required lenses has sufficient finding-specific closure evidence at the corrected commit. When the security floor applies, complete `security` and `adversary` reviews and closure of their blockers are additional mandatory conditions. Original non-pass verdicts SHALL remain unchanged; failed execution, incomplete coverage, missing or untrusted returns and unresolved blockers SHALL still hold publication.
 
 #### Scenario: Implementation reveals a security-sensitive surface
 - **WHEN** the completed changed-surface classifier reports a security-floor category
@@ -43,6 +43,10 @@ Before publication, the guided lane's executable package producer SHALL classify
 #### Scenario: A security blocker lacks closure evidence
 - **WHEN** either required security lens reported a blocker whose correction is unverified or whose required check failed or was omitted
 - **THEN** the affected PR remains blocked despite other passing checks or applied patches
+
+#### Scenario: A non-security required lens still blocks publication
+- **WHEN** the security and adversary conditions are satisfied but `qa` or `tester` reports an actual publication blocker without sufficient finding-specific closure evidence
+- **THEN** the affected PR remains blocked until that required-lens blocker is closed; security clearance does not waive it
 
 #### Scenario: The floor applies and a required lens return is missing
 - **WHEN** the original gate is computed with a required floor lens absent or returning a blocker

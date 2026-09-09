@@ -125,8 +125,10 @@ creates a readable `01-plan.md` and any accepted author-review report in the con
 `00-state.md`, execution events, pipeline summary, snapshot, overlay,
 traceability artifact, or gate ceremony, and dispatches no specialist by default. Before
 publication it always runs the deterministic changed-surface classifier. Before PR publication, offer one optional local full-scope review; live acceptance dispatches it.
-A review is mandatory after an in-lane security choice; publication requires complete
-`security` and `adversary` reviews and verified closure of their blockers. Full scope never runs
+A review is mandatory after an in-lane security choice; publication requires complete, trusted
+anchored reviews and finding-specific closure of every actual publication blocker across all
+required lenses. When the security floor applies, complete `security` and `adversary` reviews and
+verified closure of their blockers are additional mandatory conditions. Full scope never runs
 twice. A fix closes by executing the oracle its criterion already carries, not by another review,
 and a finding no criterion anticipated is a defect in the authored change rather than a new round. A
 lane-authored change uses the same `openspec/changes/` directory, schema, naming, and archive path
