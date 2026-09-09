@@ -13,6 +13,8 @@ alongside the operator plan.
   in chat and the same workspace without posting GitHub reviews or comments.
 - Fix confirmed in-scope defects and explicitly tell the operator before amending or reopening
   a spec, seeking only missing scope approval when intent or acceptance changes.
+- Continue authorized PR publication after completed reviews and verified finding closure,
+  preserving original verdicts without requiring another reviewer pass.
 - Reconcile routing and generated runtime resources; retain per-repository validation and
   applicable security requirements.
 
@@ -21,6 +23,8 @@ alongside the operator plan.
 ### Modified Capabilities
 
 - `spec-direct-lane`: sequential repository execution and optional author review.
+- `guided-lane-verification`: distinguish the original review decision from publication after
+  verified repairs, including findings from required security lenses.
 
 ## Non-Goals
 

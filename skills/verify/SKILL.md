@@ -5,8 +5,8 @@ description: Run the inline verification fan over a committed range and decide i
 
 # Verify (explicit direct mode)
 
-Requests the inline verification fan over an immutable committed range and reports whether the
-range is ready to publish. The lens contract is `agents/_shared/inline-review-contract.md`; this
+Requests the inline verification fan over an immutable committed range and reports its review
+decision. The lens contract is `agents/_shared/inline-review-contract.md`; this
 skill is its invocation surface, not a second copy of it.
 
 The skill creates no workspace, `00-state.md`, execution event, gate, Stage Gate, branch, commit,
@@ -48,7 +48,9 @@ push, or delivery record. It never publishes.
    no lens rather than reviewing an empty surface.
 3. **Decide.** Collect the lens returns and run `review-fan.mjs gate` over them. It resolves
    `ready` only when every required lens returned a pass with no blocker; an absent required return
-   is never a pass. Report the reasons verbatim when it resolves not-ready.
+   is never a pass. Report the reasons verbatim when it resolves not-ready. This result belongs to
+   the reviewed revision. For subsequent spec-author publication, Main applies
+   [author-review closure](../spec/references/author-review.md#repair) without rewriting that result.
 4. **Report.** Present the decision, the blocking reasons, and the classification. `gate` splits
    blocking findings into `covered` — a bound written-intent criterion anticipated it — and
    `spec_defects` — none did. A covered finding is fixed and closed by executing that criterion's

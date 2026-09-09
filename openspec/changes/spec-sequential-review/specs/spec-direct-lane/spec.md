@@ -76,11 +76,11 @@ For one bounded objective without a public-contract break, the coordinator SHALL
 - **THEN** the initiating repository's configured workspace hosts the common plan without turning path topology into a pipeline requirement
 
 ### Requirement: Authors may request a local review before PR publication
-The coordinator SHALL offer an optional review of the committed candidate before publishing its PR, naming the reviewer lenses and local report destination. A pending choice SHALL hold publication. Live acceptance SHALL dispatch the existing read-only inline-review mechanism per repository unless the package reports `fully_verified: true`, in which case Main SHALL report checker evidence without dispatching empty reviewer work. Otherwise, publication SHALL wait for every required lens to complete and `review-fan.mjs gate` to resolve ready. Failed, unavailable, stale or unresolved results SHALL NOT count as passes. Refusal SHALL skip only the optional review. Required security checks SHALL remain applicable, including on the checker-only path. Main SHALL report findings in chat and the common workspace, preserve reviewed commit identities and lens limitations, and fix confirmed in-scope defects without publishing GitHub reviews or comments. The plan and accepted review report SHALL be permitted reading artifacts without pipeline activation.
+The coordinator SHALL offer an optional review of the committed candidate before publishing its PR, naming the reviewer lenses and local report destination. A pending choice SHALL hold publication. Live acceptance SHALL dispatch the existing read-only inline-review mechanism per repository unless the package reports `fully_verified: true`, in which case Main SHALL report checker evidence without dispatching empty reviewer work. Otherwise, publication SHALL wait for every required lens to complete with trusted, correctly anchored evidence and for either `review-fan.mjs gate` to resolve ready on the reviewed candidate or all publication blockers to receive verified closure on the corrected candidate. Main SHALL preserve the original verdicts and gate result and record its separate publication decision with finding-specific checks, relevant suite results and corrected commit references. Failed execution, unavailable, incomplete or stale-at-consolidation reviews and unresolved blocking evidence SHALL hold publication. Refusal SHALL skip only the optional review. Required security checks SHALL remain applicable, including on the checker-only path. Main SHALL report findings in chat and the common workspace and fix confirmed in-scope defects without publishing GitHub reviews or comments. The plan and accepted review report SHALL be permitted reading artifacts without pipeline activation.
 
 #### Scenario: The operator accepts reviewer agents
 - **WHEN** the operator accepts the local author-review offer
-- **THEN** Main dispatches required read-only lenses for candidates not fully checker-verified, consolidates their evidence, saves reviews/pre-pr-review.md in the same workspace, links it from the plan and reports results before repairs; publication waits for completed required lenses and a ready gate
+- **THEN** Main dispatches required read-only lenses for candidates not fully checker-verified, consolidates their evidence, saves reviews/pre-pr-review.md in the same workspace, links it from the plan and reports results before repairs; publication waits for completed required lenses and either a ready gate or verified closure of all publication blockers
 
 #### Scenario: Checkers verify the complete candidate
 - **WHEN** an accepted review package reports `fully_verified: true`
@@ -93,6 +93,18 @@ The coordinator SHALL offer an optional review of the committed candidate before
 #### Scenario: A finding is a code defect within approved intent
 - **WHEN** evidence confirms a defect whose repair preserves approved scope and criteria
 - **THEN** Main fixes it and records finding-specific validation and corrected commit references without fabricating a new reviewer pass or automatically repeating full review
+
+#### Scenario: Repairs close the findings behind an original non-pass verdict
+- **WHEN** required reviews completed against a current anchored candidate, subsequent changes are limited to verified repairs and authorized intent amendments, and every publication blocker has sufficient passing validation on the corrected commit
+- **THEN** Main records the separate closure decision and continues already authorized PR publication without another review or approval; original concerns or fail verdicts and the gate result remain historical evidence
+
+#### Scenario: A patch leaves a blocker or required validation unresolved
+- **WHEN** a repair lacks sufficient finding-specific evidence, a required check fails or is omitted, a blocking disagreement remains, or the correction includes unrelated unreviewed changes
+- **THEN** Main retains the affected publication hold and identifies the remaining work instead of treating the existence of a patch as closure
+
+#### Scenario: Completed reviews contain only nonblocking concerns
+- **WHEN** all required reviews completed with sufficient coverage and no unresolved publication blocker remains
+- **THEN** Main carries the concerns into the PR and continues authorized publication even if the original gate is not-ready solely because a lens returned concerns
 
 #### Scenario: A finding requires reopening or amending the spec
 - **WHEN** code alone cannot resolve a finding without revising written intent or acceptance

@@ -145,7 +145,7 @@ optional author-review report per `skills/spec/SKILL.md`, without `00-state.md`,
 summary, snapshot,
 overlay, traceability artifact, gates or default specialist dispatch. Before publication it runs the
 deterministic changed-surface classifier. Live in-lane selection authorizes sensitive spec work,
-requiring `security` and `adversary` passes before publication; otherwise offer the
+requiring `security` and `adversary` review and verified blocker closure; otherwise offer the
 optional author review before publication. Acceptance dispatches it; refusal skips it. It never
 opens a correction or re-audit loop. Intent
 routing never activates the pipeline or grants outward authority.
