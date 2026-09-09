@@ -125,8 +125,10 @@ creates a readable `01-plan.md` and any accepted author-review report in the con
 `00-state.md`, execution events, pipeline summary, snapshot, overlay,
 traceability artifact, or gate ceremony, and dispatches no specialist by default. Before
 publication it always runs the deterministic changed-surface classifier. Before PR publication, offer one optional local full-scope review; live acceptance dispatches it.
-A review is mandatory after an in-lane security choice; in that
-case publication remains blocked until `security` and `adversary` pass. Full scope never runs
+A review is mandatory after an in-lane security choice; publication requires complete, trusted
+anchored reviews and finding-specific closure of every actual publication blocker across all
+required lenses. When the security floor applies, complete `security` and `adversary` reviews and
+verified closure of their blockers are additional mandatory conditions. Full scope never runs
 twice. A fix closes by executing the oracle its criterion already carries, not by another review,
 and a finding no criterion anticipated is a defect in the authored change rather than a new round. A
 lane-authored change uses the same `openspec/changes/` directory, schema, naming, and archive path
@@ -145,8 +147,10 @@ Main fixes confirmed defects within scope. Before reopening or amending a spec i
 finding, why code alone cannot resolve it and the planned revision to the operator; changed
 scope or acceptance requires any missing approval. Reuse the existing verification mechanism;
 never turn deterministic closure into an invented reviewer pass or repeat full review automatically.
-Pending author-review offers hold publication. After acceptance, require completed lens returns
-and a ready gate; checker-only verification retains its documented exception and security holds.
+Pending author-review offers hold publication. After acceptance, require complete, trusted anchored
+reviews and either a ready gate or verified closure under `skills/spec/references/author-review.md`.
+Keep the original verdicts and gate result; continue authorized publication after closure without
+another reviewer pass. Checker-only verification retains its documented exception and security holds.
 
 ## Legacy route markers (compatibility only)
 

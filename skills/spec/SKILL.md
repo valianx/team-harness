@@ -75,8 +75,9 @@ new effect.
    § Escalation. Selecting the in-lane path makes the package's `security` and `adversary` lenses
    mandatory and runs the one full-scope review without waiting for another request. When the
    floor does not apply, run the review only on an explicit live operator request. Validation
-   confirms the change; it does not iterate. `review-fan.mjs gate` classifies every blocking
-   finding:
+   confirms the change; it does not iterate. `review-fan.mjs gate` is the immutable historical
+   assessment of the reviewed revision and classifies every blocking finding; its output is never
+   rewritten after a repair:
 
    - **covered** — a bound criterion anticipated it. Fix it, then close by executing that
      criterion's scenario and the deterministic suites. No reviewer is dispatched, and nothing is
@@ -87,12 +88,19 @@ new effect.
      reusing live authorization already given. Never answer it with another review.
    - **uncovered, below the floor** — record it as a pull-request concern.
 
-   A reviewed closure pass over a fix runs only on an explicit live operator request, with the
-   prior review anchor; the script refuses a second full scope. The lane opens no other review.
+   Keep the original reviewed revision and bind any repaired head as a separate corrected revision.
+   An ordinary in-scope repair advancing that head does not make the original review stale. Inspect
+   the entire reviewed-to-corrected diff and hold publication if it contains unrelated changes;
+   only verified repairs and authorized spec amendments are eligible. A reviewed closure pass over
+   a fix runs only on an explicit live operator request, with the prior review anchor; the script
+   refuses a second full scope. The lane opens no other review.
 6. **Publish.** First satisfy the author-review decision and completion conditions in
    [author-review.md](references/author-review.md); a pending offer holds publication. Open the
-   pull request under existing branch, commit and outward-action conventions. When the in-lane security path applies, publication is
-   blocked until both `security` and `adversary` pass with no blocker.
+   pull request under existing branch, commit and outward-action conventions. The coordinator's
+   publication decision is distinct from the historical gate result and is not mechanically enforced
+   by `gh pr create`; when the in-lane security path applies, follow the mandatory closure conditions
+   in [author-review.md](references/author-review.md). Continue already authorized publication once
+   these conditions hold, without an extra permission or review ceremony.
 7. **Archive.** Check the pull request state once. When it reports merged, offer
    `openspec archive <change>` behind a one-line Y/n; on acceptance, run it on a branch delivered
    through an ordinary pull request — a dedicated chore or the next pull request that follows the
@@ -173,10 +181,11 @@ reports `security_floor.applies`, present the matching category it named and thr
 
 Live choice `1` explicitly authorizes security-sensitive development within the approved spec
 scope, satisfying the direct-mode sensitivity decision without activating a pipeline. It keeps
-`security` and `adversary` in the required lens set, and the
-coordinator holds publication until `review-fan.mjs gate` resolves ready. No hook covers
-`gh pr create`, so that hold is coordinator discipline rather than an enforced gate — the enforced
-part is the classification, which the script derives from the diff and cannot be talked out of.
+`security` and `adversary` in the required lens set. The coordinator holds publication until the
+author-review conditions are met; the historical gate remains unchanged. No hook covers
+`gh pr create`, so this publication decision is coordinator discipline rather than an enforced gate;
+the enforced part is the classification, which the script derives from the diff and cannot be talked
+out of.
 Choice `2` carries the authored change into the pipeline. Never absorb the dimension without asking, and never eject without
 offering `1`. When any of the hard routers above also holds, option `1` is not offered.
 

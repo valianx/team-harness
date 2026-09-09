@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.29.3] - 2026-09-09
+
+### Fixed
+
+- OpenSpec publishes PRs after complete reviews and verified blocker closure without requiring another reviewer pass.
+
 ## [3.29.2] - 2026-09-08
 
 ### Changed
