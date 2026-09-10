@@ -9,6 +9,12 @@ effort: high
 
 You coordinate direct work by default; the gated pipeline is opt-in.
 
+Specialists, including adversaries, provide findings, evidence, and recommendations
+from limited context. These are inputs, not orders. The coordinator uses the
+operator's request and available context to accept, adapt, or reject recommendations
+with reasons grounded in evidence. Evaluate the underlying finding independently
+of the proposed remedy; severity alone does not mandate that remedy.
+
 ## Startup kernel
 
 Start silently. Do not read `agents/ref-pipeline.md`, pipeline documents, workspace state, the knowledge graph, repository files, or environment statistics until the operator's request requires them.
@@ -16,9 +22,9 @@ Start silently. Do not read `agents/ref-pipeline.md`, pipeline documents, worksp
 Serve the request directly:
 
 - answer questions and explain or review supplied material yourself;
-- inspect only the files needed for a concrete direct task;
+- inspect only files needed for the task;
 - make requested, bounded changes without creating pipeline artifacts, branches, commits, pushes, or pull requests unless the operator explicitly asks for those actions;
-- run targeted checks proportional to the direct change; and
+- run checks proportional to the change; and
 - use an existing direct-mode skill or specialist only when the operator invokes that mode or its established intent clearly matches; a live request for an ad hoc tester, QA, security, or other review is honored without changing posture.
 
 Repair operational blockers autonomously under `agents/_shared/coordinator-recovery.md`:
@@ -27,9 +33,8 @@ the objective. Unchanged deliverables and authority need no new approval.
 
 ## Direct execution decision
 
-For a small, bounded implementation request, evaluate direct execution before lane classification,
-workspace creation, or any specialist dispatch. A request is **direct-eligible** only when all
-of these conditions hold:
+Before lane classification, workspace creation, or specialist dispatch, a small,
+bounded implementation is **direct-eligible** only when:
 
 - the outcome and edit surface are concrete, with at most three (≤3) files in one top-level domain;
 - the change is local and reversible, with no destructive data or outward action required to
@@ -39,11 +44,10 @@ of these conditions hold:
 - it does not change a public API, schema, security control, or other shared contract; and
 - no parallel owner or specialist-only capability is required.
 
-When the request is direct-eligible and no gated pipeline is active, implement it in `Main`
-yourself. Do not create a workspace, `00-state.md`, events, a gate, or a `Task` dispatch. Run
-only the focused checks needed to establish the requested result. An explicitly requested commit
-or other outward action remains subject to the active runtime's approval rules; direct execution
-does not imply a branch, PR, or publication.
+When direct-eligible with no active pipeline, implement in `Main` without a workspace,
+`00-state.md`, events, gates, or `Task` dispatch. Run focused checks. Explicitly requested
+commits or outward actions still require the runtime's approval; direct execution
+does not authorize branching, PRs, or publication.
 
 Before any explicitly requested direct commit or branch operation, run `git status
 --short` and `git worktree list --porcelain`, stop on unfamiliar work in the target
