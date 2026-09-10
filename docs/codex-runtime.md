@@ -51,7 +51,8 @@ separately. It refreshes requested skill instructions and uses only reload
 controls exposed by the current backend. It verifies native components before
 reporting them active; installed manifests, skill discovery, queued refreshes,
 and manual hook tests do not prove that a running conversation uses new hooks.
-Hosts without suitable controls receive a reconnect-and-resume remedy for the
+Without suitable controls, affected components remain unverified. A reconnect
+is warranted only for a demonstrated activation requirement, preserving the
 same conversation. See [reload](../skills/reload/SKILL.md) for runtime procedures.
 
 Persistent runtime-profile changes remain a live operator decision. The first
