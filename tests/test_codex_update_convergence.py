@@ -163,15 +163,74 @@ class ConvergenceFixture(unittest.TestCase):
         self.assertEqual(receipt["domains"]["bridge"], {
             "status": "preserved",
             "bridgeStatus": "skipped-symlink-privilege",
-            "restartRequired": True,
+            "restartRequired": False,
         })
-        self.assertTrue(receipt["restartRequired"])
+        self.assertFalse(receipt["restartRequired"])
         self.assertEqual(receipt["changedDomains"], [])
         for name in CONVERGE.DOMAIN_NAMES[1:]:
             self.assertEqual(receipt["domains"][name]["status"], "current", name)
         self.assertFalse(os.path.lexists(args.old_plugin))
         self.assertEqual(list(self.plugin.parent.glob(".*.team-harness-link-*")), [])
         self.assertIn((CODEX_BIN, "mcp", "list", "--json"), native.calls)
+
+    def test_existing_alias_path_is_preserved_without_claiming_restart(self) -> None:
+        self.converge(FakeCodex(), authorize_runtime=True)
+        args = self.args()
+        old_plugin = self.plugin.with_name("0.0.0")
+        old_plugin.write_text("operator-owned alias placeholder", encoding="utf-8")
+        args.old_plugin = str(old_plugin)
+        args.old_version = "0.0.0"
+
+        receipt = CONVERGE.validate_receipt(
+            CONVERGE.run_convergence(args, native_runner=FakeCodex())
+        )
+
+        self.assertEqual(receipt["status"], "current")
+        self.assertFalse(receipt["restartRequired"])
+        self.assertEqual(receipt["domains"]["bridge"], {
+            "status": "preserved",
+            "bridgeStatus": "skipped-existing-path",
+            "restartRequired": False,
+        })
+        self.assertEqual(
+            old_plugin.read_text(encoding="utf-8"),
+            "operator-owned alias placeholder",
+        )
+
+    def test_real_feature_change_still_propagates_restart_requirement(self) -> None:
+        native = FakeCodex(features={"multi_agent": False, "multi_agent_v2": True})
+        receipt = self.converge(native, authorize_runtime=True)
+
+        self.assertEqual(receipt["domains"]["features"]["status"], "changed")
+        self.assertTrue(receipt["domains"]["features"]["restartRequired"])
+        self.assertTrue(receipt["restartRequired"])
+
+    def test_real_agent_change_still_propagates_restart_requirement(self) -> None:
+        self.converge(FakeCodex(), authorize_runtime=True)
+        agent = self.codex_home / "agents" / "architect.toml"
+        agent.unlink()
+
+        receipt = self.converge(FakeCodex())
+
+        self.assertEqual(receipt["domains"]["agents"]["status"], "changed")
+        self.assertTrue(receipt["domains"]["agents"]["restartRequired"])
+        self.assertTrue(receipt["restartRequired"])
+
+    def test_unmanaged_alias_is_reported_without_claiming_restart(self) -> None:
+        helpers = CONVERGE.load_helpers(self.plugin)
+        old_plugin = self.plugin.with_name("0.0.0")
+        old_plugin.mkdir()
+        external_target = self.base / "operator-owned-plugin"
+
+        with (
+            mock.patch.object(Path, "is_symlink", return_value=True),
+            mock.patch.object(helpers["bridge"], "link_target", return_value=external_target),
+        ):
+            result = helpers["bridge"].bridge_result(old_plugin, self.plugin)
+
+        self.assertEqual(result["status"], "skipped-unmanaged-symlink")
+        self.assertFalse(result["restartRequired"])
+        self.assertTrue(old_plugin.is_dir())
 
     def test_bridge_permission_and_unknown_errors_still_fail_closed(self) -> None:
         args = self.args()
@@ -201,11 +260,11 @@ class ConvergenceFixture(unittest.TestCase):
         self.assertEqual(receipt["status"], "converged")
         self.assertEqual(receipt["changedDomains"], ["config"])
         self.assertEqual(receipt["domains"]["bridge"]["bridgeStatus"], "skipped-read-only")
-        self.assertTrue(receipt["restartRequired"])
+        self.assertFalse(receipt["restartRequired"])
         self.assertEqual(receipt["domains"]["hooks"]["status"], "current")
         self.assertFalse(os.path.lexists(args.old_plugin))
 
-    def test_native_missing_old_snapshot_bridge_reports_restart_when_unavailable(self) -> None:
+    def test_native_missing_old_snapshot_bridge_reports_optional_alias_omission(self) -> None:
         self.converge(FakeCodex(), authorize_runtime=True)
         args = self.args()
         args.old_plugin = str(self.plugin.with_name("0.0.0"))
@@ -215,7 +274,7 @@ class ConvergenceFixture(unittest.TestCase):
         bridge = receipt["domains"]["bridge"]
         if bridge["bridgeStatus"] == "skipped-symlink-privilege":
             self.assertEqual(os.name, "nt")
-            self.assertTrue(receipt["restartRequired"])
+            self.assertFalse(receipt["restartRequired"])
             self.assertFalse(os.path.lexists(args.old_plugin))
         else:
             self.assertEqual(bridge["bridgeStatus"], "linked")
@@ -249,6 +308,7 @@ class ConvergenceFixture(unittest.TestCase):
         self.assertEqual(resumed["status"], "converged")
         self.assertNotIn("config", resumed["changedDomains"])
         self.assertIn("features", resumed["changedDomains"])
+        self.assertTrue(resumed["restartRequired"])
 
     def test_malformed_native_output_and_unsafe_hook_are_bounded_failures(self) -> None:
         malformed = FakeCodex()

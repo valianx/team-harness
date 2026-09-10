@@ -9,7 +9,9 @@ do not distinguish activation from disk state or preserve session continuity.
 - Add a shared reload skill with Codex and OpenCode procedures and an OpenCode command.
 - Rebind requested skill resources to the verified installed version.
 - Use only exposed controls of the active backend for supported refreshes.
+- Cover all applicable Team Harness components and finish independent refreshes when another component lacks host controls.
 - Verify each component independently and preserve the existing conversation on reconnect.
+- Distinguish a demonstrated restart requirement from unavailable activation evidence or a missing optional snapshot alias.
 - Run activation after successful update, keeping its result separate from installation verification.
 - Reconcile local-review readiness with verified profile activation rather than a new conversation requirement.
 - Repair the Windows OpenSpec launcher used to bind review criteria.
