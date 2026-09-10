@@ -2,17 +2,20 @@
 
 ## Codex plugin or agents do not appear
 
-Start a new thread after install or upgrade; Codex does not retrofit plugin and
-project-agent discovery into an existing thread. Confirm the marketplace and
+Run Team Harness `reload` in the existing thread after install or upgrade. It
+refreshes supported plugin components and distinguishes unavailable activation
+evidence from a demonstrated need to reconnect. Confirm the marketplace and
 plugin with `codex plugin marketplace list` and `codex plugin list`. Plugin
 installation does not install `.codex/agents/*.toml`; run the separate agent
 installer when those roles are wanted.
 
 ## Codex hooks do not run
 
-The beta hooks are POSIX-only and require explicit repository trust. Review
-`plugins/team-harness/hooks/hooks.json`, trust the checkout, and start a new
-thread. Do not use the hook-trust bypass on unreviewed code.
+Hooks have POSIX and native PowerShell launchers and require explicit trust.
+Review `plugins/team-harness/hooks/hooks.json` through the host's native trust
+flow, then use `reload` to check discovery and actual hook execution. Trust or
+missing execution evidence alone does not establish a restart requirement.
+Do not use the hook-trust bypass on unreviewed code.
 
 ## Plugin install fails: "source type not supported"
 

@@ -122,11 +122,11 @@ files, and never read another runtime's config or touch pipeline helper bundles.
 If Windows cannot create the optional snapshot alias because the symlink
 privilege is unavailable, the helper preserves the old path, verifies the
 remaining domains, and reports `bridgeStatus: skipped-symlink-privilege` with
-`restartRequired: true`. After convergence, the reload skill handles activation
-or same-conversation reconnect; this case does not require enabling Developer
-Mode or granting broader permissions.
+`restartRequired: false` for that domain. The optional alias cannot determine
+whether the live backend needs restarting; reload assesses activation separately.
+This case does not require enabling Developer Mode or granting broader permissions.
 During a retry scoped to another domain, the optional alias can also remain
-unchanged as `skipped-read-only`, with the same activation/reconnect requirement.
+unchanged as `skipped-read-only`, also without asserting a restart requirement.
 
 Accept a receipt only when it has `schemaVersion: 1`, the exact seven domains
 `bridge`, `config`, `runtime`, `features`, `agents`, `mcp`, and `hooks`, one of
@@ -169,8 +169,8 @@ the fingerprint is not reusable for a different snapshot or proposal.
 ## Result and recovery
 
 - `current`: report versions and that no managed domain changed.
-- `converged`: report versions, only the receipt's changed domains, and its
-  combined restart decision.
+- `converged`: report versions and only the receipt's changed domains; pass
+  activation signals to reload before deciding whether to propose a restart.
 - `pending-approval`: report completed changes and the deferred runtime domain;
   do not label it a failure.
 - `partial-convergence`: report the failed domain, old/new identities, completed
@@ -181,9 +181,12 @@ After `current` or `converged`, load `../reload/SKILL.md` from the validated new
 snapshot and execute it for the current conversation. This activation pass
 does not repeat installation-domain inspections or alter the receipt. Report
 the installation result and activation outcome separately. `restartRequired`
-remains unresolved until active-host evidence proves the relevant components
-loaded; a successful skill reread cannot clear it for agents or hooks. Prefer
-reconnecting and resuming the same conversation over creating a new thread.
+identifies installation domains needing activation assessment, not an automatic
+instruction to restart. A successful skill reread cannot prove active agents or
+hooks, and unavailable evidence remains unverified. Reload covers all applicable
+Team Harness components, completes supported refreshes, and proposes a restart
+only for a demonstrated remaining need, explaining the affected component and
+impact while respecting the operator's constraints.
 Do not run reload after a pending approval, partial result, or invalid receipt.
 
 An equal-version run still executes Stage B: update remains the supported

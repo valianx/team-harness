@@ -77,8 +77,8 @@ plugin still depends on it.
 
 During local plugin development, make a real file change before reinstalling so
 the development cache key changes; then run
-`codex plugin add team-harness@team-harness --json` again and start a new
-thread. If no source byte has changed, Codex may correctly reuse the same
+`codex plugin add team-harness@team-harness --json` again, then use Team Harness
+`reload` in the same thread. If no source byte has changed, Codex may correctly reuse the same
 cached snapshot.
 
 Codex requires explicit trust before repository hooks execute. The plugin wires
@@ -93,9 +93,12 @@ decisions and no Bash dependency. The launcher resolves node.exe from PATH to an
 absolute executable path, excluding the implicit current-directory search. PATH
 must identify a trusted Node installation. Malformed or throwing launchers deny
 the action without reflecting their errors. The installer
-beta's remaining shell workflows still require POSIX. An update can bridge paths that
-the current thread already knows, but newly added or renamed skills, agent or
-MCP declarations, and hook registrations still require a new Codex thread.
+beta's remaining shell workflows still require POSIX. An update can bridge paths
+the current thread already knows. Reload assesses skills, commands, agents,
+configuration, MCP services and hooks through the active host's supported
+controls. New declarations require verified discovery and activation; they do
+not by themselves require a new thread. A missing optional alias or unavailable
+observation does not demonstrate a restart requirement.
 Hook commands prefer Codex's native
 `PLUGIN_ROOT`, accept the `CLAUDE_PLUGIN_ROOT` compatibility alias that Codex
 itself provides without requiring Claude Code. POSIX commands also recover a replacement
@@ -188,13 +191,15 @@ transport, or evidence-manifest protocol.
 
 Before dispatch, Main validates the exact project-or-global agent definition
 selected by Codex against the trusted packaged `inline-reviewer.toml`: it must
-be a regular non-symlink with the exact Terra/high/read-only fields and raw-byte
+be a regular non-symlink with the packaged model, effort, read-only fields and raw-byte
 SHA-256 digest. That digest does not attest an already-loaded profile: Main
-dispatches only from a fresh Codex session that loaded the verified managed
-profile and records `profile_session` solely as that lifecycle marker, never as
-an in-memory byte attestation. Any install, setup, agent sync, mismatch, or
-scope change requires an explicit restart before inline dispatch; otherwise the
-lens is unavailable. Shipped Codex hooks cannot attest session start or loaded
+requires activation evidence for that selected definition through startup or
+supported reload and records `profile_session` solely as that lifecycle marker,
+never as an in-memory byte attestation. Setup/update that leaves the definition
+and scope unchanged preserves valid activation evidence on the same backend.
+A changed definition or scope requires activation verification; missing evidence
+makes the lens unavailable without proving a restart is needed.
+Shipped Codex hooks cannot attest session start or loaded
 agent bytes. Main resolves each range endpoint separately with hardened globals
 and `rev-parse --verify --end-of-options <rev>^{commit}`, accepting one full
 commit OID only, binds `<oid>^{tree}`, and uses only those IDs. It rejects

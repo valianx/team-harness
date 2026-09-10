@@ -14,12 +14,13 @@ credentials without copying them into prompts, files, or command-line arguments.
 
 `/instance/dispose` disposes an instance; it is not a documented Team Harness
 hot-reload guarantee. Its effects can extend beyond the requesting conversation.
-Use it only when the host can schedule a scoped instance recycle at a safe turn
+Consider it only when component evidence establishes a need that available
+refreshes cannot address and it respects the operator's constraints. Use it
+only when the host can schedule a scoped instance recycle at a safe turn
 boundary, confirms the project/session binding, shows no other active work in
-that instance, and supports reconnecting the same session. The reload request
-authorizes that scoped activation; it does not authorize interrupting other
-sessions. If any condition is unavailable, keep the action pending and provide
-the host's reconnect/resume route. Do not call dispose synchronously from the
+that instance, and supports reconnecting the same session. Do not interrupt
+other sessions. If any condition is unavailable, keep the
+action pending and complete independent refreshes. Do not call dispose synchronously from the
 active agent tool or use global disposal as a fallback.
 
 After a supported recycle completes, verify that the original session ID and
@@ -29,9 +30,10 @@ hooks may have additional caches: a fresh `/agent` response or successful dispos
 does not prove those were replaced. Require active-host skill and hook evidence
 where applicable, and leave unsupported observations unverified.
 
-Without host control, reread the requested workflow from the verified native
-installation and report the remaining components as `reconnect-required`.
-Use OpenCode's native session continuation/history to reopen this conversation
+Without host control, reread the active workflow from the verified native
+installation and report unverifiable components as `partial`; missing controls
+alone do not establish a need to recycle. After a supported reconnect, use
+OpenCode's native session continuation/history to reopen this conversation
 after reconnecting its backend; do not create a new session by default. Check the
 installed CLI help before supplying version-dependent resume syntax.
 

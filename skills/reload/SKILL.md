@@ -1,6 +1,6 @@
 ---
 name: reload
-description: Activate an already installed Team Harness version in the current Codex or OpenCode conversation, using available host reload capabilities and reporting components that still require reconnecting the runtime. Use after update or when a session retains old skills or hooks.
+description: Reload all installed Team Harness components in the current Codex or OpenCode conversation, verify activation, and avoid restarting when supported refreshes suffice. Use after update or when a session retains old plugin resources.
 ---
 
 # Reload Team Harness
@@ -29,29 +29,54 @@ Read only the matching runtime procedure:
 
 ## Activation contract
 
+Cover the whole Team Harness installation: skill and command discovery, active
+workflow instructions and supporting resources, agent definitions, effective
+plugin configuration, hooks, and plugin-provided or configured MCP services.
+Use the installation manifest, runtime adapter and existing update evidence to
+identify applicable components; mark absent integrations as not applicable.
+Keep unrelated plugins and operator settings outside the operation's scope.
+
 Use a host capability only when it is actually callable and bound to the current
 backend and conversation. A documented API is not automatically an available
 tool. Never start a second server to claim the first was refreshed, guess ports,
 scan for credentials, rewrite old cache paths, or edit hook trust records.
 
-Read the requested workflow's new skill instructions and resolve its subsequent
-resources under the validated installation. This refreshes instructions in the
-conversation, not native discovery, loaded agents, hooks, or MCP processes. Keep
-the operator's scope, approvals, selected model, and ongoing work intact.
+Refresh discovery for all Team Harness skills and commands. Read the active
+workflow's new instructions and resolve later skill/resource reads under the
+validated installation; do not inject every unrelated workflow into the task.
+Instruction rereading alone does not refresh loaded agents, hooks or MCP
+processes. Keep the operator's scope, approvals, selected model and ongoing work.
 
-Attempt each supported refresh once. Verify its result from that same active
-backend, after the refresh has completed. A queued acknowledgement, installed
-manifest, discovery listing, or standalone script test cannot prove that hooks
+Attempt each supported refresh once and complete independent components even
+when another has no available control. Verify its result from that same active
+backend after completion. Preserve prior activation evidence for unchanged
+component definitions when the backend identity is unchanged. A queued
+acknowledgement, installed manifest, discovery listing or standalone script
+test cannot prove that hooks
 executed by the conversation have changed. Use a harmless native operation and
 its actual hook execution evidence when available; never execute a destructive
 operation to test a deny rule. Unknown identity or unavailable evidence remains
 unverified, even when the command returned success.
 
-A backend restart must happen through a supported host operation that preserves
-the conversation, at a safe turn boundary. If the host cannot arrange it, give
-the exact reconnect/resume step for this conversation. Do not kill the runtime
-executing the current tool, terminate unrelated sessions, delete history, or
-create a replacement conversation as the default remedy.
+### When a restart is actually needed
+
+Missing controls or evidence, an old injected path, an optional snapshot alias
+failure, and an installation receipt's `restartRequired` flag do not by
+themselves establish that the live backend needs restarting. Keep unverifiable
+components pending without prescribing a restart or treating them as active.
+
+Propose reconnecting only for an identified component whose stale activation
+is observed or whose changed setting is documented as requiring restart in the
+active runtime, after available refreshes cannot apply it. First complete the
+remaining independent reload work. Explain the component, evidence, unavailable
+or unsuccessful refresh, effect of deferring, and smallest reconnect scope.
+Keep an operator-requested no-restart constraint in force while completing all
+available refreshes; report a demonstrated remaining limitation specifically.
+A reconnect must use a supported host operation preserving the conversation at
+a safe turn boundary, then verify activation. If unavailable, report the exact
+same-conversation reconnect/resume route for the affected component. Do not kill
+the runtime executing the current tool, interrupt unrelated sessions, delete
+history or create a new task.
 
 ## Result
 
@@ -59,12 +84,10 @@ Report in the operator's language:
 
 - Installed target version and root; observed active version, or `unknown`.
 - Components verified active, resources reread only, and components pending.
-- One outcome, in this precedence order: `blocked` for invalid target identity
-  or an unavailable requested installation; `reconnect-required` whenever any
-  required component needs the existing runtime to reconnect, even if others
-  refreshed; `active` only when every relevant component has fresh active-host
-  evidence; otherwise `partial` for pending components without a reconnect
-  requirement.
+- One outcome: `blocked` for invalid target identity or an unavailable requested
+  installation; `reconnect-required` only for a demonstrated need described
+  above; `active` when every applicable component has valid active-host evidence;
+  otherwise `partial`.
 - The smallest remaining action, with the same conversation ID when available.
 
 Do not infer `active` from the absence of reported errors. Keep installation

@@ -49,7 +49,7 @@ HOOK_DIGESTS = {
     "hooks/dist/gate-guard.cjs": "405d76c700ec7f225fd7935d16946fea16064a76b7b06b0951b33ab81006aa52",
 }
 HELPER_DIGESTS = {
-    "skills/update/scripts/bridge_snapshot.py": "6fffc361df2b0465020cedb793c7f63503666d980a26a9fcf5e3747069819e6e",
+    "skills/update/scripts/bridge_snapshot.py": "606a16f312326350333c95518eed578a2cecdc415c70bf463bca3be56155b046",
     "skills/setup/scripts/manage_config.py": "49175207918335c7323deeb0cb38a6253c78b6595cd724c6b15e1c5ae46f4d31",
     "skills/setup/scripts/manage_runtime.py": "b96d3b25a82a039020954869e47b96001b6c957ae6578723f74f386c6a53f774",
     "skills/setup/scripts/manage_agents.py": "defb1ee1531bba5dee8a92756684f48f81b6c75a0a6938066779c5361b00b976",

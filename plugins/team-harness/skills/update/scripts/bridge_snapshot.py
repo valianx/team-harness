@@ -110,7 +110,11 @@ def bridge_result(old_plugin: Path, new_plugin: Path, *, apply: bool = True) -> 
         if not old_plugin.is_symlink():
             return outcome(
                 "skipped-existing-path",
-                restart_required=True,
+                # This alias is optional.  Preserving an existing path does
+                # not establish a host/runtime restart requirement; the
+                # reload layer owns activation evidence and can report a
+                # reconnect only when it observes one.
+                restart_required=False,
                 oldPlugin=str(old_plugin),
                 newPlugin=str(new_snapshot),
                 version=version,
@@ -119,7 +123,7 @@ def bridge_result(old_plugin: Path, new_plugin: Path, *, apply: bool = True) -> 
         if current_target.parent != cache_parent:
             return outcome(
                 "skipped-unmanaged-symlink",
-                restart_required=True,
+                restart_required=False,
                 oldPlugin=str(old_plugin),
                 currentTarget=str(current_target),
                 newPlugin=str(new_snapshot),
@@ -138,7 +142,7 @@ def bridge_result(old_plugin: Path, new_plugin: Path, *, apply: bool = True) -> 
     if not apply:
         return outcome(
             "skipped-read-only",
-            restart_required=True,
+            restart_required=False,
             oldPlugin=str(old_plugin),
             newPlugin=str(new_snapshot),
             version=version,
@@ -157,7 +161,7 @@ def bridge_result(old_plugin: Path, new_plugin: Path, *, apply: bool = True) -> 
                 raise
             return outcome(
                 "skipped-symlink-privilege",
-                restart_required=True,
+                restart_required=False,
                 oldPlugin=str(old_plugin),
                 newPlugin=str(new_snapshot),
                 version=version,

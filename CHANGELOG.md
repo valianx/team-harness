@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.29.4] - 2026-09-10
+
+### Fixed
+
+- Reload covers all applicable Team Harness components and preserves valid activation evidence for unchanged definitions, without inferring restart requirements from missing controls or observations.
+- Optional Codex snapshot aliases no longer request a restart when Windows cannot create them or an existing path is preserved.
+- Codex intake and troubleshooting no longer require a new session after every install or update.
+
 ## [3.29.3] - 2026-09-09
 
 ### Fixed
