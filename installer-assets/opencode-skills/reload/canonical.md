@@ -37,9 +37,10 @@ backend and conversation. A documented API is not automatically an available
 tool. Never start a second server to claim the first was refreshed, guess ports,
 scan for credentials, rewrite old cache paths, or edit hook trust records.
 
-Refresh discovery for all Team Harness skills and commands. Read the active
-workflow's new instructions and resolve later skill/resource reads under the
-validated installation; do not inject every unrelated workflow into the task.
+Refresh discovery for all Team Harness skills and commands. Reread the flows
+relevant to the current request from the validated installed Team Harness
+version. Use those updated instructions for the current request and subsequent
+resource reads.
 Instruction rereading alone does not refresh loaded agents, hooks or MCP
 processes. Keep the operator's scope, approvals, selected model and ongoing work.
 
