@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.29.5] - 2026-09-10
+
+### Fixed
+
+- Orchestrators in Claude Code, Codex, and OpenCode explicitly evaluate specialist and adversarial findings as recommendations from limited context, choosing whether to accept, adapt, or reject a proposed remedy.
+
 ## [3.29.4] - 2026-09-10
 
 ### Fixed
