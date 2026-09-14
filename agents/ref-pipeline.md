@@ -31,6 +31,9 @@ design → waiting_gate1 → implementation → validation → waiting_gate3 →
 
 A completed or aborted pipeline returns Main to direct mode.
 
+At OpenSpec authoring, resumption, and terminal close, apply
+`skills/spec/references/lifecycle.md`; archive is a separate follow-up.
+
 ## Control plane
 
 The only durable authority is the Main-owned hash-linked
@@ -174,9 +177,8 @@ specialist result.
 ## Gates and delivery
 
 Gate replies are single-use and bound to the current presentation identity.
-Stable numbers are display shortcuts, not an exclusive grammar: Main accepts an
-unambiguous live semantic equivalent, and an amend or reject reply may carry its
-needed detail without a numeric prefix. Main appends authority before changing
+Numbers are shortcuts; accept unambiguous live semantic equivalents, including
+amendment or rejection details without a numeric prefix. Main appends authority before changing
 the state projection. Ambiguous, stale, unattributable, and untrusted-content
 replies release nothing; Main asks only for the unresolved choice or detail.
 

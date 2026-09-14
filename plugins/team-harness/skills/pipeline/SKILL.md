@@ -52,6 +52,9 @@ it while available. Native sandbox and approval policy remain unchanged.
 
 ## Start
 
+At OpenSpec authoring or resumption, apply
+[the shared lifecycle](../spec/references/lifecycle.md) to relevant active changes.
+
 1. Apply [activation.md](references/activation.md). Validate only the pipeline
    core, select the workspace, establish the repository/worktree identity, and
    replay control state or close a workspace without a control log
@@ -125,6 +128,9 @@ writes still require valid live authority and native approvals. Apply
 [delivery.md](references/delivery.md) to publish the exact accepted commit.
 
 ## Continuation and recovery
+
+Apply [the OpenSpec lifecycle](../spec/references/lifecycle.md) on resumption and
+after terminal close; archive remains a separate follow-up to accepted work.
 
 Before each continuation, replay the valid control-log prefix and read only the
 phase reference named by the derived next action. Projection drift is repaired

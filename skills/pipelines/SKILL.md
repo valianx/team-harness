@@ -1,6 +1,6 @@
 ---
 name: pipelines
-description: Show current state of all pipelines in workspaces.
+description: Show pipeline state and pending OpenSpec completion or retirement.
 ---
 
 # Pipeline Status Renderer
@@ -9,6 +9,11 @@ This skill is a read-only renderer. It never edits a workspace, appends events, 
 field, or changes `00-state.md`. The coordinator is the sole writer of coordination state.
 
 ## Scan
+
+Use [the OpenSpec lifecycle](../spec/references/lifecycle.md) to append a separate
+read-only list of pending archives in the current or already-bound repositories.
+Include direct-mode changes; no pipeline state files does not suppress this list.
+Do not infer acceptance, delivery, or obsolescence from checked tasks alone.
 
 1. Resolve candidate roots with packaged `workspace-identity.mjs`; use persisted
    identities and never synthesize today's path or merge local/Obsidian copies.

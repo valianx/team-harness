@@ -41,3 +41,6 @@ its expected SHA-256 before an event can cite it.
 
 Append a terminal transition event first, then rebuild the terminal projection.
 Never mark only the projection complete or aborted.
+
+Then apply `skills/spec/references/lifecycle.md` for OpenSpec completion or
+retirement. Pending archive never blocks the terminal transition.

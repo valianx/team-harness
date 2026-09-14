@@ -86,7 +86,9 @@ if _IS_WINDOWS:
     _FILE_SYNCHRONOUS_IO_NONALERT = 0x00000020
     _FILE_OPEN_REPARSE_POINT = 0x00200000
 
-    _FILE_DISPOSITION_INFORMATION = 13
+    _FILE_DISPOSITION_INFORMATION_EX = 64
+    _FILE_DISPOSITION_FLAG_DELETE = 0x00000001
+    _FILE_DISPOSITION_FLAG_IGNORE_READONLY_ATTRIBUTE = 0x00000010
     _FILE_END_OF_FILE_INFORMATION = 20
     _FILE_RENAME_INFORMATION = 10
     _FILE_LINK_INFORMATION = 11
@@ -140,8 +142,8 @@ if _IS_WINDOWS:
         ]
 
 
-    class _FILE_DISPOSITION_INFORMATION_STRUCT(ctypes.Structure):
-        _fields_ = [("DeleteFile", wintypes.BOOLEAN)]
+    class _FILE_DISPOSITION_INFORMATION_EX_STRUCT(ctypes.Structure):
+        _fields_ = [("Flags", wintypes.ULONG)]
 
 
     class _FILE_END_OF_FILE_INFORMATION_STRUCT(ctypes.Structure):
@@ -880,8 +882,15 @@ else:
         )
         del info
         try:
-            data = _FILE_DISPOSITION_INFORMATION_STRUCT(DeleteFile=True)
-            _set_information(native_target, _FILE_DISPOSITION_INFORMATION, data)
+            # Git's pack and loose-object files are read-only on Windows. Use
+            # the extended disposition flags on the already validated handle.
+            data = _FILE_DISPOSITION_INFORMATION_EX_STRUCT(
+                Flags=(
+                    _FILE_DISPOSITION_FLAG_DELETE
+                    | _FILE_DISPOSITION_FLAG_IGNORE_READONLY_ATTRIBUTE
+                )
+            )
+            _set_information(native_target, _FILE_DISPOSITION_INFORMATION_EX, data)
         finally:
             _close_native(native_target)
 

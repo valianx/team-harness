@@ -32,6 +32,9 @@ specialist by default.
 
 ## Flow
 
+At entry, resumption, and before changing requirements, apply
+[the shared OpenSpec lifecycle](references/lifecycle.md) to the relevant active changes.
+
 Main repairs operational failures before treating the objective as blocked. A
 wrong path, malformed contract, missing tool/library or recoverable transport
 error is not a new approval step when its repair preserves the approved
@@ -90,20 +93,19 @@ new effect.
    only verified repairs and authorized spec amendments are eligible. A reviewed closure pass over
    a fix runs only on an explicit live operator request, with the prior review anchor; the script
    refuses a second full scope. The lane opens no other review.
-6. **Publish.** First satisfy the author-review decision and completion conditions in
+6. **Deliver.** Preserve the agreed delivery and repository conventions. If no PR
+   is required, complete applicable validation and acceptance, record local delivery,
+   and continue to close. For PR delivery, first satisfy the author-review decision and completion conditions in
    [author-review.md](references/author-review.md); a pending offer holds publication. Open the
    pull request under existing branch, commit and outward-action conventions. The coordinator's
    publication decision is distinct from the historical gate result and is not mechanically enforced
    by `gh pr create`; when the in-lane security path applies, follow the mandatory closure conditions
    in [author-review.md](references/author-review.md). Continue already authorized publication once
    these conditions hold, without an extra permission or review ceremony.
-7. **Archive.** Check the pull request state once. When it reports merged, offer
-   `openspec archive <change>` behind a one-line Y/n; on acceptance, run it on a branch delivered
-   through an ordinary pull request — a dedicated chore or the next pull request that follows the
-   merge — never this run's own pull request, never a direct default-branch push. When the pull request is not yet merged, record the archive as pending instead. Archive
-   never runs silently, and a declined or deferred offer never blocks close — either way, note the
-   disposition for a later explicit request. Identical semantics to the pipeline's terminal-close
-   step (`agents/_shared/orchestrator-state.md § "Terminal status write — mandatory"`).
+7. **Close and offer archive.** Apply [the shared lifecycle](references/lifecycle.md)
+   after validation and delivery, including accepted delivery without a PR or a PR
+   merged elsewhere. Report pending archive or reconciliation and preserve a declined
+   offer. Upstream apply completion returns to this flow for validation and closure.
 
 ## Operator plan
 

@@ -1,12 +1,12 @@
 # spec-direct-lane Specification
 
 ## Purpose
-Give short tasks a durable spec without the pipeline floor. `/th:spec` is a coordinator-only OpenSpec flow: written intent and task decomposition, one conversational approval, inline implementation, archive after merge — zero specialist dispatches, no pipeline ceremony.
+Give short tasks a durable spec without the pipeline floor. `/th:spec` is a coordinator-only OpenSpec flow: written intent and task decomposition, one conversational approval, inline implementation, and an archive offer after accepted delivery or a retirement decision — zero specialist dispatches, no pipeline ceremony.
 
 ## Requirements
 
 ### Requirement: The direct lane runs without pipeline activation or specialist dispatches
-`/th:spec` SHALL execute entirely in the coordinator: author `proposal.md` + `tasks.md` under `openspec/changes/` (adding `design.md` or spec deltas only when the task touches a specced capability), validate strictly with the pinned CLI, obtain one conversational approval turn, implement inline on a feature branch with monotonic task checkoffs, and open a normal PR under existing conventions. The lane SHALL create no workspace, state, events, summary, snapshot, overlay, traceability artifact, or gate ceremony, and SHALL dispatch no specialist by default. At most one full-scope ad hoc review MAY run on live operator request; the lane never runs a correction/re-audit loop. The lane SHALL describe its publication guarantee in terms of what it produces, and MUST NOT state a publication precondition that no deterministic control enforces.
+`/th:spec` SHALL execute entirely in the coordinator: author `proposal.md` + `tasks.md` under `openspec/changes/` (adding `design.md` or spec deltas only when the task touches a specced capability), validate strictly with the pinned CLI, obtain one conversational approval turn, implement inline on a feature branch with monotonic task checkoffs, and deliver under the agreed repository conventions, opening a normal PR when required. The lane SHALL create no workspace, state, events, summary, snapshot, overlay, traceability artifact, or gate ceremony, and SHALL dispatch no specialist by default. At most one full-scope ad hoc review MAY run on live operator request; the lane never runs a correction/re-audit loop. The lane SHALL describe its publication guarantee in terms of what it produces, and MUST NOT state a publication precondition that no deterministic control enforces.
 
 #### Scenario: A short task worth written intent arrives
 - **WHEN** the operator routes a single-repo, roughly day-sized task through `/th:spec`
@@ -61,3 +61,30 @@ Lane-authored changes SHALL use the same `openspec/changes/` directory, schema, 
 #### Scenario: A lane change and a pipeline change coexist
 - **WHEN** both flows have changes in flight
 - **THEN** both validate under the same pinned CLI and archive through the same lifecycle with no lane-specific layout
+
+### Requirement: Completion and retirement remain visible across runtimes
+Claude Code, Codex, and OpenCode SHALL apply the shared lifecycle at authoring, resumption, close, and read-only status. Completed tasks SHALL identify candidates, not prove acceptance or delivery. Main SHALL offer archive after verified accepted delivery without a required PR or with a merged PR, and SHALL surface concrete requirement conflicts in relevant active changes. Retirement of a cancelled or wholly superseded change SHALL require operator authority and SHALL NOT apply its deltas. Partial supersession SHALL be reconciled before archive. Pending or declined archive SHALL NOT block close or create pipeline state.
+
+#### Scenario: Accepted local delivery has no PR
+- **WHEN** completed work is verified and accepted under a delivery agreement requiring no PR
+- **THEN** Main offers archive and only executes it with applicable operator authority
+
+#### Scenario: A PR was merged in another session
+- **WHEN** resumed work has completed validation and its associated PR now reports merged
+- **THEN** Main offers archive without requiring a merge observed by the original session
+
+#### Scenario: A replacement leaves an older change partially obsolete
+- **WHEN** changed requirements contradict part of another active change while other requirements remain valid
+- **THEN** Main identifies both sources and offers reconciliation before applying or retiring the older change
+
+#### Scenario: An unimplemented change was cancelled
+- **WHEN** the operator approves retirement of that change
+- **THEN** Main archives without applying its deltas or falsely marking unfinished tasks complete
+
+#### Scenario: Status is requested for completed direct work
+- **WHEN** the change has no pipeline workspace
+- **THEN** pipelines and trace report its pending archive and missing evidence without creating pipeline state or executing archive
+
+#### Scenario: Archive was declined or delivery remains pending
+- **WHEN** the operator declines archive, validation is missing, or a required PR is open or absent
+- **THEN** Main closes the current task with the reason visible, without repeated unchanged offers or an automatic archive

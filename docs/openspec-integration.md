@@ -118,6 +118,11 @@ log is closed administratively with one events entry and offered inline continua
 run. A spec-only reading view is not a pipeline recovery target. Source drift makes the pipeline projection stale and routes back to Design; a valid completed Design
 resumes at Gate 1.
 
-OpenSpec `sync` and `archive` remain outside implementation authority. They are offered only after
-TH acceptance and the applicable Gate 3/operator authority. They cannot replace push/PR authority
-or retroactively validate the shipped tree.
+OpenSpec `sync` and `archive` remain outside implementation authority and cannot
+retroactively validate the shipped tree or replace push/PR authority. Main applies
+the [shared completion and retirement lifecycle](../skills/spec/references/lifecycle.md)
+at authoring, resumption and close in every runtime. Accepted delivery without a
+PR and a PR merged elsewhere can both lead to an archive offer. Cancellation or
+wholesale supersession uses an approved retirement without applying obsolete
+deltas; partial supersession requires reconciliation. Pending archive is visible
+in task close and read-only status, including direct work without pipeline state.
