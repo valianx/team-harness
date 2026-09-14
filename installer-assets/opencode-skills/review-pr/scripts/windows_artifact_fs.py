@@ -728,7 +728,12 @@ else:
             flags=flags,
             allow_reparse=True,
             type_constraint=False,
-            desired_access=_DELETE | _FILE_READ_ATTRIBUTES | _SYNCHRONIZE,
+            desired_access=(
+                _DELETE
+                | _FILE_READ_ATTRIBUTES
+                | _FILE_WRITE_ATTRIBUTES
+                | _SYNCHRONIZE
+            ),
         )
         info = _query_attributes(native_handle)
         is_directory = bool(info.FileAttributes & _FILE_ATTRIBUTE_DIRECTORY)
