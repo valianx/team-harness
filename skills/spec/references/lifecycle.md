@@ -38,7 +38,7 @@ Show the change, the reason it is ready, and whether the operation will update
 living specs or only retire the proposal. Reuse an explicit live authorization
 covering that operation; otherwise ask one brief confirmation. A decline or
 deferral leaves the disposition visible and never blocks task close. Do not
-repeat the same offer without a new request or material evidence change.
+repeat the same offer without a new request to archive or material evidence change.
 
 Use the pinned upstream `openspec archive <change>` for completed work and
 `openspec archive <change> --skip-specs` for approved cancellation or wholesale

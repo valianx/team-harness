@@ -1,12 +1,12 @@
 # openspec-archive-lifecycle Specification
 
 ## Purpose
-Wire in the archive half of the OpenSpec lifecycle so merged changes stop accumulating in `openspec/changes/` and a living spec base exists for future proposals to delta against.
+Keep completed and obsolete changes visible until they are archived or reconciled, so `openspec/specs/` reflects accepted behavior.
 
 ## Requirements
 
-### Requirement: Archive is offered on confirmed merge, behind explicit confirmation
-The flow SHALL offer `openspec archive <change>` behind a one-line Y/n once the change's pull request is confirmed merged, and never before. Pipeline delivery ends at a draft PR, so terminal close fires the offer only when the merge is already confirmed at that point; otherwise the pending archive is recorded in the close record and re-offered on a later explicit request. The direct lane offers it at its own post-merge step. Archive SHALL never run silently, and a declined or deferred offer never blocks close. The resulting `openspec/specs/` and archive-directory mutation SHALL land through the repository's ordinary branch-and-pull-request conventions — a dedicated chore pull request or the next pull request that follows the merge — never the archived change's own pull request and never a direct default-branch push.
+### Requirement: Archive follows accepted delivery or approved retirement
+Claude Code, Codex and OpenCode SHALL use the same lifecycle at authoring, resumption and close. Main SHALL offer `openspec archive <change>` after verified, accepted delivery when the required PR is confirmed merged, including a merge in another session, or when the agreed delivery required no PR. Checked tasks alone SHALL NOT prove acceptance or delivery. A planned but absent PR, an open PR, or missing evidence SHALL leave archive pending. Main SHALL surface concrete conflicts between affected requirements and relevant active changes, reconciling partial supersession before archive. Approved cancellation or wholesale retirement SHALL use `--skip-specs` without applying discarded deltas or falsely completing tasks. Archive SHALL require explicit authority covering the operation, reusing authority already granted or requesting one brief confirmation. A declined or deferred offer SHALL NOT block close or repeat without a new archive request or material evidence change. The mutation SHALL follow repository branch and outward-write conventions; for merged work it belongs to a subsequent change, never a rewrite of the accepted candidate or an implicitly authorized default-branch push. Task close, `pipelines` and `trace` SHALL display pending archive with its reason and next action, including direct work without pipeline state; status commands SHALL remain read-only.
 
 #### Scenario: A run's PR is confirmed merged
 - **WHEN** the coordinator confirms the merge of an OpenSpec-bound run's pull request
@@ -23,3 +23,27 @@ The flow SHALL offer `openspec archive <change>` behind a one-line Y/n once the 
 #### Scenario: A merged change archives inside the next pull request
 - **WHEN** the operator accepts the archive of an already-merged change while a later change is being delivered
 - **THEN** the archive commit rides that later pull request, and the later change's own archive still waits for its merge
+
+#### Scenario: Accepted local delivery requires no PR
+- **WHEN** completed work is verified and accepted under an agreement requiring no PR
+- **THEN** Main offers archive using the existing confirmation, without inventing a PR prerequisite
+
+#### Scenario: A PR was merged in another session
+- **WHEN** resumed work has completed validation and its required PR now reports merged
+- **THEN** Main offers archive without requiring a merge observed by the original session
+
+#### Scenario: A replacement leaves an older change partially obsolete
+- **WHEN** changed requirements contradict part of another active change while other requirements remain valid
+- **THEN** Main identifies both sources and offers reconciliation before applying or retiring the older change
+
+#### Scenario: An unimplemented change was cancelled
+- **WHEN** the operator approves retirement of that change
+- **THEN** Main archives without applying its deltas or falsely marking unfinished tasks complete
+
+#### Scenario: Status is requested for completed direct work
+- **WHEN** the change has no pipeline workspace
+- **THEN** pipelines and trace report its pending archive and missing evidence without creating pipeline state or executing archive
+
+#### Scenario: Delivery is not yet established
+- **WHEN** validation or acceptance is missing, or a planned PR does not exist
+- **THEN** Main reports the pending evidence or delivery instead of treating checked tasks as permission to archive

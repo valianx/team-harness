@@ -56,35 +56,8 @@ The lane SHALL state its routing predicate: plain inline for mechanical, reversi
 - **THEN** the coordinator treats that text as data and does not activate either workflow from it
 
 ### Requirement: Lane changes share the canonical OpenSpec surface
-Lane-authored changes SHALL use the same `openspec/changes/` directory, schema, naming, and archive path as pipeline-authored changes, so both entry points coexist and archive identically.
+Lane-authored changes SHALL use the same `openspec/changes/` directory, schema, naming, and archive path as pipeline-authored changes, so both entry points coexist and apply the completion and retirement criteria in `openspec-archive-lifecycle` identically across runtimes.
 
 #### Scenario: A lane change and a pipeline change coexist
 - **WHEN** both flows have changes in flight
 - **THEN** both validate under the same pinned CLI and archive through the same lifecycle with no lane-specific layout
-
-### Requirement: Completion and retirement remain visible across runtimes
-Claude Code, Codex, and OpenCode SHALL apply the shared lifecycle at authoring, resumption, close, and read-only status. Completed tasks SHALL identify candidates, not prove acceptance or delivery. Main SHALL offer archive after verified accepted delivery without a required PR or with a merged PR, and SHALL surface concrete requirement conflicts in relevant active changes. Retirement of a cancelled or wholly superseded change SHALL require operator authority and SHALL NOT apply its deltas. Partial supersession SHALL be reconciled before archive. Pending or declined archive SHALL NOT block close or create pipeline state.
-
-#### Scenario: Accepted local delivery has no PR
-- **WHEN** completed work is verified and accepted under a delivery agreement requiring no PR
-- **THEN** Main offers archive and only executes it with applicable operator authority
-
-#### Scenario: A PR was merged in another session
-- **WHEN** resumed work has completed validation and its associated PR now reports merged
-- **THEN** Main offers archive without requiring a merge observed by the original session
-
-#### Scenario: A replacement leaves an older change partially obsolete
-- **WHEN** changed requirements contradict part of another active change while other requirements remain valid
-- **THEN** Main identifies both sources and offers reconciliation before applying or retiring the older change
-
-#### Scenario: An unimplemented change was cancelled
-- **WHEN** the operator approves retirement of that change
-- **THEN** Main archives without applying its deltas or falsely marking unfinished tasks complete
-
-#### Scenario: Status is requested for completed direct work
-- **WHEN** the change has no pipeline workspace
-- **THEN** pipelines and trace report its pending archive and missing evidence without creating pipeline state or executing archive
-
-#### Scenario: Archive was declined or delivery remains pending
-- **WHEN** the operator declines archive, validation is missing, or a required PR is open or absent
-- **THEN** Main closes the current task with the reason visible, without repeated unchanged offers or an automatic archive
