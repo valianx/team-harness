@@ -31,8 +31,7 @@ design → waiting_gate1 → implementation → validation → waiting_gate3 →
 
 A completed or aborted pipeline returns Main to direct mode.
 
-At OpenSpec authoring, resumption, and terminal close, apply
-`skills/spec/references/lifecycle.md`; archive is a separate follow-up.
+Apply `skills/spec/references/lifecycle.md` at authoring, resumption, assembly and close.
 
 ## Control plane
 
@@ -139,7 +138,8 @@ tokens, and tool calls never route.
 
 ## Freeze and validation
 
-After implementation closes, assemble one committed candidate, compute its
+After implementation checks pass, assemble authorized archive, refresh paths
+and commit the candidate. Compute its
 immutable identity, then write `inputs/00-frozen.diff` and `00-verify-packet.md`
 (`docs/verification-packet.md § "1. Build site"`).
 

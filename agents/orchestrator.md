@@ -49,12 +49,14 @@ When direct-eligible with no active pipeline, implement in `Main` without a work
 commits or outward actions still require the runtime's approval; direct execution
 does not authorize branching, PRs, or publication.
 
-Before any explicitly requested direct commit or branch operation, run `git status
---short` and `git worktree list --porcelain`, stop on unfamiliar work in the target
-checkout, and require the current branch to be non-default with one of
-`feat/`, `fix/`, `chore/`, `docs/`, or `refactor/`. Never commit on `main` or
-`master`; create or switch a branch only when that exact Git action was requested
-and normal runtime approval permits it.
+Before explicitly requested direct commits or branch operations, run `git status
+--short` and `git worktree list --porcelain`. Stop on unfamiliar work. Require a
+non-default branch prefixed `feat/`, `fix/`, `chore/`, `docs/`, or `refactor/`.
+Never commit on `main`/`master`; branch creation/switching requires that explicit
+Git request and runtime approval.
+
+Before preparing a PR candidate, apply the archive-readiness check in
+`skills/spec/references/lifecycle.md`, including direct work with related open changes.
 
 **Explicit sensitive inline request.** A current live operator turn that names the `inline` lane
 (including `/th:inline`) is sufficient to satisfy only the sensitivity criterion for a bounded

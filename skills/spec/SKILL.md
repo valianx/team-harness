@@ -70,10 +70,16 @@ new effect.
    unverified even after exit zero; unrelated optional skips do not erase sufficient evidence.
    For a bug fix, optionally use [before/after evidence](references/author-review.md#optional-fix-evidence)
    when it adds useful proof without a new runner or mandatory review.
+   Once implementation and its relevant checks are complete, apply the
+   [shared lifecycle](references/lifecycle.md) to prepare authorized archive on this branch before
+   committing the final review candidate. Keep the resulting living specs and
+   archived change in the same PR as the implementation.
 5. **Classify and validate.** Before publication, build the anchored package for the committed
    branch with `skills/verify/scripts/review-fan.mjs`; this deterministic step always classifies
    the completed changed surface and binds the validated requirements as `written-intent`
    criteria. Offer the optional [author review](references/author-review.md) using that classification.
+   For an archived change, select its exact `archive/YYYY-MM-DD-<change>` reference
+   with `--change`, so the package includes the archive and final specs.
    When it reports `security_floor.applies`, stop for the live three-way choice in
    § Escalation. Selecting the in-lane path makes the package's `security` and `adversary` lenses
    mandatory and runs the one full-scope review without waiting for another request. When the
@@ -87,7 +93,7 @@ new effect.
      counted as a round.
    - **uncovered, above the floor** — the authored change failed to anticipate it, which is a
      defect in the change rather than a new finding. Explain the needed revision to the operator,
-     revise `openspec/changes/<change>/`, revalidate, and obtain only missing scope approval,
+     revise the bound change at its current source location, revalidate, and obtain only missing scope approval,
      reusing live authorization already given. Never answer it with another review.
    - **uncovered, below the floor** — record it as a pull-request concern.
 
@@ -106,10 +112,10 @@ new effect.
    by `gh pr create`; when the in-lane security path applies, follow the mandatory closure conditions
    in [author-review.md](references/author-review.md). Continue already authorized publication once
    these conditions hold, without an extra permission or review ceremony.
-7. **Close and offer archive.** Apply [the shared lifecycle](references/lifecycle.md)
-   after validation and delivery, including accepted delivery without a PR or a PR
-   merged elsewhere. Report pending archive or reconciliation and preserve a declined
-   offer. Upstream apply completion returns to this flow for validation and closure.
+7. **Close.** Report delivery and any pending archive or reconciliation under
+   [the shared lifecycle](references/lifecycle.md). Work already delivered without
+   archive can receive a recovery offer; preserve declined offers. Upstream apply
+   completion returns to this flow for candidate assembly, validation and closure.
 
 ## Operator plan
 

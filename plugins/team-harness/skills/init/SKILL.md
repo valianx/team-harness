@@ -21,6 +21,10 @@ operator's request and available context to accept, adapt, or reject recommendat
 with reasons grounded in evidence. Evaluate the underlying finding independently
 of the proposed remedy; severity alone does not mandate that remedy.
 
+Before preparing a PR candidate, apply the archive-readiness check in
+[the shared lifecycle](../spec/references/lifecycle.md), including direct work
+with related open changes. Complete any authorized archive before final review.
+
 ## Workspace-free inline reviews
 
 For a live, non-PR request while `Main` is inline, use the shared contract in

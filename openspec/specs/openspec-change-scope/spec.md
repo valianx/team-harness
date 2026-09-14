@@ -20,12 +20,16 @@ An active change under `openspec/changes/` SHALL add or modify at least one capa
 - **THEN** the scope test fails naming the change
 
 ### Requirement: Completed changes are archived by the PR that finishes them
-Once the pull request that checks the last task of a change is confirmed merged, `openspec archive <change>` SHALL land through a dedicated chore pull request or the next pull request that follows it, never through the completing pull request itself. A change reported complete by `openspec list` across two releases is a lint warning naming the change.
+Once implementation and its relevant checks are complete, Main SHALL prepare authorized archive on the feature branch before final review, following `openspec-archive-lifecycle`. The completing PR SHALL contain implementation, updated living specs and the archived change unless the operator declines or defers archive; that exception SHALL remain pending without blocking ordinary review or delivery. A later PR is a recovery path for a missed or deferred archive. A change reported complete by `openspec list` across two releases is a lint warning naming the change.
 
 #### Scenario: A change completes without archive
 - **WHEN** `openspec list` reports a change complete and the release that followed did not archive it
 - **THEN** `/th:lint` warns with the change name
 
-#### Scenario: The next feature pull request carries the archive
-- **WHEN** a completed change's pull request is confirmed merged and the next pull request runs `openspec archive <change>`
-- **THEN** the archive is accepted as the post-merge vehicle without a separate chore pull request
+#### Scenario: The completing pull request carries the archive
+- **WHEN** a completed change with authorized archive is assembled for its final review
+- **THEN** the same PR includes code, current specs and the archived change without requiring another PR after merge
+
+#### Scenario: A later pull request recovers a missed archive
+- **WHEN** completed work was merged without archive and a later PR carries its authorized recovery
+- **THEN** that recovery is accepted without imposing a post-merge prerequisite on ordinary archive
