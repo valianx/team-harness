@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -36,6 +36,38 @@ async function withRepository(callback) {
     await callback(root);
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+}
+
+async function withOpenSpecTransportFixture(expectedChange, callback) {
+  const directory = await mkdtemp(path.join(tmpdir(), "th-openspec-transport-"));
+  const previousPath = process.env.PATH;
+  const previousPathKey = process.env.Path;
+  const expectedArgs = [
+    "--yes", "@fission-ai/openspec@1.9.0", "validate", expectedChange,
+    "--type", "change", "--strict",
+  ];
+  const probe = `
+const expected = ${JSON.stringify(expectedArgs)};
+if (JSON.stringify(process.argv.slice(2)) !== JSON.stringify(expected)) process.exit(42);
+`;
+  try {
+    const unixNpx = path.join(directory, "npx");
+    await writeFile(unixNpx, `#!/usr/bin/env node\n${probe}`);
+    await chmod(unixNpx, 0o755);
+    const windowsNpx = path.join(directory, "node_modules", "npm", "bin", "npx-cli.js");
+    await mkdir(path.dirname(windowsNpx), { recursive: true });
+    await writeFile(windowsNpx, probe);
+    const pathValue = `${directory}${path.delimiter}${previousPath ?? ""}`;
+    process.env.PATH = pathValue;
+    process.env.Path = pathValue;
+    return await callback();
+  } finally {
+    if (previousPath === undefined) delete process.env.PATH;
+    else process.env.PATH = previousPath;
+    if (previousPathKey === undefined) delete process.env.Path;
+    else process.env.Path = previousPathKey;
+    await rm(directory, { recursive: true, force: true });
   }
 }
 
@@ -164,10 +196,36 @@ await check("emits a delta package bounded to the range since the prior anchor",
   assert.deepEqual(result.package.scope.paths, ["src/b.js"]);
 }));
 
-await check("refuses to bind criteria from a change that is not present", async () => withRepository(async (root) => {
+await check("refuses to bind criteria from an active or archived change that is not present", async () => withRepository(async (root) => {
   await commit(root, { "src/a.js": "export const a = 1;\n" }, "add");
-  const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa", change: "absent-change" });
-  assert.equal(result.error_code, "CHANGE_NOT_FOUND");
+  for (const change of ["absent-change", "archive/2026-09-14-missing-change"]) {
+    const result = await runReviewFan({
+      subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa", change,
+    });
+    assert.equal(result.error_code, "CHANGE_NOT_FOUND");
+  }
+}));
+
+await check("binds criteria from an archived change in the reviewed head", async () => withRepository(async (root) => {
+  const change = "archive/2026-09-14-archived-review";
+  await commit(root, {
+    [`openspec/changes/${change}/specs/alpha/spec.md`]: "### Requirement: Archived holds\nBody SHALL hold.\n",
+    "src/a.js": "export const a = 1;\n",
+  }, "archive review change");
+  const reviewedHead = (await run("git", ["-C", root, "rev-parse", "HEAD"])).stdout.trim();
+  await commit(root, {
+    [`openspec/changes/${change}/specs/alpha/spec.md`]: "### Requirement: Archived holds\nBody SHALL hold.\n\n### Requirement: Checkout only\nMore.\n",
+  }, "change the checkout after the reviewed head");
+  const result = await withOpenSpecTransportFixture(change, () => runReviewFan({
+    subcommand: "package",
+    repoRoot: root,
+    range: `${reviewedHead}~1..${reviewedHead}`,
+    lens: "qa",
+    change,
+  }));
+  assert.equal(result.verdict, "pass");
+  assert.deepEqual(result.package.criteria.map((entry) => entry.text), ["Archived holds"]);
+  assert.equal(result.package.criteria[0].source, `openspec/changes/${change}/specs/alpha/spec.md`);
 }));
 
 await check("binds authored requirement headers from the reviewed head, not the checkout", async () => withRepository(async (root) => {

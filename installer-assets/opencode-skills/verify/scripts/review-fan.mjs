@@ -18,6 +18,7 @@ const MAX_CRITERIA = 256;
 const MAX_RETURNS = 32;
 const SHA = /^[0-9a-f]{7,40}$/;
 const CHANGE_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const ARCHIVED_CHANGE_NAME = /^archive\/\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RANGE = /^([^\s.]+(?:\.[^\s.]+)*)\.{2,3}([^\s.]+(?:\.[^\s.]+)*)$/;
 
 export const LENSES = ["tester", "qa", "security", "adversary"];
@@ -112,6 +113,10 @@ function splitRange(range) {
   const match = RANGE.exec(range ?? "");
   if (!match) fail("ARGUMENT_INVALID");
   return [match[1], match[2]];
+}
+
+function validChangeRef(value) {
+  return CHANGE_NAME.test(value) || ARCHIVED_CHANGE_NAME.test(value);
 }
 
 async function resolveCommitted(root, range) {
@@ -333,8 +338,8 @@ export function headTreeReader(root, head) {
 export async function openSpecInvocation(change, {
   platform = process.platform, node = process.execPath, env = process.env,
 } = {}) {
-  if (!CHANGE_NAME.test(change)) fail("ARGUMENT_INVALID");
-  const args = ["--yes", "@fission-ai/openspec@1.9.0", "validate", change, "--strict"];
+  if (!validChangeRef(change)) fail("ARGUMENT_INVALID");
+  const args = ["--yes", "@fission-ai/openspec@1.9.0", "validate", change, "--type", "change", "--strict"];
   if (platform !== "win32") return { command: "npx", args };
 
   // Windows npx.cmd is a batch shim, not an execFile executable. Run npm's
@@ -365,7 +370,7 @@ export async function validateOpenSpec(root, change, options) {
 }
 
 async function validateChange(root, head, change) {
-  if (!CHANGE_NAME.test(change)) fail("ARGUMENT_INVALID");
+  if (!validChangeRef(change)) fail("ARGUMENT_INVALID");
   const changeRoot = `openspec/changes/${change}`;
   const present = await git(root, ["ls-tree", "--name-only", `${head}:${changeRoot}`])
     .then((stdout) => stdout.trim().length > 0)

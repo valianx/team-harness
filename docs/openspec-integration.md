@@ -93,7 +93,8 @@ Canonical OpenSpec Markdown always stays in the target repository. TH control lo
 reviews, and evidence stay in the configured TH workspace:
 
 ```text
-repository/openspec/changes/<change>/...       canonical source
+repository/openspec/changes/<change>/...       active canonical source
+repository/openspec/changes/archive/<dated-change>/...  archived canonical source
 workspace/control/control.jsonl                authority log
 workspace/inputs/openspec-pin.json             pinned content identity
 workspace/01-plan.md                           operator projection
@@ -108,7 +109,9 @@ second OpenSpec source.
 Before Freeze, TH verifies that the pinned OpenSpec source set is present byte-for-byte below the
 implementation checkout, tracked by Git, and included in the final base-to-candidate diff when
 created or changed by this pipeline. A worktree boundary never moves canonical OpenSpec
-artifacts into the workspace.
+artifacts into the workspace. When archive relocates a completed change during
+assembly, refresh its canonical source paths and projection before Freeze;
+preserve its content identity and bind subsequent leases to the archived paths.
 
 ## Recovery and finalization
 
@@ -118,11 +121,17 @@ log is closed administratively with one events entry and offered inline continua
 run. A spec-only reading view is not a pipeline recovery target. Source drift makes the pipeline projection stale and routes back to Design; a valid completed Design
 resumes at Gate 1.
 
-OpenSpec `sync` and `archive` remain outside implementation authority and cannot
-retroactively validate the shipped tree or replace push/PR authority. Main applies
-the [shared completion and retirement lifecycle](../skills/spec/references/lifecycle.md)
-at authoring, resumption and close in every runtime. Accepted delivery without a
-PR and a PR merged elsewhere can both lead to an archive offer. Cancellation or
-wholesale supersession uses an approved retirement without applying obsolete
-deltas; partial supersession requires reconciliation. Pending archive is visible
-in task close and read-only status, including direct work without pipeline state.
+Main applies the [shared lifecycle](../skills/spec/references/lifecycle.md) during
+candidate assembly, once implementation and its relevant checks are complete.
+Authorized archive updates living specs and moves the change on the same feature
+branch before the final review package or pipeline Freeze. The PR delivers code,
+living specs and the archive together; merge integrates that prepared state.
+Archive does not authorize outward writes or retroactively validate a candidate.
+Review corrections keep these artifacts consistent in the same PR, with the
+existing amendment rules when intent changes.
+
+Agreed delivery without a PR uses the same preparation. A later archive is a
+recovery path for work already delivered without one. Cancellation or wholesale
+supersession uses approved retirement without applying obsolete deltas; partial
+supersession requires reconciliation. Pending archive is visible in task close and
+read-only status, including direct work without pipeline state.

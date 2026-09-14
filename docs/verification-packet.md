@@ -105,7 +105,9 @@ silently.
 
 The packet carries **no acceptance-criteria copy — verbatim or digested.** AC live in
 the bound OpenSpec change's `specs/**/spec.md`; every verifier whose verdict baselines on AC
-live-reads those scenarios at dispatch time (§4 Step 0). Rationale: any copy-freshness mechanism
+live-reads those scenarios at dispatch time (§4 Step 0). Pointers use the bound
+change's current canonical root, active or archived, within the frozen checkout.
+Rationale: any copy-freshness mechanism
 (count check, content digest) depends on prompt-compliance-dependent emission — the same
 reliability class the June 2026 data measured at ~40%. The live read needs no new
 emission and removes the AC-staleness class entirely, including same-count substance
@@ -162,8 +164,8 @@ regression_test_path: {path or "n/a"}
 
 ## Full-Document Pointers
 - 01-plan.md
-- openspec/changes/{change}/specs/**/spec.md and tasks.md (dispatched items only)
-- openspec/changes/{change}/design.md (only when referenced)
+- {current canonical change root}/specs/**/spec.md and tasks.md (active or archived; dispatched items only)
+- {current canonical change root}/design.md (only when referenced)
 - inputs/00-frozen.diff
 - 03-testing.md
 - inputs/00-frozen.diff

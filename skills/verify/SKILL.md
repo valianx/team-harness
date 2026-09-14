@@ -15,7 +15,8 @@ push, or delivery record. It never publishes.
 ## Flow
 
 1. **Build the package.** Run `review-fan.mjs package` with the committed range, the operator's
-   lens set, and — when the work has an authored change — its change id. Resolve the script in
+   lens set, and — when the work has an authored change — its active slug or exact
+   `archive/YYYY-MM-DD-<change>` reference through `--change`. Resolve the script in
    order, taking the first that exists:
 
    1. latest `~/.claude/plugins/cache/team-harness-marketplace/th/*/skills/verify/scripts/review-fan.mjs`
