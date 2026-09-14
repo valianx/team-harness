@@ -1,7 +1,7 @@
 # spec-direct-lane Specification
 
 ## Purpose
-Give short tasks a durable spec without the pipeline floor. `/th:spec` is a coordinator-only OpenSpec flow: written intent and task decomposition, one conversational approval, inline implementation, and an archive offer after accepted delivery or a retirement decision — zero specialist dispatches, no pipeline ceremony.
+Give short tasks a durable spec without the pipeline floor. `/th:spec` is a coordinator-only OpenSpec flow: written intent and task decomposition, one conversational approval, inline implementation, and archive within the reviewed delivery candidate or after a retirement decision — zero specialist dispatches, no pipeline ceremony.
 
 ## Requirements
 
@@ -10,7 +10,7 @@ Give short tasks a durable spec without the pipeline floor. `/th:spec` is a coor
 
 #### Scenario: A short task worth written intent arrives
 - **WHEN** the operator routes a single-repo, roughly day-sized task through `/th:spec`
-- **THEN** the coordinator authors and validates the change, gets one conversational approval, implements inline, and delivers under the agreed repository conventions, opening a PR only when required — with zero specialist dispatches
+- **THEN** the coordinator authors and validates the change, gets one conversational approval, implements inline, prepares authorized archive before final review, and delivers under the agreed repository conventions, opening a PR only when required — with zero specialist dispatches
 
 #### Scenario: The operator asks for a review inside the lane
 - **WHEN** the operator requests a QA or security look on the lane's diff

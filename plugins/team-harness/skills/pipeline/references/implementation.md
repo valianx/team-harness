@@ -50,5 +50,8 @@ worktree, immutable inputs, context identity, and ownership remain unchanged.
 Otherwise revoke/close it and use causal recovery. Counts, elapsed time, tool
 calls, and compaction thresholds are telemetry only.
 
-When all approved batches close, assemble the candidate, ensure one complete
-committed tree, and enter Freeze. Full quality has not run yet for this identity.
+When all approved batches and their relevant checks close, Main applies
+[the shared lifecycle](../../spec/references/lifecycle.md) during assembly:
+prepare authorized archive on the feature branch, refresh bound source locations and include the
+living specs and archived change in the complete committed candidate. Then enter
+Freeze, where full quality and QA validate that identity before delivery.

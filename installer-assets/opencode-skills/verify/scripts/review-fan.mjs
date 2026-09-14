@@ -2,7 +2,8 @@
 /** Build the anchored inline review package from repository state, and decide its ship join. */
 
 import { execFile } from "node:child_process";
-import { readFile, realpath, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { promisify } from "node:util";
@@ -16,8 +17,12 @@ const MAX_DIFF_BYTES = 4 * 1024 * 1024;
 const MAX_CHANGED_PATHS = 4096;
 const MAX_CRITERIA = 256;
 const MAX_RETURNS = 32;
+const MAX_OPENSPEC_TREE_ENTRIES = 10000;
+const MAX_OPENSPEC_TREE_LIST_BYTES = 16 * 1024 * 1024;
+const MAX_OPENSPEC_TREE_BYTES = 64 * 1024 * 1024;
 const SHA = /^[0-9a-f]{7,40}$/;
 const CHANGE_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const ARCHIVED_CHANGE_NAME = /^archive\/\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RANGE = /^([^\s.]+(?:\.[^\s.]+)*)\.{2,3}([^\s.]+(?:\.[^\s.]+)*)$/;
 
 export const LENSES = ["tester", "qa", "security", "adversary"];
@@ -92,6 +97,15 @@ async function git(root, args) {
   return stdout;
 }
 
+async function gitBytes(root, args, maxBuffer) {
+  const { stdout } = await run("git", ["-C", root, ...args], {
+    maxBuffer,
+    windowsHide: true,
+    encoding: "buffer",
+  });
+  return stdout;
+}
+
 async function resolveRepositoryRoot(candidate) {
   const base = candidate ?? process.cwd();
   try {
@@ -112,6 +126,10 @@ function splitRange(range) {
   const match = RANGE.exec(range ?? "");
   if (!match) fail("ARGUMENT_INVALID");
   return [match[1], match[2]];
+}
+
+function validChangeRef(value) {
+  return CHANGE_NAME.test(value) || ARCHIVED_CHANGE_NAME.test(value);
 }
 
 async function resolveCommitted(root, range) {
@@ -333,8 +351,8 @@ export function headTreeReader(root, head) {
 export async function openSpecInvocation(change, {
   platform = process.platform, node = process.execPath, env = process.env,
 } = {}) {
-  if (!CHANGE_NAME.test(change)) fail("ARGUMENT_INVALID");
-  const args = ["--yes", "@fission-ai/openspec@1.9.0", "validate", change, "--strict"];
+  if (!validChangeRef(change)) fail("ARGUMENT_INVALID");
+  const args = ["--yes", "@fission-ai/openspec@1.9.0", "validate", change, "--type", "change", "--strict"];
   if (platform !== "win32") return { command: "npx", args };
 
   // Windows npx.cmd is a batch shim, not an execFile executable. Run npm's
@@ -364,14 +382,88 @@ export async function validateOpenSpec(root, change, options) {
   }
 }
 
+function openSpecTreePath(relative) {
+  if (!relative.startsWith("openspec/") || relative.includes("\\") || path.isAbsolute(relative)) {
+    throw new Error("unsupported OpenSpec tree path");
+  }
+  const parts = relative.split("/");
+  if (parts.length < 2 || parts.some((part) => part.length === 0 || part === "." || part === ".."
+    || /[\x00-\x1f<>:\"|?*]/.test(part) || /[. ]$/.test(part)
+    || part.toLowerCase() === ".git"
+    || /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part))) {
+    throw new Error("unsupported OpenSpec tree path");
+  }
+  return { parts };
+}
+
+/** Validate the reviewed head's complete OpenSpec tree in an isolated execution root. */
+async function materializeOpenSpec(root, head, destination) {
+  const listing = await gitBytes(root,
+    ["ls-tree", "-rz", "--full-tree", head, "--", "openspec"],
+    MAX_OPENSPEC_TREE_LIST_BYTES);
+  const decoded = listing.toString("utf8");
+  if (!Buffer.from(decoded, "utf8").equals(listing)) throw new Error("unsupported OpenSpec tree encoding");
+  const entries = decoded.split("\0").filter(Boolean);
+  if (entries.length > MAX_OPENSPEC_TREE_ENTRIES) throw new Error("OpenSpec tree is too large");
+
+  const seen = new Map();
+  let bytes = 0;
+  for (const entry of entries) {
+    const match = /^(100644|100755) blob ([a-f0-9]{40,64})\t(.+)$/s.exec(entry);
+    if (!match) throw new Error("OpenSpec tree contains a symlink or gitlink");
+    const [, mode, object, relative] = match;
+    const { parts } = openSpecTreePath(relative);
+    let prefix = "";
+    for (let index = 0; index < parts.length; index += 1) {
+      prefix = prefix.length === 0 ? parts[index] : `${prefix}/${parts[index]}`;
+      const alias = prefix.toLowerCase();
+      const kind = index === parts.length - 1 ? "file" : "directory";
+      const previous = seen.get(alias);
+      if (previous && (previous.path !== prefix || previous.kind === "file" || kind === "file")) {
+        throw new Error("OpenSpec tree contains an alias path");
+      }
+      seen.set(alias, { path: prefix, kind });
+    }
+
+    const file = path.join(destination, ...parts);
+    const confined = path.relative(destination, file);
+    if (!confined || path.isAbsolute(confined) || confined === ".." || confined.startsWith(`..${path.sep}`)) {
+      throw new Error("OpenSpec tree path escapes its execution root");
+    }
+    const content = await gitBytes(root, ["cat-file", "blob", object], MAX_OPENSPEC_TREE_BYTES);
+    bytes += content.length;
+    if (bytes > MAX_OPENSPEC_TREE_BYTES) throw new Error("OpenSpec tree is too large");
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, content, { flag: "wx", mode: mode === "100755" ? 0o755 : 0o644 });
+  }
+}
+
 async function validateChange(root, head, change) {
-  if (!CHANGE_NAME.test(change)) fail("ARGUMENT_INVALID");
+  if (!validChangeRef(change)) fail("ARGUMENT_INVALID");
   const changeRoot = `openspec/changes/${change}`;
   const present = await git(root, ["ls-tree", "--name-only", `${head}:${changeRoot}`])
     .then((stdout) => stdout.trim().length > 0)
     .catch(() => false);
   if (!present) fail("CHANGE_NOT_FOUND");
-  await validateOpenSpec(root, change);
+  let executionRoot;
+  try {
+    executionRoot = await mkdtemp(path.join(tmpdir(), "th-review-openspec-"));
+    await materializeOpenSpec(root, head, executionRoot);
+    await validateOpenSpec(executionRoot, change);
+  } catch (error) {
+    if (error?.message === "CHANGE_NOT_VALIDATED" || error?.message === "OPENSPEC_RUNTIME_UNAVAILABLE") {
+      throw error;
+    }
+    fail("CHANGE_NOT_VALIDATED");
+  } finally {
+    if (executionRoot !== undefined) {
+      try {
+        await rm(executionRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+      } catch {
+        fail("CHANGE_NOT_VALIDATED");
+      }
+    }
+  }
   return changeRoot;
 }
 

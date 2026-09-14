@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -33,10 +33,123 @@ async function withRepository(callback) {
     await git(root, ["config", "user.email", "test@example.invalid"]);
     await git(root, ["config", "user.name", "Test"]);
     await commit(root, { "README.md": "base\n" }, "base");
-    await callback(root);
+    return await callback(root);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+}
+
+async function withOpenSpecTransportFixture(expectedChange, callback) {
+  const directory = await mkdtemp(path.join(tmpdir(), "th-openspec-transport-"));
+  const previousPath = process.env.PATH;
+  const previousPathKey = process.env.Path;
+  const previousProbeReceipt = process.env.TH_OPENSPEC_PROBE_RECEIPT;
+  const expectedArgs = [
+    "--yes", "@fission-ai/openspec@1.9.0", "validate", expectedChange,
+    "--type", "change", "--strict",
+  ];
+  const probe = `
+const fs = require("node:fs");
+const path = require("node:path");
+const expected = ${JSON.stringify(expectedArgs)};
+if (JSON.stringify(process.argv.slice(2)) !== JSON.stringify(expected)) process.exit(42);
+const change = expected[3];
+const changeRoot = path.join(process.cwd(), "openspec", "changes", ...change.split("/"));
+const inputs = [
+  path.join(process.cwd(), "openspec", "config.yaml"),
+  path.join(changeRoot, "proposal.md"),
+  path.join(changeRoot, "tasks.md"),
+  path.join(changeRoot, "specs", "alpha", "spec.md"),
+  path.join(process.cwd(), "openspec", "specs", "alpha", "spec.md"),
+];
+const receipt = process.env.TH_OPENSPEC_PROBE_RECEIPT;
+if (receipt) fs.appendFileSync(receipt, process.cwd() + "\\n", "utf8");
+// A validator must never mutate the reviewed checkout. The marker also lets the test
+// confirm that a temporary validation root was removed after the child exits.
+fs.writeFileSync(path.join(process.cwd(), ".openspec-validation-probe"), process.cwd() + "\\n", "utf8");
+let contents = "";
+try {
+  contents = inputs.map((file) => fs.readFileSync(file, "utf8")).join("\\n");
+} catch {
+  process.exit(43);
+}
+if (contents.includes("INVALID_CHANGE") || contents.includes("INVALID_CONFIG") || contents.includes("INVALID_LIVING_SPEC")) process.exit(44);
+`;
+  try {
+    const unixNpx = path.join(directory, "npx");
+    await writeFile(unixNpx, `#!/usr/bin/env node\n${probe}`);
+    await chmod(unixNpx, 0o755);
+    const windowsNpx = path.join(directory, "node_modules", "npm", "bin", "npx-cli.js");
+    await mkdir(path.dirname(windowsNpx), { recursive: true });
+    await writeFile(windowsNpx, probe);
+    const pathValue = `${directory}${path.delimiter}${previousPath ?? ""}`;
+    process.env.PATH = pathValue;
+    process.env.Path = pathValue;
+    const probeReceipt = path.join(directory, "validator-cwds.log");
+    process.env.TH_OPENSPEC_PROBE_RECEIPT = probeReceipt;
+    return await callback({ probeReceipt });
+  } finally {
+    if (previousPath === undefined) delete process.env.PATH;
+    else process.env.PATH = previousPath;
+    if (previousPathKey === undefined) delete process.env.Path;
+    else process.env.Path = previousPathKey;
+    if (previousProbeReceipt === undefined) delete process.env.TH_OPENSPEC_PROBE_RECEIPT;
+    else process.env.TH_OPENSPEC_PROBE_RECEIPT = previousProbeReceipt;
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
+async function assertOpenSpecValidationDidNotTouchCheckout(root, probeReceipt) {
+  const status = (await run("git", ["-C", root, "status", "--porcelain=v1", "--untracked-files=all"], { windowsHide: true })).stdout.trim();
+  assert.equal(status, "", "OpenSpec validation left changes in the reviewed checkout");
+  await assert.rejects(stat(path.join(root, ".openspec-validation-probe")), { code: "ENOENT" });
+  const observed = (await readFile(probeReceipt, "utf8")).trim().split(/\r?\n/).filter(Boolean);
+  assert.ok(observed.length > 0, "the transport fixture did not observe a validation cwd");
+  assert.ok(observed.every((cwd) => cwd !== root), "validation ran against the mutable checkout");
+  for (const cwd of observed) {
+    await assert.rejects(stat(cwd), { code: "ENOENT" });
+  }
+}
+
+function changeInputs(change, { invalid = null } = {}) {
+  const root = `openspec/changes/${change}`;
+  const marker = invalid === "change" ? "INVALID_CHANGE\n" : "";
+  const configMarker = invalid === "config" ? "INVALID_CONFIG\n" : "";
+  const livingMarker = invalid === "living" ? "INVALID_LIVING_SPEC\n" : "";
+  return {
+    "openspec/config.yaml": `name: review-fan-fixture\n${configMarker}`,
+    [`${root}/proposal.md`]: "# Review fan fixture\n",
+    [`${root}/tasks.md`]: "- [ ] Validate the change\n",
+    [`${root}/specs/alpha/spec.md`]: `### Requirement: Reviewed requirement\nThe reviewed head SHALL validate.\n${marker}`,
+    "openspec/specs/alpha/spec.md": `### Requirement: Living requirement\nThe living spec SHALL remain coherent.\n${livingMarker}`,
+  };
+}
+
+async function validateAnchoredChange({ change, reviewedInvalid = null, laterState }) {
+  return withRepository(async (root) => {
+    await commit(root, changeInputs(change, { invalid: reviewedInvalid }), "reviewed OpenSpec change");
+    const reviewedHead = (await run("git", ["-C", root, "rev-parse", "HEAD"], { windowsHide: true })).stdout.trim();
+    if (laterState === "missing") {
+      await run("git", ["-C", root, "rm", "-q", "-r", `openspec/changes/${change}`], { windowsHide: true });
+      await git(root, ["commit", "-q", "-m", "remove the checkout change"]);
+    } else {
+      await commit(root, changeInputs(change, {
+        invalid: laterState === "invalid" ? "change" : null,
+      }), "change the checkout after review");
+    }
+
+    return withOpenSpecTransportFixture(change, async ({ probeReceipt }) => {
+      const result = await runReviewFan({
+        subcommand: "package",
+        repoRoot: root,
+        range: `${reviewedHead}~1..${reviewedHead}`,
+        lens: "qa",
+        change,
+      });
+      await assertOpenSpecValidationDidNotTouchCheckout(root, probeReceipt);
+      return result;
+    });
+  });
 }
 
 async function check(name, callback) {
@@ -164,10 +277,93 @@ await check("emits a delta package bounded to the range since the prior anchor",
   assert.deepEqual(result.package.scope.paths, ["src/b.js"]);
 }));
 
-await check("refuses to bind criteria from a change that is not present", async () => withRepository(async (root) => {
+await check("refuses to bind criteria from an active or archived change that is not present", async () => withRepository(async (root) => {
   await commit(root, { "src/a.js": "export const a = 1;\n" }, "add");
-  const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa", change: "absent-change" });
-  assert.equal(result.error_code, "CHANGE_NOT_FOUND");
+  for (const change of ["absent-change", "archive/2026-09-14-missing-change"]) {
+    const result = await runReviewFan({
+      subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa", change,
+    });
+    assert.equal(result.error_code, "CHANGE_NOT_FOUND");
+  }
+}));
+
+await check("binds criteria from an archived change in the reviewed head", async () => withRepository(async (root) => {
+  const change = "archive/2026-09-14-archived-review";
+  await commit(root, {
+    "openspec/config.yaml": "name: archived-review-fixture\n",
+    [`openspec/changes/${change}/proposal.md`]: "# Archived review fixture\n",
+    [`openspec/changes/${change}/tasks.md`]: "- [ ] Validate the archived change\n",
+    [`openspec/changes/${change}/specs/alpha/spec.md`]: "### Requirement: Archived holds\nBody SHALL hold.\n",
+    "openspec/specs/alpha/spec.md": "### Requirement: Archived living holds\nBody SHALL hold.\n",
+    "src/a.js": "export const a = 1;\n",
+  }, "archive review change");
+  const reviewedHead = (await run("git", ["-C", root, "rev-parse", "HEAD"])).stdout.trim();
+  await commit(root, {
+    [`openspec/changes/${change}/specs/alpha/spec.md`]: "### Requirement: Archived holds\nBody SHALL hold.\n\n### Requirement: Checkout only\nMore.\n",
+  }, "change the checkout after the reviewed head");
+  const result = await withOpenSpecTransportFixture(change, async ({ probeReceipt }) => {
+    const result = await runReviewFan({
+      subcommand: "package",
+      repoRoot: root,
+      range: `${reviewedHead}~1..${reviewedHead}`,
+      lens: "qa",
+      change,
+    });
+    await assertOpenSpecValidationDidNotTouchCheckout(root, probeReceipt);
+    return result;
+  });
+  assert.equal(result.verdict, "pass");
+  assert.deepEqual(result.package.criteria.map((entry) => entry.text), ["Archived holds"]);
+  assert.equal(result.package.criteria[0].source, `openspec/changes/${change}/specs/alpha/spec.md`);
+}));
+
+for (const change of ["anchored-review", "archive/2026-09-14-anchored-review"]) {
+  await check(`validates the ${change.startsWith("archive/") ? "archived" : "active"} change from the reviewed head when the checkout is invalid`, async () => {
+    const result = await validateAnchoredChange({ change, laterState: "invalid" });
+    assert.equal(result.verdict, "pass");
+    assert.deepEqual(result.package.criteria.map((entry) => entry.text), ["Reviewed requirement"]);
+  });
+
+  await check(`validates the ${change.startsWith("archive/") ? "archived" : "active"} change from the reviewed head when the checkout is missing it`, async () => {
+    const result = await validateAnchoredChange({ change, laterState: "missing" });
+    assert.equal(result.verdict, "pass");
+    assert.deepEqual(result.package.criteria.map((entry) => entry.text), ["Reviewed requirement"]);
+  });
+
+  await check(`rejects an invalid ${change.startsWith("archive/") ? "archived" : "active"} reviewed change even when the checkout is valid`, async () => {
+    const result = await validateAnchoredChange({ change, reviewedInvalid: "change", laterState: "valid" });
+    assert.equal(result.verdict, "fail");
+    assert.equal(result.error_code, "CHANGE_NOT_VALIDATED");
+  });
+
+  for (const invalidInput of ["config", "living"]) {
+    await check(`rejects an invalid ${invalidInput} from the reviewed ${change.startsWith("archive/") ? "archived" : "active"} head even when the checkout is valid`, async () => {
+      const result = await validateAnchoredChange({ change, reviewedInvalid: invalidInput, laterState: "valid" });
+      assert.equal(result.verdict, "fail");
+      assert.equal(result.error_code, "CHANGE_NOT_VALIDATED");
+    });
+  }
+}
+
+await check("rejects reviewed directories that would collapse on a case-insensitive filesystem", async () => withRepository(async (root) => {
+  const change = "case-alias-review";
+  await commit(root, changeInputs(change), "valid change");
+  const base = (await run("git", ["-C", root, "rev-parse", "HEAD"], { windowsHide: true })).stdout.trim();
+  const blob = (await run("git", ["-C", root, "rev-parse", `${base}:README.md`], { windowsHide: true })).stdout.trim();
+  // Build the conflicting tree in Git without relying on host filename semantics.
+  for (const name of ["openspec/schemas/Example/a.yaml", "openspec/schemas/example/b.yaml"]) {
+    await git(root, ["update-index", "--add", "--cacheinfo", `100644,${blob},${name}`]);
+  }
+  await git(root, ["commit", "-q", "-m", "conflicting directory names"]);
+  const head = (await run("git", ["-C", root, "rev-parse", "HEAD"], { windowsHide: true })).stdout.trim();
+  await git(root, ["reset", "--hard", base]);
+  await withOpenSpecTransportFixture(change, async ({ probeReceipt }) => {
+    const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: `${base}..${head}`, lens: "qa", change });
+    assert.equal(result.error_code, "CHANGE_NOT_VALIDATED");
+    await assert.rejects(stat(probeReceipt), { code: "ENOENT" });
+    const status = (await run("git", ["-C", root, "status", "--porcelain"], { windowsHide: true })).stdout.trim();
+    assert.equal(status, "");
+  });
 }));
 
 await check("binds authored requirement headers from the reviewed head, not the checkout", async () => withRepository(async (root) => {

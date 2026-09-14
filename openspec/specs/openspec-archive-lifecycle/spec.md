@@ -5,32 +5,54 @@ Keep completed and obsolete changes visible until they are archived or reconcile
 
 ## Requirements
 
-### Requirement: Archive follows accepted delivery or approved retirement
-Claude Code, Codex and OpenCode SHALL use the same lifecycle at authoring, resumption and close. Main SHALL offer `openspec archive <change>` after verified, accepted delivery when the required PR is confirmed merged, including a merge in another session, or when the agreed delivery required no PR. Checked tasks alone SHALL NOT prove acceptance or delivery. A planned but absent PR, an open PR, or missing evidence SHALL leave archive pending. Main SHALL surface concrete conflicts between affected requirements and relevant active changes, reconciling partial supersession before archive. Approved cancellation or wholesale retirement SHALL use `--skip-specs` without applying discarded deltas or falsely completing tasks. Archive SHALL require explicit authority covering the operation, reusing authority already granted or requesting one brief confirmation. A declined or deferred offer SHALL NOT block close or repeat without a new archive request or material evidence change. The mutation SHALL follow repository branch and outward-write conventions; for merged work it belongs to a subsequent change, never a rewrite of the accepted candidate or an implicitly authorized default-branch push. Task close, `pipelines` and `trace` SHALL display pending archive with its reason and next action, including direct work without pipeline state; status commands SHALL remain read-only.
+### Requirement: Archive is assembled with the completed implementation
+Claude Code, Codex and OpenCode SHALL use the same lifecycle at authoring, resumption, candidate assembly and close. Once implementation and its relevant checks are complete, Main SHALL prepare authorized archive on the feature branch before the final review package or pipeline Freeze. The same PR SHALL contain implementation, updated living specs and the archived change. An absent or open PR SHALL NOT prevent archive; merge integrates the prepared state. Checked tasks alone SHALL NOT prove implementation or verification. Main SHALL refresh canonical source locations and links after archive, preserve unchanged semantic identity, and bind subsequent review inputs to the archived sources in the candidate. Review corrections SHALL keep code, living specs and the archived record consistent on the same branch, using existing amendment and validation rules. Delivery SHALL publish the accepted candidate unchanged. A later archive SHALL remain a recovery path for work delivered without one.
 
-#### Scenario: A run's PR is confirmed merged
-- **WHEN** the coordinator confirms the merge of an OpenSpec-bound run's pull request
-- **THEN** it offers the archive with a one-line Y/n, and on acceptance the change's deltas merge into `openspec/specs/` and the change moves to the archive directory on a branch delivered through an ordinary pull request
+Main SHALL surface concrete conflicts between affected requirements and relevant active changes, reconciling partial supersession before archive. Approved cancellation or wholesale retirement SHALL use `--skip-specs` without applying discarded deltas or falsely completing tasks. Archive SHALL require authority covering the operation, reusing authority already granted or requesting one brief confirmation. A declined or deferred offer SHALL NOT block close or repeat without a new archive request or material evidence change. Archive SHALL follow repository branch and outward-write conventions and SHALL NOT authorize push, PR creation or merge. Task close, `pipelines` and `trace` SHALL display pending archive with its reason and next action, including direct work without pipeline state; status commands SHALL remain read-only.
 
-#### Scenario: Terminal close arrives before the merge
-- **WHEN** terminal close runs while the run's pull request is still an open draft
-- **THEN** no archive is offered or executed, and the pending archive is recorded for a later explicit offer
+#### Scenario: Completed work is prepared for its PR
+- **WHEN** implementation and relevant checks are complete and archive is authorized
+- **THEN** Main updates living specs and archives the change on that branch before final review, including all three in the same PR
+
+#### Scenario: PR preparation assesses archive readiness
+- **WHEN** Main prepares to create or update a PR with related open OpenSpec changes, including direct work outside the OpenSpec lane or pipeline
+- **THEN** it compares their requirements and tasks with implementation and verification evidence, validates their structure and delta coherence, and reports each as ready to archive, pending or needing reconciliation with its reason, excluding unrelated changes
+
+#### Scenario: Archive output is verified before publication
+- **WHEN** the authorized archive has updated living specs and moved the change
+- **THEN** strict validation covers both the archived change and affected living specs before the final candidate is published
+
+#### Scenario: The PR does not exist or remains open
+- **WHEN** the completed and checked implementation is ready for archive before publication or while its PR is open
+- **THEN** Main prepares archive in that branch without waiting for merge, while reporting delivery as pending integration
+
+#### Scenario: Pipeline validation reads the completed candidate
+- **WHEN** authorized archive moves the bound change during assembly
+- **THEN** Main refreshes source locations after closing outstanding leases, and Freeze, quality and QA validate the complete committed candidate before delivery
+
+#### Scenario: PR review requires a correction
+- **WHEN** a reviewer identifies a defect after the change was archived in the PR branch
+- **THEN** Main keeps implementation, living specs and the archived record consistent in that PR and revalidates through the existing flow, applying amendment rules when intent changes
+
+#### Scenario: Work resumes with an archived change
+- **WHEN** the bound change is already archived in the candidate branch
+- **THEN** Main retains that location and validates its current sources without archiving it again
 
 #### Scenario: The operator declines the archive
 - **WHEN** the operator answers no at the archive offer
-- **THEN** close completes normally and the pending archive is noted for a later explicit run
+- **THEN** ordinary review and delivery may proceed without archive, close completes normally, and the pending archive is noted without repeating the declined offer
 
 #### Scenario: A merged change archives inside the next pull request
 - **WHEN** the operator accepts the archive of an already-merged change while a later change is being delivered
-- **THEN** the archive commit rides that later pull request, and the later change's own archive still waits for its merge
+- **THEN** the recovery archive rides that later PR, whose own completed change can also be archived before its final review
 
 #### Scenario: Accepted local delivery requires no PR
 - **WHEN** completed work is verified and accepted under an agreement requiring no PR
 - **THEN** Main offers archive using the existing confirmation, without inventing a PR prerequisite
 
 #### Scenario: A PR was merged in another session
-- **WHEN** resumed work has completed validation and its required PR now reports merged
-- **THEN** Main offers archive without requiring a merge observed by the original session
+- **WHEN** resumed work was validated and merged in another session but remains unarchived
+- **THEN** Main offers a recovery archive after checking its requirements against current specs
 
 #### Scenario: A replacement leaves an older change partially obsolete
 - **WHEN** changed requirements contradict part of another active change while other requirements remain valid
@@ -44,6 +66,6 @@ Claude Code, Codex and OpenCode SHALL use the same lifecycle at authoring, resum
 - **WHEN** the change has no pipeline workspace
 - **THEN** pipelines and trace report its pending archive and missing evidence without creating pipeline state or executing archive
 
-#### Scenario: Delivery is not yet established
-- **WHEN** validation or acceptance is missing, or a planned PR does not exist
-- **THEN** Main reports the pending evidence or delivery instead of treating checked tasks as permission to archive
+#### Scenario: Implementation or verification is not yet established
+- **WHEN** implementation or its relevant checks are incomplete despite checked tasks
+- **THEN** Main reports the missing work or evidence and leaves archive pending

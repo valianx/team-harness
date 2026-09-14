@@ -129,8 +129,8 @@ writes still require valid live authority and native approvals. Apply
 
 ## Continuation and recovery
 
-Apply [the OpenSpec lifecycle](../spec/references/lifecycle.md) on resumption and
-after terminal close; archive remains a separate follow-up to accepted work.
+Apply [the OpenSpec lifecycle](../spec/references/lifecycle.md) on resumption,
+during candidate assembly before Freeze, and at close for remaining work.
 
 Before each continuation, replay the valid control-log prefix and read only the
 phase reference named by the derived next action. Projection drift is repaired
