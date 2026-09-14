@@ -429,84 +429,21 @@ Check the `Submode` / `Mode` field in the task payload:
 - `Mode: review-consolidate` → jump to **Step 2d** (Consolidation — multi-reviewer merge)
 - `Submode: update-body` → jump to **Step 2b** (Update Body)
 - `Submode: reply` → jump to **Step 2c** (Reply)
-- No submode or `Submode: fresh`, with `Focus:` field → **Focused Fresh Review** (step 2 with Focus parameter)
-- No submode or `Submode: fresh`, no `Focus:` → proceed to **Step 1** (Fresh Review, default)
+- No submode or `Submode: fresh` → **Fresh Review** below, preserving any supplied `Focus`.
 
-### Step 1 — Receive pre-fetched data (Fresh Review)
+### Fresh Review
 
-The skill already passed the review coordinates and artifact paths. Extract:
-- PR number, title, author, base/head branches, and URL
-- Reviewed head SHA, base SHA, merge-base SHA, and context hash
-- Detached worktree and review-artifact root
-- Context, conversation, diff, changed-files, checks, and optional policy paths
-- Workspace and optional linked-issue artifact paths
+Main loads the current `skills/review-pr/SKILL.md` and its phase references. That flow owns
+capture, selected roles, identity checks, bounded same-snapshot correction, source persistence,
+consolidation, verification and publication. Carry the supplied focus and verified coordinates
+into it; do not run a second dispatch or the legacy Step 3 below. There is no separate failure
+classifier or fresh-review protocol in this adapter.
 
-Zero Bash in this step.
-
-### Step 2 — Invoke reviewer (Fresh Review)
-
-Invoke `reviewer` in **fresh mode** via Task tool, passing coordinates and artifact paths:
-
-```
-mode: data-provided
-Focus: {general|architecture|security}
-PR: #{number}
-Repository: {owner}/{repo}
-Title: {title}
-Author: {author}
-Base: {base}
-Head: {head}
-Reviewed Head SHA: {reviewed_head_sha}
-Base SHA: {reviewed_base_sha}
-Merge Base SHA: {reviewed_merge_base_sha}
-Context Hash: {context_hash}
-URL: {url}
-Worktree: {worktree}
-Review Artifacts Root: {absolute path}
-Context Path: {context path}
-Conversation Path: {conversation path}
-Diff Path: {diff path}
-Changed Files Path: {changed-files path}
-Checks Path: {checks path}
-Policy Path: {policy path or "none"}
-Workspace Path: {workspace path or "none"}
-Linked Issue Path: {issue artifact path or "none"}
-```
-
-When selected, invoke `pr-review-qa` and `pr-review-security` once with the same reviewed head SHA,
-context hash, detached worktree, context path, diff path, and changed-files path. Require exact
-SHA/hash values in every inline return. After strict worktree and artifact-root comparison, the
-coordinator persists each return at the skill's fixed path; agents never choose paths.
-
-Every non-`none` supplied artifact is required for its invocation. Agent instruction-source and
-semantic-source markers are metadata, not project paths. Changed-files membership only nominates a
-candidate: before any project content read, prove that the exact repo-relative path exists as a
-non-symlink regular file and that its resolved path remains inside the frozen worktree. A deleted
-changed-file path is evidence from `Diff Path` only and is never read from the head worktree. Apply
-the same proof to directly affected and cited paths; if it cannot be established, skip the path.
-Nonexistent inferred, conventional, unresolved-import, or optional paths are also skipped.
-Classify a failed read from its exact path: a supplied artifact, the worktree coordinate, or a
-verified-existing but unreadable project leaf is `required-read-failed` and fails closed; a
-nonexistent path that was neither supplied nor verified is an agent path-scope mistake, not a
-filesystem transport failure. A failure without an exact classifiable path also fails closed.
-
-An agent return that violates its read/return schema is a TH execution defect, not an operator
-decision. A different echoed SHA/hash, actual snapshot mutation, or a failed freshness check is an
-integrity failure instead, and is never a correctable contract defect. For each violating return
-the packaged `review_context.py` failure classifier decides, invoked as
-`skills/review-pr/SKILL.md § Read scope and failed-read recovery` specifies. Its single returned
-decision is authoritative: a missing helper, an omitted required
-artifact, a malformed invocation, or a helper error fails closed, and coordinator judgment never
-replaces the executable classification.
-
-A correction the helper authorizes runs automatically. It never waits for an operator reply, never
-opens a gate, and never rebuilds or recaptures the snapshot; only an identity-matched return that
-passes strict snapshots is accepted. When the same role violates its contract again, the lens
-carries the review skill's absent outcome in the lens-coverage line and the body and recommendation
-are forced to `COMMENT`; a clean result is never inferred and an approval is never published. A
-mismatched identity, a snapshot or freshness failure, a truly unreadable required coordinate, or no
-remaining trustworthy canonical draft still fails closed. The preview and live publish-approval
-gate remain mandatory.
+The legacy update-body and reply adapters below use the same read boundary, reviewed head SHA,
+technical hash and context hash checks from `skills/review-pr/references/coordination.md`.
+Main allocates a unique non-empty suffix for each pass, retains its returned source separately
+from canonical artifacts, and records its source coordinates in the ledger. Specialists return
+inline; Main alone persists validated results.
 
 ### Step 2b — Invoke reviewer (Update Body)
 
@@ -520,6 +457,7 @@ Author: {author}
 URL: {url}
 Existing review ID: {review_id}
 Reviewed Head SHA: {reviewed_head_sha}
+Technical Hash: {technical_hash}
 Base SHA: {reviewed_base_sha}
 Merge Base SHA: {reviewed_merge_base_sha}
 Context Hash: {context_hash}
@@ -532,9 +470,9 @@ Checks Path: {checks path}
 Existing Review Path: {current review body artifact path}
 ```
 
-Require the exact reviewed SHA and context hash in the status block. Run the required frozen
+Require the exact reviewed SHA, technical hash and context hash in the status block. Run the required frozen
 worktree and review-artifact-root snapshot comparison before trusting the return. Only after both
-snapshots match may the coordinator write `review_body` to `{review artifacts root}/pr-review-draft.md`. Jump to
+snapshots match may the coordinator write `review_body` to `{review artifacts root}/pr-review-draft{suffix}.md`. Jump to
 Step 3.
 
 ### Step 2c — Invoke reviewer (Reply)
@@ -548,6 +486,7 @@ Title: {title}
 Author: {author}
 URL: {url}
 Reviewed Head SHA: {reviewed_head_sha}
+Technical Hash: {technical_hash}
 Base SHA: {reviewed_base_sha}
 Merge Base SHA: {reviewed_merge_base_sha}
 Context Hash: {context_hash}
@@ -563,12 +502,12 @@ Thread context:
   original_body: {the inline comment text}
 ```
 
-Require the exact reviewed SHA and context hash in the status block. Run the required frozen
+Require the exact reviewed SHA, technical hash and context hash in the status block. Run the required frozen
 worktree and review-artifact-root snapshot comparison before trusting the return. Only after both
-snapshots match may the coordinator write `reply_body` to `{review artifacts root}/pr-review-reply-draft.md`.
+snapshots match may the coordinator write `reply_body` to `{review artifacts root}/pr-review-reply-draft{suffix}.md`.
 Return to the skill:
 ```text
-Reply draft written to {review artifacts root}/pr-review-reply-draft.md
+Reply draft written to {review artifacts root}/pr-review-reply-draft{suffix}.md
 Thread ID: {comment_id}
 ```
 
@@ -589,23 +528,21 @@ After the snapshot comparison passes, Main persists the canonical body to
 `{review artifacts root}/pr-review-inline.json`. Return the review and evidence-grounded
 recommendation to the skill for its preview and publication rules.
 
-### Step 3 — Build draft
+### Step 3 — Prepare updated body
 
-After the required frozen worktree and review-artifact-root snapshot comparison passes, take
-`review_body` from the reviewer's status block and write it to
-`{review artifacts root}/pr-review-draft.md`.
+This step applies only to update-body. Main reads the validated source at
+`{review artifacts root}/pr-review-draft{suffix}.md`, reconciles it against the captured discussion
+and existing review, records its dispositions, and writes the canonical body to
+`{review artifacts root}/pr-review-final.md`.
 
 **Validation:** If `review_body` is empty, re-invoke reviewer once. If still empty, return `status: failed`.
 
-Read `{review artifacts root}/pr-review-draft.md` back to confirm it was written correctly.
-
-Write `inline_findings` to `{review artifacts root}/pr-review-inline.json` in fresh mode. Validate that it is a JSON
-array whose objects contain only `path`, `line`, `side`, and `body`; `side` is required and must be
-`LEFT` or `RIGHT`. Preview and validate the full `(path, line, side)` anchor against the frozen diff.
+Read the canonical body back to confirm it was written correctly. This adapter updates a body;
+it does not replace fresh-review inline findings or source reports.
 
 Return to the skill:
 ```text
-Review draft written to {review artifacts root}/pr-review-draft.md
+Review draft written to {review artifacts root}/pr-review-final.md
 Decision: {APPROVE, CHANGES_REQUESTED, or COMMENT}
 ```
 

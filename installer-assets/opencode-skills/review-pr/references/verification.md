@@ -39,6 +39,10 @@ the ordinary review's verdict mechanically. Keep preview/publication approval un
 Skip this step only when `verification` is `off`. Otherwise dispatch one `pr-review-verifier`
 against the canonical inline JSON:
 
+Preserve the selected policy. With `blocking-only` and no proposed blockers, the selected set
+is empty: the verifier returns an empty findings array and coverage is `verified 0/0`. Do not
+expand verification to suggestions just to give the verifier work.
+
 The verification input must also include any proposed body-only blocker, using a concrete
 frozen-code evidence locus in the existing `path`, `line`, `side`, `body` representation. That
 locus need not be a publishable changed-line anchor. Preserve its public channel in Main's

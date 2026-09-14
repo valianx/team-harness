@@ -1774,6 +1774,8 @@ def command_select_security(args: argparse.Namespace) -> int:
     try:
         changed_files = args.changed_files.read_bytes().decode("utf-8", errors="replace")
         diff = args.diff.read_bytes().decode("utf-8", errors="replace")
+        if "\x00" in changed_files or "\x00" in diff or bool(changed_files.strip()) != bool(diff.strip()):
+            raise ContextError("security selection requires consistent captured text artifacts")
         reason = classify_security_change(changed_files, diff)
     except OSError as error:
         raise ContextError("security selection requires readable captured artifacts") from error
@@ -1924,8 +1926,9 @@ def apply_verification(
             raise ContextError("verifier finding must be an object")
         if result.get("status") not in {"confirmed", "unconfirmed", "refuted"}:
             raise ContextError("verifier status must be confirmed, unconfirmed, or refuted")
-        if not any(isinstance(result.get(field), str) and result[field].strip() for field in ("evidence", "reason")):
-            raise ContextError("verifier assessment must include evidence or a reason")
+        required_field = "reason" if result["status"] == "unconfirmed" else "evidence"
+        if not isinstance(result.get(required_field), str) or not result[required_field].strip():
+            raise ContextError(f"verifier {result['status']} assessment requires non-empty {required_field}")
         key = _finding_key(result)
         if key in statuses:
             raise ContextError(f"verifier returned two statuses for {key[0]}:{key[1]} {key[2]}")
@@ -2003,6 +2006,9 @@ def _codex_agent_set_status(agents_dir: Path, selected_agents: tuple[str, ...] =
     invalid: list[str] = []
     for name in selected_agents:
         toml_path = agents_dir / f"{name}.toml"
+        if _is_link(agents_dir) or _is_link(agents_dir.parent):
+            invalid.append(name)
+            continue
         if _is_link(toml_path) or not toml_path.is_file():
             missing.append(name)
             continue
@@ -2086,7 +2092,7 @@ def preflight(repo_root: Path, runtime: str, agents_dir: Path | None,
         "workspaces_ignore": "present" if ignored_before else "added",
         "codex_agents": codex_agents,
         "review_agents": list(selected),
-        "agent_check": "not-run" if prerequisites_only else "definitions-checked" if runtime == "codex" else "native-check-required",
+        "agent_check": "not-run" if prerequisites_only else "native-check-required",
         "blockers": blockers,
     }
 

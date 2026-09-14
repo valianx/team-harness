@@ -55,7 +55,7 @@ HOME="${FAKE_HOME}" MEMORY_MCP_URL="https://smoke-test.example.com/mcp" CONTEXT7
     --runtime opencode \
     --opencode-dir "${OPENCODE_DIR}" \
     --non-interactive \
-    2>&1 | tail -5 || true
+    2>&1 | tail -5
 
 # Find a representative placed agent file.
 AGENT_FILE="${OPENCODE_DIR}/agents/orchestrator.md"

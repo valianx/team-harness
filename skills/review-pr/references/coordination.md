@@ -14,7 +14,8 @@ The selector returns `security_required` with its `reason` and triggers: omitted
 `known-non-executable` or `indeterminate`; required for `known-sensitive`, `unmatched-executable`,
 an explicit request, or Tier 4. Indeterminate alone is not a security trigger or evidence of
 safety. A missing selector or unreadable required artifact prevents a trustworthy review and
-fails closed. State the resolved `reason` in the preview whenever security is omitted.
+fails closed. NUL-bearing text or a changed-file list inconsistent with an empty diff is an
+invalid capture, not a classification waiver. State the resolved `reason` in the preview whenever security is omitted.
 
 Keep coverage obligations fixed: **QA** when a pipeline workspace with acceptance criteria exists
 and the diff changes executable behavior; **security** when the selector requires it; and every
@@ -43,9 +44,10 @@ python3 "$REVIEW_CONTEXT_HELPER" preflight --repo-root "$REVIEW_ROOT" --runtime 
 
 Repeat `--agent` for the actual unique role names; omit the verifier when policy is `off`.
 Without explicit selections the compatibility default is reviewer plus verifier. Codex checks
-each effective project/global definition, respecting project overrides. Claude Code and OpenCode
-report `native-check-required`: verify selected native roles, read transport and effective
-permissions before dispatch. Definition checks cannot prove runtime enforcement. Announce the
+packaging markers in each selected project/global definition, respecting project overrides;
+this is not TOML validation or a trust attestation. Every runtime reports `native-check-required`:
+verify selected native roles, read transport and effective permissions before dispatch. A successful
+preflight does not authorize dispatch with unverified permissions. Announce the
 selected specialists and their concrete responsibilities.
 
 ## Dispatch
@@ -129,6 +131,9 @@ Persist this ledger as `pr-review-ledger.json`, retaining `head_oid`, `technical
 source report and the original verification input; these are evidence for resume, not temporary
 consolidation scratch files.
 A duplicate points to its surviving claim. Do not replace source assessments with Main's opinion.
+Accounting does not require publication: retain non-actionable observations and style-only notes
+in their source report and ledger with a reason for dropping them. A verifier confirming a fact
+does not establish that the fact is a defect or an actionable improvement.
 Before preview, reconcile source counts against the ledger and final channels. An unresolved
 speculation is not a proven blocker; missing required coverage cannot become a clean approval.
 Main may disagree with any specialist using recorded evidence. Preserve supported blockers and

@@ -6,8 +6,8 @@ Baseline: `a2683ae3dedc5d06f5ff3eb96c7cc6b95ef6ab48` (3.29.7). Evidence date: 20
 
 This report separates implemented behavior, native capability observations and comparative
 quality evidence. Passing projection tests is not evidence that a model completed a review or
-that one runtime is equivalent to another. No PR was published and no issue was closed by this
-implementation run. No restart was needed for the checks described below.
+that one runtime is equivalent to another. Delivery is a draft PR with the OpenSpec change still
+active; neither issue is claimed resolved. No restart was needed for the checks described below.
 
 ## Component inventory for #662
 
@@ -103,9 +103,36 @@ limit (`WinError 206`). A local harness repair moves definitions into an isolate
 freezes the candidate inputs, and terminates its own process tree on timeout. The repaired candidate
 run was initially blocked when automatic approval review rejected sending the unpublished local
 candidate to Claude/Anthropic. The operator subsequently authorized that specific transfer and
-requested PR publication afterward. The repaired small-fixture candidate D is running with the
-four configured native plugin roles loaded; no comparative outcome is recorded yet. OpenCode
-model trials separately need an operator-configured provider and model.
+requested PR publication afterward. The repaired small-fixture Claude A and D runs both completed:
+
+| Arm | Wall time | Native estimated cost | Completed specialist calls | Final draft |
+| --- | --- | --- | --- | --- |
+| A, current workflow | 675.383 s | USD 2.7321507 | general, security, consolidator, verifier | 0 blockers, 1 wording suggestion. Verifier refuted a proposed blocker by tracing the installer. |
+| D, Main consolidation and adaptive allocation | 632.404 s | USD 2.72211665 | general, security, verifier | 0 blockers, 2 non-actionable suggestions retained by Main. |
+
+Actual native message models were Opus 5 for Main/verifier and Sonnet 5 for the other specialists,
+without per-call model overrides or nested delegation. Configured effort was preserved (high,
+except the consolidator at medium); native effective effort telemetry was unavailable. Both runs
+left all 1,497 fixture files byte-identical, with no extra files. D attempted the unavailable
+`ExitPlanMode` tool; no mutation executed.
+
+These are not a controlled performance result. D expanded `blocking-only` verification to its
+two suggestions because there were no blockers. The harness was then repaired before A to
+preserve the policy explicitly, restrict added read directories to the fixture and workflow,
+use unique run names and omit unused role-definition files. Both runs used a read-only offline
+tool projection without MCP. Their harness revisions differ, and only one negative-control
+fixture completed. The other arms and security/generated fixtures remain unmeasured.
+
+The pilot exposed an instruction problem: accounting for every source finding was mistaken for
+retaining every observation publicly. The corrected guidance distinguishes ledger retention from
+actionable publication and preserves an empty `blocking-only` selection. Those instruction fixes
+have not received a new native comparison; no quality improvement is claimed.
+
+Receipt stream SHA-256: A `4fe56ae1e7487d0063d0ce7c637554e56d83f41619d3463aceab04f5d76fc20a`;
+D `cceb5375a475d3c8990705845d965ae0220ba371a12b0a2afdf46d320d309381`.
+Prompt SHA-256: A `37aebb31886f70e4af50a5614742f02b049b9dfe49590cd5c0968c4189a0680e`;
+D `ac72754492cdab0671d569534304b6f18ffc3f2b8f4595a0545027c92e98281c`.
+OpenCode model trials separately need an operator-configured provider and model.
 
 The first harness stopped only the parent at timeout; some streams continued briefly afterward.
 Its initial stream digests are therefore provisional, not sealed final receipts. None of these
@@ -119,11 +146,13 @@ or three-runtime quality parity is established yet; task 4.2 remains open.
 
 ## Automated verification and boundaries
 
-- `test_review_context.py`: Windows passed 55 of 58 cases, with three symlink-creation errors
-  (`WinError 1314`). WSL passed 57 and skipped only the Windows junction case, which passed on
-  Windows. The union covers all 58 cases, including selected readiness, preserved assessments,
-  missing coverage, concrete security selection and retained snapshot/cleanup behavior.
-- JavaScript migration: 118 passed, one explicitly platform-gated symlink case skipped on
+- `test_review_context.py`: after review repairs, WSL passed 60 of 61 cases and skipped only the
+  Windows junction case, which passed on Windows. The new linked-agent-directory case also passed
+  on Windows using real junctions. All 61 cases are covered across the two platforms. Added cases
+  reject status/evidence mismatches and malformed captured text, preserve an empty verification
+  selection, and reject linked role directories. A legacy prose-wording assertion was removed;
+  it did not exercise filesystem behavior.
+- JavaScript migration: 148 passed, one explicitly platform-gated symlink case skipped on
   Windows. Shared transform conformance: 40 passed, including the independent verifier fixture.
 - Go Windows transform/OpenCode subset passed. Five failures in the broader installer suite
   were reproduced on the immutable baseline: remove-ledger path separators, Codex ledger parent
@@ -143,6 +172,20 @@ or three-runtime quality parity is established yet; task 4.2 remains open.
 - Strict validation of `simplify-native-pr-review` passes. The overlapping active
   `pr-regression-evidence` verification requirement was reconciled without archiving unrelated
   changes. Archive guidance now places completed authorized changes in their delivery PR.
+
+The first full `tests/run-all.sh` run on reviewed commit `0701b18b` failed three suites. One was
+a stale generated plugin manifest (3.29.7 versus 3.29.8), corrected by regenerating distribution
+assets. The GitHub identity suite reported NTFS modes as `0777` through WSL despite Git's `100755`
+index; final validation uses a native Linux filesystem. The TS parity suite's AC-17 wall-clock
+measurement jumped by days during a brief command. Its independent baseline rerun also failed
+only AC-17 (55/56 passed; 227,289,615 ms reported). This is a baseline environment limitation,
+not evidence of a new latency regression. No test or threshold is bypassed to make it green.
+
+The author review used immutable base/head coordinates with tester, QA, security and adversary
+lenses. Their original concerns/failures remain recorded in the operator workspace; QA marked
+its coverage incomplete because native/evaluation work remains. Corrections require evidence
+per finding, not rewriting the original verdict to pass. Draft publication does not assert
+completed native acceptance or a ready historical review gate.
 
 The implementation does not add per-PR benchmark gates. This evidence is for the approved
 development experiment. Keep the change active until its remaining verification and authorized

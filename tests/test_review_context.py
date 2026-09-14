@@ -218,22 +218,6 @@ class ReviewContextTests(unittest.TestCase):
             parent = repo_root / "workspaces" / "pr-review-34"
             self.assertEqual(list(parent.glob("run-*")), [])
 
-    def test_reviewer_contracts_preserve_deleted_symlink_and_optional_workspace_rules(self):
-        ref = (ROOT / "agents" / "ref-direct-modes.md").read_text(encoding="utf-8")
-        self.assertIn("A deleted\nchanged-file path is evidence from `Diff Path` only", ref)
-
-        for relative in (
-            "agents/reviewer.md",
-            "agents/pr-review-qa.md",
-            "agents/pr-review-security.md",
-        ):
-            with self.subTest(relative=relative):
-                contract = (ROOT / relative).read_text(encoding="utf-8")
-                self.assertIn("non-symlink regular file", contract)
-                self.assertRegex(contract, r"resolved\s+path remains inside")
-                self.assertIn("deleted", contract)
-                self.assertIn("head worktree", contract)
-
     def test_review_policy_defaults_and_parses_the_fenced_yaml_block(self):
         self.assertEqual(
             MODULE.read_review_policy(None),
@@ -344,8 +328,30 @@ class ReviewContextTests(unittest.TestCase):
                 MODULE.apply_verification([], value, "all")
         inline, verifier = self.verification_fixture()
         verifier["findings"][0].pop("evidence")
-        with self.assertRaisesRegex(MODULE.ContextError, "evidence or a reason"):
+        with self.assertRaisesRegex(MODULE.ContextError, "requires non-empty evidence"):
             MODULE.apply_verification(inline, verifier, "blocking-only")
+
+    def test_verifier_status_requires_its_own_evidence_field(self):
+        inline, _ = self.verification_fixture()
+        for status, required, other in (("confirmed", "evidence", "reason"),
+                                        ("refuted", "evidence", "reason"),
+                                        ("unconfirmed", "reason", "evidence")):
+            for value in (None, "", "  ", 3, [], {}):
+                assessment = dict(inline[0], status=status, **{required: value, other: "not the required field"})
+                with self.subTest(status=status, value=value), self.assertRaisesRegex(
+                    MODULE.ContextError, f"requires non-empty {required}"
+                ):
+                    MODULE.apply_verification(inline[:1], {"findings": [assessment]}, "all")
+
+    def test_empty_blocking_selection_does_not_expand_to_suggestions(self):
+        inline, _ = self.verification_fixture()
+        result = MODULE.apply_verification(inline[-1:], {"findings": []}, "blocking-only")
+        self.assertEqual(result["coverage"], "verified 0/0")
+        self.assertEqual(result["inline"], inline[-1:])
+        self.assertIsNone(result["forced_event"])
+        suggestion = dict(inline[-1], status="confirmed", evidence="src/d.ts:40")
+        with self.assertRaisesRegex(MODULE.ContextError, "0 missing, 1 unexpected"):
+            MODULE.apply_verification(inline[-1:], {"findings": [suggestion]}, "blocking-only")
 
     def test_apply_verification_absent_verifier_and_policy_off(self):
         inline, _ = self.verification_fixture()
@@ -487,6 +493,7 @@ class ReviewContextTests(unittest.TestCase):
                 selected = MODULE.preflight(repo, "codex", agents, ["reviewer", "reviewer"])
                 self.assertTrue(selected["ok"])
                 self.assertEqual(selected["review_agents"], ["reviewer"])
+                self.assertEqual(selected["agent_check"], "native-check-required")
                 with patch.object(Path, "read_text", side_effect=PermissionError("fixture unreadable")):
                     unreadable = MODULE._codex_agent_set_status(agents, ("reviewer",))
                 self.assertEqual(unreadable["status"], "mixed")
@@ -499,6 +506,31 @@ class ReviewContextTests(unittest.TestCase):
                         MODULE.preflight(repo, "codex", agents, selection)
                 with self.assertRaises(MODULE.ContextError):
                     MODULE.preflight(repo, "codex", agents, ["reviewer"], prerequisites_only=True)
+
+    def test_preflight_rejects_linked_agent_directories(self):
+        for linked_level in ("agents", ".codex"):
+            with self.subTest(level=linked_level), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                target = root / "outside"
+                target.mkdir()
+                link = root / linked_level
+                if os.name == "nt":
+                    subprocess.run(["cmd", "/d", "/c", "mklink", "/J", str(link), str(target)],
+                                   check=True, capture_output=True)
+                else:
+                    link.symlink_to(target, target_is_directory=True)
+                try:
+                    agents = link if linked_level == "agents" else link / "agents"
+                    agents.mkdir(exist_ok=True)
+                    (agents / "reviewer.toml").write_text(
+                        '# Instruction source: runtime/codex/instructions/reviewer.md\n'
+                        '# Semantic source: agents/reviewer.md\n# Projection tier: x\n'
+                        'name = "reviewer"\nsandbox_mode = "read-only"\n', encoding="utf-8")
+                    result = MODULE._codex_agent_set_status(agents, ("reviewer",))
+                    self.assertEqual(result["status"], "mixed")
+                    self.assertEqual(result["invalid"], ["reviewer"])
+                finally:
+                    os.rmdir(link) if os.name == "nt" else link.unlink()
 
     def test_snapshot_repo_avoids_writes_to_read_only_source_git_dir(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1014,6 +1046,20 @@ class ReviewContextTests(unittest.TestCase):
                     )
                 )
             self.assertEqual(output.getvalue(), "")
+
+    def test_malformed_capture_cannot_waive_security(self):
+        for files, diff in (("", "+change"), ("src/app.py\n", ""),
+                            ("src/\x00app.py\n", "+change"), ("src/app.py\n", "+bad\x00text")):
+            with self.subTest(files=files, diff=diff), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "files").write_text(files, encoding="utf-8")
+                (root / "diff").write_text(diff, encoding="utf-8")
+                output = io.StringIO()
+                with redirect_stdout(output), self.assertRaisesRegex(MODULE.ContextError, "consistent captured text"):
+                    MODULE.command_select_security(SimpleNamespace(
+                        changed_files=root / "files", diff=root / "diff", explicit_security=False, tier=None
+                    ))
+                self.assertEqual(output.getvalue(), "")
 
     def test_binary_file_does_not_blind_the_scan_to_sensitive_changes(self):
         changed_files = "assets/logo.png\nagents/security.md\n"
