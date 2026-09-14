@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.29.6] - 2026-09-13
+
+### Fixed
+
+- PR review preserves UTF-8 evidence on Windows and reports invalid output clearly. Fixes #656.
+- Windows review cleanup removes owned read-only Git snapshots after success or failure. Fixes #657.
+- OpenSpec offers completion or retirement across runtimes and shows pending archives without requiring a PR. Fixes #658.
+
 ## [3.29.5] - 2026-09-10
 
 ### Fixed

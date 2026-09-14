@@ -1,6 +1,6 @@
 ---
 name: trace
-description: Show pipeline observability for a single feature.
+description: Show feature observability and OpenSpec completion or retirement status.
 ---
 
 Show pipeline observability for a single feature. This is a standalone read-only skill — does NOT route through the orchestrator and NEVER modifies state (no Edit, no Write, no JSONL append).
@@ -27,6 +27,13 @@ Parse `$ARGUMENTS`:
   as a legacy alias for `--tokens`).
 
 If `$ARGUMENTS` is empty or just whitespace, print the usage block above and exit cleanly.
+
+Before workspace discovery, look for the named OpenSpec change in the current
+repository or an already-bound source. Apply [the shared lifecycle](../spec/references/lifecycle.md)
+to report its archive disposition read-only. If it exists without a pipeline
+workspace, show that disposition and note unavailable pipeline telemetry, then
+return without creating or requiring state. With a workspace, retain the selected
+trace output and append the OpenSpec disposition separately.
 
 **Step 0 — Resolve the persisted workspace identity.** Read the active runtime's
 Team Harness config and use packaged `workspace-identity.mjs` discovery. Match

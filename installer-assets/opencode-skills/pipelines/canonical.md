@@ -6,6 +6,11 @@ field, or changes `00-state.md`. The coordinator is the sole writer of coordinat
 
 ## Scan
 
+Use [the OpenSpec lifecycle](../spec/references/lifecycle.md) to append a separate
+read-only list of pending archives in the current or already-bound repositories.
+Include direct-mode changes; no pipeline state files does not suppress this list.
+Do not infer acceptance, delivery, or obsolescence from checked tasks alone.
+
 1. Resolve candidate roots with packaged `workspace-identity.mjs`; use persisted
    identities and never synthesize today's path or merge local/Obsidian copies.
 2. Find coordinator-root `00-state.md` files, including active worktrees when available.

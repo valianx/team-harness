@@ -558,6 +558,25 @@ def command_environment(extra_env: dict[str, str] | None = None) -> dict[str, st
     }
 
 
+def _decode_command_output(
+    output: bytes | str | None,
+    command: list[str],
+    stream: str,
+    *,
+    replace_errors: bool = False,
+) -> str:
+    if output is None:
+        return ""
+    if isinstance(output, str):
+        return output
+    try:
+        return output.decode("utf-8", errors="replace" if replace_errors else "strict")
+    except UnicodeDecodeError as error:
+        raise ContextError(
+            f"{' '.join(command[:3])} returned invalid UTF-8 on {stream}"
+        ) from error
+
+
 def run_json(
     command: list[str],
     *,
@@ -571,7 +590,7 @@ def run_json(
             cwd=cwd,
             check=False,
             capture_output=True,
-            text=True,
+            text=False,
             timeout=timeout,
             env=command_environment(extra_env),
         )
@@ -580,10 +599,15 @@ def run_json(
             f"{' '.join(command[:3])} timed out within the {COMMAND_TIMEOUT_SECONDS}s capture limit"
         ) from error
     if result.returncode != 0:
-        detail = result.stderr.strip() or result.stdout.strip() or "unknown error"
+        detail = (
+            _decode_command_output(result.stderr, command, "stderr", replace_errors=True).strip()
+            or _decode_command_output(result.stdout, command, "stdout", replace_errors=True).strip()
+            or "unknown error"
+        )
         raise ContextError(f"{' '.join(command[:3])} failed: {detail}")
+    output = _decode_command_output(result.stdout, command, "stdout")
     try:
-        return json.loads(result.stdout)
+        return json.loads(output)
     except json.JSONDecodeError as error:
         raise ContextError(f"{' '.join(command[:3])} returned invalid JSON") from error
 
@@ -601,7 +625,7 @@ def run_text(
             cwd=cwd,
             check=False,
             capture_output=True,
-            text=True,
+            text=False,
             timeout=timeout,
             env=command_environment(extra_env),
         )
@@ -610,9 +634,13 @@ def run_text(
             f"{' '.join(command[:3])} timed out within the {COMMAND_TIMEOUT_SECONDS}s capture limit"
         ) from error
     if result.returncode != 0:
-        detail = result.stderr.strip() or result.stdout.strip() or "unknown error"
+        detail = (
+            _decode_command_output(result.stderr, command, "stderr", replace_errors=True).strip()
+            or _decode_command_output(result.stdout, command, "stdout", replace_errors=True).strip()
+            or "unknown error"
+        )
         raise ContextError(f"{' '.join(command[:3])} failed: {detail}")
-    return result.stdout.strip()
+    return _decode_command_output(result.stdout, command, "stdout").strip()
 
 
 def command_timeout() -> float:
@@ -2036,7 +2064,7 @@ def preflight(repo_root: Path, runtime: str, agents_dir: Path | None) -> dict[st
     """Check the review prerequisites once and report every blocker."""
     blockers: list[str] = []
     try:
-        completed = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True, timeout=COMMAND_TIMEOUT_SECONDS)
+        completed = subprocess.run(["gh", "auth", "status"], capture_output=True, text=False, timeout=COMMAND_TIMEOUT_SECONDS)
         gh_status = "authenticated" if completed.returncode == 0 else "unauthenticated"
     except (OSError, subprocess.TimeoutExpired):
         gh_status = "unavailable"

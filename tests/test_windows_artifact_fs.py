@@ -98,6 +98,24 @@ class WindowsArtifactFilesystemTests(unittest.TestCase):
             finally:
                 os.close(root_fd)
 
+    def test_unlink_removes_read_only_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            read_only = root / "read-only-object"
+            read_only.write_bytes(b"git object")
+            read_only.chmod(stat.S_IREAD)
+            self.assertFalse(read_only.stat().st_mode & stat.S_IWRITE)
+
+            root_fd = MODULE.open(
+                root,
+                os.O_RDONLY | MODULE.DIRECTORY | MODULE.NOFOLLOW,
+            )
+            try:
+                MODULE.unlink(read_only.name, dir_fd=root_fd)
+            finally:
+                os.close(root_fd)
+            self.assertFalse(read_only.exists())
+
     def test_scandir_uses_validated_directory_handle(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

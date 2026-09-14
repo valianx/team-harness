@@ -99,6 +99,10 @@ trace. A missing native root identifier yields an unavailable result; it never
 authorizes an estimate, a reused subtotal, or a price inference.
 
 New Obsidian runs already live in the vault and perform no delivery-time copy.
+After terminal close, apply [the shared OpenSpec lifecycle](../../spec/references/lifecycle.md)
+using the available delivery observation. Report pending archive without waiting
+for merge or changing the accepted candidate.
+
 When recovering a legacy snapshot with `obsidian_sync: armed`, preserve its
 recorded one-way export behavior; this compatibility path never applies to a
 new run.

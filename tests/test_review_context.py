@@ -695,6 +695,34 @@ class ReviewContextTests(unittest.TestCase):
         finally:
             MODULE._capture_deadline = None
 
+    def test_gh_output_is_utf8_and_invalid_bytes_are_bounded(self):
+        value = "Español Ï │ 🧪"
+        text_bytes = value.encode("utf-8")
+        text_command = [
+            sys.executable,
+            "-c",
+            f"import sys; sys.stdout.buffer.write({text_bytes!r})",
+        ]
+        json_bytes = json.dumps({"body": value}, ensure_ascii=False).encode("utf-8")
+        json_command = [
+            sys.executable,
+            "-c",
+            f"import sys; sys.stdout.buffer.write({json_bytes!r})",
+        ]
+        invalid_command = [
+            sys.executable,
+            "-c",
+            "import sys; sys.stdout.buffer.write(b'\\x8f')",
+        ]
+
+        with patch.object(MODULE.subprocess.locale, "getencoding", return_value="cp1252"):
+            self.assertEqual(MODULE.run_text(text_command), value)
+            self.assertEqual(MODULE.run_json(json_command), {"body": value})
+            for runner in (MODULE.run_text, MODULE.run_json):
+                with self.subTest(runner=runner.__name__):
+                    with self.assertRaisesRegex(MODULE.ContextError, "invalid UTF-8"):
+                        runner(invalid_command)
+
     def test_workspace_ignore_update_is_atomic_and_rejects_symlink(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

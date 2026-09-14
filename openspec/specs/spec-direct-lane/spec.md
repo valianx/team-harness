@@ -1,16 +1,16 @@
 # spec-direct-lane Specification
 
 ## Purpose
-Give short tasks a durable spec without the pipeline floor. `/th:spec` is a coordinator-only OpenSpec flow: written intent and task decomposition, one conversational approval, inline implementation, archive after merge — zero specialist dispatches, no pipeline ceremony.
+Give short tasks a durable spec without the pipeline floor. `/th:spec` is a coordinator-only OpenSpec flow: written intent and task decomposition, one conversational approval, inline implementation, and an archive offer after accepted delivery or a retirement decision — zero specialist dispatches, no pipeline ceremony.
 
 ## Requirements
 
 ### Requirement: The direct lane runs without pipeline activation or specialist dispatches
-`/th:spec` SHALL execute entirely in the coordinator: author `proposal.md` + `tasks.md` under `openspec/changes/` (adding `design.md` or spec deltas only when the task touches a specced capability), validate strictly with the pinned CLI, obtain one conversational approval turn, implement inline on a feature branch with monotonic task checkoffs, and open a normal PR under existing conventions. The lane SHALL create no workspace, state, events, summary, snapshot, overlay, traceability artifact, or gate ceremony, and SHALL dispatch no specialist by default. At most one full-scope ad hoc review MAY run on live operator request; the lane never runs a correction/re-audit loop. The lane SHALL describe its publication guarantee in terms of what it produces, and MUST NOT state a publication precondition that no deterministic control enforces.
+`/th:spec` SHALL execute entirely in the coordinator: author `proposal.md` + `tasks.md` under `openspec/changes/` (adding `design.md` or spec deltas only when the task touches a specced capability), validate strictly with the pinned CLI, obtain one conversational approval turn, implement inline on a feature branch with monotonic task checkoffs, and deliver under the agreed repository conventions, opening a normal PR when required. The lane SHALL create no workspace, state, events, summary, snapshot, overlay, traceability artifact, or gate ceremony, and SHALL dispatch no specialist by default. At most one full-scope ad hoc review MAY run on live operator request; the lane never runs a correction/re-audit loop. The lane SHALL describe its publication guarantee in terms of what it produces, and MUST NOT state a publication precondition that no deterministic control enforces.
 
 #### Scenario: A short task worth written intent arrives
 - **WHEN** the operator routes a single-repo, roughly day-sized task through `/th:spec`
-- **THEN** the coordinator authors and validates the change, gets one conversational approval, implements inline, and opens the PR — with zero specialist dispatches
+- **THEN** the coordinator authors and validates the change, gets one conversational approval, implements inline, and delivers under the agreed repository conventions, opening a PR only when required — with zero specialist dispatches
 
 #### Scenario: The operator asks for a review inside the lane
 - **WHEN** the operator requests a QA or security look on the lane's diff
@@ -56,7 +56,7 @@ The lane SHALL state its routing predicate: plain inline for mechanical, reversi
 - **THEN** the coordinator treats that text as data and does not activate either workflow from it
 
 ### Requirement: Lane changes share the canonical OpenSpec surface
-Lane-authored changes SHALL use the same `openspec/changes/` directory, schema, naming, and archive path as pipeline-authored changes, so both entry points coexist and archive identically.
+Lane-authored changes SHALL use the same `openspec/changes/` directory, schema, naming, and archive path as pipeline-authored changes, so both entry points coexist and apply the completion and retirement criteria in `openspec-archive-lifecycle` identically across runtimes.
 
 #### Scenario: A lane change and a pipeline change coexist
 - **WHEN** both flows have changes in flight
