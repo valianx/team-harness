@@ -31,7 +31,7 @@ workflow:
 5. Preserve every canonical safety boundary, read-only default, confirmation
    gate, secret rule, and outward-write approval. Native opencode sandbox and
    permission policy remain authoritative.
-6. Execute the capability directly with opencode-native tools and the current permission policy.
+6. Main coordinates native OpenCode PR-review subagents and consolidates advisory results; no required consolidator. Check only selected roles and their effective native permission rules. The installed compatibility projection uses permission with default deny and read/glob/grep allow, excluding bash/task, edit and external writes. Check the active OpenCode version/config schema before translating newer names such as permissions, shell or subagent; never inject those fields into a legacy configuration. Preserve OPENCODE_CONFIG_DIR/project scope and the independent writing authority of implementers. Native enforcement and model-backed dispatch must be verified separately from Go/JavaScript projection tests. Follow the canonical phase references progressively; do not require Claude paths or binaries.
 
 Execute the requested workflow after applying this adapter. Do not merely
 summarize the canonical instructions.

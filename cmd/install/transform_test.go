@@ -159,6 +159,27 @@ func TestTransform_BlankModelSkipped(t *testing.T) {
 // transform always injects mode: subagent and name: orchestrator (fixture-bound /
 // migrate.mjs parity); the role override is an installer-specific
 // post-projection step.
+// Review permission selection must survive missing or conflicting source metadata.
+func TestTransform_ReviewBasenameCannotLosePermissions(t *testing.T) {
+	for _, name := range []string{"reviewer", "pr-review-qa", "pr-review-security", "pr-review-verifier", "reviewer-consolidator"} {
+		for _, metadata := range []string{"", "name: implementer\n", "name: " + name + " # comment\n"} {
+			t.Run(name+metadata, func(t *testing.T) {
+				src := []byte("---\n" + metadata + "tools: Read, Write, Bash, Task\n---\nBody.\n")
+				got, err := opencodeRuntimeTransform(src, TransformKindAgent, "agents/"+name+".md")
+				if err != nil {
+					t.Fatal(err)
+				}
+				// Independent expected native policy bytes; do not round-trip through
+				// the installer's deliberately limited source-frontmatter parser.
+				want := "permission: {\"*\": deny, read: allow, glob: allow, grep: allow}\n"
+				if !strings.Contains(string(got), want) {
+					t.Fatalf("basename lost read-only permission:\n%s", got)
+				}
+			})
+		}
+	}
+}
+
 func TestTransform_ModeByRole_Orchestrator(t *testing.T) {
 	input := "---\nname: orchestrator\nmodel: opus\ntools: Read\n---\nBody.\n"
 	transformed, err := transformToOpencode([]byte(input), TransformKindAgent)

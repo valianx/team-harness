@@ -315,7 +315,9 @@ func insertModelLine(transformed []byte, concrete string) []byte {
 // this installer-layer projection, so it never reaches the Claude Code
 // output.
 func applyModeByRole(src []byte, agentName string) ([]byte, error) {
-	if agentName != "orchestrator" {
+	// Review permissions also follow the installed filename, independently of
+	// source frontmatter metadata.
+	if agentName != "orchestrator" && !isPRReviewAgent(agentName) {
 		// No change needed — generic transform already set mode: subagent.
 		return src, nil
 	}
@@ -324,8 +326,12 @@ func applyModeByRole(src []byte, agentName string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("applyModeByRole parse: %v", err)
 	}
-	fm["mode"] = "primary"
-	fm["name"] = "TH-orchestrator"
+	if isPRReviewAgent(agentName) {
+		fm["permission"] = prReviewPermission()
+	} else {
+		fm["mode"] = "primary"
+		fm["name"] = "TH-orchestrator"
+	}
 	return serializeFrontmatterYAML(fm, body), nil
 }
 

@@ -732,7 +732,7 @@ function agentToolsToOpencodePermission(toolsStr) {
 }
 
 const PR_REVIEW_AGENTS = new Set([
-  "reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator",
+  "reviewer", "pr-review-qa", "pr-review-security", "pr-review-verifier", "reviewer-consolidator",
 ]);
 
 function prReviewPermission() {
@@ -1090,7 +1090,7 @@ function transformToOpencode(filePath, content, repoRoot) {
     // provider lock-in and ProviderModelNotFoundError. Per-provider tiering is a
     // future additive step (docs/opencode-model-config.md); toProviderPrefixedModel
     // is retained for it and for the reverse (opencode→CC) direction.
-    if (PR_REVIEW_AGENTS.has(fm["name"])) {
+    if (PR_REVIEW_AGENTS.has(path.basename(filePath, ".md")) || PR_REVIEW_AGENTS.has(fm["name"])) {
       projected["permission"] = prReviewPermission();
     }
     projected["mode"] = "subagent";
@@ -1128,14 +1128,19 @@ function transformToOpencode(filePath, content, repoRoot) {
  * stays name: orchestrator / mode: subagent for the orchestrator).
  */
 function applyModeByRole(content, agentName) {
-  if (agentName !== "orchestrator") {
+  // The role's installed filename also preserves review permission restrictions.
+  if (agentName !== "orchestrator" && !PR_REVIEW_AGENTS.has(agentName)) {
     // No change needed — the generic transform already set mode: subagent.
     return content;
   }
 
   const { frontmatter: fm, body } = parseFrontmatter(content);
-  fm["mode"] = "primary";
-  fm["name"] = "TH-orchestrator";
+  if (PR_REVIEW_AGENTS.has(agentName)) {
+    fm["permission"] = prReviewPermission();
+  } else {
+    fm["mode"] = "primary";
+    fm["name"] = "TH-orchestrator";
+  }
   return serializeFrontmatter(fm, body);
 }
 
@@ -1229,6 +1234,9 @@ function transformToCC(filePath, content, repoRoot) {
     // Each key maps back to the CC tool name; "edit" maps to "Edit" (canonical; Write is
     // omitted since Edit is the more specific tool in CC format).
     if (permission !== undefined) projected["tools"] = opencodePermissionToAgentTools(permission);
+    if (PR_REVIEW_AGENTS.has(path.basename(filePath, ".md")) || PR_REVIEW_AGENTS.has(fm["name"])) {
+      projected["tools"] = "Read, Glob, Grep";
+    }
     // color: map opencode enum back to a canonical CC color (lossy — e.g. info could have
     // been blue, cyan, or teal; we pick a canonical one per enum).
     if (fm["color"] !== undefined) projected["color"] = opencodeColorToCC(String(fm["color"]));

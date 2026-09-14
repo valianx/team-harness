@@ -379,8 +379,8 @@ console.log("\n=== Section 4: Forward transform CC → opencode (AC-1, AC-2, AC-
     glob: "allow",
     grep: "allow",
   };
-  for (const name of ["reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator"]) {
-    const source = `---\nname: ${name}\nmodel: sonnet\ntools: Read, Glob, Grep\n---\nBody.\n`;
+  for (const name of ["reviewer", "pr-review-qa", "pr-review-security", "pr-review-verifier", "reviewer-consolidator"]) {
+    const source = `---\nname: ${name}\nmodel: sonnet\ntools: Read, Glob, Grep, Bash, Write, Task\n---\nBody.\n`;
     const result = transformToOpencode(`agents/${name}.md`, source, "/repo");
     const { frontmatter: fm } = parseFrontmatter(result.content);
     assert(
@@ -388,7 +388,19 @@ console.log("\n=== Section 4: Forward transform CC → opencode (AC-1, AC-2, AC-
       JSON.stringify(fm["permission"]) === JSON.stringify(expectedPermission),
       JSON.stringify(fm["permission"]),
     );
+    for (const metadata of ["", "name: implementer\n", `name: ${name} # comment\n`]) {
+      const malformed = `---\n${metadata}tools: Read, Write, Bash, Task\n---\nBody.\n`;
+      const forward = transformToOpencode(`agents/${name}.md`, malformed, "/repo");
+      assert(`PR review basename ${name} remains restricted with ${JSON.stringify(metadata)}`,
+        JSON.stringify(parseFrontmatter(forward.content).frontmatter.permission) === JSON.stringify(expectedPermission));
+      const widened = `---\n${metadata}permission:\n  edit: allow\n  bash: allow\n  task: allow\n---\nBody.\n`;
+      const reverse = transformToCC(`.opencode/agents/${name}.md`, widened, "/repo");
+      assert(`Reverse PR review basename ${name} denies widened capabilities with ${JSON.stringify(metadata)}`,
+        parseFrontmatter(reverse.content).frontmatter.tools === "Read, Glob, Grep");
+    }
   }
+  const writer = transformToOpencode("agents/implementer.md", "---\nname: implementer\ntools: Read, Write, Edit, Bash\n---\nBody.\n", "/repo");
+  assert("PR review restrictions do not replace implementer native permissions", parseFrontmatter(writer.content).frontmatter.permission === undefined);
 }
 
 {

@@ -91,6 +91,7 @@ if __name__ == "__main__":
     # Reuse the same behavior assertions as POSIX; only the filesystem backend differs.
     names = [
         "test_windows_junctions_cannot_be_used_as_snapshot_or_cleanup_worktree",
+        "test_preflight_rejects_linked_agent_directories",
         "test_command_output_writes_and_promotes_a_pinned_artifact",
         "test_gh_output_is_utf8_and_invalid_bytes_are_bounded",
         "test_snapshot_repo_avoids_writes_to_read_only_source_git_dir",
@@ -100,7 +101,7 @@ if __name__ == "__main__":
         "test_prepare_run_owns_capture_materialization_and_paths",
         "test_prepare_run_cleans_its_owned_partial_run_on_capture_failure",
         "test_prepare_run_cleans_its_owned_partial_run_on_materialize_failure",
-        "test_apply_verification_cli_writes_the_applied_inline_leaf",
+        "test_apply_verification_cli_preserves_inline_leaf",
         "test_artifact_promotion_rejects_temporary_inode_swap",
         "test_artifact_promotion_uses_pinned_inode_when_source_name_swaps",
         "test_artifact_promotion_links_portably_without_procfs",

@@ -77,7 +77,7 @@ CODEX_AGENTS_DIR = REPO_ROOT / ".codex" / "agents"
 READ_ONLY_AGENTS = {
     "architect", "security", "qa", "reviewer",
     "plan-reviewer", "mentor", "adversary", "pr-review-qa",
-    "pr-review-security", "reviewer-consolidator",
+    "pr-review-security", "pr-review-verifier", "reviewer-consolidator",
 }
 
 PR_REVIEW_AGENT_TOOLS = {
@@ -87,6 +87,7 @@ PR_REVIEW_AGENT_TOOLS = {
     ],
     "pr-review-qa": ["Read", "Glob", "Grep"],
     "pr-review-security": ["Read", "Glob", "Grep"],
+    "pr-review-verifier": ["Read", "Glob", "Grep"],
     "reviewer-consolidator": ["Read", "Glob", "Grep"],
 }
 
@@ -96,7 +97,7 @@ NO_MUTATION_AGENTS = set(PR_REVIEW_AGENT_TOOLS)
 # here no longer resolves to a file.
 EXPECTED_AGENTS = [
     "orchestrator", "architect", "agent-builder", "security", "reviewer",
-    "reviewer-consolidator", "pr-review-qa", "pr-review-security",
+    "reviewer-consolidator", "pr-review-qa", "pr-review-security", "pr-review-verifier",
     "qa", "gcp-cost-analyzer", "gcp-infra", "init-project", "implementer", "tester",
     "plan-reviewer", "diagrammer", "documenter", "likec4-diagrammer",
     "d2-diagrammer", "translator", "delivery", "mentor",
@@ -643,14 +644,23 @@ def check_5_secrets() -> int:
 # ---------------------------------------------------------------------------
 
 def _self_test_check_1() -> None:
-    """Check 1 fixture: synthetic read-only agent with Bash."""
-    synthetic_fm = "---\nname: test-readonly\ntools: Read, Bash, Glob\n---\nbody"
-    fm = parse_frontmatter(synthetic_fm)
-    agent_tools = tools_list(fm)
-    assert "Bash" in agent_tools, "fixture FM parse failed"
-    # Simulate the check logic.
-    hit = "Bash" in agent_tools
-    assert hit, "check-1 fixture: should detect Bash in read-only-tier agent"
+    """Exercise the scanner on the verifier, with an authorized writer as control."""
+    from contextlib import redirect_stdout
+    from unittest.mock import patch
+
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        (root / "implementer.md").write_text(
+            "---\nname: implementer\ntools: Read, Write, Edit, Bash\n---\n", encoding="utf-8")
+        verifier = root / "pr-review-verifier.md"
+        for toolset, should_fail in (("Read, Glob, Grep", False),
+                                     ("Read, Glob, Grep, Bash", True),
+                                     ("Read, Glob, Grep, Write", True),
+                                     ("Read, Glob, Grep, Task", True)):
+            verifier.write_text(f"---\nname: pr-review-verifier\ntools: {toolset}\n---\n", encoding="utf-8")
+            with patch.dict(globals(), {"AGENTS_DIR": root, "findings": []}), redirect_stdout(io.StringIO()):
+                failures = check_1_readonly_bash()
+            assert (failures > 0) == should_fail, f"check-1 verifier fixture: {toolset}"
 
 
 def _self_test_check_2() -> None:

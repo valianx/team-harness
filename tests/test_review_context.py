@@ -19,7 +19,6 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "skills" / "review-pr" / "scripts" / "review_context.py"
-SKILL = ROOT / "skills" / "review-pr" / "SKILL.md"
 SPEC = importlib.util.spec_from_file_location("review_context", SCRIPT)
 assert SPEC and SPEC.loader
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -219,34 +218,6 @@ class ReviewContextTests(unittest.TestCase):
             parent = repo_root / "workspaces" / "pr-review-34"
             self.assertEqual(list(parent.glob("run-*")), [])
 
-    def test_review_snapshot_lifecycle_outlives_exec_yields(self):
-        contract = SKILL.read_text(encoding="utf-8")
-        self.assertNotIn("Register the EXIT trap", contract)
-        self.assertNotRegex(contract, r"(?m)^\s*trap\b.*\bEXIT\b")
-        self.assertIn("MUST outlive every specialist dispatch", contract)
-        self.assertIn("whether any one yield exceeds 30 seconds", contract)
-        self.assertIn("only after every dispatched reviewer has", contract)
-        self.assertLess(
-            contract.index("MUST outlive every specialist dispatch"),
-            contract.index("Run `cleanup-run` explicitly from the coordinator only after"),
-        )
-
-    def test_reviewer_contracts_preserve_deleted_symlink_and_optional_workspace_rules(self):
-        ref = (ROOT / "agents" / "ref-direct-modes.md").read_text(encoding="utf-8")
-        self.assertIn("A deleted\nchanged-file path is evidence from `Diff Path` only", ref)
-
-        for relative in (
-            "agents/reviewer.md",
-            "agents/pr-review-qa.md",
-            "agents/pr-review-security.md",
-        ):
-            with self.subTest(relative=relative):
-                contract = (ROOT / relative).read_text(encoding="utf-8")
-                self.assertIn("non-symlink regular file", contract)
-                self.assertRegex(contract, r"resolved\s+path remains inside")
-                self.assertIn("deleted", contract)
-                self.assertIn("head worktree", contract)
-
     def test_review_policy_defaults_and_parses_the_fenced_yaml_block(self):
         self.assertEqual(
             MODULE.read_review_policy(None),
@@ -325,21 +296,17 @@ class ReviewContextTests(unittest.TestCase):
         ]}
         return inline, verifier
 
-    def test_apply_verification_confirms_demotes_and_drops(self):
+    def test_apply_verification_preserves_all_findings_and_advisory_evidence(self):
         inline, verifier = self.verification_fixture()
         result = MODULE.apply_verification(inline, verifier, "blocking-only")
         self.assertEqual(result["coverage"], "verified 1/3")
         self.assertIsNone(result["forced_event"])
-        bodies = [finding["body"] for finding in result["inline"]]
-        self.assertEqual(len(bodies), 3)
-        self.assertTrue(bodies[0].startswith("**Blocking: null deref**"))
-        self.assertTrue(bodies[1].startswith("**Suggestion: (unverified) missing auth check**"))
-        self.assertEqual(result["inline"][2], inline[3])
-        self.assertEqual(
-            [(entry["disposition"], entry["finding"]) for entry in result["ledger"]],
-            [("demoted", "Blocking: missing auth check"), ("dropped", "Blocking: phantom race")],
-        )
-        self.assertTrue(all(entry["reason"].startswith("verifier — ") for entry in result["ledger"]))
+        self.assertEqual(result["inline"], inline)
+        self.assertEqual(result["assessments"], verifier["findings"])
+        self.assertEqual(result["ledger"], [])
+        # Return order follows the input claims, not the verifier's serialization order.
+        reversed_result = MODULE.apply_verification(inline, {"findings": list(reversed(verifier["findings"]))}, "blocking-only")
+        self.assertEqual(reversed_result, result)
 
     def test_apply_verification_requires_exact_coverage_of_the_selected_findings(self):
         inline, verifier = self.verification_fixture()
@@ -352,6 +319,39 @@ class ReviewContextTests(unittest.TestCase):
             MODULE.apply_verification(inline, verifier, "all")
         with self.assertRaisesRegex(MODULE.ContextError, "share one path:line side anchor"):
             MODULE.apply_verification([*inline, dict(inline[0], body="**Blocking: other claim**")], verifier, "blocking-only")
+        with self.assertRaisesRegex(MODULE.ContextError, "share one path:line side anchor"):
+            MODULE.apply_verification([*inline, dict(inline[0], body="**Suggestion: other claim**")], verifier, "blocking-only")
+
+    def test_apply_verification_rejects_malformed_or_evidence_free_assessments(self):
+        for value in ([], {}, {"findings": {}}, {"findings": None}):
+            with self.subTest(value=value), self.assertRaisesRegex(MODULE.ContextError, "JSON array"):
+                MODULE.apply_verification([], value, "all")
+        inline, verifier = self.verification_fixture()
+        verifier["findings"][0].pop("evidence")
+        with self.assertRaisesRegex(MODULE.ContextError, "requires non-empty evidence"):
+            MODULE.apply_verification(inline, verifier, "blocking-only")
+
+    def test_verifier_status_requires_its_own_evidence_field(self):
+        inline, _ = self.verification_fixture()
+        for status, required, other in (("confirmed", "evidence", "reason"),
+                                        ("refuted", "evidence", "reason"),
+                                        ("unconfirmed", "reason", "evidence")):
+            for value in (None, "", "  ", 3, [], {}):
+                assessment = dict(inline[0], status=status, **{required: value, other: "not the required field"})
+                with self.subTest(status=status, value=value), self.assertRaisesRegex(
+                    MODULE.ContextError, f"requires non-empty {required}"
+                ):
+                    MODULE.apply_verification(inline[:1], {"findings": [assessment]}, "all")
+
+    def test_empty_blocking_selection_does_not_expand_to_suggestions(self):
+        inline, _ = self.verification_fixture()
+        result = MODULE.apply_verification(inline[-1:], {"findings": []}, "blocking-only")
+        self.assertEqual(result["coverage"], "verified 0/0")
+        self.assertEqual(result["inline"], inline[-1:])
+        self.assertIsNone(result["forced_event"])
+        suggestion = dict(inline[-1], status="confirmed", evidence="src/d.ts:40")
+        with self.assertRaisesRegex(MODULE.ContextError, "0 missing, 1 unexpected"):
+            MODULE.apply_verification(inline[-1:], {"findings": [suggestion]}, "blocking-only")
 
     def test_apply_verification_absent_verifier_and_policy_off(self):
         inline, _ = self.verification_fixture()
@@ -366,10 +366,12 @@ class ReviewContextTests(unittest.TestCase):
         verifier["findings"].append({"path": "src/d.ts", "line": 40, "side": "LEFT", "status": "unconfirmed", "reason": "style only"})
         every = MODULE.apply_verification(inline, verifier, "all")
         self.assertEqual(every["coverage"], "verified 1/4")
+        self.assertEqual(every["assessments"], verifier["findings"])
+        self.assertEqual(every["inline"], inline)
         with self.assertRaisesRegex(MODULE.ContextError, "verifier status"):
             MODULE.apply_verification(inline, {"findings": [{"path": "a", "line": 1, "side": "RIGHT", "status": "maybe"}]}, "all")
 
-    def test_apply_verification_rejects_duplicate_anchors_and_labels_unknown_bodies(self):
+    def test_apply_verification_rejects_duplicate_anchors_and_preserves_unknown_bodies(self):
         inline, verifier = self.verification_fixture()
         verifier["findings"].append(dict(verifier["findings"][0], status="refuted", evidence="second opinion"))
         with self.assertRaisesRegex(MODULE.ContextError, "two statuses for src/a.ts:10 RIGHT"):
@@ -382,12 +384,11 @@ class ReviewContextTests(unittest.TestCase):
         statuses = [dict(finding, status="unconfirmed", reason="not readable") for finding in odd[:2]]
         result = MODULE.apply_verification(odd, {"findings": statuses}, "blocking-only")
         self.assertEqual(result["coverage"], "verified 0/2")
-        self.assertTrue(result["inline"][0]["body"].startswith("**Suggestion: (unverified) lower case**"))
-        self.assertTrue(result["inline"][1]["body"].startswith("**Suggestion: (unverified)** Unlabelled claim."))
-        self.assertEqual(result["inline"][2], odd[2])
-        self.assertEqual(len(result["ledger"]), 2)
+        self.assertEqual(result["inline"], odd)
+        self.assertEqual(result["assessments"], statuses)
+        self.assertEqual(result["ledger"], [])
 
-    def test_apply_verification_cli_writes_the_applied_inline_leaf(self):
+    def test_apply_verification_cli_preserves_inline_leaf(self):
         inline, verifier = self.verification_fixture()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -404,7 +405,8 @@ class ReviewContextTests(unittest.TestCase):
             )
             self.assertEqual(json.loads(completed.stdout)["coverage"], "verified 1/3")
             written = json.loads((root / "pr-review-inline.json").read_text(encoding="utf-8"))
-            self.assertEqual(len(written), 3)
+            self.assertEqual(written, inline)
+            self.assertEqual(json.loads(completed.stdout)["assessments"], verifier["findings"])
             self.assertEqual(sorted(path.name for path in root.iterdir()), ["pr-review-draft-inline.json", "pr-review-inline.json", "pr-review-verifier.json"])
 
     def test_lenses_line_forms(self):
@@ -419,16 +421,6 @@ class ReviewContextTests(unittest.TestCase):
         self.assertEqual(MODULE.format_lenses_line(["reviewer ran"], "verification off (policy)"), "Lenses: reviewer ran, verification off (policy)")
         with self.assertRaises(MODULE.ContextError):
             MODULE.format_lenses_line([], None)
-
-    def test_review_instructions_place_verification_coverage_on_lenses(self):
-        for skill in [SKILL, ROOT / "plugins/team-harness/skills/review-pr/canonical.md",
-                      ROOT / "installer-assets/opencode-skills/review-pr/canonical.md"]:
-            with self.subTest(skill=skill):
-                content = skill.read_text(encoding="utf-8")
-                coverage = content.split("**Coverage line.**", 1)[1].split("```", 1)[0]
-                self.assertIn("under `Lenses:`", coverage)
-                self.assertNotIn("`Checks:`", coverage)
-                self.assertIn('Checks: {concise CI summary or "not available"}', content)
 
     def test_preflight_reports_blockers_without_raising(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -449,12 +441,13 @@ class ReviewContextTests(unittest.TestCase):
             self.assertEqual(result["codex_agents"]["searched"], [str(agents), str(repo / "codex-home" / "agents")])
             self.assertEqual(result["gh"], "unavailable")
             self.assertEqual(result["workspaces_ignore"], "added")
-            self.assertEqual(result["codex_agents"]["status"], "mixed")
-            self.assertEqual(result["codex_agents"]["missing"], ["reviewer-consolidator"])
+            self.assertEqual(result["codex_agents"]["status"], "complete")
+            self.assertEqual(result["codex_agents"]["missing"], [])
+            self.assertEqual(result["review_agents"], ["reviewer", "pr-review-verifier"])
             self.assertIn("/workspaces/", (repo / ".gitignore").read_text(encoding="utf-8"))
             (agents / "reviewer-consolidator.toml").write_text('name = "reviewer-consolidator"\n', encoding="utf-8")
             with patch.dict(os.environ, {"PATH": str(repo), "CODEX_HOME": str(repo / "codex-home")}):
-                again = MODULE.preflight(repo, "codex", None)
+                again = MODULE.preflight(repo, "codex", None, ["reviewer-consolidator"])
             self.assertEqual(again["workspaces_ignore"], "present")
             self.assertEqual(again["codex_agents"]["invalid"], ["reviewer-consolidator"])
             global_agents = repo / "codex-home" / "agents"
@@ -467,7 +460,12 @@ class ReviewContextTests(unittest.TestCase):
                     encoding="utf-8",
                 )
             with patch.dict(os.environ, {"PATH": str(repo), "CODEX_HOME": str(repo / "codex-home")}):
-                from_global = MODULE.preflight(repo, "codex", None)
+                from_global = MODULE.preflight(repo, "codex", None, ["reviewer-consolidator"])
+            # A broken project override cannot be hidden by a valid global role.
+            self.assertEqual(from_global["codex_agents"]["invalid"], ["reviewer-consolidator"])
+            (agents / "reviewer-consolidator.toml").unlink()
+            with patch.dict(os.environ, {"PATH": str(repo), "CODEX_HOME": str(repo / "codex-home")}):
+                from_global = MODULE.preflight(repo, "codex", None, ["reviewer-consolidator"])
             self.assertEqual(from_global["codex_agents"]["status"], "complete")
             self.assertEqual(from_global["codex_agents"]["agents_dir"], str(global_agents))
             self.assertEqual(from_global["blockers"], ["gh unavailable"])
@@ -475,6 +473,64 @@ class ReviewContextTests(unittest.TestCase):
                 claude = MODULE.preflight(repo, "claude", None)
             self.assertIsNone(claude["codex_agents"])
             self.assertEqual(claude["blockers"], ["gh unavailable"])
+
+    def test_preflight_selected_roles_and_prerequisites_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            agents = repo / "agents"
+            agents.mkdir()
+            name = "reviewer"
+            (agents / f"{name}.toml").write_text(
+                f"# Instruction source: runtime/codex/instructions/{name}.md\n"
+                f"# Semantic source: agents/{name}.md\n# Projection tier: x\n"
+                f'name = "{name}"\nsandbox_mode = "read-only"\n', encoding="utf-8")
+            with patch.object(MODULE.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)):
+                initial = MODULE.preflight(repo, "codex", agents, prerequisites_only=True)
+                self.assertTrue(initial["ok"])
+                self.assertEqual(initial["review_agents"], [])
+                self.assertEqual(initial["agent_check"], "not-run")
+                self.assertIsNone(initial["codex_agents"])
+                selected = MODULE.preflight(repo, "codex", agents, ["reviewer", "reviewer"])
+                self.assertTrue(selected["ok"])
+                self.assertEqual(selected["review_agents"], ["reviewer"])
+                self.assertEqual(selected["agent_check"], "native-check-required")
+                with patch.object(Path, "read_text", side_effect=PermissionError("fixture unreadable")):
+                    unreadable = MODULE._codex_agent_set_status(agents, ("reviewer",))
+                self.assertEqual(unreadable["status"], "mixed")
+                self.assertEqual(unreadable["invalid"], ["reviewer"])
+                missing = MODULE.preflight(repo, "codex", agents, ["reviewer", "pr-review-security"])
+                self.assertFalse(missing["ok"])
+                self.assertEqual(missing["codex_agents"]["missing"], ["pr-review-security"])
+                for selection in ([], ["implementer"], ["unknown"]):
+                    with self.subTest(selection=selection), self.assertRaises(MODULE.ContextError):
+                        MODULE.preflight(repo, "codex", agents, selection)
+                with self.assertRaises(MODULE.ContextError):
+                    MODULE.preflight(repo, "codex", agents, ["reviewer"], prerequisites_only=True)
+
+    def test_preflight_rejects_linked_agent_directories(self):
+        for linked_level in ("agents", ".codex"):
+            with self.subTest(level=linked_level), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                target = root / "outside"
+                target.mkdir()
+                link = root / linked_level
+                if os.name == "nt":
+                    subprocess.run(["cmd", "/d", "/c", "mklink", "/J", str(link), str(target)],
+                                   check=True, capture_output=True)
+                else:
+                    link.symlink_to(target, target_is_directory=True)
+                try:
+                    agents = link if linked_level == "agents" else link / "agents"
+                    agents.mkdir(exist_ok=True)
+                    (agents / "reviewer.toml").write_text(
+                        '# Instruction source: runtime/codex/instructions/reviewer.md\n'
+                        '# Semantic source: agents/reviewer.md\n# Projection tier: x\n'
+                        'name = "reviewer"\nsandbox_mode = "read-only"\n', encoding="utf-8")
+                    result = MODULE._codex_agent_set_status(agents, ("reviewer",))
+                    self.assertEqual(result["status"], "mixed")
+                    self.assertEqual(result["invalid"], ["reviewer"])
+                finally:
+                    os.rmdir(link) if os.name == "nt" else link.unlink()
 
     def test_snapshot_repo_avoids_writes_to_read_only_source_git_dir(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -833,7 +889,7 @@ class ReviewContextTests(unittest.TestCase):
             ("docs/guide.md\n", "+clarify review behavior\n", "known-non-executable", False),
             ("config/app.json\n", '+{"flag": true}\n', "known-non-executable", False),
             ("src/plugin.future\n", "+run new handler\n", "unmatched-executable", True),
-            ("", "", "indeterminate", True),
+            ("", "", "indeterminate", False),
         ]
         for changed_files, diff, reason, required in cases:
             with self.subTest(reason=reason):
@@ -973,14 +1029,14 @@ class ReviewContextTests(unittest.TestCase):
         self.assertEqual(result["reason"], "known-sensitive")
         self.assertTrue(result["security_required"])
 
-    def test_unreadable_diff_artifact_fails_closed_to_security_required(self):
+    def test_unreadable_diff_artifact_prevents_security_selection(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             changed_path = root / "changed-files.txt"
             changed_path.write_text("docs/guide.md\n", encoding="utf-8")
             missing_diff_path = root / "missing.diff"
             output = io.StringIO()
-            with redirect_stdout(output):
+            with redirect_stdout(output), self.assertRaisesRegex(MODULE.ContextError, "readable captured artifacts"):
                 MODULE.command_select_security(
                     SimpleNamespace(
                         changed_files=changed_path,
@@ -989,9 +1045,21 @@ class ReviewContextTests(unittest.TestCase):
                         tier=None,
                     )
                 )
-            result = json.loads(output.getvalue())
-        self.assertEqual(result["reason"], "indeterminate")
-        self.assertTrue(result["security_required"])
+            self.assertEqual(output.getvalue(), "")
+
+    def test_malformed_capture_cannot_waive_security(self):
+        for files, diff in (("", "+change"), ("src/app.py\n", ""),
+                            ("src/\x00app.py\n", "+change"), ("src/app.py\n", "+bad\x00text")):
+            with self.subTest(files=files, diff=diff), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "files").write_text(files, encoding="utf-8")
+                (root / "diff").write_text(diff, encoding="utf-8")
+                output = io.StringIO()
+                with redirect_stdout(output), self.assertRaisesRegex(MODULE.ContextError, "consistent captured text"):
+                    MODULE.command_select_security(SimpleNamespace(
+                        changed_files=root / "files", diff=root / "diff", explicit_security=False, tier=None
+                    ))
+                self.assertEqual(output.getvalue(), "")
 
     def test_binary_file_does_not_blind_the_scan_to_sensitive_changes(self):
         changed_files = "assets/logo.png\nagents/security.md\n"
@@ -1014,17 +1082,17 @@ class ReviewContextTests(unittest.TestCase):
         self.assertEqual(reason, "known-sensitive")
         self.assertTrue(MODULE.resolve_security_required(reason, []))
 
-    def test_only_a_positive_benign_classification_waives_the_security_lens(self):
-        """The property, not the inputs: every reason but one requires the lens."""
-        waived = MODULE.REASONS_WAIVING_SECURITY
-        self.assertEqual(waived, {"known-non-executable"})
-        for reason in ("known-sensitive", "unmatched-executable", "indeterminate"):
+    def test_concrete_security_reasons_and_explicit_triggers_require_the_lens(self):
+        for reason in ("known-sensitive", "unmatched-executable"):
             with self.subTest(reason=reason):
                 self.assertTrue(MODULE.resolve_security_required(reason, []))
-        self.assertFalse(MODULE.resolve_security_required("known-non-executable", []))
+        for reason in ("known-non-executable", "indeterminate"):
+            with self.subTest(reason=reason):
+                self.assertFalse(MODULE.resolve_security_required(reason, []))
+                self.assertTrue(MODULE.resolve_security_required(reason, ["explicit"]))
+                self.assertTrue(MODULE.resolve_security_required(reason, ["tier-4"]))
 
-    def test_every_indeterminate_producer_requires_the_security_lens(self):
-        """Each distinct way classification can fail must reach the same fail-closed answer."""
+    def test_indeterminate_classification_alone_does_not_add_a_security_lens(self):
         producers = {
             "empty changed-file list": ("", "+something\n"),
             "empty diff": ("src/app.py\n", ""),
@@ -1035,11 +1103,11 @@ class ReviewContextTests(unittest.TestCase):
             with self.subTest(producer=label):
                 reason = MODULE.classify_security_change(changed_files, diff)
                 self.assertEqual(reason, "indeterminate")
-                self.assertTrue(MODULE.resolve_security_required(reason, []))
+                self.assertFalse(MODULE.resolve_security_required(reason, []))
 
-    def test_an_unknown_future_reason_requires_the_security_lens(self):
-        """A reason nobody enumerated inherits the floor rather than escaping it."""
-        self.assertTrue(MODULE.resolve_security_required("some-reason-added-later", []))
+    def test_an_unknown_future_reason_cannot_silently_waive_security(self):
+        with self.assertRaisesRegex(MODULE.ContextError, "unknown security classification"):
+            MODULE.resolve_security_required("some-reason-added-later", [])
 
     def test_binary_marker_in_readable_content_does_not_suppress_the_section(self):
         changed_files = "skills/review-pr/scripts/review_context.py\n"

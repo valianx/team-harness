@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.29.8] - 2026-09-14
+
+### Changed
+
+- PR review uses native Main coordination, progressive context and risk-based assignments with fixed coverage obligations. Main consolidates every finding and records evidence-backed decisions; reviewer and verifier verdicts are advisory.
+- PR-review readiness checks only selected roles. The compatibility consolidator is no longer required, and incomplete returns can receive one focused follow-up against the same snapshot.
+
+### Fixed
+
+- OpenCode's JavaScript migration now gives the PR verifier the same read-only permissions as the Go installer; the security scan covers the verifier without restricting implementation roles.
+- Review-role filenames retain their read-only permissions through OpenCode installation and reverse migration, even with incomplete role metadata. Verifier coverage requires status-specific evidence, and legacy review routing loads the current workflow.
+- OpenSpec archive guidance now keeps completed, verified changes and living specs in the delivery PR.
+
 ## [3.29.7] - 2026-09-14
 
 ### Fixed

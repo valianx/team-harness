@@ -55,7 +55,7 @@ HOME="${FAKE_HOME}" MEMORY_MCP_URL="https://smoke-test.example.com/mcp" CONTEXT7
     --runtime opencode \
     --opencode-dir "${OPENCODE_DIR}" \
     --non-interactive \
-    2>&1 | tail -5 || true
+    2>&1 | tail -5
 
 # Find a representative placed agent file.
 AGENT_FILE="${OPENCODE_DIR}/agents/orchestrator.md"
@@ -96,6 +96,23 @@ echo "${FM}"
 echo "-------------------"
 
 FAILURES=0
+
+for reviewer in reviewer pr-review-qa pr-review-security pr-review-verifier reviewer-consolidator; do
+  reviewer_file="${OPENCODE_DIR}/agents/${reviewer}.md"
+  if [[ ! -f "${reviewer_file}" ]]; then
+    echo "FAIL: missing PR review agent ${reviewer}"
+    FAILURES=$((FAILURES + 1))
+    continue
+  fi
+  reviewer_permissions="$(awk '/^---$/ {fences++; next} fences == 1 && /^permission:/ {reading=1; print; next} reading && /^  / {print; next} reading {exit}' "${reviewer_file}")"
+  expected_permissions='permission: {"*": deny, read: allow, glob: allow, grep: allow}'
+  if [[ "${reviewer_permissions}" == "${expected_permissions}" ]]; then
+    echo "PASS: ${reviewer} has only native read permissions"
+  else
+    echo "FAIL: ${reviewer} permissions do not preserve read-only review authority"
+    FAILURES=$((FAILURES + 1))
+  fi
+done
 
 # Installed agents omit permission so OpenCode's native policy remains authoritative.
 if echo "${FM}" | grep -q "^permission:"; then
