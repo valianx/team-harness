@@ -16,6 +16,8 @@ Analyze `$ARGUMENTS`. Accept a PR number (`45`, `#45`) or URL; remove options be
 - `--converge`: compatibility alias for `--multi`; one set of independent passes, never a loop.
 - `--regressions`: investigate concrete suspected regressions with bounded base/head probes.
   An explicit live request to investigate regressions selects the same behavior.
+- `workspaces path: <directory>`: optional coordinator-supplied acceptance workspace, including
+  Obsidian; capture its relevant context before dispatch as described in the snapshot reference.
 
 ## Non-negotiable invariants
 
@@ -75,6 +77,9 @@ suffixed and zero-finding reports, original verification input, verifier return 
 (unless policy was off), and Main's finding ledger. Reconcile every source finding and validate
 the recorded technical identity. Missing evidence requires recovery from retained validated
 returns or a fresh assessment; never infer successful coverage from a saved review body.
+When the ledger records workspace context, require its captured manifest and every listed leaf,
+verify their saved hashes and technical identity, and reuse those bytes. Missing or changed
+workspace evidence requires a fresh assessment; never substitute the current live workspace.
 
 ## Workflow
 

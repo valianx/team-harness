@@ -36,9 +36,12 @@ and reconcile them against the supplied current conversation instead of rejectin
 The supplied draft coordinates are a closed read allowlist. Never infer a draft from an agent
 name, an instruction-source/semantic-source marker, or a conventional filename; `none` and an
 unsupplied optional draft are not read targets. Before opening code to adjudicate a cited finding,
-first prove that its exact repo-relative path is a regular existing leaf under the supplied frozen
-worktree using `Glob` or an exact file-list search. Never issue `Read`, `sed`, or another content
-read for an unverified candidate. An absent inferred path is skipped, not a transport failure.
+use `Glob` or an exact file-list search only to nominate its repo-relative path. Before any content
+read, use separate bounded metadata checks to prove that the candidate is an existing non-symlink
+regular file, no path component below the frozen worktree is a symlink or junction, and its resolved
+path remains inside that worktree. File-list membership alone is not this proof. Never issue `Read`,
+`sed`, or another content read for an unverified candidate. If complete proof is unavailable, skip
+the candidate and report the evidence limitation; an absent unverified path is not a transport failure.
 
 If a supplied draft, the worktree coordinate, or a verified existing cited worktree leaf cannot
 actually be read, return `failure_kind: required-read-failed` and `failed_read_path` with the exact

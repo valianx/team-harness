@@ -61,7 +61,8 @@ Pass coordinates and artifact paths, not artifact bodies. The `reviewer` packet 
 `Reviewed Head SHA`, `Base SHA`, `Merge Base SHA`, `Technical Hash`, `Conversation Hash`,
 `Context Hash`, `Mergeability` with both raw GitHub values, `Worktree`, `Review Artifacts Root`,
 `Context Path`, `Conversation Path`, `Diff Path`, `Changed Files Path`, `Checks Path`,
-`Policy Path`, `Workspace Path`, and `Linked Issue Path` (each `none` when absent), plus
+`Policy Path`, `Workspace Path`, and `Linked Issue Path` (each `none` when absent),
+`Workspace Manifest Path` and `Workspace Files` from the optional workspace capture, plus
 `Draft Output: $ARTIFACTS/pr-review-draft{suffix}.md` and
 `Inline Output: $ARTIFACTS/pr-review-inline{suffix}.json`. Main assigns a unique non-empty
 suffix to every reviewer pass, including the default (`-general`), so source reports cannot
@@ -74,13 +75,19 @@ specialist for the same review.
 When selected, dispatch QA and `pr-review-security` in parallel with only their required
 coordinates: `Mode`, `PR`, `Reviewed Head SHA`, `Technical Hash`, `Context Hash`, `Worktree`,
 `Workspace Path`, `Context Path`, `Diff Path`, and `Changed Files Path`.
+QA also receives `Workspace Manifest Path` and its relevant `Workspace Files`; security receives
+no workspace context unless its assignment needs it. Select QA from the captured acceptance
+context even when the source workspace is outside the repository. Absent workspace context uses
+`none` for its manifest and an empty file list.
 
 ### Read boundary and absent returns
 
 Every non-`none` coordinate in a dispatch is required; before dispatch, verify each artifact
 coordinate is a regular non-symlink leaf inside `$ARTIFACTS` or `$WORKTREE`, and `Worktree` and
 `Workspace Path` are contained non-symlink directories. Reviewers read only supplied coordinates and
-project leaves proven to exist as regular files inside the frozen worktree; a deleted changed-file
+the explicitly listed workspace leaves; a supplied workspace directory never widens that allowlist.
+They may also read project leaves proven to exist as regular files inside the frozen worktree;
+a deleted changed-file
 path is evidence from `Diff Path` only, and source markers are never read coordinates. Every lens
 returns its draft inline with the exact reviewed SHA, technical hash, and context hash. Validate
 each return once:
