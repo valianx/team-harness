@@ -732,7 +732,7 @@ function agentToolsToOpencodePermission(toolsStr) {
 }
 
 const PR_REVIEW_AGENTS = new Set([
-  "reviewer", "pr-review-qa", "pr-review-security", "reviewer-consolidator",
+  "reviewer", "pr-review-qa", "pr-review-security", "pr-review-verifier", "reviewer-consolidator",
 ]);
 
 function prReviewPermission() {

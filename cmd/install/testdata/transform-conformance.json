@@ -1,5 +1,12 @@
 [
   {
+    "name": "pr_verifier_denies_mutation_and_delegation",
+    "surface": "agent",
+    "input": "---\nname: pr-review-verifier\nmodel: opus\ntools: Read, Write, Edit, Bash, Task\n---\nVerifier.\n",
+    "expectedOutput": "---\nname: pr-review-verifier\npermission: {\"*\": deny, read: allow, glob: allow, grep: allow}\nmode: subagent\nth-origin: opencode\n---\nVerifier.\n",
+    "note": "Independent shared oracle: even a widened source tool list projects this PR role to native default-deny with read-only exceptions."
+  },
+  {
     "name": "agent_bare_model_dropped",
     "surface": "agent",
     "input": "---\nname: architect\ndescription: Software architect\nmodel: opus\ntools: Read, Edit, Bash\n---\nBody text here.\n",

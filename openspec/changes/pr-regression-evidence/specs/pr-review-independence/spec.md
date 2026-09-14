@@ -1,27 +1,28 @@
 ## MODIFIED Requirements
 
 ### Requirement: Blocking findings are verified against the frozen worktree before preview
+Subject to the existing repository verification policy, proposed Blocking findings SHALL receive independent read-only verification against the captured diff, frozen worktree and reviewed identity before preview. The verifier SHALL return `confirmed`, `unconfirmed` or `refuted` with cited evidence or an explicit limitation and echo the reviewed identity. It SHALL NOT add findings or execute reproduction probes. Its classification SHALL be advisory: Main SHALL decide each final disposition from the evidence, recording any disagreement and its basis instead of automatically mapping a label to severity or deletion. An unresolved hypothesis SHALL NOT be presented as a proven blocker, and uncertainty or missing evidence SHALL NOT be presented as a clean approval.
 
-After the canonical draft exists and before Preview, the coordinator SHALL dispatch one read-only `pr-review-verifier` with the inline findings, the captured diff, the frozen worktree, and the reviewed identity. For each Blocking finding the verifier SHALL return `confirmed` with a `file:line` citation and one sentence of evidence, `unconfirmed` with the reason, or `refuted` with the evidence that the cited behavior does not exist at the reviewed identity, and SHALL echo the reviewed identity. An unconfirmed Blocking SHALL be demoted to a Suggestion whose body begins with `(unverified)`. A Blocking whose cited behavior does not exist at the reviewed identity SHALL be dropped and recorded in the disposition ledger as `dropped: verifier — <reason>`. Verification SHALL NOT add findings. The coordinator SHALL append `verified k/n` to the `Lenses:` line; an absent verifier SHALL appear as `verified 0/n (verifier absent)` and force `COMMENT`.
+When regression investigation was selected, the coordinator SHALL supply validated reproduction evidence and its identity as optional read-only input. The verifier SHALL assess that evidence alongside code for causality and intended behavior. Missing, inconclusive or rejected reproduction evidence SHALL NOT refute a code-proven defect or confirm a speculative one; a failing probe SHALL NOT determine severity or verdict automatically.
 
-When regression investigation was selected, the coordinator SHALL additionally supply the optional validated reproduction evidence and its identity as read-only input. The verifier SHALL inspect that evidence alongside code to assess the finding's causality and intended behavior, without executing the probe. Missing, inconclusive or rejected reproduction evidence SHALL NOT refute a code-proven defect or confirm a speculative one. A failing probe SHALL NOT automatically set severity or a publication verdict.
+Coverage SHALL retain honest `verified k/n` accounting. An absent verifier SHALL be disclosed as `verified 0/n (verifier absent)`, preserving the non-approving COMMENT fallback and ordinary preview/publication flow. Explicit policy `verification: off` SHALL retain its existing meaning and disclosure. A conflicting result MAY prompt bounded coordinator-directed investigation at the same immutable identity; it SHALL NOT trigger an automatic full review loop.
 
 #### Scenario: A blocker cites behavior the code does not have
-- **WHEN** the verifier finds that the cited path and line at the reviewed identity do not exhibit the claimed defect
-- **THEN** the finding is dropped, the ledger records the verifier's reason, and the preview shows the remaining findings with `verified` counted on the coverage line
+- **WHEN** the verifier supplies code evidence refuting the claimed behavior
+- **THEN** Main evaluates that evidence, drops the unsupported claim or records specific counterevidence for a different disposition, and preserves the original report and reason
 
 #### Scenario: The verifier cannot confirm a blocker
-- **WHEN** the verifier returns `unconfirmed` for a Blocking finding
-- **THEN** the finding is published as a Suggestion prefixed `(unverified)` and counted as unverified on the coverage line
+- **WHEN** the verifier returns `unconfirmed`
+- **THEN** Main resolves or discloses the uncertainty from available evidence without automatically demoting the finding or presenting it as verified
 
 #### Scenario: The verifier does not return
-- **WHEN** the verifier dispatch produces no valid return
-- **THEN** the coverage line reads `verified 0/n (verifier absent)`, the recommendation is `COMMENT`, and the normal preview and approval flow continues
+- **WHEN** independent verification produces no valid result
+- **THEN** coverage reports the absent verifier, the recommendation remains COMMENT, and the ordinary preview and approval flow continues
 
 #### Scenario: A reproduction supports a finding
-- **WHEN** a validated comparison reproduces the claimed head failure and code demonstrates an unintended change to required behavior
-- **THEN** the verifier can confirm the finding using both evidence sources while remaining read-only
+- **WHEN** validated comparison evidence and the code demonstrate an unintended change to required behavior
+- **THEN** the verifier can confirm the finding from both evidence sources while remaining read-only, and Main decides its disposition
 
 #### Scenario: A reproduction records an environmental failure
-- **WHEN** the comparison is inconclusive because the test environment is unavailable
-- **THEN** the verifier evaluates the code evidence independently and preserves the reproduction limit
+- **WHEN** comparison evidence is inconclusive because its test environment is unavailable
+- **THEN** verification evaluates code evidence independently and preserves the reproduction limitation

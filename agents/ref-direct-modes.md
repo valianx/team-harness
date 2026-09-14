@@ -336,15 +336,15 @@ The `### Publish Gate (preview-and-confirm)` section below defines the full cont
 
 ## Read-Only Working-Tree Guard
 
-This guard applies to the `review` direct mode running over the operator's active repository. The `/th:review-pr` skill also reviews a detached worktree and performs the same before/after tree comparison; see `skills/review-pr/SKILL.md § Gather`.
+This guard applies to the `review` direct mode running over the operator's active repository. The `/th:review-pr` skill also reviews a detached worktree and performs the same before/after tree comparison; see `skills/review-pr/references/snapshot.md`.
 
 ### Layer 1 — No-dispatch
 
-Review mode MUST NOT dispatch `implementer` or any agent to change working-tree source files. It may dispatch `reviewer`, selected QA/security lenses, and `reviewer-consolidator`; all are review-only in this mode. Any implementation request routes to the pipeline only after the operator explicitly activates it.
+Review mode MUST NOT dispatch `implementer` or any agent to change working-tree source files. It may dispatch `reviewer`, selected QA/security specialists, and the independent `pr-review-verifier`; all are review-only in this mode. Any implementation request routes to the pipeline only after the operator explicitly activates it.
 
 ### Layer 2 — Deny-tools (system-prompt prohibition)
 
-`reviewer`, `pr-review-qa`, `pr-review-security`, and `reviewer-consolidator` have exact read-only
+`reviewer`, `pr-review-qa`, `pr-review-security`, `pr-review-verifier`, and the optional compatibility `reviewer-consolidator` have exact read-only
 allowlists and return drafts inline. They never write source, configuration, or review artifacts.
 The coordinator persists validated returns only after tree verification, using the skill's fixed
 mapping rather than a path supplied by an agent.
@@ -574,40 +574,20 @@ Thread ID: {comment_id}
 
 The skill handles user approval and publishing via `POST .../comments/{id}/replies`.
 
-### Step 2d — Consolidation (Mode: review-consolidate)
+### Step 2d — Coordinator consolidation (Mode: review-consolidate)
 
-Invoked when more than one selected review lens produced a draft.
+Main reads all validated source drafts against the supplied frozen worktree and identities,
+resolves disagreements from evidence, and consolidates the final review. Do not dispatch a
+mandatory consolidator. Preserve source reports and account for every claim in the existing
+disposition ledger, including duplicate references and evidence-backed drops or demotions.
+Specialists recommend; Main owns all final decisions and coordinator writes.
 
-Extract from the payload:
-- selected source paths
-- PR metadata (number, title, author, URL)
-- `Reviewed Head SHA` and `Context Hash`
-
-Invoke `reviewer-consolidator` via Task tool, passing:
-```
-PR: #{number}
-Title: {title}
-Author: {author}
-URL: {url}
-Reviewed Head SHA: {reviewed_head_sha}
-Context Hash: {context_hash}
-Reviewer Drafts: {supplied review-artifact-root/pr-review-draft*.md paths}
-Reviewer Inline Files: {supplied review-artifact-root/pr-review-inline*.json paths}
-QA Draft: {review-artifact-root/pr-review-qa.md or "none"}
-Security Draft: {review-artifact-root/pr-review-security.md or "none"}
-```
-
-The consolidator de-duplicates by logical fingerprint, adjudicates severity from evidence, and
-returns the consolidated body and findings inline. After the snapshot comparison passes, the
-coordinator persists them to `{review artifacts root}/pr-review-final.md` and
-`{review artifacts root}/pr-review-inline.json`.
-
-Return to the skill:
-```text
-Consolidated review draft written to {review artifacts root}/pr-review-final.md
-Decision: {APPROVE, CHANGES_REQUESTED, or COMMENT}
-Contradictions: {true|false}
-```
+Follow `skills/review-pr/references/coordination.md` and `references/verification.md` for the
+canonical draft, independent advisory verification, bounded same-snapshot follow-up and coverage.
+After the snapshot comparison passes, Main persists the canonical body to
+`{review artifacts root}/pr-review-final.md` and final GitHub comments to
+`{review artifacts root}/pr-review-inline.json`. Return the review and evidence-grounded
+recommendation to the skill for its preview and publication rules.
 
 ### Step 3 — Build draft
 

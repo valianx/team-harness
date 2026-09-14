@@ -1755,18 +1755,17 @@ def command_same_author(args: argparse.Namespace) -> int:
     return 0
 
 
-# The waiver is keyed to the one positive benign classification, never to a list of
-# failure modes: a reason that means "could not classify" is not evidence of safety, and
-# a later indeterminate producer inherits the floor without being enumerated here.
-REASONS_WAIVING_SECURITY = {"known-non-executable"}
+REASONS_REQUIRING_SECURITY = {"known-sensitive", "unmatched-executable"}
+REASONS_WAIVING_SECURITY = {"known-non-executable", "indeterminate"}
 def resolve_security_required(reason: str, triggers: list[str]) -> bool:
     """Pure function of the resolved reason and trigger list.
 
-    An explicit or tier-4 trigger always forces the lens. Otherwise the lens is
-    waived only by a positive benign classification; every other reason,
-    including a classification that could not be reached, requires it.
+    Explicit/tier triggers and concrete sensitive or executable changes require the lens.
+    Indeterminate classification alone is not a trigger or a claim of safety.
     """
-    return bool(triggers) or reason not in REASONS_WAIVING_SECURITY
+    if reason not in REASONS_REQUIRING_SECURITY | REASONS_WAIVING_SECURITY:
+        raise ContextError("unknown security classification")
+    return bool(triggers) or reason in REASONS_REQUIRING_SECURITY
 
 
 def command_select_security(args: argparse.Namespace) -> int:
@@ -1776,10 +1775,8 @@ def command_select_security(args: argparse.Namespace) -> int:
         changed_files = args.changed_files.read_bytes().decode("utf-8", errors="replace")
         diff = args.diff.read_bytes().decode("utf-8", errors="replace")
         reason = classify_security_change(changed_files, diff)
-        read_failed = False
-    except OSError:
-        reason = "indeterminate"
-        read_failed = True
+    except OSError as error:
+        raise ContextError("security selection requires readable captured artifacts") from error
     triggers = []
     if args.explicit_security:
         triggers.append("explicit")
@@ -1787,7 +1784,7 @@ def command_select_security(args: argparse.Namespace) -> int:
         triggers.append("tier-4")
     print(json.dumps({
         "reason": reason,
-        "security_required": True if read_failed else resolve_security_required(reason, triggers),
+        "security_required": resolve_security_required(reason, triggers),
         "triggers": triggers,
     }))
     return 0
@@ -1880,26 +1877,15 @@ def _is_blocking(finding: dict[str, Any]) -> bool:
     return not SUGGESTION_PREFIX_RE.match(str(finding.get("body", "")))
 
 
-def _demote_body(body: str) -> str:
-    if BLOCKING_PREFIX_RE.match(body):
-        return BLOCKING_PREFIX_RE.sub("**Suggestion: (unverified) ", body, count=1)
-    if SUGGESTION_PREFIX_RE.match(body):
-        return SUGGESTION_PREFIX_RE.sub("**Suggestion: (unverified) ", body, count=1)
-    return f"**Suggestion: (unverified)** {body.lstrip()}"
-
-
 def apply_verification(
     inline: list[dict[str, Any]],
     verifier: dict[str, Any] | None,
     mode: str,
 ) -> dict[str, Any]:
-    """Apply the verifier's statuses to the inline findings.
+    """Validate advisory assessments without changing any finding or disposition.
 
-    Unconfirmed findings are demoted to `(unverified)` suggestions, refuted findings are
-    dropped into the ledger, and confirmed findings pass unchanged. Verification never adds a
-    finding. An absent verifier leaves the findings untouched and forces `COMMENT`; a present
-    verifier must cover exactly the selected findings, so a partial return cannot demote a
-    blocker outside the absent-verifier path.
+    Main owns the final inline payload and ledger. A present verifier must cover exactly
+    the selected findings; absence remains a coverage gap that forces COMMENT.
     """
     if mode not in VERIFICATION_MODES:
         raise ContextError("unknown verification mode")
@@ -1909,6 +1895,7 @@ def apply_verification(
         return {
             "inline": inline,
             "ledger": [],
+            "assessments": [],
             "coverage": "verification off (policy)",
             "forced_event": None,
             "confirmed": 0,
@@ -1916,23 +1903,29 @@ def apply_verification(
         }
     selected = [finding for finding in inline if mode == "all" or _is_blocking(finding)]
     selected_keys = [_finding_key(finding) for finding in selected]
-    if len(set(selected_keys)) != len(selected_keys):
+    inline_keys = [_finding_key(finding) for finding in inline]
+    if len(set(inline_keys)) != len(inline_keys):
         raise ContextError("inline findings share one path:line side anchor, so verifier statuses would be ambiguous")
     if verifier is None:
         return {
             "inline": inline,
             "ledger": [],
+            "assessments": [],
             "coverage": f"verified 0/{len(selected)} (verifier absent)",
             "forced_event": "COMMENT",
             "confirmed": 0,
             "selected": len(selected),
         }
+    if not isinstance(verifier, dict) or not isinstance(verifier.get("findings"), list):
+        raise ContextError("verifier findings must be a JSON array")
     statuses: dict[tuple[str, int, str], dict[str, Any]] = {}
-    for result in verifier.get("findings") or []:
+    for result in verifier["findings"]:
         if not isinstance(result, dict):
             raise ContextError("verifier finding must be an object")
         if result.get("status") not in {"confirmed", "unconfirmed", "refuted"}:
             raise ContextError("verifier status must be confirmed, unconfirmed, or refuted")
+        if not any(isinstance(result.get(field), str) and result[field].strip() for field in ("evidence", "reason")):
+            raise ContextError("verifier assessment must include evidence or a reason")
         key = _finding_key(result)
         if key in statuses:
             raise ContextError(f"verifier returned two statuses for {key[0]}:{key[1]} {key[2]}")
@@ -1943,29 +1936,12 @@ def apply_verification(
         raise ContextError(
             f"verifier coverage does not match the selected findings ({missing} missing, {unexpected} unexpected)"
         )
-    selected_ids = {id(finding) for finding in selected}
-    output: list[dict[str, Any]] = []
-    ledger: list[dict[str, Any]] = []
-    confirmed = 0
-    for finding in inline:
-        if id(finding) not in selected_ids:
-            output.append(finding)
-            continue
-        result = statuses[_finding_key(finding)]
-        status = result["status"]
-        reason = str(result.get("evidence") or result.get("reason") or "no evidence given")
-        claim = str(finding.get("body", "")).splitlines()[0].strip("* ")
-        if status == "confirmed":
-            confirmed += 1
-            output.append(finding)
-        elif status == "refuted":
-            ledger.append({"source": "verifier", "finding": claim, "disposition": "dropped", "reason": f"verifier — {reason}"})
-        else:
-            output.append({**finding, "body": _demote_body(str(finding.get("body", "")))})
-            ledger.append({"source": "verifier", "finding": claim, "disposition": "demoted", "reason": f"verifier — {reason}"})
+    assessments = [statuses[key] for key in selected_keys]
+    confirmed = sum(result["status"] == "confirmed" for result in assessments)
     return {
-        "inline": output,
-        "ledger": ledger,
+        "inline": inline,
+        "ledger": [],
+        "assessments": assessments,
         "coverage": f"verified {confirmed}/{len(selected)}",
         "forced_event": None,
         "confirmed": confirmed,
@@ -2019,15 +1995,22 @@ def command_lenses_line(args: argparse.Namespace) -> int:
     return 0
 
 
-def _codex_agent_set_status(agents_dir: Path) -> dict[str, Any]:
+DEFAULT_PREFLIGHT_AGENTS = ("reviewer", "pr-review-verifier")
+
+
+def _codex_agent_set_status(agents_dir: Path, selected_agents: tuple[str, ...] = DEFAULT_PREFLIGHT_AGENTS) -> dict[str, Any]:
     missing: list[str] = []
     invalid: list[str] = []
-    for name in REVIEW_AGENT_NAMES:
+    for name in selected_agents:
         toml_path = agents_dir / f"{name}.toml"
         if _is_link(toml_path) or not toml_path.is_file():
             missing.append(name)
             continue
-        text = toml_path.read_text(encoding="utf-8", errors="replace")
+        try:
+            text = toml_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            invalid.append(name)
+            continue
         markers = (
             f'name = "{name}"',
             'sandbox_mode = "read-only"',
@@ -2039,7 +2022,7 @@ def _codex_agent_set_status(agents_dir: Path) -> dict[str, Any]:
             invalid.append(name)
     if not missing and not invalid:
         status = "complete"
-    elif len(missing) == len(REVIEW_AGENT_NAMES):
+    elif len(missing) == len(selected_agents):
         status = "missing"
     else:
         status = "mixed"
@@ -2053,15 +2036,32 @@ def _codex_agent_dirs(repo_root: Path, agents_dir: Path | None) -> list[Path]:
     return [repo_root / ".codex" / "agents", codex_home / "agents"]
 
 
-def _codex_agents_status(repo_root: Path, agents_dir: Path | None) -> dict[str, Any]:
-    """Report the first complete agent set among the project and global scopes."""
-    statuses = [(directory, _codex_agent_set_status(directory)) for directory in _codex_agent_dirs(repo_root, agents_dir)]
-    directory, status = next(((d, s) for d, s in statuses if s["status"] == "complete"), statuses[0])
-    return {**status, "agents_dir": str(directory), "searched": [str(d) for d, _ in statuses]}
+def _codex_agents_status(repo_root: Path, agents_dir: Path | None, selected_agents: tuple[str, ...] = DEFAULT_PREFLIGHT_AGENTS) -> dict[str, Any]:
+    """Check each effective role, respecting project overrides of global definitions."""
+    directories = _codex_agent_dirs(repo_root, agents_dir)
+    missing: list[str] = []
+    invalid: list[str] = []
+    sources: dict[str, str] = {}
+    for name in selected_agents:
+        directory = next((d for d in directories if os.path.lexists(d / f"{name}.toml")), directories[0])
+        result = _codex_agent_set_status(directory, (name,))
+        missing.extend(result["missing"])
+        invalid.extend(result["invalid"])
+        sources[name] = str(directory)
+    status = "complete" if not missing and not invalid else "missing" if len(missing) == len(selected_agents) else "mixed"
+    return {"status": status, "missing": missing, "invalid": invalid,
+            "agents_dir": next(iter(sources.values()), str(directories[0])),
+            "sources": sources, "searched": [str(d) for d in directories]}
 
 
-def preflight(repo_root: Path, runtime: str, agents_dir: Path | None) -> dict[str, Any]:
+def preflight(repo_root: Path, runtime: str, agents_dir: Path | None,
+              selected_agents: list[str] | None = None, prerequisites_only: bool = False) -> dict[str, Any]:
     """Check the review prerequisites once and report every blocker."""
+    if prerequisites_only and selected_agents:
+        raise ContextError("prerequisites-only cannot select agents")
+    selected = () if prerequisites_only else tuple(dict.fromkeys(DEFAULT_PREFLIGHT_AGENTS if selected_agents is None else selected_agents))
+    if not prerequisites_only and (not selected or any(name not in REVIEW_AGENT_NAMES for name in selected)):
+        raise ContextError("select at least one known PR-review agent")
     blockers: list[str] = []
     try:
         completed = subprocess.run(["gh", "auth", "status"], capture_output=True, text=False, timeout=COMMAND_TIMEOUT_SECONDS)
@@ -2076,8 +2076,8 @@ def preflight(repo_root: Path, runtime: str, agents_dir: Path | None) -> dict[st
     )
     ensure_workspaces_ignored(repo_root)
     codex_agents: dict[str, Any] | None = None
-    if runtime == "codex":
-        codex_agents = _codex_agents_status(repo_root, agents_dir)
+    if runtime == "codex" and not prerequisites_only:
+        codex_agents = _codex_agents_status(repo_root, agents_dir, selected)
         if codex_agents["status"] != "complete":
             blockers.append(f"codex review agents {codex_agents['status']}")
     return {
@@ -2085,13 +2085,15 @@ def preflight(repo_root: Path, runtime: str, agents_dir: Path | None) -> dict[st
         "gh": gh_status,
         "workspaces_ignore": "present" if ignored_before else "added",
         "codex_agents": codex_agents,
-        "review_agents": list(REVIEW_AGENT_NAMES),
+        "review_agents": list(selected),
+        "agent_check": "not-run" if prerequisites_only else "definitions-checked" if runtime == "codex" else "native-check-required",
         "blockers": blockers,
     }
 
 
 def command_preflight(args: argparse.Namespace) -> int:
-    result = preflight(args.repo_root, args.runtime, args.agents_dir)
+    result = preflight(args.repo_root, args.runtime, args.agents_dir,
+                       getattr(args, "agent", None), getattr(args, "prerequisites_only", False))
     print(json.dumps(result, sort_keys=True))
     return 0 if result["ok"] else 30
 
@@ -2376,6 +2378,8 @@ def build_parser() -> argparse.ArgumentParser:
     preflight_parser.add_argument("--repo-root", required=True, type=Path)
     preflight_parser.add_argument("--runtime", choices=["claude", "codex", "opencode"], required=True)
     preflight_parser.add_argument("--agents-dir", type=Path)
+    preflight_parser.add_argument("--agent", action="append", choices=REVIEW_AGENT_NAMES)
+    preflight_parser.add_argument("--prerequisites-only", action="store_true")
     preflight_parser.set_defaults(func=command_preflight)
 
     ignore_parser = subparsers.add_parser("ensure-workspaces-ignore")

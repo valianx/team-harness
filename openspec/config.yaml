@@ -48,8 +48,10 @@ operations:
   archive:
     guidance:
       - >-
-        Archive a completed change once its delivery is merged: in the next release
-        pull request, or in a dedicated archive pull request.
+        Archive a completed, verified and authorized change on its delivery branch
+        before the final review candidate. Include implementation, living specs and
+        archive in the same pull request. Keep incomplete changes active; merging
+        is not a prerequisite for archive and does not require a second archive PR.
 
 # Repository-owned scope rules. Enforced by tests/test_openspec_scope.py on every
 # active change and read by agents/architect.md during the single design pass.
