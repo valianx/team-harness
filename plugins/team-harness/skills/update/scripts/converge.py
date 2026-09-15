@@ -351,23 +351,10 @@ def validate_manifest(plugin: Path, expected_version: str) -> dict[str, str]:
 
 def parse_features(output: str) -> dict[str, bool]:
     features: dict[str, bool] = {}
-    for raw_line in output.splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        match = re.fullmatch(
-            r"([a-z][a-z0-9_]*)\s{2,}([a-z][a-z0-9 -]*[a-z0-9])\s{2,}(true|false)",
-            line,
-        )
-        if match is None:
-            raise ConvergenceError("FEATURE_LIST_INVALID")
-        name, stage, enabled_raw = match.groups()
-        if (
-            not re.fullmatch(r"[a-z][a-z0-9 -]*", stage)
-            or name in features
-        ):
-            raise ConvergenceError("FEATURE_LIST_INVALID")
-        features[name] = enabled_raw == "true"
+    for line in output.splitlines():
+        fields = line.split()
+        if len(fields) >= 2 and fields[0] in REQUIRED_FEATURES and fields[-1] in {"true", "false"}:
+            features[fields[0]] = fields[-1] == "true"
     if any(name not in features for name in REQUIRED_FEATURES):
         raise ConvergenceError("REQUIRED_FEATURE_MISSING")
     return features

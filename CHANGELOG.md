@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.29.9] - 2026-09-14
+
+### Fixed
+
+- Codex updates ignore unrelated feature names and display formatting while checking only Team Harness's required features.
+
 ## [3.29.8] - 2026-09-14
 
 ### Changed
