@@ -119,7 +119,13 @@ class ConvergenceFixture(unittest.TestCase):
         return CONVERGE.validate_receipt(receipt)
 
     def test_pending_approval_then_authorized_pass_then_current_fast_path(self) -> None:
-        native = FakeCodex()
+        native = FakeCodex(
+            features={
+                "multi_agent": True,
+                "multi_agent_v2": True,
+                "guardianv2.thread_context": False,
+            }
+        )
         pending = self.converge(native)
         self.assertEqual(pending["status"], "pending-approval")
         self.assertEqual(pending["domains"]["runtime"]["status"], "pending")
@@ -136,6 +142,7 @@ class ConvergenceFixture(unittest.TestCase):
         current = self.converge(native)
         self.assertEqual(current["status"], "current")
         self.assertEqual(current["changedDomains"], [])
+        self.assertFalse(current["restartRequired"])
         self.assertEqual(
             native.calls,
             [(CODEX_BIN, "features", "list"), (CODEX_BIN, "mcp", "list", "--json")],
@@ -289,10 +296,13 @@ class ConvergenceFixture(unittest.TestCase):
         self.assertEqual(native.calls.count((CODEX_BIN, "features", "enable", "multi_agent")), 1)
         self.assertEqual(native.calls.count((CODEX_BIN, "features", "list")), 2)
         parsed = CONVERGE.parse_features(
-            "multi_agent                            under development  true\n"
-            "multi_agent_v2                         stable             true\n"
+            "Feature Name\tStage\tEnabled\n"
+            "guardianv2.thread_context                under development  false\n"
+            "unrelated malformed row ???\n"
+            "multi_agent\tunder development\ttrue\n"
+            "multi_agent_v2 future/stage true\n"
         )
-        self.assertTrue(parsed["multi_agent"])
+        self.assertEqual(parsed, {"multi_agent": True, "multi_agent_v2": True})
 
     def test_partial_failure_preserves_completed_work_and_rerun_resumes(self) -> None:
         failing = FakeCodex(features={"multi_agent": False, "multi_agent_v2": True})
@@ -300,6 +310,7 @@ class ConvergenceFixture(unittest.TestCase):
         partial = self.converge(failing)
         self.assertEqual(partial["status"], "partial-convergence")
         self.assertEqual(partial["failedDomain"], "features")
+        self.assertEqual(partial["domains"]["features"]["errorCode"], "NATIVE_COMMAND_FAILED")
         self.assertIn("config", partial["changedDomains"])
         self.assertEqual(partial["domains"]["runtime"]["status"], "pending")
 
@@ -310,12 +321,13 @@ class ConvergenceFixture(unittest.TestCase):
         self.assertIn("features", resumed["changedDomains"])
         self.assertTrue(resumed["restartRequired"])
 
-    def test_malformed_native_output_and_unsafe_hook_are_bounded_failures(self) -> None:
+    def test_missing_required_native_output_and_unsafe_hook_are_bounded_failures(self) -> None:
         malformed = FakeCodex()
         malformed.invalid_features = True
         failed = self.converge(malformed)
         self.assertEqual(failed["failedDomain"], "features")
-        self.assertEqual(failed["domains"]["features"]["errorCode"], "FEATURE_LIST_INVALID")
+        self.assertEqual(failed["domains"]["features"]["errorCode"], "REQUIRED_FEATURE_MISSING")
+        self.assertFalse(any(call[:3] == (CODEX_BIN, "features", "enable") for call in malformed.calls))
 
         self.converge(FakeCodex(), authorize_runtime=True)
         hooks = self.plugin / "hooks/hooks.json"
