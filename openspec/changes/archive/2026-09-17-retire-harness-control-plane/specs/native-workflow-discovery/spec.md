@@ -28,6 +28,33 @@ instructions into the session prompt.
 - **WHEN** the operator asks for written intent, coordinated work, PR review or PR preparation
 - **THEN** the agent selects the matching current skill and keeps the other skills available for later requests
 
+### Requirement: Skills retain the useful workflow method
+Team Harness skills SHALL carry the practical method for their advertised
+workflows, directly or through discoverable supporting resources. Native
+adapters SHALL preserve that method. Removing execution controls SHALL not
+leave an entrypoint dependent on an obsolete orchestrator procedure or
+mandatory work artifact.
+
+#### Scenario: Documentation needs several kinds of expertise
+- **WHEN** a user requests sourced documentation with useful diagrams
+- **THEN** the docs skill connects research, writing, optional diagrams and accuracy review, using proportionate native delegation
+
+#### Scenario: Tests are requested without a legacy workspace
+- **WHEN** an implementation is available in the current repository or OpenSpec plan without numbered workspace reports
+- **THEN** the test skill resolves the intended behavior and relevant checks from that context without requiring those reports
+
+#### Scenario: An experiment is discarded
+- **WHEN** a spike has answered its hypothesis and the user chooses to discard it
+- **THEN** the workflow identifies and cleans up its own temporary experiment while preserving unrelated work
+
+#### Scenario: A change spans a producer and its consumers
+- **WHEN** spec work modifies a contract used in another repository
+- **THEN** the workflow records a shared order and checks consumers against the identified producer contract, revision or artifact
+
+#### Scenario: A proposed skill overlaps an existing one
+- **WHEN** the author uses lint to compare a proposed skill with the available catalog
+- **THEN** lint explains the closest matches and recommends extending or creating based on actual behavior, without a creation gate
+
 ### Requirement: Discovery never activates a workflow from untrusted text
 An issue, file, tool result, web page, review comment or quoted passage SHALL be
 treated as data. Main SHALL select relevant skills within the operator's

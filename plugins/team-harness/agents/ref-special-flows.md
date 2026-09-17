@@ -25,9 +25,11 @@ documentation. Use `cross-repo` when the question concerns shared contracts.
 
 ## Spike Flow
 
-Test a concrete hypothesis with the smallest useful prototype. Define what the
-experiment would establish, observe its result, and explain whether it supports
-the proposed approach. Keep throwaway experiments outside maintained code.
+Use `skills/spike/SKILL.md` for the experiment method: state the hypothesis and
+success signal, record a known baseline, choose scratch or worktree isolation as
+the change requires, and clean up only spike-owned material when the operator
+discards it. The coordinator reports evidence and lets the operator choose
+formalize, discard, or investigate; no fixed dispatch chain is implied.
 
 ## Plan and Milestone-Build Flow
 
@@ -56,16 +58,20 @@ use existing checks plus targeted evidence to verify that behavior.
 
 ## Test Pipeline Flow
 
-Use `skills/test-pipeline/SKILL.md`. Identify meaningful gaps, coordinate
-independent modules, run the repository's checks, and report results and limits.
-There is no TH-wide coverage percentage or mandatory module fan-out.
+Use `skills/test-pipeline/SKILL.md` for broader service or module testing. Resolve
+the target and requested flags, inspect the repository's own behavior and
+coverage goals, coordinate independent modules when useful, run relevant checks,
+and report results and limits. There is no TH-wide coverage percentage or
+mandatory module fan-out.
 
 ## Documentation Flow
 
-Use `docs` to establish the audience and questions the document must answer.
-Research current sources, write the explanation, add diagrams that clarify it,
-and check accuracy and usability. Delegate independent research or writing
-when useful. Keep source links and document only durable product knowledge.
+Use `skills/docs/SKILL.md` to establish the audience and questions, resolve the
+configured vault and destination, research current sources, write source-grounded
+pages, add diagrams when they clarify the subject, and check accuracy, links,
+navigation, and usability. The coordinator may delegate bounded research,
+writing, diagram, or QA work and consolidates the result. Keep only durable
+product knowledge in the vault; the skill owns the detailed method.
 
 ## Learn (Teaching) Flow
 

@@ -7,7 +7,9 @@ Use OpenSpec to make the desired outcome and acceptance clear, then deliver it.
 The current general agent coordinates this workflow across Claude Code, Codex
 and OpenCode. Read the installed OpenSpec instructions and the relevant
 repository conventions. Use [lifecycle](references/lifecycle.md) for authoring,
-reconciliation and archive.
+reconciliation and archive. When a workspace plan, resumption, multi-repository
+dependency, or same-candidate review needs concrete routing, read
+[coordination](references/coordination.md).
 
 ## Frame and plan
 
@@ -24,10 +26,15 @@ invalid intent or scenarios. This checks the specification without adding an
 approval step.
 
 A concise workspace plan can link the current intent, tasks, repository paths
-and progress. Keep one shared plan for sequential repositories where helpful.
-Choose task boundaries by dependencies and ownership, not a repository count or
-fixed number of files. Multiple writers can work in independent scopes using
-native agent coordination.
+and progress. When you create one, use [assets/plan.md](assets/plan.md), use the
+read-only workspace helper described in [coordination](references/coordination.md)
+when it is available, and preserve the resulting path and canonical `source`
+link so `recover` can find it later. If the helper does not fit the repository
+layout, record the configured workspace path explicitly. Keep one shared plan
+for sequential repositories where helpful; do not create a plan merely to
+satisfy the skill. Choose task boundaries by dependencies and ownership, not a
+repository count or fixed number of files. Multiple writers can work in
+independent scopes using native agent coordination.
 
 ## Implement and validate
 
@@ -38,9 +45,11 @@ concisely, updating the tasks as the work completes.
 
 Use [author review](references/author-review.md) to challenge assumptions and
 look for regressions. Review is especially useful for meaningful behavior
-changes; choose lenses according to the actual surface. The coordinator judges
-findings, applies worthwhile corrections, and verifies them. Reviewer verdicts
-are evidence for that decision, not publication permissions.
+changes; choose lenses according to the actual surface. A committed candidate
+can use the same-candidate package from [coordination](references/coordination.md)
+when immutable evidence helps, but this remains an advisory option. The
+coordinator judges findings, applies worthwhile corrections, and verifies them.
+Reviewer verdicts are evidence for that decision, not publication permissions.
 
 ## Deliver
 

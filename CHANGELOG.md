@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Make spec and independent review the central development workflow; reviewer findings guide the coordinator without granting or vetoing publication.
 - Retire duplicate command guards, pipeline authority journals, capability leases, profile attestations, and forced native settings across the runtime integrations.
 - Keep native read-only reviewers, workflow discovery and voice; make detailed Claude observability opt-in and preserve user settings during update.
+- Preserve documentation, testing, isolated spikes, multi-repository spec work and skill-authoring methods in their skills, with native coordination and advisory review.
 
 ## [3.30.0] - 2026-09-17
 

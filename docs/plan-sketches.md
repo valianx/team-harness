@@ -10,7 +10,7 @@ system. Three representations reference this document:
    trigger→required-set table and skeleton templates, shipped with the agents
    so the architect can emit the correct files without reading an arbitrary
    repo path mid-dispatch.
-3. **`hooks/sketch-guard.sh`** — the hardcoded manifest mapping used by the gate script
+3. **`hooks/sketch-guard.sh`** — the hardcoded manifest mapping used by the optional probe
    (a bash script cannot reliably parse markdown at runtime). A structural drift test in
    The three representations must agree; nothing mechanically asserts it.
 
@@ -18,19 +18,21 @@ system. Three representations reference this document:
 
 ## 1. Purpose
 
-The plan stage declares a **result-defining sketch set** for an active `pipeline` posture —
-lightweight, plan-resident documents (`sketches/{type}`) that show WHAT will be delivered (functional + non-functional)
-so the final result is determinable before a line is implemented. The goal is **contract
-determinism, not content determinism**: the same input type produces a predictable,
-verifiable SET of artifacts in a fixed shape. LLM prose varies; the envelope (what exists,
-what fields, what passed) is deterministic.
+When a coordinator chooses sketch-based planning, the plan stage may declare a
+**result-defining sketch set** — lightweight, plan-resident documents
+(`sketches/{type}`) that show WHAT will be delivered (functional + non-functional)
+so the final result is easier to check before a line is implemented. The goal is
+**contract determinism, not content determinism**: the same input type produces
+a predictable, verifiable SET of artifacts in a fixed shape. LLM prose varies;
+the envelope (what exists, what fields, what passed) is deterministic.
 
 **Fidelity ceiling:** inside the canonical pipeline, sketches are LOW-fidelity and
 changed-surface-only. They are throwaway decision aids, not production polish.
 
-Sketches are pipeline artifacts. Inline direct work and live ad hoc tester/QA/security reviews do
-not create or require a sketch set; if an operator explicitly requests a standalone sketch, it is
-bounded evidence rather than pipeline state.
+When used, sketches are workspace decision aids. Inline direct work and live ad
+hoc tester/QA/security reviews do not create or require a sketch set; if an
+operator explicitly requests a standalone sketch, it is bounded evidence rather
+than pipeline state.
 
 **Representation ceiling (global):** token-cheap text that renders in Obsidian with zero
 dependency — Mermaid / ASCII / markdown tables / fenced code. **No verbose machine-JSON
@@ -55,12 +57,12 @@ ui-wireframe — the zero-dependency, text-only rule stands for the other 8 sket
 
 ## 2. Classification Schema
 
-Main derives bounded design-surface hints from canonical OpenSpec. When an
-architect is required for missing or operator-requested planning, its returned
+Main may derive bounded design-surface hints from canonical OpenSpec. When an
+architect is used for missing or operator-requested planning, its returned
 `classification:` may supply those hints; it never writes `01-plan.md` or
-security impact. Main validates and projects the hints into `00-state.md`;
-specialists never write coordination state. The compact operator plan has no
-classification mirror.
+security impact. Main validates and records useful hints in the current plan
+or workspace note; specialists never write coordination state. The compact
+operator plan has no required classification mirror.
 
 ### The eight booleans
 
@@ -91,23 +93,24 @@ classification mirror.
 The verifier reads these with strict line-token parsing (exact line tokens, no fuzzy matching).
 `00-state.md` is the sketch guard's derived input. Only Main writes it; a
 specialist finding a mismatch returns it for correction rather than editing
-state. These design-surface hints select sketches only and never determine the
-post-Freeze security floor.
+state. These design-surface hints select sketches only and do not replace the
+repository's or runtime's security review.
 
 ---
 
 ## 3. The 9 Sketches
 
-### Always (every task with a workspace)
+### Shared plan surfaces (when a plan uses sketches)
 
 | Sketch | Trigger | Format | Tool | Fidelity ceiling | Representation ceiling | Home |
 |--------|---------|--------|------|-----------------|----------------------|------|
 | Functional acceptance criteria | always | Given/When/Then text | none | per-task AC, no implementation detail | markdown | canonical in the affected `plan/tasks/Task-N.md` |
 | Non-functional notes | always | bullet list (auth, perf, rate-limit, errors; a11y if frontend) | none | bullets only, no design | markdown | canonical in `plan/architecture.md` Security/Performance Assessment |
 
-The two always-sketches collapse into existing surfaces and are NOT separate files.
-Every plan has a `§ Task List` AC block and a `§ Architecture` Security/Performance section,
-so no standalone `sketches/*` files are needed for the always-pair.
+The two shared surfaces collapse into existing OpenSpec or plan content and are
+NOT separate files. A plan that opts into sketches can keep its `§ Task List` AC
+block and `§ Architecture` Security/Performance section without creating
+standalone `sketches/*` files for this pair.
 
 ### Conditional (on classification booleans)
 
@@ -195,26 +198,28 @@ When a multi-project initiative is active (`initiative != null`, parent `overvie
 
 ---
 
-## 5. Enforcement
+## 5. Optional verification probe
 
-The gate blocks plan approval if the work triggers a sketch and it is missing. Detection
-is bounded booleans, not judgment.
+When a coordinator chooses to use the sketch probe, it reports whether the
+declared design surfaces have corresponding sketches. Detection is bounded
+booleans, not judgment. Sketches are optional workspace decision aids; their
+absence does not create a pipeline gate or block validation.
 
-**Gate script:** `hooks/sketch-guard.sh` is invoked by the orchestrator at STAGE-GATE-1.
-It is an orchestrator-invoked gate script (like the TS-based `notify-stage` hook,
-run via `hooks/run-ts-hook.sh notify-stage`), NOT a `PreToolUse` event hook. Do NOT
-add it to `.claude-plugin/hooks.json`.
+`hooks/sketch-guard.sh` remains available as a best-effort, coordinator-invoked
+probe. There is no current general `pipeline` or `validate` caller that
+guarantees it runs, and it is not a `PreToolUse` event hook. Do not add it to
+`.claude-plugin/hooks.json`.
 
 **Fail-OPEN:** the verifier fails safe-allow (an unreadable or absent input allows rather than blocks).
-This is a completeness check, not a security gate. The coordinator and the operator at
-STAGE-GATE-1 are the backstops. A missing sketch surfaces as a `concerns`-level finding the
-operator sees — never a hard block that strands the pipeline on a parsing edge case.
+This is a completeness check, not a security gate. A missing sketch surfaces as
+a `concerns`-level finding when the optional probe is used; the coordinator
+decides whether the surface needs one.
 
 **Anti-gaming check (concerns-only):** if the plan's `Files:` touch contract-surface
 keywords (route, controller, handler, endpoint, schema, migration, component, etc.) but the
 matching boolean is `false`, the verifier emits a `concerns`-level consistency finding. This
-is a backstop, not the sole control — the operator at STAGE-GATE-1 also sees the classification
-block and the diff signal. The check is `concerns`-severity
+is a backstop, not the sole control — the coordinator also sees the classification
+block and the diff signal when the probe is selected. The check is `concerns`-severity
 (surface to human), never `fail`.
 
 ---
@@ -223,27 +228,26 @@ block and the diff signal. The check is `concerns`-severity
 
 | Phase | Who | Action |
 |-------|-----|--------|
-| `design` | Main; architect only when OpenSpec authorship is required | Derives sketch hints from OpenSpec; an invoked architect may produce triggered `sketches/*` and return hints, which Main validates before projecting state |
-| `waiting_gate1` | orchestrator + operator | Invokes `sketch-guard.sh`, shows missing-sketch concerns and the sketch pointers in the concise Gate 1 summary |
-| `implementation` | implementer + tester | Reads every triggered sketch before writing code or evidence and records `sketches_read` in its status block |
-| `validation` | qa (+ security when frozen-candidate impact is true or unknown) | Reads the triggered sketches and checks the delivered surface against the corresponding contracts |
+| `design` | Main; architect only when OpenSpec authorship is required | Derives sketch hints from OpenSpec when the surface benefits from them; an invoked architect may produce triggered `sketches/*` and return hints, which Main validates |
+| `implementation` | implementer + tester | Reads any applicable sketch before writing code or evidence and records that it used the design aid when useful |
+| `validation` | qa (+ security when the selected review needs it) | Reads applicable sketches when present and checks the delivered surface against the corresponding contracts |
 | Explicit `/th:plan-review` | plan-reviewer | May inspect canonical OpenSpec and projection fidelity as part of the operator-requested review; never runs automatically |
-| Pipeline-attached entry skills | `/th:review-pr`, `/th:validate` | When an active pipeline workspace is supplied, run `sketch-guard.sh` as a prerequisite probe and read triggered sketch files before the consuming pass; standalone inline reviews do not create a sketch set |
+| Pipeline-attached entry skills | `/th:review-pr`, `/th:validate` | May use `sketch-guard.sh` as a prerequisite probe when an active workspace and relevant sketches exist; standalone inline reviews do not create or require a sketch set |
 
 ---
 
 ## 7. Per-Type Applicability
 
-| Type / severity metadata | Classification block produced? | Always-sketches | Conditional sketches | Verifier runs? |
+| Type / severity metadata | Classification block produced? | Always-sketches | Conditional sketches | Optional probe use |
 |-------------|-------------------------------|-----------------|---------------------|---------------|
-| `feature` / `refactor` / `enhancement` | Main derives hints from OpenSpec; invoked architect may return them | yes (collapsed surfaces) | per hints | Yes, at STAGE-GATE-1 |
-| `fix` severity 2–4 (metadata) | Main derives hints from OpenSpec; invoked architect may return them | yes (canonical OpenSpec acceptance) | only if the fix touches a contract surface | Yes, at STAGE-GATE-1 |
-| `fix` severity 1 / `hotfix` | Minimal design may be coordinator-authored only where the canonical flow permits; coordinator still owns state | yes (minimum AC) | none (all false unless architect returns otherwise) | Yes, at STAGE-GATE-1 |
-| `docs` request in pipeline posture | architect docs research → orchestrator records all-false block (docs do not touch product contracts) | yes | none | Yes — no-op pass |
+| `feature` / `refactor` / `enhancement` | Main derives hints from OpenSpec; invoked architect may return them | yes (collapsed surfaces) | per hints | Coordinator decides when useful |
+| `fix` severity 2–4 (metadata) | Main derives hints from OpenSpec; invoked architect may return them | yes (canonical OpenSpec acceptance) | only if the fix touches a contract surface | Coordinator decides when useful |
+| `fix` severity 1 / `hotfix` | Minimal design may be coordinator-authored only where the canonical flow permits; coordinator still owns state | yes (minimum AC) | none (all false unless architect returns otherwise) | Usually unnecessary; use when a contract surface benefits |
+| `docs` request in pipeline posture | architect docs research → coordinator records the relevant surface | yes | none | Optional no-op pass |
 
-The former Tier-0/docs exemption is **superseded**. Old workspaces may lack sketches, but that
-historical absence is migration data and does not authorize a current pipeline to skip its fixed
-design and Gate 1 checks.
+Old workspaces may lack sketches. That historical absence is useful migration
+context, but it does not require the current workflow to create a fixed sketch
+set. Create or inspect only the design aids that clarify the current surface.
 
 ---
 
@@ -299,5 +303,5 @@ a repository whose spec is `openapi.yaml` or `openapi.yml` keeps `.yaml`/`.yml`.
 
 This boundary invariant is referenced by format-preservation guards in:
 - `agents/implementer.md` — Session Context Protocol, conditional-evidence step
-- `agents/ref-pipeline.md` — tracked OpenAPI changes must be implemented and reviewed before Phase 2.8 Freeze
+- `agents/ref-pipeline.md` — tracked OpenAPI changes must be implemented and reviewed before delivery
 - `agents/architect.md` — api-contract skeleton quality note

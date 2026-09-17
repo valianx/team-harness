@@ -42,7 +42,7 @@ operator and the host harness retain decisions about permissions and publication
 |---|---|---|---|---|---|
 | `orchestrator` | Coordinate Team Harness workflows from written intent and independent review to the user's objective. | opus | `high` | Read, Edit, Write, Bash, Glob, Grep, Task, WebFetch, WebSearch, NotebookEdit, `mcp__memory__search_nodes`, `mcp__memory__open_nodes`, `mcp__memory__create_nodes`, `mcp__memory__add_observations`, `mcp__memory__create_relations`, `mcp__memory__read_graph`, `mcp__memory__session_start`, `mcp__memory__session_end`, `mcp__memory__record_flow_event` | Top-level coordinator; routes specialists, keeps workspace notes, and consolidates evidence. |
 | `architect` | Design and review architecture, risk, migration, and technology choices; never writes code. | opus | `xhigh` | Read, Glob, Grep, Edit, Write, WebFetch, WebSearch, `mcp__memory__search_nodes`, `mcp__memory__open_nodes`, `mcp__context7__resolve-library-id`, `mcp__context7__query-docs` | Architecture proposals and research. |
-| `agent-builder` | Design and create Claude Code agents and slash commands; always runs `/th:lint` after writing. | opus | `xhigh` | Read, Edit, Write, Glob, Grep, Bash | Agent and command authoring. |
+| `agent-builder` | Design or improve specialist agents and reusable skills, using advisory lint and current runtime conventions. | opus | `xhigh` | Read, Edit, Write, Glob, Grep, Bash | Agent, skill and compatibility-command authoring. |
 | `security` | Perform comprehensive OWASP/CWE/ASVS security audits; never modifies source code. | opus | `xhigh` | Read, Glob, Grep, Edit, Write, WebFetch, WebSearch, `mcp__memory__search_nodes`, `mcp__memory__open_nodes`, `mcp__context7__resolve-library-id`, `mcp__context7__query-docs` | Security audit reports. |
 | `adversary` | Challenge a proposed design or implementation with reachable failure cases and concrete evidence. | sonnet | `xhigh` | Read, Glob, Grep | Independent adversarial findings. |
 | `reviewer` | Review pull requests for correctness, contract, security, and change-caused regressions without publishing. | sonnet | `high` | Read, Glob, Grep, `mcp__context7__resolve-library-id`, `mcp__context7__query-docs` | General PR review. |
@@ -112,10 +112,12 @@ by a second policy table in this document.
 
 ## Adding or modifying an agent
 
-Per the top-level `CLAUDE.md`, agent changes route through the `architect` subagent first, and the `agent-builder` agent writes the prompt. After editing:
+Use `agent-builder` for specialist authoring expertise and an architect when a
+design question warrants independent analysis. After editing:
 
-1. **Plugin (canonical):** run `/plugin reload th` inside Claude Code to pick up changes.
-   **Legacy (contributors):** run `go run ./cmd/install` from the repo root to propagate into your own `~/.claude/`. The `./bin/install.sh` / `.\bin\install.ps1` bootstrap scripts download the released binary — they don't use the local clone.
+1. Regenerate repository projections and run the relevant checks described in
+   `runtime/codex/README.md`. Use the selected runtime's `update` or `reload`
+   skill when installing or refreshing the user's runtime is part of the request.
 2. Add a `CHANGELOG.md` entry under `[Unreleased]`.
 3. Open a PR.
 
@@ -123,4 +125,5 @@ Per the top-level `CLAUDE.md`, agent changes route through the `architect` subag
 
 - `README.md` in this folder is contributor documentation; the installer does **not** copy it to `~/.claude/agents/`.
 - Keep one concern per file. One `.md` = one agent.
-- Agent prompts communicate with each other through files in `workspaces/{feature-name}/`, never through return values.
+- Return outcomes and evidence through native agent messages. A shared workspace
+  can hold useful plans or artifacts without becoming a mandatory message bus.

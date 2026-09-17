@@ -1,44 +1,45 @@
 
 Analyze the input: $ARGUMENTS
 
----
-name: test
-
 ## Frontend detection
 
-Before building the Direct Mode Task payload, check the feature's workspace path (or the current working directory when in Mode 2) for frontend markers:
+Check the resolved target (or the current working directory when no target path
+is available) for frontend markers:
 - Config files: `next.config.*`, `vite.config.*`, `nuxt.config.*`, `svelte.config.*`, `cypress.config.*`
 - Route directories: `src/pages/`, `src/app/`, `app/`, `pages/`
 - `package.json` dependencies: `react`, `vue`, `svelte`, `next`
 
-When ANY marker matches, include `frontend_scope: true` in the Direct Mode Task payload. When none matches, omit the field (absence is the signal — do not set it to false explicitly).
+When any marker matches, carry `frontend_scope: true` into a delegated tester
+request. When none matches, omit the field rather than setting it to false.
 
-## Mode 1 — Feature name provided
+## Resolve the target
 
-1. Run the frontend detection step against the feature's workspace path
-2. Pass to the `orchestrator` agent:
-   ```
-   Direct Mode Task:
-   - Mode: test
-   - Feature: {feature-name}
-   - frontend_scope: true   # detected from repo markers; activates the tester's browser-test routing
-   ```
-   (omit `frontend_scope` when no frontend markers are found)
+If a feature or path is provided, use it as the target. Otherwise resolve the
+current objective from the active OpenSpec change, plan, task context, or recent
+diff, then locate the affected source and tests. Existing `workspaces/` notes can
+help but are optional; do not require `02-implementation.md`, a workspace, or a
+particular stage file. If several unrelated targets remain and the request does
+not identify one, ask which target to test.
 
-## Mode 2 — No input provided
+Apply frontend detection to the resolved target's project root so browser or UI
+checks are considered even when the target is a single source file.
 
-1. Look for active `workspaces/*/` folders that contain `02-implementation.md`
-2. If exactly one found, use its feature name
-3. If multiple found, ask the user: "Multiple features found in workspaces. Which one do you want to test? {list}"
-4. If none found, tell the user: "No implementation found in workspaces/. Implement first or provide a feature name."
-5. Once the feature path is resolved, run the frontend detection step before building the payload
+## Method
 
----
-name: test
+Read the requested behavior from the current objective, OpenSpec scenarios,
+plans, and source. Use the diff and repository history to identify changed
+paths, then inspect nearby integration boundaries and existing test conventions.
+Choose meaningful unit, integration, contract, or browser checks that can expose
+the relevant regression; do not create tests merely to mirror the implementation.
 
-## Important
+Add or update tests with the repository's normal tools and run the narrowest
+relevant checks first, followed by broader checks when the change warrants them.
+Report commands, results, failures, omissions, and remaining risk. Keep raw
+runner output in temporary or configured workspace storage. A concise report may
+be written to an active workspace when that workflow uses one, but this skill
+does not require `03-testing.md` or any other fixed artifact.
 
-- Always invoke the `orchestrator` agent — do NOT invoke agents directly
-- The orchestrator will route to the `tester` agent
-- Requires existing workspaces with implementation docs
-- Output: tests created + `workspaces/{feature-name}/03-testing.md`
+The current agent coordinates the work and may delegate independent modules or
+specialist browser checks with clear ownership. Consolidate their evidence and
+judge the remaining gaps; delegation is optional and does not activate a
+separate pipeline.

@@ -14,6 +14,8 @@ in charge of execution.
   requirements from the current workflow contracts.
 - Keep OpenSpec as written intent and keep `spec`, `pipeline`, `review-pr`,
   `create-pr` and `modes` discoverable to the native general agent.
+- Preserve the practical documentation, testing, spike, multi-repository and
+  skill-authoring methods in their skills and native adapters.
 - Treat specialist and review returns as evidence and recommendations. Main
   evaluates them with the full task context and chooses the next action.
 - Keep author-side PR comment handling in one proportional evaluation guide,

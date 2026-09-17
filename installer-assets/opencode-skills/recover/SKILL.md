@@ -4,9 +4,12 @@ description: Resume an interrupted Team Harness task from saved progress and the
 ---
 
 Resolve the named task under the active OpenCode TH configuration and workspace.
-Read intent, progress and results; verify saved facts against the current
-repository. Preserve completed work and use the current spec or pipeline workflow
-to continue the authorized objective.
+Read intent, progress and results; preserve the exact plan path and canonical
+OpenSpec source when handing work back. Verify saved facts against the current
+repository. For sequential repositories, verify each saved branch, revision,
+artifact or contract fixture before adapting consumers. Preserve completed work
+and use the current spec or pipeline workflow to continue the authorized
+objective.
 
 Old state and control logs are historical evidence. Resumption needs no gate
 release, nonce or lease. Ask only for real missing decisions, and use native

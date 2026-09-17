@@ -15,6 +15,13 @@
 - [x] 3.2 Keep restart reporting conditional on an observed native requirement and preserve the no-restart fast path.
 - [x] 3.3 Keep PR comment handling self-contained and advisory, and resolve shared references at their installed runtime paths.
 
+## 3a. Preserve workflow capabilities in skills
+
+- [x] 3a.1 Restore documentation, testing and spike methods in self-contained skills, including current inputs and temporary experiment cleanup.
+- [x] 3a.2 Keep a resumable shared plan and dependency/consumer checks for multi-repository spec work, and align optional validation helpers with their callers.
+- [x] 3a.3 Restore advisory skill comparison and update authoring guidance so workflows live in skills across all three runtimes.
+- [ ] 3a.4 Exercise representative requests and obtain independent capability-preservation review of the integrated candidate.
+
 ## 4. Validate and close
 
 - [x] 4.1 Run strict OpenSpec validation for this change and the affected living specs.
