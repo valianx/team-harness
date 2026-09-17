@@ -22,8 +22,6 @@ package main
 import (
 	"bytes"
 	"io/fs"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -144,7 +142,6 @@ func TestBuildOpencodeManifests_PipelineRunnersPresent(t *testing.T) {
 	required := map[string]bool{
 		"bounded-command.mjs": false,
 		"quality-lib.mjs":     false,
-		"control-plane.mjs":   false,
 		"quality-runner.mjs":  false,
 		"test-transition.mjs": false,
 	}
@@ -730,54 +727,6 @@ func TestTHUpdateCommand_CanonicalURLAndNoSubstitutableTokens(t *testing.T) {
 		if bytes.Contains(data, []byte(token)) {
 			t.Errorf("th-update.md contains substitutable token %q (AC-11 violation)", token)
 		}
-	}
-}
-
-// ---------------------------------------------------------------------------
-// AC-12: README.md has Updating (opencode) section; plugin.json unchanged
-// ---------------------------------------------------------------------------
-
-// TestREADME_HasUpdatingOpencodeSection verifies that README.md contains an
-// "Updating (opencode)" section documenting the re-run command and /th-update.
-func TestREADME_HasUpdatingOpencodeSection(t *testing.T) {
-	// The README is in the repo root — not in the embedded FS. Read it from the
-	// filesystem relative to the test file's package (cmd/install/ → ../../README.md).
-	// Using a relative path here is safe: tests run with cwd = package dir.
-	readmePath := filepath.Join("..", "..", "README.md")
-	data, err := os.ReadFile(readmePath)
-	if err != nil {
-		t.Fatalf("read README.md: %v", err)
-	}
-
-	if !bytes.Contains(data, []byte("Updating (opencode)")) {
-		t.Error("README.md does not contain 'Updating (opencode)' section header")
-	}
-	if !bytes.Contains(data, []byte("install-opencode.sh")) {
-		t.Error("README.md Updating section does not reference install-opencode.sh")
-	}
-	if !bytes.Contains(data, []byte("/th-update")) {
-		t.Error("README.md Updating section does not reference /th-update")
-	}
-}
-
-// TestPluginJSON_VersionUnchanged verifies that .claude-plugin/plugin.json has
-// NOT been bumped by this PR — cmd/install/, bin/, and docs/ are not
-// distributed plugin assets (no plugin marketplace impact).
-func TestPluginJSON_VersionUnchanged(t *testing.T) {
-	pluginPath := filepath.Join("..", "..", ".claude-plugin", "plugin.json")
-	data, err := os.ReadFile(pluginPath)
-	if err != nil {
-		t.Skipf("plugin.json not found at %s — skip (may be running outside repo root)", pluginPath)
-		return
-	}
-
-	// The version at the start of this PR is 2.112.1. The Go-installer bumped
-	// to 2.112.2 but plugin.json must remain at 2.112.1 (not a plugin asset).
-	// We assert the plugin version is NOT 2.112.2 — if it were bumped, someone
-	// violated the "no plugin bump" constraint.
-	const goInstallerNewVersion = "2.112.2"
-	if bytes.Contains(data, []byte(`"version": "`+goInstallerNewVersion+`"`)) {
-		t.Errorf("plugin.json version was bumped to %q — this PR must NOT touch plugin.json (it is not a distributed plugin asset)", goInstallerNewVersion)
 	}
 }
 

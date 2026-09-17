@@ -9,7 +9,7 @@ function getHookProfile() {
   if (val === "minimal" || val === "standard" || val === "strict") {
     return val;
   }
-  return "standard";
+  return "minimal";
 }
 function observabilityEnabled(cls) {
   const profile = getHookProfile();

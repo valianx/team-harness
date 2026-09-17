@@ -1,92 +1,57 @@
 ---
 name: create-pr
-description: Prepare or publish a pull request for completed repository work, or resume an intended PR creation, from direct, OpenSpec, or Team Harness pipeline flows. Use for requests to create, open, update, or publish a PR; do not use for PR review, applying review comments, or merge-only work.
+description: Prepare, create, update, or publish a pull request for completed repository work, including direct, OpenSpec, and pipeline flows.
 ---
 
-Analyze `$ARGUMENTS`.
+Use this skill whenever the request or active workflow calls for PR preparation
+or publication, without requiring the user to name it. For reviewing an existing
+PR use `review-pr`; for author-side comments use `apply-review`. A merge-only
+request follows the repository's merge workflow without preparing a new PR.
+The current general agent coordinates and reuses the user's authorization.
 
-Use this shared skill at two checkpoints in one PR lifecycle. Use it whenever a direct PR
-request or the spec or pipeline flow reaches candidate preparation or publication; no
-explicit skill invocation is needed. A resumed run must reuse its retained preparation
-and authorization. A mere PR mention in unrelated work or a review-only request does not
-activate it. Skill selection itself never grants push, PR, merge, or issue-closing authority.
+## Prepare a reviewable candidate
 
-Do not route review of an existing PR, application of review comments, or a merge-only
-request through this skill; use `review-pr`, `apply-review`, or the repository's merge
-flow. The coordinator owns this workflow. Do not create a nested orchestrator, require
-a specialist by default, or weaken native runtime permissions. Keep the instructions
-portable across Claude Code, Codex, and OpenCode by using the active runtime's native
-tools and existing repository helpers.
+Resolve the repository, branch, base, intended scope and current diff. Follow
+the repository's PR and branch conventions. Preserve unrelated tracked and
+untracked work and stage only the intended change.
 
-## Checkpoint 1: prepare the candidate
+Keep maintained tests, tools, fixtures, documentation and shipped generated
+outputs. Exclude execution logs, scratch scripts, screenshots and temporary
+review reports unless they are deliberately part of the product. Use the
+configured workspace or temporary storage for work evidence.
 
-Before final review or pipeline Freeze, resolve the exact repository, working branch,
-base, candidate head, and intended PR scope. Respect repository instructions, project
-branch conventions, PR templates, commit conventions, and native permissions.
+Check relevant open OpenSpec changes against the implementation and validation.
+Use [the lifecycle](../spec/references/lifecycle.md) to archive completed,
+verified changes with their implementation in the same PR. Report unfinished or
+conflicting work precisely; unrelated changes stay outside this PR.
 
-- Inspect the full base-to-candidate diff and worktree status. Preserve unrelated
-  tracked or untracked changes; do not stage, discard, or fold them into the PR.
-- Keep maintained tests, tools, fixtures, and required shipped generated outputs that
-  belong to the candidate. Keep transient reports, logs, and scratch material in the
-  existing workspace or a temporary directory; do not add them to the repository.
-- Reuse verification that still applies to this exact candidate and scope. Run the
-  selected required checks when needed, and report omitted checks, their reasons, and
-  unknown counts honestly. Unrelated optional skips do not erase sufficient evidence.
-- When OpenSpec is relevant, read [the shared lifecycle](../spec/references/lifecycle.md)
-  and follow its current archive readiness and upstream archive contract. Preserve
-  OpenSpec's repository archive contract; do not invent external archive support or
-  silently auto-delete history.
-  Otherwise do not create OpenSpec artifacts for this PR task.
-- When author review applies, read [the author-review contract](../spec/references/author-review.md).
-  A pending review choice holds publication, an explicit refusal skips only optional
-  review, and accepted review returns and any repair closure must remain anchored to
-  the candidate. Reuse applicable evidence rather than starting an unrequested full
-  review round.
-- Direct and spec flows create no new pipeline state, gates, or checklist files. Reuse
-  an existing workspace or temporary body file, and add no scripts, generated copies,
-  or duplicate lifecycle content as new administrative preparation material.
+Run appropriate repository checks and reuse evidence that remains applicable.
+Use [author review](../spec/references/author-review.md) where it adds confidence.
+Evaluate findings, apply worthwhile corrections and verify them. A historical
+review label or missing TH gate record is not publication authority.
 
-Prepare the title, body, issue references, and any required metadata from the repository
-template and approved scope. Use closing keywords only for issues fully resolved by the
-candidate; reference a partially resolved issue without auto-closing it. Keep the
-candidate reviewable and report the files inspected, prepared, or retained with the
-rationale for any scope decision.
+Write a concise title and body explaining the resulting behavior, why it changed
+and how it was checked. Follow the repository template. Use issue-closing keywords
+only when the candidate fully resolves those issues.
 
-For an active pipeline, follow its existing delivery mechanics and accepted preview.
-From this skill directory, Codex uses `../pipeline/references/delivery.md`, Claude Code
-uses `../../agents/_shared/delivery-mechanics.md`, and OpenCode uses
-`../../th-references/agents/_shared/delivery-mechanics.md` in the selected installation.
-Do not replace that contract with this skill's prose.
+## Publish or resume
 
-## Checkpoint 2: publish or resume
+Confirm the final branch/base/head and scope before publication. If the candidate
+changed, assess the actual difference and refresh affected evidence. Existing
+authorization covers ordinary in-scope repairs; ask only for a genuinely missing
+decision. Native runtime permissions continue to govern outward actions.
 
-Publication reuses the completed preparation and its existing authorization. Revalidate
-the exact repository, base, head commit/tree, branch, worktree, body bytes, and applicable
-review or Freeze evidence before an outward write. A direct/spec ordinary in-scope repair
-may advance the head or revise its body after this diff check while reusing existing
-authority; ask only for a decision when scope, acceptance, security authority, or another
-real prerequisite is new. An active pipeline keeps the delivery contract's strict accepted
-Freeze and preview identities; a mismatch returns to validation/Freeze.
+Resolve any configured GitHub identity route and use the intended account and
+host. Check for an existing PR for the exact repository/head/base before creating
+one. Preserve its current state unless the request changes it. For a merged or
+closed prior PR, inspect branch history before choosing a new delivery branch.
 
-An active pipeline publishes its accepted frozen tree through the existing delivery
-mechanics. Once an accepted Freeze is handed to publication, perform no edits, tests,
-commits, rebases, or re-review; validation runs before that Freeze is accepted. Direct
-and spec publication follows their already-satisfied completion and author-review
-conditions without inventing a second gate. A native permission prompt remains a
-technical boundary; it is not silently answered by this skill.
+With `gh`, use explicit `--repo`, `--head`, `--base` and a temporary
+`--body-file` where supported. Prepare the body locally; `gh pr create
+--dry-run` may push and is not a local preview. After an uncertain network
+result, inspect the exact remote state before retrying. If push succeeded but PR
+creation failed, resume the PR step rather than repeating completed work.
 
-Make the operation idempotent: first inspect for a PR in the exact repository with the
-exact head and base. If a network or transport result is uncertain, inspect that exact
-state before retrying; never replay an unknown outward write blindly. Preserve an open
-ready-for-review PR and surface a merged or closed stale branch according to the delivery
-contract.
-
-When `gh` is used, pass explicit `--repo`, `--base`, `--head`, and `--body-file` values
-whenever available, and include only flags supported by the installed command. Use a
-local temporary body file when needed. Do not fabricate flags or use
-`gh pr create --dry-run` as a preview because it may push or otherwise change state.
-Reuse the repository's sanctioned fallback when `gh` is unavailable. If push succeeds
-but PR creation fails, report the pending PR state and do not push again.
-
-Finish with a concise PR URL and state, plus validation limitations or a precise pending
-reason. Do not wait for CI or merge, and do not auto-publish review comments.
+Return the PR URL and state, validation limitations, or the precise remaining
+step. Continue CI monitoring, comment handling or merge when the user requested
+those actions as part of the task.

@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { belowFloor, classifyFloor, gateDecision, headTreeReader, partitionFindings, readSpecRequirements, runReviewFan } from "../skills/verify/scripts/review-fan.mjs";
+import { belowFloor, classifyFloor, headTreeReader, partitionFindings, readSpecRequirements, reviewSummary, runReviewFan } from "../skills/verify/scripts/review-fan.mjs";
 
 const run = promisify(execFile);
 const failures = [];
@@ -159,7 +159,8 @@ async function check(name, callback) {
 
 function pkg(overrides = {}) {
   return {
-    required_lenses: overrides.required_lenses ?? ["qa"],
+    requested_lenses: overrides.requested_lenses ?? ["qa"],
+    recommended_lenses: overrides.recommended_lenses ?? ["qa"],
     scope: { kind: "full", prior_anchor: null, paths: ["src/a.js"] },
     ...overrides,
   };
@@ -204,19 +205,20 @@ await check("derives the changed surface from the repository, not from the calle
   assert.equal(result.package.read_only, true);
 }));
 
-await check("forces the floor lenses into the required set when the floor applies", async () => withRepository(async (root) => {
+await check("recommends risk lenses when the changed surface is sensitive", async () => withRepository(async (root) => {
   await commit(root, { "src/auth_service.py": "def authorize(user):\n    return True\n" }, "auth");
   const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa" });
   assert.equal(result.package.security_floor.applies, true);
   assert.deepEqual(result.package.requested_lenses, ["qa"]);
-  assert.deepEqual(result.package.required_lenses, ["adversary", "qa", "security"]);
+  assert.deepEqual(result.package.recommended_lenses, ["adversary", "qa", "security"]);
+  assert.equal(Object.hasOwn(result.package, "required_lenses"), false);
 }));
 
-await check("leaves the required set alone when no floor category matches", async () => withRepository(async (root) => {
+await check("leaves recommendations alone when no risk category matches", async () => withRepository(async (root) => {
   await commit(root, { "docs/layout.md": "# Layout\n\nColumns and spacing.\n" }, "docs");
   const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa" });
   assert.equal(result.package.security_floor.applies, false);
-  assert.deepEqual(result.package.required_lenses, ["qa"]);
+  assert.deepEqual(result.package.recommended_lenses, ["qa"]);
 }));
 
 await check("does not derive code-level floor categories from prose wording alone", async () => {
@@ -251,7 +253,7 @@ await check("treats an unscannable path as ambiguous, and ambiguous as sensitive
   assert.equal(result.package.security_floor.applies, true);
   assert.equal(result.package.security_floor.ambiguous, true);
   assert.deepEqual(result.package.security_floor.categories, []);
-  assert.deepEqual(result.package.required_lenses, ["adversary", "qa", "security"]);
+  assert.deepEqual(result.package.recommended_lenses, ["adversary", "qa", "security"]);
 }));
 
 await check("leaves a fully scannable change unambiguous", () => {
@@ -260,11 +262,14 @@ await check("leaves a fully scannable change unambiguous", () => {
   assert.equal(floor.applies, false);
 });
 
-await check("refuses a second full-scope package once a prior anchor exists", async () => withRepository(async (root) => {
+await check("allows a requested full review after an earlier anchor", async () => withRepository(async (root) => {
   await commit(root, { "src/a.js": "export const a = 1;\n" }, "add");
   const anchor = "abcdef1";
   const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa", priorAnchor: anchor, scope: "full" });
-  assert.equal(result.error_code, "SCOPE_FULL_REFUSED");
+  assert.equal(result.verdict, "pass");
+  assert.equal(result.package.scope.kind, "full");
+  assert.equal(result.package.scope.prior_anchor, null);
+  assert.deepEqual(result.package.scope.paths, ["src/a.js"]);
 }));
 
 await check("emits a delta package bounded to the range since the prior anchor", async () => withRepository(async (root) => {
@@ -398,70 +403,76 @@ await check("refuses a package when the tree carries untracked files", async () 
 
 await check("reports a finding the authored criteria anticipated as covered", () => {
   const anticipated = pkg({ criteria: [{ text: "Derivation is all-or-nothing", provenance: "written-intent", source: "specs/a/spec.md" }] });
-  const decision = gateDecision(anticipated, [ret("qa", { verdict: "fail", findings: [{ file: "src/a.js", criterion: "Derivation is all-or-nothing" }] })]);
-  assert.equal(decision.covered.length, 1);
-  assert.equal(decision.spec_defects.length, 0);
-  assert.equal(decision.covered[0].source, "specs/a/spec.md");
+  const summary = reviewSummary(anticipated, [ret("qa", { verdict: "fail", findings: [{ file: "src/a.js", criterion: "Derivation is all-or-nothing" }] })]);
+  assert.equal(summary.covered.length, 1);
+  assert.equal(summary.spec_defects.length, 0);
+  assert.equal(summary.covered[0].source, "specs/a/spec.md");
 });
 
 await check("reports a finding no criterion anticipated as a spec defect", () => {
   const anticipated = pkg({ criteria: [{ text: "Derivation is all-or-nothing", provenance: "written-intent" }] });
-  const decision = gateDecision(anticipated, [ret("qa", { verdict: "fail", findings: [{ file: "src/a.js", criterion: "Decoding never fails open" }] })]);
-  assert.equal(decision.spec_defects.length, 1);
-  assert.equal(decision.spec_defects[0].coverage, "uncovered");
-  assert.equal(decision.covered.length, 0);
+  const summary = reviewSummary(anticipated, [ret("qa", { verdict: "fail", findings: [{ file: "src/a.js", criterion: "Decoding never fails open" }] })]);
+  assert.equal(summary.spec_defects.length, 1);
+  assert.equal(summary.spec_defects[0].coverage, "uncovered");
+  assert.equal(summary.covered.length, 0);
 });
 
 await check("treats a finding naming no criterion at all as uncovered", () => {
-  const decision = gateDecision(pkg({ criteria: [{ text: "Anything", provenance: "written-intent" }] }), [ret("qa", { verdict: "fail", findings: [{ file: "src/a.js" }] })]);
-  assert.equal(decision.spec_defects.length, 1);
+  const summary = reviewSummary(pkg({ criteria: [{ text: "Anything", provenance: "written-intent" }] }), [ret("qa", { verdict: "fail", findings: [{ file: "src/a.js" }] })]);
+  assert.equal(summary.spec_defects.length, 1);
 });
 
 await check("classifies nothing when a package bound no written intent", () => {
-  const decision = gateDecision(pkg(), [ret("qa")]);
-  assert.deepEqual(decision.covered, []);
-  assert.deepEqual(decision.spec_defects, []);
-  assert.equal(decision.ready, true);
+  const summary = reviewSummary(pkg(), [ret("qa")]);
+  assert.deepEqual(summary.covered, []);
+  assert.deepEqual(summary.spec_defects, []);
+  assert.equal(Object.hasOwn(summary, "ready"), false);
 });
 
-await check("keeps an absent required return from resolving ready", () => {
-  const decision = gateDecision(pkg({ required_lenses: ["qa", "security"] }), [ret("qa")]);
-  assert.equal(decision.ready, false);
-  assert.equal(decision.reasons.some((reason) => reason.includes("security")), true);
+await check("records a missing recommendation without resolving publication", () => {
+  const summary = reviewSummary(pkg({ recommended_lenses: ["qa", "security"] }), [ret("qa")]);
+  assert.deepEqual(summary.missing, ["security"]);
+  assert.equal(summary.observations.some((reason) => reason.includes("recommended lens security")), true);
+  assert.equal(Object.hasOwn(summary, "ready"), false);
 });
 
-await check("keeps a blocking floor lens from resolving ready", () => {
-  const decision = gateDecision(pkg({ required_lenses: ["adversary"] }), [ret("adversary", { verdict: "fail" })]);
-  assert.equal(decision.ready, false);
+await check("keeps a selected risk finding as evidence for Main", () => {
+  const summary = reviewSummary(pkg({ recommended_lenses: ["adversary"] }), [ret("adversary", { verdict: "fail" })]);
+  assert.equal(summary.lens_results[0].outcome.verdict, "fail");
+  assert.equal(summary.observations.some((reason) => reason.includes("lens adversary returned fail")), true);
+  assert.equal(Object.hasOwn(summary, "ready"), false);
 });
 
-await check("keeps a duplicate return from burying an earlier failure, discarding neither", () => {
-  const decision = gateDecision(pkg(), [
+await check("keeps duplicate returns and their findings", () => {
+  const summary = reviewSummary(pkg(), [
     ret("qa", { verdict: "fail", findings: [{ severity: "blocker", file: "src/a.js" }] }),
     ret("qa"),
   ]);
-  assert.equal(decision.ready, false, "a later benign return buried an earlier failure");
-  assert.equal(decision.spec_defects.length + decision.covered.length, 1, "the earlier finding was discarded");
+  assert.equal(summary.lens_results[0].returns.length, 2);
+  assert.equal(summary.lens_results[0].outcome.verdict, "fail");
+  assert.equal(summary.spec_defects.length + summary.covered.length, 1, "the earlier finding was discarded");
+  assert.equal(Object.hasOwn(summary, "ready"), false);
 });
 
-await check("takes the worse outcome regardless of the order the returns arrive in", () => {
-  const worstFirst = gateDecision(pkg(), [ret("qa", { verdict: "fail" }), ret("qa")]);
-  const worstLast = gateDecision(pkg(), [ret("qa"), ret("qa", { verdict: "fail" })]);
-  assert.equal(worstFirst.ready, false);
-  assert.equal(worstLast.ready, false);
+await check("takes the worse outcome regardless of return order", () => {
+  const worstFirst = reviewSummary(pkg(), [ret("qa", { verdict: "fail" }), ret("qa")]);
+  const worstLast = reviewSummary(pkg(), [ret("qa"), ret("qa", { verdict: "fail" })]);
+  assert.equal(worstFirst.lens_results[0].outcome.verdict, "fail");
+  assert.equal(worstLast.lens_results[0].outcome.verdict, "fail");
 });
 
-await check("keeps a return for a lens nobody required without letting it decide anything", () => {
-  const decision = gateDecision(pkg({ required_lenses: ["qa"] }), [ret("qa"), ret("security", { verdict: "fail" })]);
-  assert.equal(decision.ready, true, "an unrequested lens held the ship");
-  assert.equal(decision.unrequested.length, 1, "an unrequested return was thrown away instead of kept");
+await check("keeps a return for an unselected lens without letting it decide anything", () => {
+  const summary = reviewSummary(pkg({ recommended_lenses: ["qa"] }), [ret("qa"), ret("security", { verdict: "fail" })]);
+  assert.equal(summary.unrequested.length, 1, "an unselected return was thrown away instead of kept");
+  assert.equal(summary.lens_results.some((result) => result.lens === "security"), true);
+  assert.equal(Object.hasOwn(summary, "ready"), false);
 });
 
-await check("holds a non-terminal lens status short of a pass, whatever its verdict", () => {
+await check("records a non-terminal lens status as evidence", () => {
   for (const status of ["incomplete", "failed", "unavailable", "untrusted"]) {
-    const decision = gateDecision(pkg(), [ret("qa", { lens_status: status })]);
-    assert.equal(decision.ready, false, status);
-    assert.equal(decision.reasons.some((reason) => reason.includes(status)), true, status);
+    const summary = reviewSummary(pkg(), [ret("qa", { lens_status: status })]);
+    assert.equal(summary.observations.some((reason) => reason.includes(status)), true, status);
+    assert.equal(Object.hasOwn(summary, "ready"), false);
   }
 });
 
@@ -485,8 +496,8 @@ await check("raises the floor when a change removes a security control at a beni
     }, "drop the check");
     const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa" });
     assert.equal(result.package.security_floor.applies, true, "removing a control raised no floor");
-    assert.equal(result.package.required_lenses.includes("security"), true);
-    assert.equal(result.package.required_lenses.includes("adversary"), true);
+    assert.equal(result.package.recommended_lenses.includes("security"), true);
+    assert.equal(result.package.recommended_lenses.includes("adversary"), true);
   }));
 
 await check("raises the floor when a whole file carrying a control is deleted", async () =>
@@ -501,7 +512,7 @@ await check("raises the floor when a whole file carrying a control is deleted", 
     await git(root, ["commit", "-q", "-m", "delete the whole file"]);
     const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa" });
     assert.equal(result.package.security_floor.applies, true, "deleting the file carrying the control raised no floor");
-    assert.equal(result.package.required_lenses.includes("adversary"), true);
+    assert.equal(result.package.recommended_lenses.includes("adversary"), true);
   }));
 
 await check("raises the same floor when the same control is added rather than removed", async () =>
@@ -532,38 +543,37 @@ await check("leaves the floor down when neither direction touches a security con
     assert.equal(result.package.security_floor.applies, false, "widening to removals made an ordinary change sensitive");
   }));
 
-await check("resolves ready only when every required lens passes without a blocker", () => {
-  const decision = gateDecision(pkg({ required_lenses: ["qa", "tester"] }), [ret("qa"), ret("tester")]);
-  assert.equal(decision.ready, true);
-  assert.deepEqual(decision.reasons, []);
-  assert.deepEqual(decision.unrequested, []);
+await check("summarizes selected passes without resolving publication", () => {
+  const summary = reviewSummary(pkg({ recommended_lenses: ["qa", "tester"] }), [ret("qa"), ret("tester")]);
+  assert.equal(summary.lens_results.length, 2);
+  assert.deepEqual(summary.observations, []);
+  assert.deepEqual(summary.unrequested, []);
+  assert.equal(Object.hasOwn(summary, "ready"), false);
 });
 
-await check("treats a return that omits lens_status as unfinished, not complete", () => {
-  // A lens that did not finish and simply left the field out must not read as a completed pass.
-  const decision = gateDecision(pkg({ required_lenses: ["qa"] }), [{ lens: "qa", verdict: "pass", findings: [] }]);
-  assert.equal(decision.ready, false);
-  assert.equal(decision.reasons.some((reason) => reason.includes("no lens_status")), true);
+await check("records a return that omits lens_status as unfinished", () => {
+  const summary = reviewSummary(pkg(), [{ lens: "qa", verdict: "pass", findings: [] }]);
+  assert.equal(summary.observations.some((reason) => reason.includes("no lens_status")), true);
 });
 
-await check("holds the range when a lens leaves a blocking disagreement unresolved", () => {
-  const decision = gateDecision(pkg({ required_lenses: ["qa"] }), [
+await check("records a blocking disagreement for Main to resolve", () => {
+  const summary = reviewSummary(pkg(), [
     ret("qa", { disagreements: [{ with: "tester", claim: "coverage is not sufficient", blocking: true }] }),
   ]);
-  assert.equal(decision.ready, false);
-  assert.equal(decision.reasons.some((reason) => reason.includes("blocking disagreement")), true);
+  assert.equal(summary.observations.some((reason) => reason.includes("blocking disagreement")), true);
 });
 
-await check("a disagreement the lens did not mark blocking does not hold the range", () => {
-  const decision = gateDecision(pkg({ required_lenses: ["qa"] }), [
+await check("retains a disagreement the lens did not mark blocking", () => {
+  const summary = reviewSummary(pkg(), [
     ret("qa", { disagreements: [{ with: "tester", claim: "style", blocking: false }] }),
   ]);
-  assert.equal(decision.ready, true);
+  assert.deepEqual(summary.lens_results[0].returns[0].disagreements, [{ with: "tester", claim: "style", blocking: false }]);
 });
 
-await check("treats a pass carrying blockers as not ready", () => {
-  const decision = gateDecision(pkg(), [ret("qa", { findings: [{ file: "src/a.js" }] })]);
-  assert.equal(decision.ready, false);
+await check("reports a pass carrying blockers as evidence", () => {
+  const summary = reviewSummary(pkg(), [ret("qa", { findings: [{ file: "src/a.js" }] })]);
+  assert.equal(summary.spec_defects.length, 1);
+  assert.equal(Object.hasOwn(summary, "ready"), false);
 });
 
 await check("demotes a finding outside a delta range to a concern", () => {
@@ -571,19 +581,18 @@ await check("demotes a finding outside a delta range to a concern", () => {
   const split = partitionFindings(delta, [{ file: "src/unrelated.js" }, { file: "src/a.js" }]);
   assert.equal(split.concerns.length, 1);
   assert.equal(split.blockers.length, 1);
-  const decision = gateDecision(delta, [{ ...ret("qa"), findings: [{ file: "src/unrelated.js" }] }]);
-  assert.equal(decision.ready, true);
-  assert.equal(decision.concerns.length, 1);
+  const summary = reviewSummary(delta, [{ ...ret("qa"), findings: [{ file: "src/unrelated.js" }] }]);
+  assert.equal(summary.concerns.length, 1);
 });
 
-await check("holds the ship on blocker and high severities", () => {
+await check("classifies blocker and high severities for Main", () => {
   for (const severity of ["blocker", "high"]) {
     const split = partitionFindings(pkg(), [{ file: "src/a.js", severity }]);
     assert.equal(split.blockers.length, 1, severity);
   }
 });
 
-await check("lets medium, low and info ride as concerns below the floor", () => {
+await check("classifies medium, low and info as concerns below the floor", () => {
   for (const severity of ["medium", "low", "info"]) {
     const split = partitionFindings(pkg(), [{ file: "src/a.js", severity }]);
     assert.equal(split.concerns.length, 1, severity);
@@ -591,7 +600,7 @@ await check("lets medium, low and info ride as concerns below the floor", () => 
   }
 });
 
-await check("holds the ship when a severity is absent or unrecognized", () => {
+await check("classifies absent or unrecognized severity as a blocker candidate", () => {
   for (const entry of [{ file: "src/a.js" }, { file: "src/a.js", severity: "urgent" }, { file: "src/a.js", severity: 7 }]) {
     assert.equal(partitionFindings(pkg(), [entry]).blockers.length, 1, JSON.stringify(entry));
     assert.equal(belowFloor(entry), false);
@@ -600,10 +609,9 @@ await check("holds the ship when a severity is absent or unrecognized", () => {
 
 await check("routes a sub-floor uncovered finding to concerns rather than spec defects", () => {
   const anticipated = pkg({ criteria: [{ text: "Some property", provenance: "written-intent" }] });
-  const decision = gateDecision(anticipated, [ret("qa", { findings: [{ file: "src/a.js", severity: "low", criterion: "Unrelated" }] })]);
-  assert.equal(decision.ready, true);
-  assert.equal(decision.concerns.length, 1);
-  assert.equal(decision.spec_defects.length, 0);
+  const summary = reviewSummary(anticipated, [ret("qa", { findings: [{ file: "src/a.js", severity: "low", criterion: "Unrelated" }] })]);
+  assert.equal(summary.concerns.length, 1);
+  assert.equal(summary.spec_defects.length, 0);
 });
 
 await check("never demotes a finding inside a full-scope package", () => {
@@ -617,9 +625,9 @@ await check("leaves an ambiguous criterion match uncovered rather than binding t
     { text: "Only a successful benign classification may waive the security lens", provenance: "written-intent" },
     { text: "Only a successful benign classification may waive the review lens", provenance: "written-intent" },
   ] });
-  const decision = gateDecision(ambiguous, [ret("qa", { verdict: "fail", findings: [{ file: "src/a.js", criterion: "Only a successful benign classification" }] })]);
-  assert.equal(decision.covered.length, 0, "an ambiguous match was bound to one arbitrary criterion");
-  assert.equal(decision.spec_defects.length, 1);
+  const summary = reviewSummary(ambiguous, [ret("qa", { verdict: "fail", findings: [{ file: "src/a.js", criterion: "Only a successful benign classification" }] })]);
+  assert.equal(summary.covered.length, 0, "an ambiguous match was bound to one arbitrary criterion");
+  assert.equal(summary.spec_defects.length, 1);
 });
 
 await check("binds an exact criterion match even when another criterion contains it", () => {
@@ -627,9 +635,9 @@ await check("binds an exact criterion match even when another criterion contains
     { text: "Validation runs once", provenance: "written-intent" },
     { text: "Validation runs once and a fix closes by executing its oracle", provenance: "written-intent" },
   ] });
-  const decision = gateDecision(overlapping, [ret("qa", { verdict: "fail", findings: [{ file: "src/a.js", criterion: "Validation runs once" }] })]);
-  assert.equal(decision.covered.length, 1);
-  assert.equal(decision.covered[0].criterion, "Validation runs once");
+  const summary = reviewSummary(overlapping, [ret("qa", { verdict: "fail", findings: [{ file: "src/a.js", criterion: "Validation runs once" }] })]);
+  assert.equal(summary.covered.length, 1);
+  assert.equal(summary.covered[0].criterion, "Validation runs once");
 });
 
 await check("does not read a content line beginning with +++ b/ as a file header", async () => {
@@ -674,6 +682,18 @@ await check("marks a surface whose every path a checker proved, instead of emitt
   const split = partitionFindings(pkg(), [{ file: "src/a.js", severity: "high" }]);
   assert.equal(split.blockers.length, 1, "a high-severity finding was demoted below the blocking floor");
 });
+
+await check("keeps the legacy gate invocation as an advisory summary", async () => withRepository(async (root) => {
+  const packagePath = path.join(root, "package.json5");
+  await writeFile(packagePath, JSON.stringify(pkg()));
+  const returnsPath = path.join(root, "returns.json");
+  await writeFile(returnsPath, JSON.stringify([ret("qa", { verdict: "fail" })]));
+  const result = await runReviewFan({ subcommand: "gate", package: packagePath, returns: returnsPath });
+  assert.equal(result.verdict, "pass");
+  assert.equal(result.kind, "team_harness_inline_review_summary");
+  assert.equal(result.summary.lens_results[0].outcome.verdict, "fail");
+  assert.equal(Object.hasOwn(result.summary, "ready"), false);
+}));
 
 await check("rejects a malformed returns document", async () => withRepository(async (root) => {
   const packagePath = path.join(root, "package.json5");

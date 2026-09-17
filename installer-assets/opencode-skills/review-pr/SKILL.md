@@ -23,14 +23,14 @@ workflow:
    primary thread. Never spawn a persistent or nested orchestrator.
 3. Translate Claude tool names to the closest native opencode tools. Delegate
    only bounded work to available native agents when delegation is allowed and
-   materially useful. Gate approval and consolidation stay in the primary thread.
+   materially useful. Integration and workflow decisions stay in the primary thread.
 4. Resolve persistent settings from
    `${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}/.team-harness.json`. Never depend on a Claude
    Code installation, `~/.claude`, the `claude` binary, or Claude plugin
-   cache paths. Use packaged files relative to this skill directory.
-5. Preserve every canonical safety boundary, read-only default, confirmation
-   gate, secret rule, and outward-write approval. Native opencode sandbox and
-   permission policy remain authoritative.
+   cache paths. Use packaged files relative to this skill directory. Agent reference resources (including `_shared/`, `testing-refs/`, and top-level `ref-*.md`, named through `agents/...` or `../../agents/...` in canonical links) are installed under `${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}/th-references/agents/`; resolve their suffix there.
+5. Follow the user's objective and existing authorization. Preserve read-only
+   review roles and use native opencode permissions. TH adds workflow
+   guidance, not another execution-permission protocol.
 6. Main coordinates native OpenCode PR-review subagents and consolidates advisory results; no required consolidator. Check only selected roles and their effective native permission rules. The installed compatibility projection uses permission with default deny and read/glob/grep allow, excluding bash/task, edit and external writes. Check the active OpenCode version/config schema before translating newer names such as permissions, shell or subagent; never inject those fields into a legacy configuration. Preserve OPENCODE_CONFIG_DIR/project scope and the independent writing authority of implementers. Native enforcement and model-backed dispatch must be verified separately from Go/JavaScript projection tests. Follow the canonical phase references progressively; do not require Claude paths or binaries.
 
 Execute the requested workflow after applying this adapter. Do not merely

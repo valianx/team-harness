@@ -18,16 +18,12 @@ class BridgeError(ValueError):
     """A bounded bridge validation failure safe to report to the operator."""
 
 
-def outcome(status: str, *, restart_required: bool, **details: object) -> dict[str, object]:
-    return {
-        "status": status,
-        "restartRequired": restart_required,
-        **details,
-    }
+def outcome(status: str, **details: object) -> dict[str, object]:
+    return {"status": status, **details}
 
 
-def emit(status: str, *, restart_required: bool, **details: object) -> None:
-    print(json.dumps(outcome(status, restart_required=restart_required, **details), indent=2, sort_keys=True))
+def emit(status: str, **details: object) -> None:
+    print(json.dumps(outcome(status, **details), indent=2, sort_keys=True))
 
 
 def lexical_path(value: str) -> Path:
@@ -41,7 +37,6 @@ def fail(message: str) -> None:
 def fail_write_protected() -> None:
     emit(
         "error",
-        restart_required=True,
         errorCode="CACHE_WRITE_PROTECTED",
         retryWithEscalation=True,
         error="Codex plugin cache is protected in the current sandbox",
@@ -67,15 +62,12 @@ def validate_new_snapshot(path: Path) -> tuple[Path, str]:
     cache_parent = resolved.parent
     validate_cache_parent(cache_parent)
     manifest_path = resolved / ".codex-plugin/plugin.json"
-    runner_path = resolved / "hooks/run-codex-hook.sh"
     try:
         manifest = json.loads(manifest_path.read_text())
     except (FileNotFoundError, json.JSONDecodeError) as exc:
         fail(f"new plugin manifest is unavailable or invalid: {exc}")
     if manifest.get("name") != PLUGIN_NAME:
         fail(f"new snapshot manifest is not {PLUGIN_NAME}")
-    if not runner_path.is_file():
-        fail(f"new snapshot hook runner is missing: {runner_path}")
     return resolved, str(manifest.get("version", resolved.name))
 
 
@@ -99,7 +91,6 @@ def bridge_result(old_plugin: Path, new_plugin: Path, *, apply: bool = True) -> 
     if old_plugin == new_snapshot:
         return outcome(
             "same-snapshot",
-            restart_required=False,
             oldPlugin=str(old_plugin),
             newPlugin=str(new_snapshot),
             version=version,
@@ -110,11 +101,6 @@ def bridge_result(old_plugin: Path, new_plugin: Path, *, apply: bool = True) -> 
         if not old_plugin.is_symlink():
             return outcome(
                 "skipped-existing-path",
-                # This alias is optional.  Preserving an existing path does
-                # not establish a host/runtime restart requirement; the
-                # reload layer owns activation evidence and can report a
-                # reconnect only when it observes one.
-                restart_required=False,
                 oldPlugin=str(old_plugin),
                 newPlugin=str(new_snapshot),
                 version=version,
@@ -123,7 +109,6 @@ def bridge_result(old_plugin: Path, new_plugin: Path, *, apply: bool = True) -> 
         if current_target.parent != cache_parent:
             return outcome(
                 "skipped-unmanaged-symlink",
-                restart_required=False,
                 oldPlugin=str(old_plugin),
                 currentTarget=str(current_target),
                 newPlugin=str(new_snapshot),
@@ -132,7 +117,6 @@ def bridge_result(old_plugin: Path, new_plugin: Path, *, apply: bool = True) -> 
         if current_target == new_snapshot:
             return outcome(
                 "current",
-                restart_required=False,
                 oldPlugin=str(old_plugin),
                 newPlugin=str(new_snapshot),
                 version=version,
@@ -142,7 +126,6 @@ def bridge_result(old_plugin: Path, new_plugin: Path, *, apply: bool = True) -> 
     if not apply:
         return outcome(
             "skipped-read-only",
-            restart_required=False,
             oldPlugin=str(old_plugin),
             newPlugin=str(new_snapshot),
             version=version,
@@ -161,7 +144,6 @@ def bridge_result(old_plugin: Path, new_plugin: Path, *, apply: bool = True) -> 
                 raise
             return outcome(
                 "skipped-symlink-privilege",
-                restart_required=False,
                 oldPlugin=str(old_plugin),
                 newPlugin=str(new_snapshot),
                 version=version,
@@ -176,7 +158,6 @@ def bridge_result(old_plugin: Path, new_plugin: Path, *, apply: bool = True) -> 
 
     return outcome(
         status,
-        restart_required=False,
         oldPlugin=str(old_plugin),
         newPlugin=str(new_snapshot),
         version=version,
@@ -199,10 +180,10 @@ if __name__ == "__main__":
     try:
         main()
     except BridgeError as exc:
-        emit("error", restart_required=True, error=str(exc))
+        emit("error", error=str(exc))
         raise SystemExit(2) from exc
     except OSError as exc:
         if exc.errno in {errno.EACCES, errno.EPERM, errno.EROFS}:
             fail_write_protected()
-        emit("error", restart_required=True, error="snapshot bridge filesystem operation failed")
+        emit("error", error="snapshot bridge filesystem operation failed")
         raise SystemExit(2) from exc

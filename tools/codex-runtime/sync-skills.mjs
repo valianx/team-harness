@@ -55,7 +55,7 @@ const codexSpecialMappings = new Map([
   ["kg", "Use the configured Memory MCP when available; otherwise report the missing native dependency without substituting another store."],
   ["learn-english", "Read and update only the Codex-native Team Harness configuration through its packaged configuration helper."],
   ["likec4-diagram", "Author the `.c4` source directly. Treat LikeC4 rendering as optional and report when the CLI is unavailable."],
-  ["lint", "Audit Codex plugin skills, generated agents, native hooks, and configuration paths; do not inspect or repair a Claude Code installation."],
+  ["lint", "Audit Codex plugin skills, generated agents, and native configuration paths; do not inspect or repair a Claude Code installation."],
   ["mcp-optimize", "Inspect Codex MCP registrations and config rather than Claude connector files. Preserve secrets and gate every proposed write."],
   ["obsidian-bases", "Resolve vault settings from Codex-native Team Harness configuration or explicit operator input, never from a Claude-only config path."],
   ["obsidian-cli", "Resolve vault settings from Codex-native Team Harness configuration or explicit operator input, never from a Claude-only config path."],
@@ -94,8 +94,6 @@ export const sharedPipelineScripts = [
   "cli-entrypoint.mjs",
   "code-hygiene.mjs",
   "commit-integrity.mjs",
-  "control-plane.mjs",
-  "control-plane-specialist.mjs",
   "quality-lib.mjs",
   "quality-runner.mjs",
   "test-transition.mjs",
@@ -163,7 +161,7 @@ function renderAdapter(name, canonical, runtime) {
     ?? `Execute the capability directly with ${codex ? "Codex" : "opencode"}-native tools and the current permission policy.`;
   const invocation = codex ? `$team-harness:${name}` : name;
   const example = codex
-    ? `Examples written as \`/th:${name}\` name the same capability; do not try to execute them as shell commands.`
+    ? `Examples use \`$team-harness:${name}\` as the supported Codex skill invocation; do not try to execute it as a shell command.`
     : `Examples written as \`/th:${name}\` name the same capability; interpret them as examples rather than requiring Claude Code.`;
   const configPath = codex
     ? "${CODEX_HOME:-$HOME/.codex}/.team-harness.json"
@@ -194,14 +192,14 @@ workflow:
    primary thread. Never spawn a persistent or nested orchestrator.
 3. Translate Claude tool names to the closest native ${codex ? "Codex" : "opencode"} tools. Delegate
    only bounded work to available native agents when delegation is allowed and
-   materially useful. Gate approval and consolidation stay in the primary thread.
+   materially useful. Integration and workflow decisions stay in the primary thread.
 4. Resolve persistent settings from
    \`${configPath}\`. Never depend on a Claude
    Code installation, \`~/.claude\`, the \`claude\` binary, or Claude plugin
-   cache paths. Use packaged files relative to this skill directory.
-5. Preserve every canonical safety boundary, read-only default, confirmation
-   gate, secret rule, and outward-write approval. Native ${codex ? "Codex" : "opencode"} sandbox and
-   permission policy remain authoritative.
+   cache paths. Use packaged files relative to this skill directory.${codex ? "" : " Agent reference resources (including `_shared/`, `testing-refs/`, and top-level `ref-*.md`, named through `agents/...` or `../../agents/...` in canonical links) are installed under `${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}/th-references/agents/`; resolve their suffix there."}
+5. Follow the user's objective and existing authorization. Preserve read-only
+   review roles and use native ${codex ? "Codex" : "opencode"} permissions. TH adds workflow
+   guidance, not another execution-permission protocol.
 6. ${mapping}
 
 Execute the requested workflow after applying this adapter. Do not merely

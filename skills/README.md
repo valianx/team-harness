@@ -1,6 +1,8 @@
 # skills/
 
-Slash-command entry points. Each skill is a directory with a `SKILL.md` file that registers one command a developer invokes inside Claude Code.
+Reusable Team Harness workflows for Claude Code, Codex and OpenCode. Each
+skill owns the method for a recognizable task and is discoverable through its
+name and description.
 
 ## Skill format — directory
 
@@ -13,48 +15,58 @@ When installed via the legacy Go binary installer, skills are invoked as `/<name
 Claude Code, Codex, and opencode. `skills/` owns the canonical domain workflow;
 `tools/codex-runtime/sync-skills.mjs` packages generated Codex and opencode
 adapters that translate runtime paths, tools, delegation, and permissions.
-Hand-authored overrides are reserved for lifecycle or gated-pipeline mechanics
-that genuinely differ. Never exclude a capability merely because its source
-body names one runtime.
+Hand-authored overrides are reserved for behavior that genuinely differs by
+runtime. When changing a workflow, check those overrides as well as generated
+adapters so all hosts retain the capability.
 
 ### Complex skill — subfolder with references
 
-Skills that need supporting material (scripts, templates, reference data) add a `references/` subdirectory inside the skill folder:
+Keep the core method in `SKILL.md`. Use references for conditional detail,
+scripts for useful executable helpers and assets for output templates:
 
 ```
 skills/
 └── excalidraw-diagram/
     ├── SKILL.md         ← skill prompt
-    └── references/      ← scripts, templates, reference material
+    └── references/      ← supporting guidance loaded when relevant
 ```
 
-Convention: parse arguments, build a task payload, route to the `orchestrator` agent.
+Describe the objective, inputs, meaningful decisions and expected result. A
+skill can connect research, implementation and review without prescribing a
+fixed agent count or mandatory reports. Substantial domain procedures belong
+with the skill that uses them; specialists contribute expertise and the
+current general agent coordinates.
 
 ## Routing
 
-- **Shared PR preparation/publication:** `/th:create-pr`, selected automatically by relevant requests and by spec/pipeline delivery in the current coordinator.
-- **Explicit gated activation:** `/th:pipeline` (operator-only, `disable-model-invocation: true`).
-- **Explicit compatibility activation:** `/th:issue`, `/th:plan` in `plan-and-execute` mode, and `/th:recover` for persisted state.
-- **Routes to the direct orchestrator kernel:** plain `/th:plan`, `/th:design`, `/th:plan-review`, `/th:research`, `/th:learn`, `/th:spike`, `/th:test`, `/th:test-cross-browser`, `/th:test-pipeline`, `/th:validate`, `/th:define-ac`, `/th:security`, `/th:audit`, `/th:review-pr`, `/th:deliver`, `/th:diagram`, `/th:likec4-diagram`, `/th:d2-diagram`, `/th:translate`, `/th:bootstrap`, `/th:eval`, `/th:gcp-costs`, `/th:cross-repo`, `/th:inline`.
-- **Standalone** (no orchestrator involvement): `/th:modes`, `/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:background`, `/th:update`, `/th:report-issue`, `/th:hookify`, `/th:save-session`, `/th:resume-session`, `/th:todo`, `/th:mcp-optimize`.
-- **Standalone complex skills** (no slash-command entry point, triggered by description matching): `obsidian-markdown`, `obsidian-bases`, `json-canvas`, `obsidian-cli`.
+- Use `spec` for written intent and a bounded development objective; choose
+  `pipeline` when the operator wants broader coordination.
+- Use `review-pr` for reviewing an existing PR and `create-pr` for preparation
+  and publication, including delivery from spec or pipeline work.
+- Use the matching domain skill for research, documentation, testing or other
+  tasks. `modes` exposes the installed catalog and native invocation syntax.
+- Skills run in the current general agent. Delegate bounded specialist work
+  when it contributes useful context or independent review. Native tools and
+  permissions govern execution; reviewers provide recommendations to Main.
 
 ## Adding a skill
 
-1. Create `skills/<name>/SKILL.md` with frontmatter and a body.
-2. Default behaviour: parse args, route to orchestrator with a descriptive mode. Use existing skills as templates.
-3. For skills with supporting material, add `skills/<name>/references/` with the relevant files.
-4. **Plugin (canonical):** run `/plugin reload th` inside Claude Code to pick up the new skill.
-   **Legacy (contributors):** run `go run ./cmd/install` from the repo root to propagate via the Go installer.
-5. Add a `CHANGELOG.md` entry under `[Unreleased]`.
-6. Open a PR.
-
-## No nested-dispatch continuity contract — retired
-
-A skill invokes `th:orchestrator` as the top-level session agent, never via `Task(subagent_type=orchestrator, ...)` — there is no coordinator dispatched as a subagent for this repo's routing skills to hand off from. The `dispatch_handoff`/`blocked-no-dispatch` takeover protocol that used to exist for that scenario is retired along with the second coordination agent it backstopped: see `docs/subagent-orchestration.md § "Nested-context dispatch — RETIRED protocol, retained provisioning"` for the full retirement note and the harmless depth-2 nesting provisioning that survives it for specialist leaf agents invoked one level deep.
+1. Compare the intended request with existing skills. `lint --against` can help
+   decide whether to extend an existing capability.
+2. Create or update `skills/<name>/SKILL.md` with a precise description and an
+   actionable method. Keep the method in one place and link relevant resources.
+3. Run `node tools/codex-runtime/sync-skills.mjs` and inspect the packaged
+   changes. Align any applicable hand-authored runtime override.
+4. Check references and package freshness, then try representative requests.
+   Validate outcomes and preservation of useful behavior; counting headings or
+   matching prose does not establish that a workflow works.
+5. Record the user-visible change and deliver it through `create-pr`. Updating
+   a contributor checkout does not imply installing it into the user's hosts;
+   use the selected runtime's `update` or `reload` skill when requested.
 
 ## Notes
 
 - `README.md` in this folder is contributor documentation; the installer does **not** copy it to `~/.claude/commands/` or the plugin root.
-- Keep skill files thin. Heavy logic belongs in the agents they route to.
+- Load only the supporting detail relevant to the task. A small entrypoint is
+  useful when its references retain the complete method.
 - Skill directory names (minus the path) become the slash-command name in Claude Code. Don't rename casually.

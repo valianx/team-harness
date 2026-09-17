@@ -1,23 +1,19 @@
 # Deterministic Quality Runner
 
-The quality runner is Team Harness's machine authority for repository-declared
+The quality runner is an optional Team Harness helper for repository-declared
 quality checks. It executes exact argument arrays against one clean Git
 candidate and emits a closed JSON evidence record. It does not select tools,
 install dependencies, edit source, or decide whether a test expresses the
-approved behavior.
+approved behavior. `pipeline` and `validate` do not invoke it automatically;
+the coordinator selects it when a repository manifest and the objective make
+that evidence useful.
 
-The base runner is used by the pre-implementation test-transition checkpoints
-and by the single Freeze quality run (`post_implementation`).
-
-The v5 pipeline limits pre-implementation checks to prerequisites; it does not
-run a second full quality pass before implementation. An applicable opt-in
-RED/GREEN test transition remains inside implementation under
-`docs/test-contract-runner.md`. Main records diagnostic results and routes
-failures through `agents/_shared/coordinator-recovery.md`; these results do not
-replace acceptance evidence. The complete quality set runs once for each
-immutable candidate at Freeze, after any applicable cleaner result, and its
-receipt is reused while that identity remains unchanged. The phase and role
-predicates are owned by `agents/ref-pipeline.md`.
+The same runner can support an opt-in RED/GREEN test transition under
+`docs/test-contract-runner.md` or a final candidate check. The selected
+checkpoint is caller-provided; this reference does not imply a Freeze phase or
+require a full quality pass for every task. Main records diagnostic results and
+routes failures through `agents/_shared/coordinator-recovery.md`; these
+results do not replace acceptance evidence.
 
 ## Functional contract
 
@@ -50,7 +46,7 @@ included in the pull request. The runner requires absolute workspace and
 manifest paths and fails closed when either boundary is ambiguous or crossed.
 
 Command and policy changes still alter the manifest's SHA-256 identity and
-invalidate older full-manifest readiness and Freeze evidence.
+invalidate older full-manifest readiness and candidate evidence.
 Test-transition schema v3 additionally records a narrower
 `test_binding_sha256`, calculated from the normalized manifest schema version,
 `commands.test`, and `test_contract`. RED/GREEN compatibility uses that binding
@@ -262,7 +258,7 @@ The adapter never supplies the CRAP score. The runner computes it consistently:
 CRAP = complexity² × (1 − coverage)³ + complexity
 ```
 
-The pipeline runs CRAP measure-only: the default `--policy-mode measure`
+When selected by a coordinator, the runner uses CRAP measure-only: the default `--policy-mode measure`
 records per-function values as informational diagnostics with verdict
 `not_applied`, and no baseline comparison gates the run. `--policy-mode
 enforce` remains a standalone runner capability for repositories that want a
@@ -270,16 +266,16 @@ hard threshold outside the pipeline; with `--baseline` and
 `--baseline-sha256` it rejects a new function over `new_function_max`, a
 worsening score when policy forbids it, a changed function missing from the
 baseline (`CRAP_REPORT_INCOMPLETE`), a changed manifest, or a baseline
-candidate that is not an ancestor of the current candidate. The pipeline never
-selects enforce mode.
+candidate that is not an ancestor of the current candidate. Callers that need
+an enforced threshold must select that standalone mode explicitly.
 
 ## Invocation
 
 The base must be a full 40- or 64-character commit ID. The candidate may be a
 full commit ID or `HEAD`, but it must resolve to the currently checked-out clean
-commit. The raw runner does not infer optional checks from the manifest. The
-pipeline's single Freeze invocation selects every command declared by the
-manifest plus the per-repository union of task-declared required checks:
+commit. The raw runner does not infer optional checks from the manifest. A
+coordinator selects the checks that apply to the current repository and records
+why they were chosen. For example:
 
 ```bash
 node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
@@ -290,11 +286,16 @@ node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
   --candidate HEAD \
   --checkpoint post_implementation \
   --checks test,format_check,lint,crap \
+  --required-checks test \
   --policy-mode measure
 ```
 
-Select optional checks only when the manifest declares them; `test` leads and
-each declared `format_check`, `lint`, and `crap` follows in that order.
+Pass all eight required options: `--repo`, `--workspace`, `--manifest`,
+`--base`, `--candidate`, `--checkpoint`, `--checks` and `--required-checks`.
+Select comma-separated check IDs declared by the manifest. Required checks
+must be included in the selection; pass an empty string explicitly when none
+is required. The order of `--checks` is the execution order; choose it for the
+repository and task rather than inferring a mandatory global check set.
 
 Successful command output is counted but not replayed. Failure diagnostics use
 the existing bounded-command envelope: independently counted stdout/stderr,
@@ -316,14 +317,15 @@ written by repository tools. The runner is an evidence and output-control
 layer, not a process sandbox; the active runtime's native permissions remain
 the security boundary.
 
-## Cleaner integration
+## Coordinator integration
 
-The cleaner checkpoint records a hashed production allowlist and a pre-cleanup
-baseline anchor, then dispatches one bounded cleanup pass. There is no pre- or
-post-cleanup quality run: quality executes exactly once per candidate tree at
-the Freeze `post_implementation` checkpoint, and cleanup containment is proven
-by a git-native overreach diff at Freeze. See
-[Cleaner Checkpoint](cleaner-crap.md).
+When a coordinator selects the runner, use the complete invocation above,
+including checkpoint, selected and required checks. Record the receipt alongside the
+task's other temporary evidence. Reuse the receipt only while the candidate
+and manifest identity remain unchanged. A failed command is evidence to
+diagnose; it is not a permission decision or an automatic retry instruction.
 
-Both deterministic checkpoints live inside `implementation`; they do not
-change the v5 state machine or either Stage Gate.
+The runner remains an evidence and output-control layer. Native runtime
+permissions govern process execution, and a caller may use ordinary repository
+checks without this helper when no manifest or deterministic envelope is
+needed.

@@ -11,10 +11,8 @@
 //   - Writes one JSONL line to 00-subagent-trace.jsonl in the active workspace.
 //   - Scope guard: subagent_type field must start with "th:" — skip others silently.
 //
-// NON-SUPPRESSIBLE BY DESIGN: unlike the stop-side TS body, this module does
-// NOT import hook-profile / observabilityEnabled. hooks/subagent-trace.sh
-// documents the breadcrumb as a deterministic floor that TH_HOOK_PROFILE must
-// never erase; the start-side breadcrumb inherits that same invariant.
+// Profile gate: this detailed breadcrumb belongs to the optional
+// pipeline-observability class and is suppressed by TH_HOOK_PROFILE=minimal.
 //
 // Fired on PreToolUse (matcher: Task) — BEFORE the subagent boundary exists.
 // The CC payload carries the requested subagent_type but no agent_id yet
@@ -24,8 +22,7 @@
 // project key (TH-LANE marker): when the dispatching agent stamps a
 // `TH-LANE: {project-key}` line into the FIRST LINE of the dispatch prompt,
 // this hook stamps a `project` field on the breadcrumb. Only the first line
-// is trusted, mirroring checkpoint-guard's TH-STATE-REF controlled-header
-// parse: content forwarded or fetched into the rest of the prompt is
+// is trusted: content forwarded or fetched into the rest of the prompt is
 // untrusted per CLAUDE.md §6.6, so a marker planted lower in the prompt
 // cannot smuggle a project key onto the breadcrumb. Charset/length are
 // bounded (PROJECT_KEY_RE) before the value ever reaches the JSONL sink — an
@@ -44,11 +41,12 @@
 // prompt itself (whole, truncated, or otherwise derived) — the same
 // content-boundary discipline as the project-key extraction above.
 
+import { observabilityEnabled } from "./hook-profile.js";
 import type { NormalizedInput } from "../shim/normalized-v1.js";
 
 // ---------------------------------------------------------------------------
 // project key extraction — TH-LANE marker (charset/length bounded,
-// first-line-only, mirrors checkpoint-guard's extractStateRefHeader)
+// first-line-only controlled-header rule)
 // ---------------------------------------------------------------------------
 
 const PROJECT_KEY_RE = /^[a-z0-9-]{1,60}$/;
@@ -117,6 +115,10 @@ function isTHAgent(subagentType: string): boolean {
 // ---------------------------------------------------------------------------
 
 export function writeStart(input: NormalizedInput, writer: SubagentStartWriter): string | null {
+  if (!observabilityEnabled("pipeline-observability")) {
+    return null;
+  }
+
   // Extract subagent_type from the Task tool_input payload.
   const subagentType =
     typeof input.tool?.input?.["subagent_type"] === "string"

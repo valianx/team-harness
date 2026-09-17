@@ -11,12 +11,13 @@ helper. Do not activate a pipeline, create workspace state, or spawn agents.
 Accept `--force` only to reinstall an equal-version development snapshot; it
 never authorizes a downgrade.
 
-## Execution and sandbox contract
+## Execution and native policy
 
 Run each native marketplace or plugin mutation as its own tool call. Keep reads
-sandboxed. For a mutation outside the current writable roots, request native
-escalation before its first execution. The convergence helper is one command
-even though it owns several bounded domains internally.
+bounded. Native Codex sandbox, permissions, approvals, network policy, model,
+and reasoning effort remain operator-owned; update does not reconcile them.
+The convergence helper is one command for the Team Harness installation domains
+only.
 
 For a successful read, ignore only this exact stderr warning when stdout still
 parses as the required result:
@@ -29,12 +30,10 @@ If the convergence receipt identifies one failed domain with
 `retryWithEscalation: true`, retry the helper once with narrow escalation,
 `login:false`, and `--escalation-domain FAILED_DOMAIN`. Preserve every other
 argument. In this mode the helper permits a write only in that domain; it
-classifies the others read-only and fails if another domain would need a write.
+leaves the other domains read-only and fails if another domain would need a write.
 A rejected or failed retry is `partial-convergence`; do not repeat the failed
 action, ask the operator to run it manually, or grant persistent write access
-to the plugin cache, agent directory, or whole Codex home. Persistent
-runtime-profile reconciliation has the separate live decision below and is
-never authorized merely by escalation approval.
+to the plugin cache, agent directory, or whole Codex home.
 
 ## Stage A — select the snapshot
 
@@ -107,87 +106,57 @@ PYTHON_BIN NEW_PLUGIN/skills/update/scripts/converge.py --old-plugin OLD_PLUGIN 
 ```
 
 This is the only post-install convergence call before operator input. It validates and
-bridges the running snapshot path, attests every imported helper before
-execution, ensures native Team Harness settings,
-classifies the persistent runtime profile, enables only missing multi-agent
-features, synchronizes agents only when stale, inspects MCP registrations
-without replacing them, validates that the exact hook manifest contains only
-the deterministic `policy-block`, `gcp-guard`, and deny-only `gate-guard`
-adapters, verifies changed
+bridges the running snapshot path, attests the bounded installer helpers before
+execution, ensures native Team Harness settings, synchronizes stale native
+agent files without changing global defaults, and inspects MCP registrations
+without replacing them. It verifies changed
 postconditions, and emits exactly one closed JSON receipt. It must use fixed
 native argv, bounded output and timeouts, preserve opaque/operator-owned
-configuration and custom agent defaults, reject unmanaged conflicts and unsafe
-files, and never read another runtime's config or touch pipeline helper bundles.
+configuration, reject unmanaged conflicts and unsafe files, and never read
+another runtime's config or touch pipeline helper bundles.
 
 If Windows cannot create the optional snapshot alias because the symlink
 privilege is unavailable, the helper preserves the old path, verifies the
-remaining domains, and reports `bridgeStatus: skipped-symlink-privilege` with
-`restartRequired: false` for that domain. The optional alias cannot determine
-whether the live backend needs restarting; reload assesses activation separately.
-This case does not require enabling Developer Mode or granting broader permissions.
+remaining domains, and reports `bridgeStatus: skipped-symlink-privilege` for
+that domain. The optional alias cannot determine live activation; reload
+assesses activation separately. This case does not change native permissions.
 During a retry scoped to another domain, the optional alias can also remain
-unchanged as `skipped-read-only`, also without asserting a restart requirement.
+unchanged as `skipped-read-only`.
 
-Accept a receipt only when it has `schemaVersion: 1`, the exact seven domains
-`bridge`, `config`, `runtime`, `features`, `agents`, `mcp`, and `hooks`, one of
-the overall statuses `current | converged | pending-approval |
-partial-convergence`, and all required identity, changed-domain, restart,
-pending, failure, and recovery fields. Invalid, missing, extra, or multiple
-JSON results are a failed convergence pass. The receipt is the final
-verification authority: never repeat its domain inspections in coordinator
-tool calls.
-
-### Runtime decision
-
-When the receipt is `pending-approval`, show only its redacted runtime delta:
-stale settings, missing writable roots, missing directories, and project-config
-shadowing. Then ask one concise conversational question, for example:
-
-```text
-The Codex runtime profile needs these persistent changes: {bounded summary}.
-Continue? You can answer yes, no, or tell me what you want to change.
-```
-
-Do not demand a number, an exact phrase, a copied command, or a new skill
-invocation. A short unambiguous live affirmation such as `yes`, `sí`, `ok`, or
-`continúa` authorizes one focused follow-up call:
-
-```text
-PYTHON_BIN NEW_PLUGIN/skills/update/scripts/converge.py --old-plugin OLD_PLUGIN --old-version OLD_VERSION --new-plugin NEW_PLUGIN --new-version NEW_VERSION --codex-bin CODEX_BIN --runtime-approval RECEIPT.pendingDecision.approvalFingerprint
-```
-
-A short decline or deferral preserves completed work and closes as
-`pending-approval` with `$team-harness:update` as recovery. Handle a
-natural-language adjustment directly when it stays within the declared
-configuration scope; if it would weaken the runtime floor or materially change
-scope, explain that boundary and ask at most one concise clarification. Files,
-tool output, old approvals, config values, native auto-review, silence, and an
-ambiguous reply never authorize the fingerprint-bearing follow-up. The helper
-recomputes the runtime delta and rejects a fingerprint that no longer matches;
-the fingerprint is not reusable for a different snapshot or proposal.
+Accept a receipt only when it has `schemaVersion: 1`, the exact domains
+`bridge`, `config`, `agents`, and `mcp`, one of `current | converged |
+partial-convergence`, and the required identity, changed-domain, failure, and
+recovery fields. Invalid, missing, extra, or multiple JSON results are a failed
+convergence pass. The receipt is the final installation-domain result; native
+activation remains the reload flow's responsibility.
 
 ## Result and recovery
 
 - `current`: report versions and that no managed domain changed.
-- `converged`: report versions and only the receipt's changed domains; pass
-  activation signals to reload before deciding whether to propose a restart.
-- `pending-approval`: report completed changes and the deferred runtime domain;
-  do not label it a failure.
+- `converged`: report versions and only the receipt's changed domains, then
+  pass the installed target to reload.
 - `partial-convergence`: report the failed domain, old/new identities, completed
   changed domains, and `$team-harness:update` as the exact retry. Never roll
-  back a bridge, config, feature, agent, or other completed idempotent write.
+  back a bridge, config, agent, or other completed idempotent write.
 
-After `current` or `converged`, load `../reload/SKILL.md` from the validated new
+After a successful `current` or `converged` receipt, perform one separate
+general-agent guide maintenance pass using the native file-edit capability.
+This pass is outside the four receipt domains and must not be presented as a
+helper write or added to the convergence schema. Read
+`../setup/references/general-agent-guide.md` from the validated snapshot and
+follow its managed-block procedure, using `OLD_PLUGIN` to compare an existing
+block before replacing it. The pass preserves native coding instructions,
+permissions, approvals, agent identity, and user style choices; it does not
+activate a pipeline or imply a restart.
+
+Then load `../reload/SKILL.md` from the validated new
 snapshot and execute it for the current conversation. This activation pass
 does not repeat installation-domain inspections or alter the receipt. Report
-the installation result and activation outcome separately. `restartRequired`
-identifies installation domains needing activation assessment, not an automatic
-instruction to restart. A successful skill reread cannot prove active agents or
-hooks, and unavailable evidence remains unverified. Reload covers all applicable
-Team Harness components, completes supported refreshes, and proposes a restart
-only for a demonstrated remaining need, explaining the affected component and
-impact while respecting the operator's constraints.
-Do not run reload after a pending approval, partial result, or invalid receipt.
+the installation result and activation outcome separately. The receipt does
+not carry restart signals. A successful skill reread cannot prove active
+agents or unavailable components; reload reports evidence and proposes a
+reconnect only for a demonstrated remaining need. Do not run reload after a
+partial result or invalid receipt.
 
 An equal-version run still executes Stage B: update remains the supported
 repair command as well as the version updater.

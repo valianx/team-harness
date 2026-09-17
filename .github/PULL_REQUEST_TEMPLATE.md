@@ -1,27 +1,17 @@
 ## Summary
 
-<!-- What does this PR change and why? One or two sentences. -->
+<!-- Explain the concrete problem and resulting behavior. -->
 
-## Checklist
+## Validation
 
-<!-- See CONTRIBUTING.md and CLAUDE.md §6 for the full rules. -->
+<!-- Name relevant checks and meaningful limitations. -->
 
-- [ ] Branch is off `main` and named `feat|fix|chore|docs|refactor/<kebab>`
-- [ ] Commits follow conventional-commit format (`feat(area): …`)
-- [ ] If this touches a distributed runtime input (`agents/`, `skills/`, `hooks/`,
-      `plugins/team-harness/`, `.agents/`, `.codex/`, `runtime/`, `tools/codex-runtime/`,
-      `assets.go`, or production `cmd/install/`): bumped the version once in all four
-      current sites — `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`
-      `plugins[0].version`, `plugins/team-harness/.codex-plugin/plugin.json`,
-      and `cmd/install/main.go` `var version` (matched semver) — and added the
-      `## [X.Y.Z]` CHANGELOG section directly in this PR. If it does not touch a
-      distributed asset, no bump is needed.
-- [ ] Used a `changelog.d/{slug}.md` fragment instead of the direct CHANGELOG
-      section only when intentionally batching several changes into one cut
-- [ ] `bash tests/run-all.sh` passes locally (exits 0)
-- [ ] No secrets, tokens, API keys, `.env` files, or private keys committed
-- [ ] Updated `CLAUDE.md` §3/§4 if the tech stack or golden commands changed
+## Delivery
+
+<!-- For distributed changes, note the aligned release version.
+     For OpenSpec work, note archive or remaining work.
+     Keep temporary evidence outside the product diff. -->
 
 ## Related issues
 
-<!-- e.g. Closes #123 -->
+<!-- Use closing keywords only for issues fully resolved by this PR. -->

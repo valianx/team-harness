@@ -27,8 +27,8 @@ Each role's semantic contract and its per-runtime adapters SHALL be checked for 
 - **THEN** the missing propagation is reported before release
 
 ### Requirement: Oversized files are rewritten in stages with behavioral validation
-Files above budget SHALL be rewritten highest per-dispatch cost first, preserving behavior: every removed rule is inferable, redundant with a single remaining site, or dead; security floors and gate contracts are never removed; the deterministic behavioral suite and a trial run validate each rewrite. Prose edits refactor whole sections and target net word reduction per file.
+Files above budget SHALL be rewritten highest per-dispatch cost first, preserving useful behavior: every removed rule is inferable, redundant with a single remaining site, or dead. Native runtime permissions and read-only reviewer boundaries remain; duplicated TH gates, leases and hook enforcement may be removed when their behavior is supplied by the runtime or the rule is no longer used. The deterministic behavioral suite and a trial run validate each rewrite. Prose edits refactor whole sections and target net word reduction per file.
 
 #### Scenario: A specialist agent is rewritten to budget
 - **WHEN** the rewrite lands
-- **THEN** the behavioral suite passes, the file meets budget, and no floor or gate semantics changed
+- **THEN** the behavioral suite passes, the file meets budget, and native permission and read-only boundaries remain clear

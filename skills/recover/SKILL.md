@@ -1,36 +1,19 @@
 ---
 name: recover
-description: Resume an interrupted pipeline from its v5 control log or close a workspace without one administratively.
-disable-model-invocation: true
+description: Resume an interrupted Team Harness task using its saved intent, progress and the current repository.
 ---
 
-# Pipeline recovery (v5)
+Resolve the workspace or task named by $ARGUMENTS. Read its plan, source links,
+progress, checks and available results. Preserve the exact plan path and
+canonical OpenSpec source when handing the task back. Compare the saved
+repository, branch and revision with the current worktree before continuing.
 
-## Recover Safety Rules
+Treat legacy state and control logs as historical evidence. Preserve completed
+work and useful context; resumption needs no control-log replay, nonce, lease
+or administrative close. Clarify only real conflicting facts or missing scope.
 
-Analyze `$ARGUMENTS`, resolve the configured workspace root safely, and select
-only an exact validated feature directory. This skill is read-only: it neither
-creates authority nor presents or records a Gate.
-
-Read the workspace's `control/control.jsonl` through the packaged control-plane
-helper, replay the contiguous hash-linked prefix, and rebuild stale state, Gate,
-finding, and acceptance projections. Main remains the only log appender and
-projection writer. An incomplete/corrupt suffix blocks later control events but
-does not erase the valid prefix.
-
-Resume from the last valid transition only when the log contains the required
-live authority. Liveness provides delivery, acknowledgement, terminality,
-progress, and interruption facts. Preserve progress and apply causal recovery;
-counts, ordinals, elapsed time, tokens, and tool calls never choose a route.
-
-A workspace without `control/control.jsonl` has nothing to replay. Close it
-administratively through the packaged helper, which appends one `pipeline.close`
-entry to its events file and refuses a symlinked or hard-linked `control/` or
-events path, then offer
-inline continuation or a fresh run. Missing or conflicting authority requires a
-live decision; never infer or repair it. Mixed writable schemas fail closed.
-
-If the feature is absent, say no pipeline state was found. If its terminal
-projection is complete or aborted and agrees with the log, report that no
-recovery is needed. Otherwise return the exact missing authority, integrity,
-ownership, prerequisite, or causal condition.
+Continue the authorized objective through its current `spec` or `pipeline`
+workflow. If a multi-repository plan exists, verify each repository's saved
+reference and dependency evidence before adapting consumers. If work is already
+complete, report the result and remaining delivery steps. Keep notes concise
+and native permissions in effect.

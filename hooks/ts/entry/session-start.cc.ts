@@ -62,9 +62,8 @@ async function main(): Promise<void> {
     // Empty stdout → CC SessionStart hook emits nothing (no-op).
   } catch (err) {
     if (err instanceof ShimRejectError) {
-      // FAIL-OPEN: emit nothing, still load the orchestrator disposition
-      // via a minimal fallback so the session is not crippled.
-      // (Rarely triggered — session-start payload is simple JSON.)
+      // FAIL-OPEN: emit nothing so a malformed context payload cannot affect
+      // the native session.
     }
     // Any other error: emit nothing.
   }

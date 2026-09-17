@@ -31,7 +31,7 @@ Read only the matching runtime procedure:
 
 Cover the whole Team Harness installation: skill and command discovery, active
 workflow instructions and supporting resources, agent definitions, effective
-plugin configuration, hooks, and plugin-provided or configured MCP services.
+plugin configuration, and plugin-provided or configured MCP services.
 Use the installation manifest, runtime adapter and existing update evidence to
 identify applicable components; mark absent integrations as not applicable.
 Keep unrelated plugins and operator settings outside the operation's scope.
@@ -39,32 +39,32 @@ Keep unrelated plugins and operator settings outside the operation's scope.
 Use a host capability only when it is actually callable and bound to the current
 backend and conversation. A documented API is not automatically an available
 tool. Never start a second server to claim the first was refreshed, guess ports,
-scan for credentials, rewrite old cache paths, or edit hook trust records.
+scan for credentials, rewrite old cache paths, or edit host-managed trust
+settings.
 
 Refresh discovery for all Team Harness skills and commands. Reread the flows
 relevant to the current request from the validated installed Team Harness
 version. Use those updated instructions for the current request and subsequent
 resource reads.
-Instruction rereading alone does not refresh loaded agents, hooks or MCP
-processes. Keep the operator's scope, approvals, selected model and ongoing work.
+Instruction rereading alone does not refresh loaded agents or MCP processes.
+Keep the operator's scope, approvals, selected model and ongoing work.
 
 Attempt each supported refresh once and complete independent components even
 when another has no available control. Verify its result from that same active
 backend after completion. Preserve prior activation evidence for unchanged
 component definitions when the backend identity is unchanged. A queued
 acknowledgement, installed manifest, discovery listing or standalone script
-test cannot prove that hooks
-executed by the conversation have changed. Use a harmless native operation and
-its actual hook execution evidence when available; never execute a destructive
+test cannot prove that a loaded component changed. Use a harmless native
+operation when an active-host check is available; never execute a destructive
 operation to test a deny rule. Unknown identity or unavailable evidence remains
 unverified, even when the command returned success.
 
 ### When a restart is actually needed
 
-Missing controls or evidence, an old injected path, an optional snapshot alias
-failure, and an installation receipt's `restartRequired` flag do not by
-themselves establish that the live backend needs restarting. Keep unverifiable
-components pending without prescribing a restart or treating them as active.
+Missing controls or evidence, an old injected path, and an optional snapshot
+alias failure do not by themselves establish that the live backend needs
+restarting. Keep unverifiable components pending without prescribing a restart
+or treating them as active.
 
 Propose reconnecting only for an identified component whose stale activation
 is observed or whose changed setting is documented as requiring restart in the

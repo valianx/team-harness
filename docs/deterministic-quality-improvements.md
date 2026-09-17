@@ -1,4 +1,4 @@
-# Deterministic quality improvements
+# Deterministic quality improvements (historical recommendations)
 
 For TH maintainers selecting testing investments after the v5 simplification; researched September 4, 2026.
 
@@ -12,7 +12,7 @@ This direction is consistent with documented industry practices, but does not es
 
 The [quality runner](quality-runner.md) executes exact argument arrays against an identified Git candidate, bounds output and duration, rejects tracked mutations, and accepts repository-defined command IDs. `coverage`, `contract`, and `integration` are already supported names; additional names use the same command envelope. Repository tooling can enforce thresholds, reject empty runs, and preserve detailed reports without a new TH schema.
 
-The [control-plane suite](../tests/test_pipeline_control_plane.mjs), [quality-runner suite](../tests/test_quality_runner.mjs), and [RED/GREEN suite](../tests/test_test_transition.mjs) already exercise identity, ownership, replay, command execution, and immutable test inputs. New tests should extend meaningful behavioral coverage rather than reproduce implementation branches.
+The former control-plane and pipeline-simplification benchmark suites were retired with the internal control protocol. The retained [quality-runner suite](../tests/test_quality_runner.mjs) and [RED/GREEN suite](../tests/test_test_transition.mjs) exercise command execution, transitions and immutable test inputs. New tests should extend meaningful behavioral coverage rather than reproduce implementation branches.
 
 The packaged-asset regression also verifies that local OpenCode scratch bundles stay out of the plugin while distributed CJS and raw TypeScript hooks remain synchronized. This addresses a concrete reproducibility defect without adding pipeline structure.
 

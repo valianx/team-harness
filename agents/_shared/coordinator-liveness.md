@@ -1,11 +1,8 @@
-# Coordinator liveness facts (v5)
+# Progress visibility
 
-Liveness reports only delivery, acknowledgement, terminality, declared progress,
-and interruption cause for an identity-bound lease/session. Main collects those
-facts from the native status query and the control log; liveness never chooses a
-wait, interruption, continuation, replacement, correction, or terminal route.
+Use native agent status and results to see whether work is running, completed,
+failed or needs input. A short task update should explain new evidence or a
+material blocker. Avoid repeated unchanged polling.
 
-Wait timeouts and project SLAs are operator-visible telemetry. Main may use a
-bounded native status query to collect facts, but elapsed time and observation
-counts do not grant authority. Every non-success goes to the causal recovery
-contract after safe ownership and preserved progress are established.
+Progress observations help the coordinator recover work; they are not a
+separate protocol for authority, leases or role replacement.

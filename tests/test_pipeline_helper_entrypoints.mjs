@@ -24,14 +24,6 @@ try {
   assert.ok(guarded.includes("quality-runner.mjs"));
   assert.ok(guarded.includes("workspace-identity.mjs"));
 
-  const specialistControl = await import("../skills/pipeline/scripts/control-plane-specialist.mjs");
-  for (const safeExport of ["controlIdentity", "createResultEnvelope", "validateCapabilityLease", "validateResultEnvelope", "verifyCapabilityCapsule"]) {
-    assert.equal(typeof specialistControl[safeExport], "function", `${safeExport} is missing from the specialist-safe surface`);
-  }
-  for (const mainOnlyExport of ["appendControlEvent", "issueCapabilityLease", "acceptResultEnvelope", "rebuildControlProjections"]) {
-    assert.equal(Object.hasOwn(specialistControl, mainOnlyExport), false, `${mainOnlyExport} leaked into the specialist-safe surface`);
-  }
-
   for (const name of guarded) {
     const invoked = spawnSync(process.execPath, [path.join(bridgeRoot, name)], {
       cwd: repositoryRoot,

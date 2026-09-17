@@ -94,7 +94,7 @@ Then retry `/plugin install th`.
 
 **Cause:** Claude Code's subagent-nesting depth is configurable, not a permanent cap, via the `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` environment variable in `~/.claude/settings.json`. It defaults to unset, in which case a subagent one level deep does not retain the tools its own contract grants.
 
-**Fix:** Run `/th:setup` (or `/th:update` on an already-installed machine) — both provision `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: "2"` after an explicit confirmation. Restart the session (or start a new one) — the value resolves at session start and does not take effect mid-session. This is depth headroom for a specialist leaf agent, not a coordinator-dispatch fallback: `th:orchestrator` is always the top-level session agent and never itself runs nested, so there is no second-coordinator handoff to relay. Full mechanism: `docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`; `docs/subagent-orchestration.md § "Nested-context dispatch — RETIRED protocol, retained provisioning"`.
+**Fix:** Check the host runtime's native subagent permissions and depth settings. `/th:setup`, `/th:update` and reload preserve those choices; they do not repair them into a TH profile or require a restart merely because files changed. If the active runtime reports that a refresh is unavailable, report that concrete limitation and decide whether a new session is worthwhile. The former nested-dispatch workaround is historical; current coordination guidance is `docs/subagent-orchestration.md § "Coordinating specialists"` and the native setup boundary is `docs/setup-update-model.md § "Setup, update and reload"`.
 
 ---
 

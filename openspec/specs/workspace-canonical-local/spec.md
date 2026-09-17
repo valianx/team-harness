@@ -1,43 +1,46 @@
 # workspace-canonical-local Specification
 
 ## Purpose
-Pipeline coordination state has one canonical home — the repository — on every runtime. Obsidian becomes a one-way, non-authoritative export instead of a live external dependency of the state machine.
+
+Keep continuity notes and temporary evidence in a predictable configured home
+without making a Team Harness workspace a second authority source.
 
 ## Requirements
 
-### Requirement: A pipeline has one canonical persisted workspace identity
-Team Harness SHALL resolve a workspace identity once before the first state write and SHALL persist its absolute coordinator root, mode, repository base, date, and initiative or feature slug. In Obsidian mode a confirmed multi-repository initiative SHALL use `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}` as its coordinator root, with each participating service below that root. Activation, recovery, trace, pipeline listing, gates, and specialist dispatch MUST consume the persisted identity or the same shared resolver and MUST NOT compose an alternative path locally.
+### Requirement: Workspace notes have one resolved home
+When a workflow needs continuity, Main SHALL resolve one configured workspace or
+permitted temporary location and record its repository, branch, objective and
+source links. A direct task that needs no continuity creates no workspace.
 
-#### Scenario: Obsidian multi-repository initiative is activated
-- **WHEN** the operator confirms an initiative containing multiple distinct repositories under Obsidian mode
-- **THEN** Team Harness creates one coordinator root at `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}` and places each service workspace below it
+#### Scenario: A multi-repository task needs shared notes
+- **WHEN** the operator chooses coordinated work across repositories
+- **THEN** Main uses one configured shared location for links, progress and evidence while each repository retains its own source files
 
-#### Scenario: A downstream skill needs the initiative workspace
-- **WHEN** trace, recovery, pipeline listing, or another workflow resolves an existing initiative
-- **THEN** it confirms the persisted workspace identity and uses that exact root rather than deriving a repo-local, undated, or differently nested path
+### Requirement: Notes do not authorize current work
+Workspace plans, traces, review summaries and old control files SHALL be treated
+as historical or advisory evidence. On resumption Main verifies them against the
+current repository, commits, native session status and live operator context.
 
-#### Scenario: Two matching dated initiative directories exist
-- **WHEN** identity discovery finds more than one candidate matching the initiative slug
-- **THEN** it selects only a unique candidate whose persisted repository identities match, otherwise it stops with an ambiguity report before reading or writing pipeline state
+#### Scenario: A saved note points at a different branch
+- **WHEN** the current checkout differs from the note
+- **THEN** Main reports the mismatch and continues only with facts from the current checkout and applicable authorization
 
-### Requirement: Workspace formulas are canonical for every pipeline shape
-Team Harness SHALL define the complete local and Obsidian workspace formulas in one canonical contract and SHALL project them to every consuming skill and agent. Single-repository runs and multi-repository initiatives MUST include the run date in their workspace identity; initiative roots MUST use the common `repo_base` rather than treating any participating repository as the coordinator repository.
+### Requirement: Temporary evidence is cleaned explicitly
+Raw logs, scratch scripts, transcripts and disposable review artifacts SHALL use
+the configured workspace or permitted temporary storage and SHALL be removed or
+retained deliberately at close. Cleanup MUST not delete maintained source,
+OpenSpec artifacts or unrelated user work.
 
-#### Scenario: Skills are generated or linted
-- **WHEN** workspace-related canonical inputs or projections are validated
-- **THEN** generation or lint fails if a consumer embeds a conflicting path formula or omits the date or initiative repository base required by the canonical resolver
+#### Scenario: A workflow closes after a failed attempt
+- **WHEN** diagnostic debris is no longer needed
+- **THEN** Main cleans only the known temporary artifacts and keeps the durable conclusion in the task or PR result
 
-#### Scenario: A reference repository supplies evidence only
-- **WHEN** an initiative reads a repository that is not a participating writable service
-- **THEN** that repository may be recorded as evidence but does not influence `repo_base`, become the coordinator root, or receive a service workspace
+### Requirement: Restart and relocation do not create duplicate workspaces
+If a native session restarts or the current directory changes, Main MAY resolve
+the existing note by repository and objective identity. It SHALL not create a
+second authority record or duplicate source-of-intent artifacts merely because
+the process changed.
 
-### Requirement: Recovery preserves the original workspace identity
-Recovery SHALL read the persisted coordinator identity and repository bindings from the existing workspace. A restart, current working directory change, repository rename, or configuration change MUST NOT migrate or split an active initiative; an unreadable required coordinator workspace MUST fail closed.
-
-#### Scenario: Recovery starts from a participating service repository
-- **WHEN** recovery is invoked from any bound service after a restart
-- **THEN** it resolves the same coordinator root by persisted initiative and repository identity and resumes without creating a second dated workspace
-
-#### Scenario: Required coordinator state is unreadable
-- **WHEN** the persisted state or coordinator root cannot actually be read or its identity cannot be verified
-- **THEN** recovery stops before dispatch or gate release and reports the required unreadable artifact
+#### Scenario: The operator resumes from another runtime
+- **WHEN** the repository and objective match an existing continuity note
+- **THEN** Main reuses the note as context and verifies current facts before continuing

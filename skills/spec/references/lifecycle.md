@@ -31,7 +31,7 @@ candidate; it does not prove implementation or verification. Missing evidence st
 
 - **Completed:** when implementation and its relevant checks are complete,
   prepare archive on the same feature branch before the final review package
-  or pipeline Freeze. Include implementation, updated living specs and the
+  for delivery. Include implementation, updated living specs and the
   archived change in the same PR. An absent or open PR does not prevent archive;
   merge integrates the prepared state. Apply the same preparation to agreed
   delivery without a PR.
@@ -86,16 +86,14 @@ retirement. Keep validation enabled and surface any incomplete-task warning in
 the retirement offer. Reconcile a mixed change before choosing either operation.
 After execution, strictly validate the archived change and affected living specs,
 then refresh existing plan links and bound source locations. Use the explicit archived reference
-`archive/YYYY-MM-DD-<change>` with `review-fan.mjs --change`; its criteria must
+`archive/YYYY-MM-DD-<change>` with `review-fan.mjs package --change`; its criteria must
 come from the committed candidate. A failure remains pending with its reason;
 do not claim closure.
 
 Archive follows the repository's normal branch and outward-write permissions.
 It belongs to candidate assembly, before final validation and acceptance.
-In a pipeline, accept outstanding results and close their leases before moving
-the change. Preserve its content identity, refresh its location and projection,
-and bind subsequent leases to the archived sources. Delivery publishes the
-accepted candidate unchanged; archive grants no push, PR or merge authority.
+Coordinate outstanding work before moving the change and refresh links to its
+archived location. Archive grants no push, PR or merge authority.
 
 Review corrections keep code, living specs and the archived record consistent
 on the same branch. Revalidate the changed candidate through the existing flow.

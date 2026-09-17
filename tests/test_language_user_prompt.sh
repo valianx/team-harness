@@ -1,7 +1,7 @@
 #!/bin/bash
 # tests/test_language_user_prompt.sh
 # Regression tests for hooks/ts/bodies/language-user-prompt.ts (compiled to
-# hooks/ts/dist/language-user-prompt.cjs — the single source of gate logic
+# hooks/ts/dist/language-user-prompt.cjs — the language-context loader
 # post-cutover, issue #446) (AC-1..AC-5, SEC-DR-A)
 # Suite 7 — per-turn UserPromptSubmit language directive.
 #

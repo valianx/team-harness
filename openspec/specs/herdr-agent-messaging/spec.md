@@ -6,7 +6,7 @@ Defines a safe and verifiable Team Harness protocol for communicating with agent
 ## Requirements
 
 ### Requirement: HerdR messaging is capability-detected and optional
-Team Harness SHALL use HerdR coordination only after confirming that the `herdr` CLI and the required `agent list`, `agent send`, `agent read`, `pane current`, and `pane send-keys` operations are available. Absence or incompatibility MUST produce an explicit unavailable disposition and SHALL NOT weaken normal native-agent, tmux, background, gate, permission, or workspace contracts.
+Team Harness SHALL use HerdR coordination only after confirming that the `herdr` CLI and the required `agent list`, `agent send`, `agent read`, `pane current`, and `pane send-keys` operations are available. Absence or incompatibility MUST produce an explicit unavailable disposition and SHALL NOT weaken normal native-agent, tmux, background, permission, or workspace behavior.
 
 #### Scenario: HerdR is unavailable
 - **WHEN** an agent attempts to use the shared HerdR protocol and the required CLI operations are unavailable

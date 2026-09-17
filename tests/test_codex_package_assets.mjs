@@ -7,8 +7,8 @@ import { join } from "node:path";
 import { syncClaudePackageAssets } from "../tools/codex-runtime/sync-skills.mjs";
 
 const rootDir = await mkdtemp(join(tmpdir(), "th-package-assets-"));
-const shipped = ["ts/dist/gcp-guard.cjs", "ts/entry/session-enforcement.opencode.ts"];
-const scratch = ["ts/dist/opencode-plugin.cjs", "ts/dist/session-enforcement.opencode.cjs"];
+const shipped = ["ts/dist/session-start.cjs", "ts/entry/session-start.cc.ts"];
+const scratch = ["ts/dist/opencode-plugin.cjs", "ts/dist/legacy.opencode.cjs"];
 try {
   for (const directory of [".claude-plugin", "agents", "docs", "hooks/ts/dist", "hooks/ts/entry"]) {
     await mkdir(join(rootDir, directory), { recursive: true });
@@ -32,7 +32,7 @@ try {
   }
   await syncClaudePackageAssets({ rootDir, check: true });
 
-  const leftover = join(rootDir, "plugins/team-harness/hooks/ts/dist/checkpoint-guard.opencode.cjs");
+  const leftover = join(rootDir, "plugins/team-harness/hooks/ts/dist/legacy.opencode.cjs");
   await writeFile(leftover, "old packaged scratch with no source counterpart\n");
   await assert.rejects(syncClaudePackageAssets({ rootDir, check: true }), /assets are stale/);
   assert.equal(await readFile(leftover, "utf8"), "old packaged scratch with no source counterpart\n");
@@ -51,7 +51,7 @@ try {
   await writeFile(sentinel, "preserve unrelated files\n");
   const hookTarget = join(rootDir, "plugins/team-harness/hooks");
   await rm(hookTarget, { recursive: true });
-  await symlink(unrelated, hookTarget, "dir");
+  await symlink(unrelated, hookTarget, process.platform === "win32" ? "junction" : "dir");
   for (const check of [true, false]) {
     await assert.rejects(syncClaudePackageAssets({ rootDir, check }), /symbolic-link/);
     assert.equal(await readFile(sentinel, "utf8"), "preserve unrelated files\n");

@@ -16,12 +16,15 @@ The runner SHALL emit distinct codes for distinct causes: `MANIFEST_ABSENT` ≠ 
 - **WHEN** manifest validation rejects a document
 - **THEN** the result names the offending key/condition in `detail` instead of a bare `MANIFEST_INVALID`
 
-### Requirement: Plan-declared checks are validated at Gate 1
-Required quality checks named by the plan SHALL be validated against the manifest before Gate-1 presentation; a mismatch is a plan defect surfaced while it is cheap to fix, and `REQUIRED_CHECKS_MISSING` at Freeze becomes unreachable for well-formed plans.
+### Requirement: Plan-declared checks are validated before candidate review
+Required quality checks named by the plan SHALL be validated against the manifest
+before the candidate is reviewed; a mismatch is a plan defect surfaced while it
+is cheap to fix, and `REQUIRED_CHECKS_MISSING` at the quality run becomes
+unreachable for well-formed plans.
 
 #### Scenario: The plan names a check the manifest does not declare
-- **WHEN** Gate-1 preparation compares required checks with manifest command ids
-- **THEN** the mismatch is reported at Gate 1 and the plan is corrected before approval
+- **WHEN** candidate preparation compares required checks with manifest command ids
+- **THEN** the mismatch is reported before the quality run and the plan is corrected before delivery
 
 ### Requirement: Identity checks tolerate the pipeline's own operations
 Cross-checkpoint artifact identity SHALL use canonical hashing (not raw-byte equality) for manifest, contract, allowlist, and baselines; ancestry validation SHALL tolerate the pipeline's own squash/amend operations; and worktree cleanliness SHALL NOT fail on untracked toolchain byproducts (explicit benign-artifact policy or `--untracked-files=normal`), with the internal git timeout configurable for slow filesystems.

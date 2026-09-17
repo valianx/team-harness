@@ -96,7 +96,7 @@ function rejectPollutionKeys(obj) {
     }
   }
 }
-function buildNormalized(parsed, runtime) {
+function buildNormalized(parsed) {
   const rawEvent = parsed["event"];
   if (typeof rawEvent !== "string" || !VALID_EVENTS.has(rawEvent)) {
     throw new ShimRejectError(
@@ -130,7 +130,7 @@ function buildNormalized(parsed, runtime) {
     throw new ShimRejectError("SEC-07: 'dataHome' must be a string or absent");
   }
   const dataHome = typeof rawDataHome === "string" ? rawDataHome : null;
-  return { event, tool, workspace, runtime, dataHome };
+  return { event, tool, runtime: "claude-code", workspace, dataHome };
 }
 function parseCCPayload(raw) {
   let parsed;
@@ -162,7 +162,26 @@ function inboundCC(raw) {
   checkSize(raw);
   checkDepth(raw);
   const mapped = parseCCPayload(raw);
-  return buildNormalized(mapped, "claude-code");
+  return buildNormalized(mapped);
+}
+
+// bodies/hook-profile.ts
+function getHookProfile() {
+  const val = (typeof process !== "undefined" ? process.env["TH_HOOK_PROFILE"] : void 0) ?? "";
+  if (val === "minimal" || val === "standard" || val === "strict") {
+    return val;
+  }
+  return "minimal";
+}
+function observabilityEnabled(cls) {
+  const profile = getHookProfile();
+  if (profile === "minimal") {
+    if (cls === "idle-notify" || cls === "pipeline-observability") {
+      return false;
+    }
+    return true;
+  }
+  return true;
 }
 
 // bodies/subagent-start.ts
@@ -187,6 +206,9 @@ function isTHAgent(subagentType) {
   return subagentType.startsWith("th:");
 }
 function writeStart(input, writer) {
+  if (!observabilityEnabled("pipeline-observability")) {
+    return null;
+  }
   const subagentType = typeof input.tool?.input?.["subagent_type"] === "string" ? input.tool.input["subagent_type"] : "";
   if (!subagentType || !isTHAgent(subagentType)) {
     return null;

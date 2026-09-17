@@ -2,11 +2,10 @@
 // The versioned I/O contract every canonical hook body speaks.
 // ioContract: "normalized-v1"
 //
-// Every body reads only this shape; the shim enforces it at both
-// runtimes (Claude Code stdin / opencode callback args).
+// Every retained body reads only this shape from Claude Code stdin.
 // SEC-07: absent keys are emitted as `null`, NEVER omitted.
 
-/** Inbound: the single stable shape a body sees, regardless of runtime.
+/** Inbound: the single stable shape a body sees from Claude Code.
  *  Absent keys are emitted as `null`, NEVER omitted (SEC-07 invariant). */
 export interface NormalizedInput {
   event:
@@ -19,18 +18,8 @@ export interface NormalizedInput {
     | "Task";
   tool: { name: string; input: Record<string, unknown> } | null;
   workspace: string | null;
-  runtime: "claude-code" | "opencode";
+  runtime: "claude-code";
   dataHome: string | null;
-}
-
-/** Outbound: the stable decision a body returns. The shim translates this
- *  into the runtime's native control signal. */
-export interface NormalizedDecision {
-  decision: "allow" | "deny" | "ask" | "none";
-  /** Names the pattern CLASS for secret-scan decisions, never the captured value (CWE-200). */
-  reason: string;
-  /** Reserved; always null in normalized-v1. Enforced by the absence of a write path. */
-  mutations: null;
 }
 
 // SEC-07 bounds documented as named constants in the versioned contract.

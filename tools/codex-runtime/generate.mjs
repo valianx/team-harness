@@ -35,19 +35,6 @@ function assertUniqueStringArray(value, label, { nonEmpty = false } = {}) {
   return seen;
 }
 
-function markdownSection(document, heading, label) {
-  const marker = `## ${heading}\n`;
-  const start = document.indexOf(marker);
-  if (start < 0 || document.indexOf(marker, start + marker.length) >= 0) {
-    fail(`${label} must contain exactly one ${marker.trim()} section`);
-  }
-  const bodyStart = start + marker.length;
-  const next = document.indexOf("\n## ", bodyStart);
-  const body = document.slice(bodyStart, next < 0 ? document.length : next).trim();
-  if (body === "") fail(`${label} section ${heading} is empty`);
-  return body;
-}
-
 function repositoryPath(rootDir, path, label) {
   assertNonEmptyString(path, label);
   if (isAbsolute(path) || path.includes("\\")) fail(`${label} must be a repository-relative POSIX path`);
@@ -142,42 +129,8 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
   if (contract.format_version !== 1 || contract.runtime !== "codex") {
     fail("unsupported contract format or runtime");
   }
-  if (!Number.isInteger(contract.max_concurrent_threads_per_session) || contract.max_concurrent_threads_per_session < 1) {
-    fail("max_concurrent_threads_per_session must be a positive integer");
-  }
   const allowedCapabilities = assertUniqueStringArray(contract.allowed_capabilities, "allowed_capabilities", { nonEmpty: true });
   const allowedSandboxModes = assertUniqueStringArray(contract.allowed_sandbox_modes, "allowed_sandbox_modes", { nonEmpty: true });
-  const projectExecution = contract.project_execution;
-  if (!projectExecution || typeof projectExecution !== "object" || Array.isArray(projectExecution)) {
-    fail("project_execution must be an object");
-  }
-  if (!allowedSandboxModes.has(projectExecution.sandbox_mode)) {
-    fail(`project_execution: unsupported sandbox mode ${projectExecution.sandbox_mode ?? "missing"}`);
-  }
-  if (projectExecution.approval_policy !== "on-request") {
-    fail("project_execution.approval_policy must be on-request");
-  }
-  if (typeof projectExecution.network_access !== "boolean") {
-    fail("project_execution.network_access must be a boolean");
-  }
-  const projectDefaults = contract.project_defaults;
-  if (!projectDefaults || typeof projectDefaults !== "object" || Array.isArray(projectDefaults)) {
-    fail("project_defaults must be an object");
-  }
-  if (projectDefaults.default_subagent_model !== "gpt-5.6-luna"
-      || projectDefaults.default_subagent_reasoning_effort !== "max") {
-    fail("project_defaults must set the generic Luna/max fallback");
-  }
-  if (!Array.isArray(projectDefaults.project_doc_fallback_filenames)
-      || projectDefaults.project_doc_fallback_filenames.length !== 1
-      || projectDefaults.project_doc_fallback_filenames[0] !== "CLAUDE.md") {
-    fail("project_defaults must set CLAUDE.md as the project instruction fallback");
-  }
-  if (!projectDefaults.features || typeof projectDefaults.features !== "object" || Array.isArray(projectDefaults.features)
-      || projectDefaults.features.multi_agent !== true || projectDefaults.features.multi_agent_v2 !== true
-      || Object.keys(projectDefaults.features).length !== 2) {
-    fail("project_defaults must enable exactly multi_agent and multi_agent_v2");
-  }
   const allowedSourceModels = assertUniqueStringArray(contract.allowed_source_models, "allowed_source_models", { nonEmpty: true });
   const allowedSourceEfforts = assertUniqueStringArray(contract.allowed_source_efforts, "allowed_source_efforts", { nonEmpty: true });
   const allowedRuntimeReasoningEfforts = assertUniqueStringArray(contract.allowed_runtime_reasoning_efforts, "allowed_runtime_reasoning_efforts", { nonEmpty: true });
@@ -306,11 +259,7 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
   const selectedProfileName = profileName ?? contract.default_profile;
   const profile = validateProfile(contract, selectedProfileName, usedProjectionTiers, allowedRuntimeReasoningEfforts);
   const dispatchContractSource = "agents/_shared/dispatch-contract.md";
-  const specialistDispatch = markdownSection(
-    await readFile(repositoryPath(rootDir, dispatchContractSource, "specialist dispatch contract"), "utf8"),
-    "Pipeline specialist reference",
-    dispatchContractSource,
-  );
+  const specialistDispatch = (await readFile(repositoryPath(rootDir, dispatchContractSource, "specialist coordination"), "utf8")).trim();
   const files = new Map();
   for (const agent of validatedAgents) {
     const sourcePath = repositoryPath(rootDir, agent.instruction_source, `${agent.name}.instruction_source`);
@@ -323,7 +272,7 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     if (instructions === "") fail(`${agent.name}: instruction source is empty`);
     if (["implementer", "tester"].includes(agent.role)) {
       instructions = [
-        "## Canonical pipeline specialist reference",
+        "## Specialist coordination",
         specialistDispatch,
         instructions,
       ].join("\n\n");
@@ -350,23 +299,7 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
 
   const config = [
     "# Code generated from runtime/schema/codex-agents.json; DO NOT EDIT.",
-    `sandbox_mode = ${JSON.stringify(projectExecution.sandbox_mode)}`,
-    `approval_policy = ${JSON.stringify(projectExecution.approval_policy)}`,
-    `project_doc_fallback_filenames = [${projectDefaults.project_doc_fallback_filenames.map(value => JSON.stringify(value)).join(", ")}]`,
-    "",
-    "[features]",
-    "multi_agent = true",
-    "multi_agent_v2 = true",
-    "",
-    "[sandbox_workspace_write]",
-    `network_access = ${projectExecution.network_access}`,
-    "",
-    "[agents]",
-    "enabled = true",
-    `default_subagent_model = ${JSON.stringify(projectDefaults.default_subagent_model)}`,
-    `default_subagent_reasoning_effort = ${JSON.stringify(projectDefaults.default_subagent_reasoning_effort)}`,
-    `max_concurrent_threads_per_session = ${contract.max_concurrent_threads_per_session}`,
-    "interrupt_message = true",
+    "# TH roles are discovered in .codex/agents. Native execution settings are user-owned.",
     ""
   ].join("\n");
   files.set(join(rootDir, ".codex/config.toml"), config);
@@ -389,11 +322,11 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     "",
     "## Improve Team Harness from Codex",
     "",
-    "Start Codex from the repository root. Use `@Team-Harness init <request>` for lightweight intake or a small bounded improvement; it stays in Main without creating pipeline state or spawning specialists. Use `@Team-Harness pipeline <request>` only when you explicitly want the full gated workflow.",
+    "Start Codex from the repository root. Use `@Team-Harness init <request>` for intake, `spec` for development with written intent and review, or `pipeline` when you choose broader coordination. Main uses native settings and permissions.",
     "",
     "Author shared role intent in `agents/*.md`. Codex model and effort values are projected from that frontmatter, while Codex-specific execution instructions live in `runtime/codex/instructions/*.md` and workflow adapters live in `plugins/team-harness/skills/`. A semantic prompt change is not translated automatically into those adapters, so review both surfaces when behavior should change in Claude Code and Codex.",
     "",
-    "The seven additional `pipeline-*` custom-agent identities reuse the corresponding logical role adapter but intentionally omit `model` and `model_reasoning_effort`. The pipeline passes both values explicitly on every spawn, using the standard role matrix by default or one ephemeral pair selected in the current live Main session.",
+    "The seven additional `pipeline-*` custom-agent identities reuse the corresponding logical role adapter but intentionally omit `model` and `model_reasoning_effort`. Use the active runtime's model selection or the operator's requested pair.",
     "",
     "After changing any canonical agent's model or effort, an installed role contract, a Codex instruction adapter, or `runtime/schema/codex-agents.json`, run `$sync-codex-agents`. The equivalent repository commands are:",
     "",

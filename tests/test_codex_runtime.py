@@ -63,10 +63,7 @@ def check_registry_and_projections() -> None:
     require(len(names) == len(set(names)), "Codex agent registry contains duplicate names")
 
     declared_outputs: set[str] = set()
-    specialist_reference = markdown_section(
-        DISPATCH_CONTRACT.read_text(encoding="utf-8"),
-        "Pipeline specialist reference",
-    )
+    specialist_reference = DISPATCH_CONTRACT.read_text(encoding="utf-8").strip()
     for agent in agents:
         name = agent["name"]
         for key in ("description", "semantic_source", "instruction_source", "output_path", "sandbox_mode"):
@@ -94,7 +91,7 @@ def check_registry_and_projections() -> None:
         logical_role = agent.get("role", name)
         if logical_role in {"implementer", "tester"}:
             expected = (
-                "## Canonical pipeline specialist reference\n\n"
+                "## Specialist coordination\n\n"
                 f"{specialist_reference}\n\n{adapter}"
             )
             require(
@@ -123,9 +120,7 @@ def check_registry_and_projections() -> None:
 
 def check_config_and_manifests() -> None:
     config = tomllib.loads((ROOT / ".codex/config.toml").read_text(encoding="utf-8"))
-    require(config.get("agents", {}).get("enabled") is True, "Codex subagents are disabled")
-    require(config.get("features", {}).get("multi_agent_v2") is True, "Codex V2 is disabled")
-    require(config.get("project_doc_fallback_filenames") == ["CLAUDE.md"], "fallback config drift")
+    require(config == {}, "generated project config must leave native settings user-owned")
 
     manifests = [
         ROOT / ".claude-plugin/plugin.json",
@@ -147,7 +142,6 @@ def main() -> None:
     for command in (
         ["node", "tools/codex-runtime/generate.mjs", "--check"],
         ["node", "tools/codex-runtime/test_generate.mjs"],
-        ["node", "tools/codex-runtime/sync-hooks.mjs", "--check"],
         ["node", "tools/codex-runtime/sync-skills.mjs", "--check"],
         ["node", "tests/test_codex_package_assets.mjs"],
         ["node", "tools/codex-runtime/validate-marketplace.mjs"],

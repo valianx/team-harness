@@ -1,8 +1,9 @@
 # Testing Reference: Cross-Browser Testing
 
-> Loaded on demand by the `tester` agent via the Reference Router **only when `cross_browser: true`
-> is present in the dispatch payload**. This file is an AXIS reference — it is loaded ALONGSIDE
-> the warranted `e2e` or `browser-mode` reference, never as the sole warranted type.
+> Read explicitly whenever the cross-browser workflow is selected. The current
+> agent or a delegated tester loads this AXIS reference alongside the warranted
+> `e2e` or `browser-mode` reference; a dispatch flag is only optional context,
+> never the mechanism that makes this method available.
 > Stack-agnostic principles first, then per-stack sections keyed `## <stack>`.
 
 ## Principles
@@ -19,10 +20,10 @@ Key definitional points:
   uniquely cross-engine: the browser model, which channels are real, the grid path for coverage
   that Playwright cannot provide locally, device emulation, CI cost strategy, skip annotations, and
   the failure-mode catalog.
-- **Strictly opt-in.** Cross-browser coverage is never the default. The default CI target for any
-  Playwright or Vitest browser-mode suite is **chromium only**. The full engine or channel matrix
-  is activated on demand via the `/th:test-cross-browser` skill (the sole producer of
-  `cross_browser: true`) or an explicit CI schedule / `cross-browser` PR label — never by default.
+- **Respect the requested and configured matrix.** Preserve existing repository
+  coverage. For a new CI strategy, a small PR matrix and broader scheduled runs
+  can reduce cost; select them for the actual browser support requirements.
+  A schedule or PR label is useful only when that repository configures it.
 - Cross-link discipline: detection mechanics (screenshots, baselines, viewport control) are owned by
   the existing references and are **pointed to here, not re-documented**. See
   `agents/testing-refs/visual.md` for screenshot/baseline mechanics and the platform-suffix caveat.
@@ -141,7 +142,10 @@ elements that overflow, clip, or move off-screen at a specific breakpoint IN a s
    `visual.md` Option B/C for mechanics and the **platform-suffix caveat** — do NOT re-document
    them here.
 2. **Plus** explicit **programmatic assertions** for the off-screen class:
-   - `await expect(locator).toBeVisible()` — fails deterministically for an off-screen element.
+   - `await expect(locator).toBeInViewport()` — checks viewport intersection; see the
+     [Playwright locator assertion](https://playwright.dev/docs/api/class-locatorassertions#locator-assertions-to-be-in-viewport).
+     `toBeVisible()` only checks DOM visibility and attachment, so it does not prove that the
+     element intersects the viewport.
    - Bounding-box-within-viewport check:
      ```typescript
      const box = await locator.boundingBox()
@@ -166,7 +170,7 @@ For viewport-control mechanics, cross-link to `e2e.md` § "Responsive assertions
 
 ## Third-party UI library review
 
-Before writing the cross-browser test plan, the tester should:
+Before writing the cross-browser test plan, inspect:
 
 1. **Inventory UI libraries** from `package.json` that own rendering or positioning: date pickers,
    modal / popover / `floating-ui` / `@popperjs`, carousels, charting libraries (recharts, chart.js,
@@ -178,8 +182,9 @@ Before writing the cross-browser test plan, the tester should:
    Floating-UI / Popper-based components are the canonical example: `flip()`, `shift()`, `autoUpdate`
    timing diverges per engine, making dropdown calendars and popovers the most common class of
    "works in Chrome, broken in Safari" reports.
-4. **Surface unsupported-browser findings** in `03-testing.md` rather than silently passing. If a
-   library's docs state no WebKit support, that is a reported finding — not a skipped test.
+4. **Surface unsupported-browser findings** in the testing evidence or final report rather than
+   silently passing. If a library's docs state no WebKit support, that is a reported finding —
+   not a skipped test.
 
 ---
 
@@ -432,26 +437,28 @@ import { test } from '@playwright/test'
 // Skip on a specific engine with a reason
 test.skip(({ browserName }) => browserName === 'webkit', 'Safari: <tracked issue URL>')
 
-// Mark as expected to fail (fixme) — test still runs and reports as expected-to-fail
+// Known broken test intentionally not run until repaired
 test.fixme(({ browserName }) => browserName === 'firefox', 'Firefox: <tracked issue URL>')
 ```
 
-Rules:
-- Always provide a reason string — a URL to the issue tracker or a concise description.
-- Prefer `test.fixme` over `test.skip` when the failure is a known engine bug expected to be fixed.
-- Never skip an engine permanently without a tracking issue. A `skip` without a reason is a
-  silent hole in coverage.
-- Record every skip/fixme annotation in `03-testing.md` under "Known skip annotations" with the
-  engine, reason, and issue URL.
+Use `skip` for an inapplicable configuration and `fixme` for broken work that is
+not run. Use `test.fail` when the test should execute and is expected to fail;
+an unexpected pass then surfaces the change. See the
+[Playwright annotation semantics](https://playwright.dev/docs/test-annotations).
+Report the engine, reason and a tracking issue when available. Skipped or fixme
+cases remain gaps in executed coverage; expected failures are not passing tests.
 
 ---
 
-## CI strategy — defaults and matrix gating
+## CI strategy — cost and coverage options
 
-### Default: chromium-only on every PR
+### Example: a small PR matrix
 
-The default `playwright.config.ts` (from `e2e.md`) already specifies a single `chromium` project.
-The cross-browser matrix is **never the PR default**.
+Preserve the repository's existing browser matrix and support commitments.
+The following example uses Chromium for fast PR feedback; a repository may
+instead require several engines on every PR. Change CI selection only within
+the requested scope, and connect any label or schedule to actual configured
+projects rather than assuming a label enables browsers automatically.
 
 ```typescript
 // playwright.config.ts — default: chromium only on every PR
@@ -499,7 +506,7 @@ npx playwright install --with-deps          # installs all browsers + system dep
 npx playwright install-deps webkit          # WebKit-only system deps
 ```
 
-The tester **surfaces this as a setup finding** in `03-testing.md` — it does NOT auto-install on
+Surface this as a setup finding in the testing evidence or final report — do NOT auto-install on
 the developer's machine. WebKit is also the most flake-prone engine on headless Linux: enable
 `retries: 2` and `trace: 'on-first-retry'` in the WebKit project config rather than disabling it.
 

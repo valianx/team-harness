@@ -1,6 +1,6 @@
 // hooks/ts/shim/shim.ts
-// Format-shim: enforces SEC-07 on inbound payloads and translates
-// canonical NormalizedDecision into the runtime's native control signal.
+// Format-shim: bounds and normalizes Claude Code hook payloads before the
+// retained context and observability bodies inspect them.
 //
 // SEC-07 contract (inbound):
 //   1. Size bound — O(n) length check BEFORE JSON.parse (CWE-770).
@@ -14,21 +14,14 @@
 //      keys cause hard-reject BEFORE named-key read (redundant by design with #4).
 //   6. Schema validate — wrong type = hard reject (no coercion); absent = null.
 //
-// Outbound (CC): decision → stdout JSON + process.exit(0).
-// Outbound (opencode): decision → return (allow/none) or throw (deny/ask→throw
-//   for outward/gcp gates per fail-closed mapping). NEVER writes output.args.
-
 import {
   NormalizedInput,
-  NormalizedDecision,
   MAX_PAYLOAD_BYTES,
   MAX_NESTING_DEPTH,
   VALID_EVENTS,
 } from "./normalized-v1.js";
 
-/** SEC-07 hard-reject signal. The entry wrapper maps this to the gate's
- *  per-gate fail-closed default (deny for security gates, none for no-op
- *  gates like dev-guard on non-covered Bash). */
+/** SEC-07 hard-reject signal. Retained entries handle it fail-open. */
 export class ShimRejectError extends Error {
   constructor(message: string) {
     super(message);
@@ -121,8 +114,7 @@ function rejectPollutionKeys(obj: Record<string, unknown>): void {
 // ---------------------------------------------------------------------------
 
 function buildNormalized(
-  parsed: Record<string, unknown>,
-  runtime: "claude-code" | "opencode"
+  parsed: Record<string, unknown>
 ): NormalizedInput {
   // Read `event` — must be a valid event string.
   const rawEvent = parsed["event"];
@@ -173,7 +165,7 @@ function buildNormalized(
   }
   const dataHome = typeof rawDataHome === "string" ? rawDataHome : null;
 
-  return { event, tool, workspace, runtime, dataHome };
+  return { event, tool, runtime: "claude-code", workspace, dataHome };
 }
 
 // ---------------------------------------------------------------------------
@@ -228,101 +220,5 @@ export function inboundCC(raw: string): NormalizedInput {
   checkSize(raw);
   checkDepth(raw);
   const mapped = parseCCPayload(raw);
-  return buildNormalized(mapped, "claude-code");
-}
-
-/** Inbound (opencode): the (input, output) callback args → frozen NormalizedInput.
- *  Returns a frozen (readonly) object: the body cannot mutate it, and it holds
- *  no reference to opencode's mutable native `output` (SEC-DR-F). */
-export function inboundOpencode(
-  input: unknown,
-  _output: unknown
-): Readonly<NormalizedInput> {
-  // opencode passes `input` as { tool: string, args: object, ... }
-  if (typeof input !== "object" || input === null || Array.isArray(input)) {
-    throw new ShimRejectError("SEC-07: opencode input must be an object");
-  }
-  const obj = input as Record<string, unknown>;
-  rejectPollutionKeys(obj);
-
-  // Serialize to string for the size/depth bounds check.
-  // NOTE: we serialise the opencode input object, not the entire callback scope.
-  let raw: string;
-  try {
-    raw = JSON.stringify(obj);
-  } catch {
-    throw new ShimRejectError("SEC-07: opencode input not serialisable");
-  }
-  checkSize(raw);
-  checkDepth(raw);
-
-  // opencode native format: { tool: string, args: { command?: string, ... } }
-  const toolName = obj["tool"];
-  const toolArgs = obj["args"];
-
-  const mapped: Record<string, unknown> = {
-    event: "PreToolUse",
-    tool:
-      typeof toolName === "string"
-        ? {
-            name: toolName,
-            input:
-              typeof toolArgs === "object" && toolArgs !== null && !Array.isArray(toolArgs)
-                ? toolArgs
-                : {},
-          }
-        : null,
-    workspace: obj["workspace"] ?? null,
-    dataHome: obj["dataHome"] ?? null,
-  };
-
-  const result = buildNormalized(mapped, "opencode");
-
-  // Deep-freeze the normalized input so the body receives a truly readonly view.
-  // Any attempted write throws in strict mode (SEC-DR-F structural barrier).
-  if (result.tool?.input) {
-    Object.freeze(result.tool.input);
-  }
-  if (result.tool) {
-    Object.freeze(result.tool);
-  }
-  Object.freeze(result);
-
-  return result as Readonly<NormalizedInput>;
-}
-
-// ---------------------------------------------------------------------------
-// Public API — Outbound
-// ---------------------------------------------------------------------------
-
-/** Outbound (CC): decision → stdout JSON + process.exit(0).
- *  "none" → empty stdout + exit 0.
- *  "deny"/"ask"/"allow" → hookSpecificOutput permissionDecision JSON. */
-export function outboundCC(d: NormalizedDecision): never {
-  if (d.decision === "none") {
-    process.stdout.write("");
-    process.exit(0);
-  }
-  const payload = {
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: d.decision,
-      permissionDecisionReason: d.reason,
-    },
-  };
-  process.stdout.write(JSON.stringify(payload) + "\n");
-  process.exit(0);
-}
-
-/** Outbound (opencode): decision → return (allow/none) or throw (deny/ask→throw).
- *  Reads ONLY the body's decision; NEVER writes opencode's mutable output.args.
- *  ask→throw for outward/gcp gates (fail-closed mapping — opencode has no interactive
- *  operator-confirm; an un-prompted outward action is exactly the harm dev-guard prevents). */
-export function outboundOpencode(d: NormalizedDecision): void {
-  if (d.decision === "allow" || d.decision === "none") {
-    return;
-  }
-  // deny and ask both throw (fail-closed mapping for opencode).
-  // Error.message names the pattern CLASS, never the captured value (CWE-200).
-  throw new Error(d.reason || d.decision);
+  return buildNormalized(mapped);
 }

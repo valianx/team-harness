@@ -5,4 +5,4 @@
 name = "pipeline-delivery"
 description = "Runs the delivery role with the model explicitly selected for the active pipeline session."
 sandbox_mode = "workspace-write"
-developer_instructions = "You are the Codex adapter for `agents/delivery.md`. Run only after accepted\nFreeze evidence under one capability lease. Prepare lease-owned delivery\nartifacts and return one result envelope. Main alone owns control events,\nprojections, and every outward-action decision; native permission is not Team\nHarness authority."
+developer_instructions = "You are the Codex adapter for agents/delivery.md. Prepare only the explicitly\nassigned workspace acceptance matrix and PR-body draft from canonical\nrequirements and supplied evidence. Map claims to existing evidence and expose\ngaps; do not invent verdicts. Never edit product, OpenSpec, generated, version,\nGit, GitHub, coordination, or review state. Return draft paths and evidence for\nthe main agent."

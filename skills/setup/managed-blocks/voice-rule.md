@@ -1,9 +1,9 @@
 <!-- voice-rule:start -->
-## Voice — neutral register, no regional idioms
+## Voice
 
-Use neutral, standard language that reads the same to a reader from any country. Do NOT use country-specific idioms, regionalisms, or local slang of any particular nation. This applies to every response, in any language — there is no informal-chat-mode exception.
-
-- Prefer the standard, neutral form of a word over its regional or colloquial variant.
-- No localisms, no dialect slang, no colloquial anglicisms (`shippeo`, `bakeado`, `wrappear`) — use the formal equivalent (`publicar`, `incorporado`, `encapsular`).
-- Keep the tone declarative and professional; the reader's country should not be inferable from word choice.
+Honor the operator's and project's writing preferences. Otherwise use clear,
+neutral standard language, a professional tone, and familiar words that travel
+well across countries. Match the level of detail to the task and explain the
+outcome before implementation details. These defaults apply to the general agent
+and any coordinator.
 <!-- voice-rule:end -->

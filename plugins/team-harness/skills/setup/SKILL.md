@@ -1,6 +1,6 @@
 ---
 name: setup
-description: "Configure or reconfigure the complete Team Harness Codex installation: native settings, bundled specialist agents, optional MCP servers, workspace preferences, and hook verification. Use when the operator invokes Team Harness setup or asks to configure any Codex integration."
+description: "Configure or reconfigure the Team Harness Codex installation: native Team Harness settings, bundled specialist agents, explicitly selected MCP servers, workspace preferences, and workflow discovery."
 ---
 
 # Team Harness setup for Codex
@@ -15,29 +15,37 @@ opencode settings during ordinary operation and never modify their files.
 The only cross-runtime operation allowed here is an explicit one-time copy of
 values selected by the operator.
 
+The native general agent must know that Team Harness is available without
+changing its identity, coding instructions, permissions, approvals, or model.
+Use [the general-agent guide](references/general-agent-guide.md) as the short
+managed block for workflow discovery and voice. It names the key skills
+(`$team-harness:spec`, `$team-harness:pipeline`, `$team-harness:review-pr`,
+`$team-harness:create-pr`, and `$team-harness:apply-review`) and points to
+`$team-harness:modes` for the complete catalog.
+
 Resolve all helpers relative to this skill and use them for every managed
 write:
 
 - `scripts/manage_config.py` validates, backs up, and atomically writes native
   settings with mode `0o600`.
-- `scripts/manage_runtime.py` converges the global Codex sandbox, automatic
-  approval reviewer, network access, tool caches, runtime temp directory, and
-  configured shared Obsidian root `{logs-path}/{logs-subfolder}` without
-  removing operator-owned writable roots. The grant is deliberately above the
-  per-repository directory because pipelines resolve
-  `{logs-path}/{logs-subfolder}/{repo-name}/{feature}` from their own cwd.
 - `scripts/manage_agents.py` installs or refreshes the twenty bundled generated
   agents without overwriting an unmanaged same-name file.
 - `scripts/manage_github_identities.py` validates and atomically manages the
   runtime-neutral GitHub workspace/account routes without reading token bytes.
+
+The general-agent guide is the one guided native-instructions write that does
+not use one of these helpers. Follow its managed-block procedure only for a
+full setup or the `instructions`/`voice` target; preserve every other line and
+native override. Do not implement it by changing a runtime profile or by
+writing a second policy layer.
 
 ## Routing
 
 With no targeted intent, run the complete flow. For a targeted request, change
 only that concern and still ensure the native settings document exists.
 Supported targets are `workspace`, `language`, `english-learning`, `memory`,
-`context7`, `agents`, `features`, `github-accounts`, `clickup`, `obsidian-tasks`, and
-`flow-telemetry`.
+`context7`, `agents`, `github-accounts`, `clickup`, `obsidian-tasks`,
+`flow-telemetry`, `instructions`, and `voice`.
 
 `lane-autoselect` is legacy migration metadata, not a supported target or an
 active selector. Never use it to choose a route; require the live operator's
@@ -82,69 +90,27 @@ migration, and preserve every unrelated value.
    python3 scripts/manage_config.py ensure --version 3.6.5
    ```
 
+2a. For a full setup or the explicit `instructions`/`voice` target, follow the
+managed-block procedure in
+`references/general-agent-guide.md`. Skip it for every other targeted setup.
+
 3. For a full setup, refresh marketplace metadata and inspect the installed
    plugin with `codex plugin marketplace upgrade team-harness --json` and
    `codex plugin list --json`. If code is stale, run `$team-harness:update`
    before continuing. An unavailable network is non-blocking when the installed
    snapshot is usable.
 
-4. Only for a full setup or an explicit `features` target, enable Codex
-   multi-agent V2 with Codex's native feature writer; do not hand-rewrite the
-   global `config.toml`:
-
-   ```bash
-   codex features enable multi_agent
-   codex features enable multi_agent_v2
-   ```
-
-   For every other targeted setup, skip both feature-writer commands and do not
-   change global Codex feature state. Confirm both flags with
-   `codex features list` only when this step runs. The generated project config
-   also enables both flags and supplies the generic `gpt-5.6-luna` / `max`
-   subagent fallback under `[agents]`. It also sets
-   `project_doc_fallback_filenames = ["CLAUDE.md"]`, so Codex reads `CLAUDE.md`
-   only at directory levels where `AGENTS.md` is absent; it never overrides
-   Main's selected model. Global installation applies both defaults narrowly:
-   agent sync
-   installs a missing fallback and migrates only the exact formerly managed
-   `gpt-5.6-terra` / `medium` pair to `gpt-5.6-luna` / `max`. It preserves any
-   other complete operator-selected pair as `custom-preserved`. Standard named
-   specialists retain the generated per-role projection table; the seven
-   `pipeline-*` identities intentionally omit model and effort so the pipeline
-   can supply either that standard pair or one live-session pair at dispatch.
-   For project-document
-   fallbacks, sync preserves their order and appends `CLAUDE.md` once when it is
-   absent.
-
-5. Gather only requested values, showing current values as defaults. Apply all
+4. Gather only requested values, showing current values as defaults. Apply all
    selected settings in one `manage_config.py set` command.
 
    - Workspace defaults to `local`. For `obsidian`, require an existing
      absolute vault path plus a safe relative subfolder. Reject filesystem
-     roots, the user home, traversal, globs, and symlink escapes. Runtime
-     reconciliation creates the shared `{logs-path}/{logs-subfolder}` subtree
-     when needed and appends that canonical path to
-     `sandbox_workspace_write.writable_roots`; never append only the current
-     `{repo-name}` child, which would make the configuration unusable from other
-     repositories.
-     A settings write does not update a running session's sandbox: require a
-     Codex restart or new tab before reporting the external workspace ready.
-     The pipeline's non-escalated live write probe remains authoritative.
-   - Keep `approval_policy = "on-request"` and set
-     `approvals_reviewer = "auto_review"`. This is Codex's automatic review
-     path for sandbox escalations, including ordinary local Git metadata writes,
-     benign pushes, and PR creation; it is not a blanket command allow rule.
-     Never add a repository `.git` directory to writable roots and never install
-     a blanket `git`, `git push`, `gh pr create`, or `git worktree add` rule,
-     because an allow rule could outrank a deterministic deny hook. Force-push
-     remains denied by `gate-guard`, while server-side GitHub branch protection
-     remains authoritative for the default branch.
-     A pipeline still submits one exact `git worktree add -b <branch>
-     <absolute-path> <immutable-base-sha>` native escalation after Gate 1;
-     `auto_review` evaluates it without a human prompt. If that reviewer times
-     out or denies the command, the pipeline remains technically paused and may
-     make the contract's single bounded resubmission; setup never rewrites
-     permission state or treats that technical boundary as a functional failure.
+     roots, the user home, traversal, globs, and symlink escapes. Team Harness
+     stores the selected workspace values but does not change Codex sandbox or
+     writable-root policy.
+   - Preserve the active Codex approval policy, permission rules, sandbox,
+     network access, model, and reasoning effort. Team Harness does not install
+     command allow rules or change global runtime execution defaults.
    - Language is a two-letter lowercase code or absent for automatic detection.
    - English learning, Obsidian Tasks, and flow telemetry are booleans;
      telemetry defaults off.
@@ -181,33 +147,7 @@ migration, and preserve every unrelated value.
    directory with `GH_CONFIG_DIR=<dir> gh auth login` remains an operator action;
    never read, print, copy, or store token bytes.
 
-6. Reconcile global Codex execution defaults on every setup, including a
-   targeted setup, after applying any selected workspace values:
-
-   ```bash
-   python3 scripts/manage_runtime.py inspect
-   python3 scripts/manage_runtime.py ensure
-   ```
-
-   The helper atomically updates `${CODEX_HOME:-$HOME/.codex}/config.toml`,
-   preserves unrelated keys and all existing writable roots, and ensures
-   `workspace-write`, `on-request`, `auto_review`, sandbox network access, the
-   standard Go/uv/npm caches, `${CODEX_HOME:-$HOME/.codex}/tmp`, and the active
-   Obsidian Team Harness subtree. It never adds `.git` or a command rule. A
-   changed runtime config requires verified activation before it is effective.
-
-   When `inspect` reports `projectConfigShadowing: true`, the checked-out
-   tree's `.codex/config.toml` declares its own `writable_roots` (or is
-   degraded and unreadable) and replaces the operator-level list for sessions
-   started in that tree. Warn the operator explicitly, naming the reported
-   `projectConfig.path`, before running `ensure`: the operator-level repair
-   (`ensure`, behind the same confirmation gate as every config write) fixes
-   the global config, but the shadowing itself is fixed only by updating the
-   checkout or regenerating the project config so it stops declaring
-   `writable_roots`. Restarting Codex alone does not clear shadowing; give the
-   restart instruction only after the shadowing fix.
-
-7. Reconcile all twenty bundled specialists in the persisted scope on every full
+5. Reconcile all twenty bundled specialists in the persisted scope on every full
    setup, and whenever `agents` is targeted:
 
    ```bash
@@ -226,15 +166,13 @@ migration, and preserve every unrelated value.
    conflict: report it and do not overwrite it. Writes outside the repository
    use Codex's native permission prompt. Do not use or download the separate Go
    installer; the marketplace snapshot is the source of these agent bytes.
-   Inspect and sync output includes `runtimeConfig`, `runtimeConfigChanged`, and
-   `restartRequired`. When sync changes a role or fallback, use the installed
-   `../reload/SKILL.md` activation procedure after setup finishes. Verify affected
-   components before declaring them ready; reconnect and resume this conversation
-   when the host cannot reload them. No-op sync or updates to other roles do not
-   invalidate an already verified reviewer profile. Never require a new chat
-   solely because setup ran.
+   Inspect and sync report the selected scope and role file changes. They do
+   not alter global model, reasoning-effort, or project-document fallback
+   settings. When a role file changes, reread the native skill or use the
+   installed `../reload/SKILL.md` activation procedure; report activation only
+   when the host provides evidence.
 
-8. Configure selected MCP servers after `codex mcp list --json`. Preserve an
+6. Configure selected MCP servers after `codex mcp list --json`. Preserve an
    existing registration unless the operator explicitly requests replacement.
 
    - Memory: register a streamable HTTP URL, optionally with the name (not the
@@ -244,30 +182,11 @@ migration, and preserve every unrelated value.
      printing it, then run
      `codex mcp add context7 --env DEFAULT_MINIMUM_TOKENS=10000 -- npx -y @upstash/context7-mcp@3.2.5`.
 
-9. Verify the installed plugin's `hooks/hooks.json`. Codex supports the
-   deterministic deny hooks only: `policy-block`, the catastrophic-deny
-   portion of `gcp-guard`, and `gate-guard`'s force-push floor. `gate-guard`
-   denies direct force flags, `--force-with-lease`, `+refspec` forms, and the
-   statically resolved wrapper forms covered by its bounded command analyzer,
-   even after `ship`. It does not guarantee detection when a push is assembled
-   from runtime-only shell state such as variables, aliases, functions, PATH,
-   or Git configuration; this accepted limitation is not expanded in setup,
-   and server-side GitHub branch protection remains authoritative. Benign push
-   and ordinary GitHub approval ownership remain native. Approval-classifying
-   `ask` guards are intentionally not registered because Codex's native
-   permission flow owns approvals.
-   Explain that the operator must review and trust hooks through `/hooks`;
-   never approve or bypass trust.
-
-10. Re-run the applicable helper inspections and `codex mcp list --json`; re-run
-    `codex features list` only when step 4 ran. Report one compact result:
-    native config path, workspace/language, agent scope and twenty agent statuses,
-    GitHub route count when configured, feature-flag status when checked, MCP registrations, hook
-    verification/trust, global execution-default status, pending activation or
-    same-conversation reconnect, and for Obsidian whether the writable-root grant
-    is effective. Also report that ordinary Git/push/PR approval requests route
-    through automatic review, while force-push remains denied. Never print
-    imported opaque values, secrets, or environment-variable values.
+7. Re-run the applicable helper inspections and `codex mcp list --json`. Report
+   one compact result: native Team Harness config path, workspace/language,
+   agent scope and role statuses, GitHub route count when configured, MCP
+   registrations, and any activation evidence or pending native reread. Never
+   print imported opaque values, secrets, or environment-variable values.
 
 The flow is idempotent. Blank input preserves current values; unrelated native
 keys remain untouched; unchanged config and agent files are not rewritten.
