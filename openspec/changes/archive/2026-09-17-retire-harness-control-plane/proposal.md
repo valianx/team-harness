@@ -16,6 +16,8 @@ in charge of execution.
   `create-pr` and `modes` discoverable to the native general agent.
 - Treat specialist and review returns as evidence and recommendations. Main
   evaluates them with the full task context and chooses the next action.
+- Keep author-side PR comment handling in one proportional evaluation guide,
+  without a mandatory per-comment ledger or a separate orchestration protocol.
 - Preserve native permission and sandbox boundaries, normal PR authorization,
   anchored review evidence, and opt-in telemetry without making telemetry a
   prerequisite.

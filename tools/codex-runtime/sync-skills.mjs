@@ -196,7 +196,7 @@ workflow:
 4. Resolve persistent settings from
    \`${configPath}\`. Never depend on a Claude
    Code installation, \`~/.claude\`, the \`claude\` binary, or Claude plugin
-   cache paths. Use packaged files relative to this skill directory.
+   cache paths. Use packaged files relative to this skill directory.${codex ? "" : " Shared agent references (such as `agents/_shared/` or `../../agents/_shared/` in canonical links) are installed under `${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}/th-references/agents/`; resolve their suffix there."}
 5. Follow the user's objective and existing authorization. Preserve read-only
    review roles and use native ${codex ? "Codex" : "opencode"} permissions. TH adds workflow
    guidance, not another execution-permission protocol.

@@ -13,6 +13,7 @@
 
 - [x] 3.1 Update Codex parity and update/reload requirements so operator settings remain native-owned.
 - [x] 3.2 Keep restart reporting conditional on an observed native requirement and preserve the no-restart fast path.
+- [x] 3.3 Keep PR comment handling self-contained and advisory, and resolve shared references at their installed runtime paths.
 
 ## 4. Validate and close
 

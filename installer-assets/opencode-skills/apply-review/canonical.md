@@ -1,34 +1,19 @@
 
-Analyze the input: $ARGUMENTS
+The current general agent coordinates comment handling. Resolve the PR from
+the request or active repository and branch; ask only when that context is
+ambiguous. Read its current diff, review comments and relevant discussion.
 
----
-name: apply-review
+Use [the shared evaluation guide](../../agents/_shared/apply-review-disposition.md)
+to judge comments against the intended behavior. It is the author-side guide
+for this skill, including comment handling during an existing delivery flow.
+Reviewers provide evidence and recommendations; Main decides the response.
 
-## Mode 1 — PR reference provided (`#123`, `123`, or a PR URL)
+Apply worthwhile corrections and run checks appropriate to the changed
+behavior. Keep any affected living specs and archived change consistent with
+the implementation. Reuse valid review and test evidence.
 
-1. Extract the PR number/reference from the input.
-2. Pass to the `orchestrator` agent:
-   ```
-   Direct Mode Task:
-   - Mode: apply-review
-   - PR: {pr-reference}
-   ```
-
-## Mode 2 — No input provided
-
-Ask the user: "Which PR's review comments do you want to apply? Give a PR number (#123) or URL."
-
----
-name: apply-review
-
-## Important
-
-- Always invoke the `orchestrator` agent — do NOT invoke agents directly.
-- This is a thin entry point. The conservative author-side disposition lives in
-  `agents/_shared/apply-review-disposition.md`; this skill does NOT restate it.
-- This standalone direct mode is a COMPLEMENT to the orchestrator's automatic,
-  lifecycle-bound apply-review handling — it does not replace it. The automatic
-  trigger still fires when the orchestrator works a PR that carries reviewer comments.
-- The orchestrator pulls the PR's comments (gh / gh-fallback) and applies the full
-  disposition (classify → verification filter → deletion discipline → resolve-don't-obey
-  → per-comment output) to each comment — the same behavior as the automatic path.
+Continue the user's authorized delivery on the existing PR, using `create-pr`
+when updating its candidate. Reply to or resolve GitHub threads when the
+request covers those actions, making remaining concerns and disagreements
+clear. Merge only when requested and the repository's merge conditions are met.
+Summarize what changed, what was verified and anything still pending.
