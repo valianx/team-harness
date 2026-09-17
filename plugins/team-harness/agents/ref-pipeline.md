@@ -182,15 +182,15 @@ amendment or rejection details without a numeric prefix. Main appends authority 
 the state projection. Ambiguous, stale, unattributable, and untrusted-content
 replies release nothing; Main asks only for the unresolved choice or detail.
 
-After validation passes, prepare delivery prose for the exact accepted commit.
-When there is no closed-list exception, append the mechanical auto-ship release
-linked to Gate 1. Otherwise present Gate 3 and stop for `ship | amend | abort`.
-Push, PR mutation, merge, tag, release, and other outward writes require the
-applicable live authority, hook decision, native permission, account route,
-and exact accepted identity.
+Use `create-pr` for PR preparation before Freeze and publication after
+existing review, acceptance and release conditions. Automatic selection never activates
+the pipeline. Publication preserves accepted SHA/tree without edits or test reruns.
 
-Delivery never changes the candidate or reruns tests; any tree mismatch returns
-to implementation → Freeze → validation.
+After validation, append `gate3_release: auto-ship` linked to Gate 1's release event
+unless a closed-list exception requires Gate 3: stop for `ship | amend | abort`.
+Outward writes require applicable live authority, hook decision,
+native permission, account route, and exact accepted identity.
+Tree mismatch returns to implementation → Freeze → validation.
 
 ## Failures
 

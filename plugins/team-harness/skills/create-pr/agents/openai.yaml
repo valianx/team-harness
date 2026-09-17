@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Create Pr"
+  short_description: "Team Harness Create Pr workflow"
+  default_prompt: "Use $team-harness:create-pr for this request."

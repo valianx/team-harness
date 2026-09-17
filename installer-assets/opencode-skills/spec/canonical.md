@@ -5,6 +5,9 @@ This is not Discover's spec co-authoring flow (the pipeline's `00-spec-seed.md` 
 is a standalone entry point for a task that is too small to justify the pipeline floor but still
 merits a durable written intent. The mode runs entirely in the coordinator.
 
+When PR preparation or publication is relevant, use [create-pr](../create-pr/SKILL.md)
+automatically; selecting it does not activate the pipeline.
+
 ## Routing predicate
 
 Plain inline handles mechanical, reversible work with no design decision worth recording. `/th:spec`
@@ -66,10 +69,10 @@ new effect.
    unverified even after exit zero; unrelated optional skips do not erase sufficient evidence.
    For a bug fix, optionally use [before/after evidence](references/author-review.md#optional-fix-evidence)
    when it adds useful proof without a new runner or mandatory review.
-   Once implementation and its relevant checks are complete, apply the
-   [shared lifecycle](references/lifecycle.md) to prepare authorized archive on this branch before
-   committing the final review candidate. Keep the resulting living specs and
-   archived change in the same PR as the implementation.
+   Once implementation and its relevant checks are complete, use [create-pr](../create-pr/SKILL.md)'s
+   preparation checkpoint when PR delivery is agreed; otherwise apply the [shared
+   lifecycle](references/lifecycle.md) directly. Prepare archive before committing the final
+   review candidate, including the living specs and archived change with the implementation.
 5. **Classify and validate.** Before publication, build the anchored package for the committed
    branch with `skills/verify/scripts/review-fan.mjs`; this deterministic step always classifies
    the completed changed surface and binds the validated requirements as `written-intent`
@@ -102,8 +105,10 @@ new effect.
 6. **Deliver.** Preserve the agreed delivery and repository conventions. If no PR
    is required, complete applicable validation and acceptance, record local delivery,
    and continue to close. For PR delivery, first satisfy the author-review decision and completion conditions in
-   [author-review.md](references/author-review.md); a pending offer holds publication. Open the
-   pull request under existing branch, commit and outward-action conventions. The coordinator's
+   [author-review.md](references/author-review.md), then use [create-pr](../create-pr/SKILL.md)'s
+   publication checkpoint;
+   a pending offer holds publication. Open the pull request under existing branch, commit and
+   outward-action conventions. The coordinator's
    publication decision is distinct from the historical gate result and is not mechanically enforced
    by `gh pr create`; when the in-lane security path applies, follow the mandatory closure conditions
    in [author-review.md](references/author-review.md). Continue already authorized publication once

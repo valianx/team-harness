@@ -6,6 +6,22 @@ or reporting its status.
 Upstream propose/apply completion returns to this lifecycle; it does not finish
 Team Harness delivery or archive the change.
 
+## Write only useful intent
+
+Reuse the affected living specs and relevant active change before adding another
+document. Specs describe observable behavior and acceptance scenarios; design
+describes the approach. Update existing requirements instead of copying them
+into parallel specs. Routine tooling, delivery, or repository chores need no
+new OpenSpec change merely because a PR is being prepared.
+
+Keep execution logs, reviewer transcripts, captures, scratch scripts, and operator
+projections in the configured workspace or permitted temporary storage, outside
+tracked product files. Preserve reusable tests, fixtures, tools, and deliberate
+product documentation. An archive preserves canonical change history; it does
+not turn execution debris into durable specifications. Do not purge active work
+or relocate archives by age or by a PR request alone: the current archive and
+review contracts require their canonical repository paths.
+
 ## Assess the relevant changes
 
 Read active `openspec/changes/` entries and the current bound change, including

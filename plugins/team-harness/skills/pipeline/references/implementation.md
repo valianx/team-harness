@@ -50,8 +50,8 @@ worktree, immutable inputs, context identity, and ownership remain unchanged.
 Otherwise revoke/close it and use causal recovery. Counts, elapsed time, tool
 calls, and compaction thresholds are telemetry only.
 
-When all approved batches and their relevant checks close, Main applies
-[the shared lifecycle](../../spec/references/lifecycle.md) during assembly:
-prepare authorized archive on the feature branch, refresh bound source locations and include the
-living specs and archived change in the complete committed candidate. Then enter
-Freeze, where full quality and QA validate that identity before delivery.
+When all approved batches and their relevant checks close, Main applies [create-pr](../../create-pr/SKILL.md)'s
+preparation checkpoint before committing the final review candidate and entering Freeze. It applies
+[the shared lifecycle](../../spec/references/lifecycle.md) to prepare authorized archive, refresh
+bound source locations, and include the living specs and archived change in the complete candidate.
+Freeze then validates that identity before delivery.

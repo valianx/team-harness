@@ -5,9 +5,9 @@ Handle the operator's request in the current primary thread. Clarify only
 material ambiguity, frame the desired outcome, and complete small bounded work
 directly.
 
-Before preparing a PR candidate, apply the archive-readiness check in
-[the shared lifecycle](../spec/references/lifecycle.md), including direct work
-with related open changes. Complete any authorized archive before final review.
+Use [create-pr](../create-pr/SKILL.md) whenever the request calls for PR
+preparation or publication, without requiring the operator to name the skill.
+It includes the shared OpenSpec lifecycle when relevant and does not activate a pipeline.
 
 Diagnose and repair operational blockers such as wrong paths, contract-format
 errors or missing declared dependencies within existing permissions. Verify the

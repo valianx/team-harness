@@ -1,6 +1,10 @@
 
 Analyze the input: $ARGUMENTS
 
+Use [create-pr](../create-pr/SKILL.md) for relevant PR preparation and publication. Its
+selection is automatic by relevance and does not activate the pipeline. Publication preserves
+existing authority; only active pipeline publication requires the accepted Freeze identity.
+
 ## Route
 
 Always route through the top-level `orchestrator`; never invoke `delivery`

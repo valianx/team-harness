@@ -21,9 +21,9 @@ operator's request and available context to accept, adapt, or reject recommendat
 with reasons grounded in evidence. Evaluate the underlying finding independently
 of the proposed remedy; severity alone does not mandate that remedy.
 
-Before preparing a PR candidate, apply the archive-readiness check in
-[the shared lifecycle](../spec/references/lifecycle.md), including direct work
-with related open changes. Complete any authorized archive before final review.
+Use [create-pr](../create-pr/SKILL.md) whenever the request calls for PR
+preparation or publication, without requiring the operator to name the skill.
+It includes the shared OpenSpec lifecycle when relevant and does not activate a pipeline.
 
 ## Workspace-free inline reviews
 

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.30.0] - 2026-09-17
+
+### Added
+
+- Shared `create-pr` skill prepares and publishes pull requests across Claude Code, Codex, and OpenCode.
+
+### Changed
+
+- Direct, OpenSpec, and pipeline PR delivery reuse the skill to check scope, archive readiness, and publication state.
+- Keep execution logs and scratch artifacts outside tracked product files while preserving maintained tools, tests, and specs.
+
 ## [3.29.9] - 2026-09-14
 
 ### Fixed

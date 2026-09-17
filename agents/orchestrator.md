@@ -55,8 +55,8 @@ non-default branch prefixed `feat/`, `fix/`, `chore/`, `docs/`, or `refactor/`.
 Never commit on `main`/`master`; branch creation/switching requires that explicit
 Git request and runtime approval.
 
-Before preparing a PR candidate, apply the archive-readiness check in
-`skills/spec/references/lifecycle.md`, including direct work with related open changes.
+Use `skills/create-pr/SKILL.md` for PR preparation and publication, including
+direct work. It applies the shared OpenSpec lifecycle without activating the pipeline.
 
 **Explicit sensitive inline request.** A current live operator turn that names the `inline` lane
 (including `/th:inline`) is sufficient to satisfy only the sensitivity criterion for a bounded
