@@ -37,7 +37,7 @@
       "@Team-Harness pipeline: coordinate planning, implementation, review, and delivery for this change in the current Main thread.",
       "Use Team Harness to create an architecture diagram for this repository.",
       "Use Team Harness to inspect GCP infrastructure in read-only plan mode.",
-      "Continue implementation of the active approved Team Harness pipeline.",
+      "Continue implementation of the active Team Harness pipeline.",
       "Recover the active Team Harness workspace."
     ],
     "brandColor": "#2563EB"
