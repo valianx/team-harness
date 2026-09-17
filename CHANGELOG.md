@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.30.1] - 2026-09-17
+
+### Changed
+
+- Retire the Claude developer-mode style and hookify rule proposals; keep TH discoverable through native skills and a concise workflow guide.
+- Make spec and independent review the central development workflow; reviewer findings guide the coordinator without granting or vetoing publication.
+- Retire duplicate command guards, pipeline authority journals, capability leases, profile attestations, and forced native settings across the runtime integrations.
+- Keep native read-only reviewers, workflow discovery and voice; make detailed Claude observability opt-in and preserve user settings during update.
+
 ## [3.30.0] - 2026-09-17
 
 ### Added

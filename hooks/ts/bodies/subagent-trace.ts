@@ -5,13 +5,9 @@
 //   - NEVER emits stdout (no permissionDecision envelope).
 //   - ALWAYS exits 0 (never blocks).
 //   - Writes one JSONL line to 00-subagent-trace.jsonl in the active workspace.
-//   - NON-SUPPRESSIBLE: the breadcrumb is NOT gated by TH_HOOK_PROFILE, matching
-//     the Bash oracle (hooks/subagent-trace.sh has no profile gate at all) and
-//     its own start-side twin (subagent-start.ts, also non-suppressible by
-//     design). This is a pipeline-observability floor (SEC-DR-002/004/005/007),
-//     not an optional notification — the mate on the other end of a start/stop
-//     pair must never silently disappear because the operator lowered the hook
-//     profile for a different, unrelated class of hook.
+//   - Profile gate: the breadcrumb is optional pipeline observability and is
+//     suppressed by TH_HOOK_PROFILE=minimal, like the start-side twin and the
+//     other detailed trace hooks.
 //   - Scope guard: agent_type field must start with "th:" — skip others silently.
 //   - agent_id (SEC-DR-007): carried through as an opaque correlation key,
 //     same as the retired Bash oracle (hooks/subagent-trace.sh Step 2/6) —
@@ -31,10 +27,10 @@
 // The body exposes a SubagentTraceWriter interface for testability.
 // The CC entry injects a real filesystem writer; tests inject a mock.
 //
-// IMPORTS hook-profile: NO. Despite being an observability hook, the
-// breadcrumb invariant above requires it to stay outside the profile gate —
-// see the CONTRACT note.
+// IMPORTS hook-profile: YES. Trace writes belong to the optional
+// pipeline-observability class.
 
+import { observabilityEnabled } from "./hook-profile.js";
 import type { NormalizedInput } from "../shim/normalized-v1.js";
 
 // ---------------------------------------------------------------------------
@@ -72,6 +68,10 @@ function isTHAgent(agentType: string): boolean {
 // ---------------------------------------------------------------------------
 
 export function writeTrace(input: NormalizedInput, writer: SubagentTraceWriter): string | null {
+  if (!observabilityEnabled("pipeline-observability")) {
+    return null;
+  }
+
   // Extract agent_type from the subagent stop payload.
   // SubagentStop payload: { agent_type, stop_reason, ... }
   const agentType =

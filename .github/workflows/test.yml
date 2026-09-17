@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   windows-hooks:
-    name: native Windows hooks and filesystem
+    name: native Windows installation and filesystem
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,17 +22,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Hook commands in PowerShell 7 and Windows PowerShell
-        run: node tests/test_codex_windows_hooks.mjs
       - run: node tests/test_openspec_launcher.mjs
-      - run: node tests/test_th_update_windows.mjs
       - run: python tests/test_windows_artifact_fs.py
       - run: python tests/test_review_context_windows.py
       - run: python tests/test_codex_update_convergence.py
       - run: python tests/test_codex_binary_resolution.py
 
   verify:
-    name: run-all (policy-block + frontmatter + hook/gate suites)
+    name: run-all (installation, workflows and review evidence)
     runs-on: ubuntu-latest
     env:
       # Node/npm/bun suites must run for real in CI, not silently SKIP —
@@ -147,9 +144,8 @@ jobs:
           done
           echo "Shared version sites are changed, parseable, and equal at $plugin (Codex=$has_codex installer=$has_installer)."
 
-      # Python and Node are set up UNCONDITIONALLY: the policy-block functional
-      # suite validates .claude-plugin/plugin.json, which is IN the release-only
-      # allowlist above — so a release-only diff must still exercise it.
+      # Python and Node are set up UNCONDITIONALLY for the always-on repository
+      # checks and the full suite when the diff is not release-only.
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -170,22 +166,15 @@ jobs:
         if: steps.release-only.outputs.is_release_only != 'true'
         uses: oven-sh/setup-bun@v2
 
-      # The policy-block suite validates plugin.json — a file that IS in the
-      # release-only allowlist — so it runs on every diff, release-only included.
-      # The full suite below re-runs it (plus every other suite) only for
-      # non-release diffs.
-      - name: Run policy-block functional suite (always)
-        run: bash tests/test_policy_block.sh
-
       - name: Run full verification suite
         if: steps.release-only.outputs.is_release_only != 'true'
         env:
           TH_BASELINE_BASE_REF: ${{ github.event.pull_request.base.sha || 'origin/main' }}
         run: bash tests/run-all.sh
 
-      - name: Release-only diff — heavier suites skipped (policy-block still ran)
+      - name: Release-only diff — heavier suites skipped
         if: steps.release-only.outputs.is_release_only == 'true'
-        run: echo "Diff is limited to version sites + CHANGELOG.md + changelog.d/ (a per-PR version bump) — the policy-block suite ran above; skipping the heavier frontmatter (uv/PyYAML) and behavioral suites. This check still ran and reports success; it is not a paths-ignore trigger skip."
+        run: echo "Diff is limited to version sites + CHANGELOG.md + changelog.d/ (a per-PR version bump) — skipping the heavier frontmatter and behavioral suites. This check still ran and reports success; it is not a paths-ignore trigger skip."
 
   go-test:
     name: go test (installer)
@@ -244,10 +233,6 @@ jobs:
           python3 tests/test_codex_runtime.py
           python3 tests/test_no_prose_assertions.py
           python3 tests/test_reference_resolution.py
-      - name: Verify Codex hooks
-        run: |
-          node tools/codex-runtime/sync-hooks.mjs --check
-          bash tests/test_codex_hooks.sh
 
   dist-freshness:
     name: hooks/ts dist freshness (rebuild + diff + completeness)
@@ -275,9 +260,7 @@ jobs:
         run: git diff --exit-code hooks/ts/dist/
 
       - name: Verify every CC entry has a build script
-        # Scoped to *.cc.ts (CC ships bundled dist/*.cjs). *.opencode.ts entries
-        # are distributed as raw TypeScript source and are never bundled — see
-        # cmd/install/manifest_registry.go's opencode plugin component builder.
+        # Claude ships the retained observational hooks as bundled dist/*.cjs.
         run: |
           missing=0
           for entry in hooks/ts/entry/*.cc.ts; do

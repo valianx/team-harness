@@ -10,9 +10,10 @@
 //   B — fixed-template emit; only validated lang + derived display-name interpolated.
 //   C — no raw config bytes in output; error paths emit null (silent).
 //
-// NEVER imports hook-profile helper (enforcement floor — same as session-start).
+// NEVER imports hook-profile helper: language context remains available in
+// TH_HOOK_PROFILE=minimal alongside SessionStart discovery.
 
-import type { NormalizedInput, NormalizedDecision } from "../shim/normalized-v1.js";
+import type { NormalizedInput } from "../shim/normalized-v1.js";
 
 // ---------------------------------------------------------------------------
 // LanguagePromptReader — injected by the entry module.
@@ -62,31 +63,9 @@ export function evaluateLanguagePrompt(
   const name = languageName(raw);
 
   // SEC-DR-B: only validated raw (lang code) and derived name interpolated.
-  // Text reconciled to hooks/language-user-prompt.sh (Bash is interim-canonical —
-  // see docs/opencode-migration-guide.md status header).
+  // Keep the reminder fixed apart from the validated language code and name.
   const additionalContext =
     `Reply in ${name} (configured default \`${raw}\`), regardless of this message's language, unless the operator set a per-session override.`;
 
   return { additionalContext };
-}
-
-// ---------------------------------------------------------------------------
-// evaluate() — adapts LanguagePromptOutput to NormalizedDecision.
-// The CC entry emits additionalContext; this is a non-blocking hook.
-// ---------------------------------------------------------------------------
-
-export function evaluate(
-  input: NormalizedInput,
-  reader: LanguagePromptReader
-): NormalizedDecision & { langOutput?: LanguagePromptOutput } {
-  const langOutput = evaluateLanguagePrompt(input, reader);
-  if (langOutput.additionalContext === null) {
-    return { decision: "none", reason: "", mutations: null };
-  }
-  return {
-    decision: "allow",
-    reason: "",
-    mutations: null,
-    langOutput,
-  } as NormalizedDecision & { langOutput?: LanguagePromptOutput };
 }

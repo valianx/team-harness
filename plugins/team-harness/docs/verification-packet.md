@@ -23,7 +23,7 @@ build-once-read-many shape already used for `00-knowledge-context.md`
 
 **When:** Freeze — after implementation, hygiene, and candidate assembly
 succeed, before validation roles launch. See
-`agents/ref-pipeline.md § "Freeze and validation"`.
+`agents/ref-pipeline.md § "Coordinated development workflow"`.
 
 **Where:** `{docs_root}/00-verify-packet.md` — one file per task, overwritten in place on
 every rebuild. **Never create a versioned sibling file** — the `Packet version`

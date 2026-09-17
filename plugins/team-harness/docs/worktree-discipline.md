@@ -258,15 +258,15 @@ No filesystem search is needed.
 
 **The coordinator-level fan-out this rule gated is retired.** It described two mechanisms that no
 longer exist: a same-repo multi-task batch spawning one orchestrator instance per task (retired —
-`agents/ref-dispatch-machinery.md § "What left this file"` names the multi-task fan-out and its
+`agents/ref-dispatch-machinery.md § "Multi-repository coordination"` records current coordination; the historical multi-task fan-out and its
 consolidator removed, measured at 0.6% of runs, both operator overrides), and a multi-project
 initiative spawning one orchestrator instance per project concurrently. The latter survives only
 as a **serial** sequence inside the single coordinator (`agents/ref-dispatch-machinery.md §
-"Multi-project sequencing"`) — one project runs to completion before the next starts, so there is
+"Multi-repository coordination"`) — one project runs to completion before the next starts, so there is
 no concurrent-lane collision class for this rule's per-lane STOP-on-unfamiliar-WIP check to guard
 against. Each project may still use its own worktree, because each is a genuinely distinct
-repository (proven by the repo-identity test, `agents/ref-dispatch-machinery.md § "Repo-identity
-verification"`) — Rules 1–5 apply to that worktree exactly as they do to any single-project run,
+repository (proven by the repo-identity test, with current guidance in
+`agents/ref-dispatch-machinery.md § "Multi-repository coordination"`) — Rules 1–5 apply to that worktree exactly as they do to any single-project run,
 with no lane-specific binding needed since nothing runs concurrently. Intra-task parallelism
 (`agents/ref-pipeline.md`) is a different mechanism entirely and
 was never governed by this rule: its lanes share ONE worktree and branch, with the coordinator as

@@ -27,7 +27,7 @@ This document covers ONE parallelism mechanism: an operator-authorized batch of 
 | Mechanism | Axis | Unit of fan-out | Gate | Canonical source |
 |---|---|---|---|---|
 | Inter-task DAG scheduler | tasks within one plan | the base dispatch carries every non-decomposed task, in `Depends on:` order | none | `agents/ref-pipeline.md` |
-| ~~Parallel Multi-Project Dispatch~~ — **RETIRED** | projects within one initiative | — | — | Retired with the coordinator fusion: fanning out per-project lanes required the coordinator to dispatch a copy of itself. Successor: serial, `agents/ref-dispatch-machinery.md § "Multi-project sequencing"` |
+| ~~Parallel Multi-Project Dispatch~~ — **RETIRED** | projects within one initiative | — | — | Retired with the coordinator fusion: fanning out per-project lanes required the coordinator to dispatch a copy of itself. Current successor: serial coordination, `agents/ref-dispatch-machinery.md § "Multi-repository coordination"` |
 | Batch Implementation (this document) | independent items across an operator-authorized batch | one implementer per item, own worktree | operator authorization + the 5 preconditions in `## When this applies` | this document |
 | **Intra-task lane decomposition** | **files WITHIN one already-approved task** | **one implementer lane per architect-declared, file-disjoint seam** | **`Lane-decomposable: yes` in `01-plan.md` AND `Files:` count ≥ `LANE_DECOMPOSE_MIN_FILES` (8) AND ≥2 disjoint seams** | `agents/ref-pipeline.md § Phase 2 — Implementation → Intra-task execution-lane decomposition` |
 
@@ -57,7 +57,7 @@ impact-required security over the immutable frozen candidate.
 
 Cap the concurrency at `batch_concurrency` (default 5) using an eager slot-fill wave model: fill all available slots immediately, and as each item finishes open the slot to the next queued item. This mirrors the Stage-1 planning fan-out (N architects + N plan-reviewers) on the implementation side.
 
-**Commit ownership per item (`agents/implementer.md § Commit Contract`).** An item's implementer commits and reports `commit: {sha}` for any item-LOCAL diff — before the item's in-worktree verify runs. This is the standard 1:1 case, never `lane-deferred`: `lane-deferred` is reserved for intra-task execution-lane decomposition, where multiple lanes share ONE worktree and branch (see the mechanism-comparison table above). Each item in this batch holds its own isolated worktree and its own branch, so no lane index-race exists here — the item's own committed sha is what `git merge <item-branch>` (below) merges into the integration branch at consolidation. An item whose entire contribution is **shared-serial only** (see "Edit-class split" below) — nothing item-local to commit — has no item-worktree diff to commit: it reports `commit: none — no source change` instead of a fabricated sha. Reserved shared-serial content must never be written inside an item's own worktree to manufacture a commit; it is spliced centrally by the orchestrator at consolidation, per the Edit-class split below.
+**Historical commit-ownership protocol.** The former per-item commit vocabulary and lane-specific ownership rules are retained here for provenance only. Current work follows the native Git state and the coordinator's bounded integration workflow; this document's batch mechanism remains opt-in.
 
 ---
 

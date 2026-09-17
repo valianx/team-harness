@@ -184,26 +184,27 @@ def is_legacy_selector(key: str, value: Any) -> bool:
 
 def legacy_selectors(doc: dict[str, Any], prefix: str = "") -> list[str]:
     """Return legacy selector keys without treating them as routing input."""
+    # Legacy selectors are a small, historical TH migration surface.  Only
+    # the configuration document's root belongs to that surface; nested
+    # dictionaries can be owned by the operator or another runtime.
+    if prefix:
+        return []
     found: list[str] = []
     for key, value in doc.items():
-        dotted = f"{prefix}.{key}" if prefix else key
         if is_legacy_selector(key, value):
-            found.append(dotted)
-        elif isinstance(value, dict):
-            found.extend(legacy_selectors(value, dotted))
+            found.append(key)
     return sorted(found)
 
 
 def remove_legacy_selectors(doc: dict[str, Any], prefix: str = "") -> list[str]:
     """Remove only known legacy selectors; preserve every unrelated key."""
+    if prefix:
+        return []
     removed: list[str] = []
     for key, value in list(doc.items()):
-        dotted = f"{prefix}.{key}" if prefix else key
         if is_legacy_selector(key, value):
             doc.pop(key)
-            removed.append(dotted)
-        elif isinstance(value, dict):
-            removed.extend(remove_legacy_selectors(value, dotted))
+            removed.append(key)
     return sorted(removed)
 
 
@@ -247,18 +248,12 @@ def import_missing(
         if not prefix and key in IMPORT_EXCLUDED_KEYS:
             continue
         dotted = f"{prefix}.{key}" if prefix else key
-        if is_legacy_selector(key, source_value):
+        if not prefix and is_legacy_selector(key, source_value):
             if legacy is not None:
                 legacy.append(dotted)
             continue
         if key not in target:
             copied = json.loads(json.dumps(source_value))
-            if isinstance(copied, dict):
-                removed = remove_legacy_selectors(copied, dotted)
-                if legacy is not None:
-                    legacy.extend(removed)
-                if not copied:
-                    continue
             target[key] = copied
             imported.append(dotted)
             continue
@@ -280,12 +275,10 @@ def classify_import(target: dict[str, Any], source: dict[str, Any], prefix: str 
         if not prefix and key in IMPORT_EXCLUDED_KEYS:
             continue
         dotted = f"{prefix}.{key}" if prefix else key
-        if is_legacy_selector(key, source_value):
+        if not prefix and is_legacy_selector(key, source_value):
             continue
         if key not in target:
             copied = json.loads(json.dumps(source_value))
-            if isinstance(copied, dict):
-                remove_legacy_selectors(copied, dotted)
             if copied != {}:
                 importable.append(dotted)
             continue

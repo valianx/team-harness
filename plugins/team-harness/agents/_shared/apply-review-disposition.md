@@ -177,7 +177,7 @@ Note: {one line}
 Thread action: {reply + resolve | reply, left open}
 ```
 
-**Decision-ledger append.** Immediately after emitting the per-comment output above, the orchestrator appends one `disposition` line to `00-decision-ledger.*` for that comment, with `phase: "4.5-review"`, `subject` set to the comment's one-line summary, and `rationale` set to the Evidence/Note text. The `Decision` value above maps deterministically to the ledger's `accept | watch | reject` vocabulary: `APPLIED → accept`, `PARTIAL → watch`, `DEFERRED → watch`, `REJECTED → reject`, `NEEDS-CLARIFICATION → reject`. See `docs/observability.md § "Decision Ledger"` for write mechanics and mapping. This telemetry is never mirrored into `00-execution-events` and grants no pipeline authority; control actions follow `agents/_shared/orchestrator-state.md`.
+**Decision-ledger append.** Immediately after emitting the per-comment output above, the orchestrator appends one `disposition` line to `00-decision-ledger.*` for that comment, with `phase: "4.5-review"`, `subject` set to the comment's one-line summary, and `rationale` set to the Evidence/Note text. The `Decision` value above maps deterministically to the ledger's `accept | watch | reject` vocabulary: `APPLIED → accept`, `PARTIAL → watch`, `DEFERRED → watch`, `REJECTED → reject`, `NEEDS-CLARIFICATION → reject`. See `docs/observability.md § "Workflow visibility"` for the current observability boundary. This telemetry is never mirrored into `00-execution-events` and grants no pipeline authority; control actions follow `agents/_shared/orchestrator-state.md`.
 
 ## Step 6 — Reply and resolve on the thread
 

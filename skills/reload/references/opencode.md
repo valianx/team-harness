@@ -26,8 +26,8 @@ active agent tool or use global disposal as a fallback.
 After a supported recycle completes, verify that the original session ID and
 existing history remain accessible. Check the host's effective agent/command
 discovery and MCP status against the intended installation. Skills and plugin
-hooks may have additional caches: a fresh `/agent` response or successful dispose
-does not prove those were replaced. Require active-host skill and hook evidence
+resources may have additional caches: a fresh `/agent` response or successful
+dispose does not prove every resource was replaced. Require active-host evidence
 where applicable, and leave unsupported observations unverified.
 
 Without host control, reread the active workflow from the verified native

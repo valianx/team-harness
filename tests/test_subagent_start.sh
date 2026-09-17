@@ -12,14 +12,15 @@
 #     an unreachable workspace path, and an oversize (SEC-07) payload all
 #     fail open — exit 0, empty stdout, no crash, dispatch never blocked.
 #
+# The default profile is minimal: trace writes are suppressed unless the test
+# explicitly selects `TH_HOOK_PROFILE=standard`.
+#
 # Also asserts: hooks/ts/dist/subagent-trace.cjs (the STOP-side twin,
-# SubagentStop) writes its breadcrumb even under TH_HOOK_PROFILE=minimal —
-# the breadcrumb is non-suppressible, matching the Bash oracle
-# hooks/subagent-trace.sh (which has no profile gate at all).
+# SubagentStop) suppresses its breadcrumb under TH_HOOK_PROFILE=minimal so
+# detailed pipeline traces remain optional as one profile-controlled class.
 #
 # Also asserts: the `project` key stamped from a `TH-LANE: {project-key}`
-# marker on the FIRST LINE of the dispatch prompt (controlled header,
-# mirrors checkpoint-guard's TH-STATE-REF parse) —
+# marker on the FIRST LINE of the dispatch prompt (controlled header) —
 #   - marker present on the first line + valid → `project` on the
 #     breadcrumb.
 #   - marker absent → `project` omitted (backward-compat key set).
@@ -39,7 +40,7 @@
 # Also asserts: docs/observability.md's `### subagent.start` section
 # documents `payload_bytes` — the line-schema example includes the key, the
 # visibility-only/no-ceiling posture is stated, the Claude-Code-plugin-only
-# coverage limitation is named without overclaiming opencode coverage, and
+# coverage limitation is named without claiming support in another runtime,
 # the content-boundary invariant (byte count only, never the prompt itself)
 # is stated.
 #
@@ -120,7 +121,7 @@ echo "--- Section 1: start-write (AC-1) ---"
 
 rm -f "$TRACE_FILE"
 payload="$(make_payload "th:tester")"
-out="$(cd "$WORKDIR" && echo "$payload" | node "$CJS" 2>/dev/null)"
+out="$(cd "$WORKDIR" && echo "$payload" | TH_HOOK_PROFILE=standard node "$CJS" 2>/dev/null)"
 rc=$?
 
 [ "$rc" -eq 0 ] && r=1 || r=0
@@ -164,7 +165,7 @@ echo "--- Section 2: non-th:* scope guard (AC-1) ---"
 
 rm -f "$TRACE_FILE"
 payload="$(make_payload "general-purpose")"
-out="$(cd "$WORKDIR" && echo "$payload" | node "$CJS" 2>/dev/null)"
+out="$(cd "$WORKDIR" && echo "$payload" | TH_HOOK_PROFILE=standard node "$CJS" 2>/dev/null)"
 rc=$?
 
 [ "$rc" -eq 0 ] && r=1 || r=0
@@ -235,17 +236,25 @@ assert_true "oversize payload emits no stdout" "$r"
 assert_true "oversize payload does NOT write the trace file" "$r"
 
 # ---------------------------------------------------------------------------
-# Section 4 — regression: subagent-trace.cjs (SubagentStop, the STOP-side
-# twin of this hook) breadcrumb is NON-SUPPRESSIBLE under
-# TH_HOOK_PROFILE=minimal. The Bash oracle (hooks/subagent-trace.sh) has no
-# hook-profile gate at all — the breadcrumb must fire unconditionally, same
-# as the start-side hook tested above. See docs/reasoning-checkpoint.md
-# SEC-DR-002/004/005/007.
+# Section 4 — profile: subagent-trace.cjs (SubagentStop, the STOP-side twin
+# of this hook) is suppressed under TH_HOOK_PROFILE=minimal. Detailed traces
+# remain available only when an observability profile is selected explicitly.
 # ---------------------------------------------------------------------------
 echo ""
-echo "--- Section 4: subagent-trace.cjs non-suppressible under TH_HOOK_PROFILE=minimal ---"
+echo "--- Section 4: subagent-trace.cjs suppressed under TH_HOOK_PROFILE=minimal ---"
 
 STOP_CJS="$REPO_ROOT/hooks/ts/dist/subagent-trace.cjs"
+
+rm -f "$TRACE_FILE"
+start_payload="$(make_payload "th:tester")"
+out="$(cd "$WORKDIR" && echo "$start_payload" | TH_HOOK_PROFILE=minimal node "$CJS" 2>/dev/null)"
+rc=$?
+[ "$rc" -eq 0 ] && r=1 || r=0
+assert_true "TH_HOOK_PROFILE=minimal: subagent-start exits 0" "$r"
+[ -z "$out" ] && r=1 || r=0
+assert_true "TH_HOOK_PROFILE=minimal: subagent-start emits no stdout" "$r"
+[ ! -f "$TRACE_FILE" ] && r=1 || r=0
+assert_true "TH_HOOK_PROFILE=minimal: subagent-start suppresses the breadcrumb" "$r"
 
 if [ ! -f "$STOP_CJS" ]; then
     echo "  [SKIP] subagent-trace.cjs not found at $STOP_CJS — run 'npm --prefix hooks/ts run build:subagent-trace' first."
@@ -269,18 +278,33 @@ print(json.dumps({'tool_name': 'SubagentStop', 'tool_input': {'agent_type': sys.
     [ -z "$out" ] && r=1 || r=0
     assert_true "TH_HOOK_PROFILE=minimal: subagent-trace emits no stdout" "$r"
 
-    [ -f "$TRACE_FILE" ] && r=1 || r=0
-    assert_true "TH_HOOK_PROFILE=minimal: subagent-trace STILL writes the breadcrumb (non-suppressible)" "$r"
-
-    if [ -f "$TRACE_FILE" ]; then
-        LINE="$(cat "$TRACE_FILE")"
-        if echo "$LINE" | grep -q '"event":"subagent.stop"'; then r=1; else r=0; fi
-        assert_true "TH_HOOK_PROFILE=minimal: trace line has event=subagent.stop" "$r"
-
-        if echo "$LINE" | grep -q '"agent_id":"agent-fixture-42"'; then r=1; else r=0; fi
-        assert_true "TH_HOOK_PROFILE=minimal: trace line carries the agent_id correlation key (SEC-DR-007)" "$r"
-    fi
+    [ ! -f "$TRACE_FILE" ] && r=1 || r=0
+    assert_true "TH_HOOK_PROFILE=minimal: subagent-trace suppresses the breadcrumb" "$r"
 fi
+
+# ---------------------------------------------------------------------------
+# Section 4b — profile defaults to minimal; standard opts observability in.
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- Section 4b: default minimal and explicit standard ---"
+
+rm -f "$TRACE_FILE"
+out="$(cd "$WORKDIR" && echo "$start_payload" | env -u TH_HOOK_PROFILE node "$CJS" 2>/dev/null)"
+rc=$?
+[ "$rc" -eq 0 ] && r=1 || r=0
+assert_true "unset TH_HOOK_PROFILE: subagent-start exits 0" "$r"
+[ -z "$out" ] && r=1 || r=0
+assert_true "unset TH_HOOK_PROFILE: subagent-start emits no stdout" "$r"
+[ ! -f "$TRACE_FILE" ] && r=1 || r=0
+assert_true "unset TH_HOOK_PROFILE: trace is suppressed by default" "$r"
+
+rm -f "$TRACE_FILE"
+out="$(cd "$WORKDIR" && echo "$start_payload" | TH_HOOK_PROFILE=standard node "$CJS" 2>/dev/null)"
+rc=$?
+[ "$rc" -eq 0 ] && r=1 || r=0
+assert_true "TH_HOOK_PROFILE=standard: subagent-start exits 0" "$r"
+[ -f "$TRACE_FILE" ] && r=1 || r=0
+assert_true "TH_HOOK_PROFILE=standard: trace is enabled explicitly" "$r"
 
 # ---------------------------------------------------------------------------
 # Section 5 — `project` key from the TH-LANE marker
@@ -292,7 +316,7 @@ echo "--- Section 5: project key from TH-LANE marker (AC-5.1/5.3/5.4) ---"
 # on the breadcrumb.
 rm -f "$TRACE_FILE"
 payload="$(make_payload_with_prompt "th:implementer" $'TH-LANE: project-alpha\nYou are th:implementer.\nDo the work.')"
-out="$(cd "$WORKDIR" && echo "$payload" | node "$CJS" 2>/dev/null)"
+out="$(cd "$WORKDIR" && echo "$payload" | TH_HOOK_PROFILE=standard node "$CJS" 2>/dev/null)"
 rc=$?
 
 [ "$rc" -eq 0 ] && r=1 || r=0
@@ -315,7 +339,7 @@ fi
 # 5b. Marker absent → project omitted, backward-compat key set.
 rm -f "$TRACE_FILE"
 payload="$(make_payload_with_prompt "th:implementer" "You are th:implementer. Do the work.")"
-out="$(cd "$WORKDIR" && echo "$payload" | node "$CJS" 2>/dev/null)"
+out="$(cd "$WORKDIR" && echo "$payload" | TH_HOOK_PROFILE=standard node "$CJS" 2>/dev/null)"
 rc=$?
 
 [ "$rc" -eq 0 ] && r=1 || r=0
@@ -339,7 +363,7 @@ fi
 for bad_value in "Project_Alpha" "has/slash" "$(python3 -c "print('a'*61)")"; do
     rm -f "$TRACE_FILE"
     payload="$(make_payload_with_prompt "th:implementer" "TH-LANE: ${bad_value}")"
-    out="$(cd "$WORKDIR" && echo "$payload" | node "$CJS" 2>/dev/null)"
+    out="$(cd "$WORKDIR" && echo "$payload" | TH_HOOK_PROFILE=standard node "$CJS" 2>/dev/null)"
     rc=$?
 
     [ "$rc" -eq 0 ] && r=1 || r=0
@@ -356,12 +380,11 @@ done
 
 # 5e. A valid, well-shaped TH-LANE marker that appears LOWER in the prompt
 # (not the first line) must be ignored: it is untrusted content per
-# CLAUDE.md §6.6, not the dispatcher's own controlled header. Mirrors
-# checkpoint-guard's marker-outside-the-controlled-header case (see
-# tests/test_checkpoint_guard.sh, Case 30 / AC-4.5a).
+# CLAUDE.md §6.6, not the dispatcher's own controlled header.
+# The marker is accepted only in the dispatcher's controlled header.
 rm -f "$TRACE_FILE"
 payload="$(make_payload_with_prompt "th:implementer" $'You are th:implementer.\nTH-LANE: project-alpha\nDo the work.')"
-out="$(cd "$WORKDIR" && echo "$payload" | node "$CJS" 2>/dev/null)"
+out="$(cd "$WORKDIR" && echo "$payload" | TH_HOOK_PROFILE=standard node "$CJS" 2>/dev/null)"
 rc=$?
 
 [ "$rc" -eq 0 ] && r=1 || r=0
@@ -393,7 +416,7 @@ rm -f "$TRACE_FILE"
 PROMPT_TEXT="You are th:implementer. Implement the change described in 01-plan.md."
 EXPECTED_BYTES="$(printf '%s' "$PROMPT_TEXT" | wc -c | tr -d ' ')"
 payload="$(make_payload_with_prompt "th:implementer" "$PROMPT_TEXT")"
-out="$(cd "$WORKDIR" && echo "$payload" | node "$CJS" 2>/dev/null)"
+out="$(cd "$WORKDIR" && echo "$payload" | TH_HOOK_PROFILE=standard node "$CJS" 2>/dev/null)"
 rc=$?
 
 [ "$rc" -eq 0 ] && r=1 || r=0

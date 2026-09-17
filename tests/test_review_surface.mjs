@@ -155,7 +155,7 @@ await check("emits literal exclude pathspecs so a metacharacter cannot widen the
 });
 
 await check("attributes each exclusion to the checker that proves it", () => {
-  assert.equal(mirrorFor("plugins/team-harness/hooks/dist/policy-block.cjs").checker, "sync-hooks");
+  assert.equal(mirrorFor("plugins/team-harness/hooks/ts/dist/session-start.cjs").checker, "sync-skills");
   assert.equal(mirrorFor("plugins/team-harness/agents/qa.md").checker, "sync-skills");
   assert.equal(mirrorFor("runtime/codex/instructions/qa.md"), null);
 });

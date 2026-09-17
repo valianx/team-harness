@@ -110,16 +110,13 @@ EXPECTED_AGENTS = [
 # naive scan would false-FAIL the clean tree.
 # ---------------------------------------------------------------------------
 DETECTOR_FILE_ALLOWLIST = {
-    "hooks/ts/bodies/policy-block.ts",
-    "tests/test_policy_block.sh",
     "tests/test_security_scan.py",   # repo wrapper for this file
     "skills/audit-security/scripts/security_scan.py",   # this file
 }
 
 # ---------------------------------------------------------------------------
 # Check 5 — high-confidence secret patterns (class-anchored, not concrete).
-# Repository-scan patterns. This scanner and the pre-tool guard have different
-# input boundaries, so this list is maintained independently.
+# Repository-scan patterns, maintained for shipped asset contents.
 # Each pattern requires a non-trivial concrete VALUE after its prefix —
 # a bare regex shell like the AKIA prefix alone does NOT match.
 # ---------------------------------------------------------------------------
@@ -725,8 +722,7 @@ def _self_test_check_4() -> None:
 def _self_test_check_5() -> None:
     """Check 5 fixture: file with a programmatically-constructed secret value.
     The value is built at runtime via string concatenation so no concrete literal
-    appears in this source file (the policy-block gate would otherwise block
-    writing this file)."""
+    appears in the shipped scanner source."""
     # AWS key: prefix "AKIA" + 16 uppercase alphanumeric chars — constructed at runtime.
     aws_prefix = "AKIA"
     aws_suffix = "X" * 16  # 16 chars → total 20 chars; matches AKIA[0-9A-Z]{16}

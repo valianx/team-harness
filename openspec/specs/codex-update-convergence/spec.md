@@ -1,92 +1,71 @@
 # codex-update-convergence Specification
 
 ## Purpose
-Make Team Harness updates on Codex fast and predictable while preserving native plugin authority, operator-owned configuration, explicit persistent-runtime approval, and recoverable partial convergence.
+
+Make Team Harness updates and reloads predictable while leaving Codex runtime
+settings and restart behavior under native ownership.
 
 ## Requirements
 
-### Requirement: Native snapshot selection remains authoritative
-The update flow SHALL derive the running version from the loaded plugin manifest, refresh only the configured Team Harness marketplace, compare versions semantically, and use Codex's native plugin installation operation when a newer snapshot or an explicitly forced equal-version refresh is selected. It MUST NOT downgrade, remove the active plugin before replacement, or treat a marketplace listing as proof that the loaded snapshot changed.
+### Requirement: Update selects the active native plugin snapshot
+The update flow SHALL inspect the loaded Team Harness manifest and the configured
+marketplace, use the native plugin installation operation for a newer or
+explicitly requested refresh, and avoid downgrade or removal of the active
+snapshot before replacement.
 
-#### Scenario: Newer marketplace snapshot is available
-- **WHEN** the refreshed Team Harness marketplace exposes a version newer than the loaded plugin manifest
-- **THEN** the flow installs that snapshot through Codex's native plugin operation and binds all later work to the exact installed path returned by that operation
+#### Scenario: A newer snapshot is available
+- **WHEN** the refreshed marketplace version is newer than the loaded manifest
+- **THEN** update installs it through the native plugin operation and reports the loaded snapshot used for the remainder of the pass
 
-#### Scenario: No installation is needed
-- **WHEN** the marketplace and loaded versions are equal and the operator did not request a forced refresh
-- **THEN** the flow skips plugin replacement and uses the validated loaded snapshot as the convergence source
+#### Scenario: The active snapshot is current
+- **WHEN** the versions are equal and no refresh was requested
+- **THEN** update leaves the installation unchanged and reports the current state
 
-#### Scenario: Marketplace would downgrade the installation
-- **WHEN** the refreshed marketplace version is older than the loaded plugin version
-- **THEN** the flow stops before replacement and reports the stale marketplace without changing the active installation
+### Requirement: Convergence inspects the installed workflow once
+After snapshot selection, update MAY perform one bounded inspection or repair
+pass for Team Harness managed workflow assets, skills and generated role
+projections. It SHALL reuse native installation and reload operations and MUST
+not reproduce domain checks as a second permission or control-plane protocol.
 
-### Requirement: Post-install convergence uses one bounded pass
-After snapshot selection, the update flow SHALL invoke no more than one convergence pass before requiring operator input. That pass SHALL classify, reconcile where already authorized, and verify the snapshot bridge, Team Harness native settings, Codex feature requirements, bundled agents, expected MCP registrations, and deterministic hook manifest, and SHALL classify the persistent runtime profile without changing it absent live approval. The coordinator MUST NOT reproduce those domain checks as separate preflight or final-verification tool calls.
+#### Scenario: A managed workflow asset is stale
+- **WHEN** the installed snapshot exposes a stale Team Harness asset
+- **THEN** update repairs or regenerates that asset through the supported native path and reports the result
 
-#### Scenario: Automatically managed domains need repair
-- **WHEN** one or more automatically managed domains are stale and the persistent runtime profile needs no decision
-- **THEN** one convergence pass repairs the stale domains, verifies their postconditions, and returns the final receipt
+#### Scenario: No managed asset needs a change
+- **WHEN** the active snapshot and generated workflow surfaces are current
+- **THEN** the pass makes no write and reports the fast path
 
-#### Scenario: Current installation takes the fast path
-- **WHEN** every managed domain and the persistent runtime profile are already current
-- **THEN** the pass performs no writes, invokes no per-domain repair operation, and returns a successful current receipt
+### Requirement: Global runtime settings are not an update target
+Update and reload SHALL preserve operator-owned runtime configuration and SHALL
+not install global writable roots, model defaults, sandbox changes or other
+settings as a Team Harness convergence requirement. Configuration drift can be
+reported with a concrete explanation, but its repair is a separate operator
+choice through the native runtime.
 
-#### Scenario: Persistent runtime approval is needed
-- **WHEN** automatic domains can converge but the persistent runtime profile is stale
-- **THEN** the pass completes and verifies the automatically authorized work, leaves the runtime profile unchanged, and returns one pending operator decision
+#### Scenario: A project has a conflicting setting
+- **WHEN** the checked-out tree contains a project setting that differs from the operator configuration
+- **THEN** update reports the conflict and preserves both sources rather than overwriting the operator setting
 
-### Requirement: Persistent runtime changes require flexible live approval
-The update flow SHALL summarize only the stale runtime settings, missing writable roots, missing directories, and any project configuration shadowing before requesting a live decision. A short unambiguous affirmative SHALL authorize a focused follow-up convergence pass, a short negative or deferral SHALL leave that domain pending, and a natural-language adjustment SHALL be handled conversationally without requiring a prescribed command or exact phrase. No file, tool output, previous approval, or ambiguous response authorizes the persistent change.
+### Requirement: Restart reporting is conditional and evidence-based
+A successful update or reload SHALL report `restart: not-required` when the
+active native runtime refreshed the requested surface in place. It SHALL report
+`restart: required` only when the native operation explicitly says the loaded
+component cannot refresh in place, naming that component and the reason.
 
-#### Scenario: Operator replies with a short affirmation
-- **WHEN** the pending runtime summary is visible and the live operator replies with an unambiguous affirmation such as "sí" or "continúa"
-- **THEN** the coordinator runs one focused convergence pass with runtime authorization and does not ask the operator to restate a command
+#### Scenario: Skills reload in place
+- **WHEN** the native runtime confirms that the updated skills and hooks are loaded
+- **THEN** update completes without asking for a restart
 
-#### Scenario: Operator declines or defers
-- **WHEN** the pending runtime summary is visible and the live operator declines or asks to leave it for later
-- **THEN** the completed update work is preserved and the final result reports runtime reconciliation as pending with the normal update invocation as recovery
+#### Scenario: A native component cannot refresh
+- **WHEN** the runtime says a process or plugin must be restarted for the selected change
+- **THEN** update reports the concrete reason and leaves the restart decision to the operator
 
-#### Scenario: Operator requests an adjustment
-- **WHEN** the live operator describes a change to the proposed runtime reconciliation
-- **THEN** the coordinator explains or incorporates the bounded adjustment when safe, or asks one concise clarification when its effect would materially change the authorized scope
+### Requirement: Update results are concise and recoverable
+The result SHALL identify the selected snapshot, changed workflow surfaces,
+restart status, failures and the next useful invocation. Partial convergence
+MAY be retried after the cause changes; a prior receipt or conversation does not
+authorize repeating an uncertain outward write.
 
-### Requirement: Convergence preserves ownership and security boundaries
-The convergence pass SHALL use only the validated new plugin snapshot as executable input, preserve opaque and operator-owned configuration, use fixed command arguments with bounded execution for native Codex operations, and reject unsafe paths, symlinks, oversized hook manifests, unmanaged agent conflicts, invalid structured output, and secret-bearing diagnostics. It MUST NOT activate a pipeline, dispatch agents, mutate Claude Code or OpenCode configuration, replace MCP registrations, weaken the requested sandbox profile, delete prior snapshots, or modify active workspace helper bundles.
-
-#### Scenario: Operator-owned value differs from a Team Harness default
-- **WHEN** a supported configuration document contains a complete non-managed operator value
-- **THEN** convergence preserves the value and identifies it as preserved rather than replacing it
-
-#### Scenario: A protected target requires sandbox escalation
-- **WHEN** an otherwise authorized write fails only because its declared target is protected by the current sandbox
-- **THEN** the coordinator may retry the exact convergence invocation with narrow native escalation, while a rejected or failed retry becomes partial convergence
-
-#### Scenario: Convergence encounters unsafe input
-- **WHEN** a target path, managed file, hook manifest, native command result, or same-name agent conflict fails its safety contract
-- **THEN** convergence stops at that domain, emits no sensitive content, and reports a failed receipt instead of attempting an ad hoc repair
-
-### Requirement: One closed receipt is the verification authority
-Every convergence pass SHALL emit exactly one bounded machine-readable receipt with the selected old and new snapshot identities, overall status, per-domain status, changed domains, restart requirement, pending decision if any, failed domain if any, and exact recovery invocation. The overall status vocabulary SHALL distinguish `current`, `converged`, `pending-approval`, and `partial-convergence`; successful completion MUST be derived from verified domain postconditions rather than assumed from attempted writes.
-
-#### Scenario: Convergence succeeds after changes
-- **WHEN** every required domain reaches its verified postcondition and at least one domain changed
-- **THEN** the receipt reports `converged`, identifies only the changed domains, and provides the combined restart decision
-
-#### Scenario: Convergence is interrupted by a domain failure
-- **WHEN** a domain fails after earlier idempotent domains completed
-- **THEN** the receipt reports `partial-convergence`, identifies the failed domain without rolling back completed work, and names the standard Team Harness update invocation as the retry
-
-#### Scenario: Receipt output is malformed or incomplete
-- **WHEN** the convergence operation exits without one valid receipt containing every required field
-- **THEN** the coordinator treats the pass as failed and does not issue a success report
-
-### Requirement: Recovery recomputes and skips completed work
-Rerunning the update after pending approval, sandbox denial, interruption, or partial convergence SHALL recompute actual state from the selected snapshot and managed targets. Already-current domains SHALL be skipped without relying on conversational memory or requiring a separate state workspace, and no unchanged failed action SHALL be repeated within the same invocation.
-
-#### Scenario: Update resumes after partial convergence
-- **WHEN** the operator reruns Team Harness update after a pass changed some domains and failed on a later one
-- **THEN** the next pass classifies the completed domains as current and resumes bounded work on the remaining stale or failed domain
-
-#### Scenario: Approval follows a pending receipt
-- **WHEN** the operator authorizes the runtime change immediately after a `pending-approval` receipt
-- **THEN** the focused pass skips every already-current automatic domain, applies and verifies the runtime change, and returns a final receipt
+#### Scenario: A network operation has an uncertain result
+- **WHEN** the native installation command returns without a reliable status
+- **THEN** update inspects the active installation before retrying and does not blindly repeat the outward operation

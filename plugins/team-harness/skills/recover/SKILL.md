@@ -1,13 +1,20 @@
 ---
 name: recover
-description: Resume an explicitly activated Team Harness pipeline from durable workspace state without replaying completed phases. Use only for pipeline recovery; ordinary Codex work remains direct when no active state exists.
+description: Resume an interrupted Team Harness task using its saved intent, progress and the current repository.
 ---
 
-# Recover
+Resolve the workspace or task named by $ARGUMENTS. Read its plan, source links,
+progress, checks and available results. Compare the saved repository, branch
+and revision with the current worktree before continuing.
 
-Read `../pipeline/references/state-and-gates.md` and
-`../pipeline/references/recovery.md`. The primary thread performs recovery and
-remains the sole coordination-state writer and gate presenter. If no explicit
-pipeline state exists, report that there is nothing to recover; do not create a
-pipeline implicitly. `complete` and `aborted` are terminal outcomes, not
-recoverable states.
+Treat legacy state and control logs as historical evidence. Preserve completed
+work and useful context; resumption needs no control-log replay, nonce, lease
+or administrative close. Clarify only real conflicting facts or missing scope.
+
+Continue the authorized objective through its current `spec` or `pipeline`
+workflow. If work is already complete, report the result and remaining delivery
+steps. Keep notes concise and native permissions in effect.
+
+Use Codex-native tools and available agents. Read TH preferences from
+`${CODEX_HOME:-$HOME/.codex}/.team-harness.json` only when relevant; absence
+uses ordinary defaults. Native permissions and user settings remain in effect.

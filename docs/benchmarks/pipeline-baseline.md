@@ -1,12 +1,10 @@
 # Pipeline real-run baseline
 
-Measurements from three fixture requests run through the **live** pipeline. This
-is the wall-clock and dispatch record that
-`tests/test_pipeline_simplification_benchmark.mjs` cannot produce: that suite
-compares normalized helper-operation counts against fixture data and never runs
-a pipeline. A change that alters dispatch, state, or recovery contracts records
-its own measurement and cites this file's tree anchor, stating each metric as
-before/after.
+**Historical baseline.** Measurements from three fixture requests were intended
+to describe the live pipeline. The former simplification benchmark and its
+control protocol have been retired, so this pending-run record is reference
+material only. Current changes should use the active workflow and repository
+checks rather than treating these rows as a release gate.
 
 The three runs are executed as separate operator-driven pipelines; every cell
 below reads `pending-runs` until each run completes and its numbers are

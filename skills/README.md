@@ -36,7 +36,7 @@ Convention: parse arguments, build a task payload, route to the `orchestrator` a
 - **Explicit gated activation:** `/th:pipeline` (operator-only, `disable-model-invocation: true`).
 - **Explicit compatibility activation:** `/th:issue`, `/th:plan` in `plan-and-execute` mode, and `/th:recover` for persisted state.
 - **Routes to the direct orchestrator kernel:** plain `/th:plan`, `/th:design`, `/th:plan-review`, `/th:research`, `/th:learn`, `/th:spike`, `/th:test`, `/th:test-cross-browser`, `/th:test-pipeline`, `/th:validate`, `/th:define-ac`, `/th:security`, `/th:audit`, `/th:review-pr`, `/th:deliver`, `/th:diagram`, `/th:likec4-diagram`, `/th:d2-diagram`, `/th:translate`, `/th:bootstrap`, `/th:eval`, `/th:gcp-costs`, `/th:cross-repo`, `/th:inline`.
-- **Standalone** (no orchestrator involvement): `/th:modes`, `/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:background`, `/th:update`, `/th:report-issue`, `/th:hookify`, `/th:save-session`, `/th:resume-session`, `/th:todo`, `/th:mcp-optimize`.
+- **Standalone** (no orchestrator involvement): `/th:modes`, `/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:background`, `/th:update`, `/th:report-issue`, `/th:save-session`, `/th:resume-session`, `/th:todo`, `/th:mcp-optimize`.
 - **Standalone complex skills** (no slash-command entry point, triggered by description matching): `obsidian-markdown`, `obsidian-bases`, `json-canvas`, `obsidian-cli`.
 
 ## Adding a skill
@@ -51,7 +51,7 @@ Convention: parse arguments, build a task payload, route to the `orchestrator` a
 
 ## No nested-dispatch continuity contract — retired
 
-A skill invokes `th:orchestrator` as the top-level session agent, never via `Task(subagent_type=orchestrator, ...)` — there is no coordinator dispatched as a subagent for this repo's routing skills to hand off from. The `dispatch_handoff`/`blocked-no-dispatch` takeover protocol that used to exist for that scenario is retired along with the second coordination agent it backstopped: see `docs/subagent-orchestration.md § "Nested-context dispatch — RETIRED protocol, retained provisioning"` for the full retirement note and the harmless depth-2 nesting provisioning that survives it for specialist leaf agents invoked one level deep.
+A skill invokes `th:orchestrator` as the top-level session agent, never via `Task(subagent_type=orchestrator, ...)` — there is no coordinator dispatched as a subagent for this repo's routing skills to hand off from. The former `dispatch_handoff`/`blocked-no-dispatch` takeover protocol is retired; current specialist coordination is described in `docs/subagent-orchestration.md § "Coordinating specialists"`.
 
 ## Notes
 

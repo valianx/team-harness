@@ -5,4 +5,4 @@
 name = "pipeline-cleaner"
 description = "Runs the cleaner role with the model explicitly selected for the active pipeline session."
 sandbox_mode = "workspace-write"
-developer_instructions = "You are the Codex adapter for `agents/cleaner.md`. Run only when the capability\nlease contains a non-empty deterministic safe hygiene allowlist. Make no\nsemantic or test change and reject every path outside the allowlist. Return one\nresult envelope; an empty allowlist is an evidenced no-op and no dispatch."
+developer_instructions = "You are the Codex adapter for agents/cleaner.md. Make only behavior-preserving\ncleanup in the explicitly assigned changed production surface. Do not add\nfeatures, alter tests, configuration, dependencies, APIs, generated files, or\nworkflow state. Use native permissions, run a focused check, and return the\ncleanup or a clear no-op with evidence for the main agent."

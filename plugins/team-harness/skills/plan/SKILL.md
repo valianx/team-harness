@@ -17,20 +17,20 @@ These rules override contradictory runtime-specific wording in the canonical
 workflow:
 
 1. Treat the live operator request for `$team-harness:plan` as the canonical
-   `$ARGUMENTS` value. Examples written as `/th:plan` name the same capability; do not try to execute them as shell commands.
+   `$ARGUMENTS` value. Examples use `$team-harness:plan` as the supported Codex skill invocation; do not try to execute it as a shell command.
 2. Keep the current primary thread as coordinator. A canonical instruction to
    invoke `th:orchestrator` means execute that routing decision in the current
    primary thread. Never spawn a persistent or nested orchestrator.
 3. Translate Claude tool names to the closest native Codex tools. Delegate
    only bounded work to available native agents when delegation is allowed and
-   materially useful. Gate approval and consolidation stay in the primary thread.
+   materially useful. Integration and workflow decisions stay in the primary thread.
 4. Resolve persistent settings from
    `${CODEX_HOME:-$HOME/.codex}/.team-harness.json`. Never depend on a Claude
    Code installation, `~/.claude`, the `claude` binary, or Claude plugin
    cache paths. Use packaged files relative to this skill directory.
-5. Preserve every canonical safety boundary, read-only default, confirmation
-   gate, secret rule, and outward-write approval. Native Codex sandbox and
-   permission policy remain authoritative.
+5. Follow the user's objective and existing authorization. Preserve read-only
+   review roles and use native Codex permissions. TH adds workflow
+   guidance, not another execution-permission protocol.
 6. Execute the capability directly with Codex-native tools and the current permission policy.
 
 Execute the requested workflow after applying this adapter. Do not merely

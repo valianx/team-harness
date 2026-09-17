@@ -144,7 +144,6 @@ func TestBuildOpencodeManifests_PipelineRunnersPresent(t *testing.T) {
 	required := map[string]bool{
 		"bounded-command.mjs": false,
 		"quality-lib.mjs":     false,
-		"control-plane.mjs":   false,
 		"quality-runner.mjs":  false,
 		"test-transition.mjs": false,
 	}

@@ -4,11 +4,11 @@
 
 ## Improve Team Harness from Codex
 
-Start Codex from the repository root. Use `@Team-Harness init <request>` for lightweight intake or a small bounded improvement; it stays in Main without creating pipeline state or spawning specialists. Use `@Team-Harness pipeline <request>` only when you explicitly want the full gated workflow.
+Start Codex from the repository root. Use `@Team-Harness init <request>` for intake, `spec` for development with written intent and review, or `pipeline` when you choose broader coordination. Main uses native settings and permissions.
 
 Author shared role intent in `agents/*.md`. Codex model and effort values are projected from that frontmatter, while Codex-specific execution instructions live in `runtime/codex/instructions/*.md` and workflow adapters live in `plugins/team-harness/skills/`. A semantic prompt change is not translated automatically into those adapters, so review both surfaces when behavior should change in Claude Code and Codex.
 
-The seven additional `pipeline-*` custom-agent identities reuse the corresponding logical role adapter but intentionally omit `model` and `model_reasoning_effort`. The pipeline passes both values explicitly on every spawn, using the standard role matrix by default or one ephemeral pair selected in the current live Main session.
+The seven additional `pipeline-*` custom-agent identities reuse the corresponding logical role adapter but intentionally omit `model` and `model_reasoning_effort`. Use the active runtime's model selection or the operator's requested pair.
 
 After changing any canonical agent's model or effort, an installed role contract, a Codex instruction adapter, or `runtime/schema/codex-agents.json`, run `$sync-codex-agents`. The equivalent repository commands are:
 

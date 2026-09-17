@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Build the anchored inline review package from repository state, and decide its ship join. */
+/** Build the anchored inline review package and summarize advisory lens evidence. */
 
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
@@ -26,7 +26,7 @@ const ARCHIVED_CHANGE_NAME = /^archive\/\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+
 const RANGE = /^([^\s.]+(?:\.[^\s.]+)*)\.{2,3}([^\s.]+(?:\.[^\s.]+)*)$/;
 
 export const LENSES = ["tester", "qa", "security", "adversary"];
-const FLOOR_LENSES = ["security", "adversary"];
+const RISK_LENSES = ["security", "adversary"];
 
 export const ERROR_CODES = new Set([
   "ARGUMENT_INVALID",
@@ -39,7 +39,6 @@ export const ERROR_CODES = new Set([
   "OPENSPEC_RUNTIME_UNAVAILABLE",
   "CHANGE_NOT_FOUND",
   "CRITERIA_TOO_MANY",
-  "SCOPE_FULL_REFUSED",
   "PACKAGE_INVALID",
   "RETURNS_INVALID",
   "INTERNAL_ERROR",
@@ -481,10 +480,10 @@ function normalizeLenses(value) {
   return [...new Set(requested)].sort();
 }
 
-function resolveRequiredLenses(requested, floorApplies) {
-  const required = new Set(requested);
-  if (floorApplies) for (const lens of FLOOR_LENSES) required.add(lens);
-  return [...required].sort();
+function resolveRecommendedLenses(requested, floorApplies) {
+  const recommended = new Set(requested);
+  if (floorApplies) for (const lens of RISK_LENSES) recommended.add(lens);
+  return [...recommended].sort();
 }
 
 function resolveScope(priorAnchor, requestedScope) {
@@ -496,7 +495,7 @@ function resolveScope(priorAnchor, requestedScope) {
     return { kind: "full", prior_anchor: null };
   }
   if (!SHA.test(priorAnchor)) fail("ARGUMENT_INVALID");
-  if (requestedScope === "full") fail("SCOPE_FULL_REFUSED");
+  if (requestedScope === "full") return { kind: "full", prior_anchor: null };
   return { kind: "delta", prior_anchor: priorAnchor };
 }
 
@@ -516,7 +515,7 @@ async function buildPackage(input) {
   );
   const requested = normalizeLenses(input.lens);
   const coordinateBlock = { commit_or_range: range, base: coordinates.base, head: coordinates.head, source: "derived" };
-  const required = resolveRequiredLenses(requested, floor.applies);
+  const recommended = resolveRecommendedLenses(requested, floor.applies);
   const draft = {
     mode: "inline-review",
     repository_root: root,
@@ -532,7 +531,7 @@ async function buildPackage(input) {
     criteria: await bindWrittenIntent(root, coordinates.head, input.change),
     changed_surface: changedSurface,
     requested_lenses: requested,
-    required_lenses: required,
+    recommended_lenses: recommended,
     security_floor: floor,
     review_surface: verified.surface,
     read_only: true,
@@ -567,9 +566,9 @@ function findingFiles(entry) {
 }
 
 /**
- * The floor over the shared contract's severity vocabulary. `blocker` and `high` hold the ship;
- * the rest ride as concerns. An absent or unrecognized severity holds the ship, so a malformed
- * return cannot demote itself below the floor.
+ * Classify the shared contract's severity vocabulary for Main. `blocker` and `high` are blocker
+ * candidates; the rest ride as concerns. An absent or unrecognized severity remains a blocker
+ * candidate, so a malformed return cannot demote itself below the review floor.
  */
 const BLOCKING_SEVERITIES = new Set(["blocker", "high"]);
 const SUB_FLOOR_SEVERITIES = new Set(["medium", "low", "info"]);
@@ -578,7 +577,7 @@ export function belowFloor(entry) {
   return typeof entry?.severity === "string" && SUB_FLOOR_SEVERITIES.has(entry.severity);
 }
 
-/** A finding below the floor, or outside a delta package's range, is a concern, never a blocker. */
+/** A finding below the floor, or outside a delta package's range, is reported as a concern. */
 export function partitionFindings(pkg, findings) {
   const inScope = new Set(pkg.scope.range_paths ?? pkg.scope.paths);
   const blockers = [];
@@ -635,45 +634,68 @@ function worseOf(left, right) {
   return rank(right) > rank(left) ? right : left;
 }
 
-/** Fail-closed join: an absent required return is never a pass. */
-export function gateDecision(pkg, returns) {
-  const reasons = [];
+/**
+ * Summarize lens evidence without deciding whether the work is ready to publish.
+ *
+ * Lens selection is advisory: a package can recommend risk lenses, while Main decides which
+ * evidence is useful for the objective and how findings are closed. Every return remains in a
+ * lens group so a later benign result cannot erase an earlier finding.
+ */
+export function reviewSummary(pkg, returns) {
+  const observations = [];
   const byLens = new Map();
   const extra = [];
+  const selected = new Set([
+    ...(Array.isArray(pkg.requested_lenses) ? pkg.requested_lenses : []),
+    ...(Array.isArray(pkg.recommended_lenses) ? pkg.recommended_lenses : []),
+  ]);
   for (const entry of returns) {
-    if (!pkg.required_lenses.includes(entry.lens)) { extra.push(entry); continue; }
-    byLens.set(entry.lens, worseOf(byLens.get(entry.lens) ?? null, entry));
+    if (!selected.has(entry.lens)) extra.push(entry);
+    const entries = byLens.get(entry.lens) ?? [];
+    entries.push(entry);
+    byLens.set(entry.lens, entries);
   }
 
   const concerns = [];
   const covered = [];
   const specDefects = [];
-  for (const lens of pkg.required_lenses) {
-    const entry = byLens.get(lens);
-    if (entry === undefined) {
-      reasons.push(`required lens ${lens} returned nothing`);
-      continue;
-    }
-    const split = partitionFindings(pkg, entry.findings ?? []);
+  const lensResults = [];
+  for (const [lens, entries] of byLens) {
+    const outcome = entries.reduce((current, entry) => worseOf(current, entry), null);
+    const findings = entries.flatMap((entry) => entry.findings ?? []);
+    const split = partitionFindings(pkg, findings);
     concerns.push(...split.concerns);
     for (const blocker of split.blockers) {
       const classified = { ...classifyCoverage(pkg, blocker), lens, finding: blocker };
       (classified.coverage === "covered" ? covered : specDefects).push(classified);
     }
-    // A lens that did not finish says so, and an unfinished pass is not a pass. That is the
-    // lens's own knowledge about its work, not a correlation field. An absent status is
-    // treated as unfinished, because a missing answer is not a completed one.
-    if (entry.lens_status !== "complete") {
-      reasons.push(`required lens ${lens} did not finish (${entry.lens_status ?? "no lens_status"})`);
+    lensResults.push({ lens, outcome, returns: entries });
+    for (const entry of entries) {
+      // These observations describe evidence for Main; they do not hold publication by
+      // themselves. An absent status is still recorded as an incomplete response.
+      if (entry.lens_status !== "complete") {
+        observations.push(`lens ${lens} did not finish (${entry.lens_status ?? "no lens_status"})`);
+      }
+      const disputed = blockingDisagreements(entry);
+      if (disputed.length > 0) {
+        observations.push(`lens ${lens} left ${disputed.length} blocking disagreement(s) unresolved`);
+      }
+      if (entry.verdict !== "pass") observations.push(`lens ${lens} returned ${entry.verdict}`);
     }
-    const disputed = blockingDisagreements(entry);
-    if (disputed.length > 0) {
-      reasons.push(`required lens ${lens} left ${disputed.length} blocking disagreement(s) unresolved`);
-    }
-    if (entry.verdict !== "pass") reasons.push(`required lens ${lens} returned ${entry.verdict}`);
-    if (split.blockers.length > 0) reasons.push(`required lens ${lens} returned ${split.blockers.length} blocker(s)`);
+    if (split.blockers.length > 0) observations.push(`lens ${lens} returned ${split.blockers.length} blocker(s)`);
   }
-  return { ready: reasons.length === 0, reasons, concerns, covered, spec_defects: specDefects, unrequested: extra };
+  const missing = [...selected]
+    .filter((lens) => !byLens.has(lens));
+  for (const lens of missing) observations.push(`recommended lens ${lens} returned nothing`);
+  return {
+    lens_results: lensResults,
+    missing,
+    observations,
+    concerns,
+    covered,
+    spec_defects: specDefects,
+    unrequested: extra,
+  };
 }
 
 async function readJson(target, code) {
@@ -684,12 +706,13 @@ async function readJson(target, code) {
   }
 }
 
-async function runGate(input) {
+async function runSummary(input) {
   const pkg = await readJson(input.package, "PACKAGE_INVALID");
-  if (!object(pkg) || !Array.isArray(pkg.required_lenses) || !object(pkg.scope)) fail("PACKAGE_INVALID");
+  if (!object(pkg) || !Array.isArray(pkg.requested_lenses)
+    || !Array.isArray(pkg.recommended_lenses) || !object(pkg.scope)) fail("PACKAGE_INVALID");
   const returns = await readJson(input.returns, "RETURNS_INVALID");
   if (!Array.isArray(returns) || returns.length > MAX_RETURNS || !returns.every(validReturn)) fail("RETURNS_INVALID");
-  return { decision: gateDecision(pkg, returns) };
+  return { summary: reviewSummary(pkg, returns) };
 }
 
 function result(kind, payload, error = null) {
@@ -708,13 +731,15 @@ export async function runReviewFan(input) {
     if (subcommand === "package") {
       return result("team_harness_inline_review_package", { package: await buildPackage(input) });
     }
-    if (subcommand === "gate") {
-      return result("team_harness_inline_review_gate", await runGate(input));
+    if (subcommand === "gate" || subcommand === "summary") {
+      return result("team_harness_inline_review_summary", await runSummary(input));
     }
     return fail("ARGUMENT_INVALID");
   } catch (error) {
     const code = ERROR_CODES.has(error?.message) ? error.message : "INTERNAL_ERROR";
-    const kind = subcommand === "gate" ? "team_harness_inline_review_gate" : "team_harness_inline_review_package";
+    const kind = subcommand === "gate" || subcommand === "summary"
+      ? "team_harness_inline_review_summary"
+      : "team_harness_inline_review_package";
     return result(kind, {}, code);
   }
 }
@@ -732,7 +757,7 @@ const KEYS = {
 
 function parseCli(argv) {
   const [subcommand, ...rest] = argv;
-  if (!["package", "gate"].includes(subcommand) || rest.length % 2 !== 0) return null;
+  if (!["package", "gate", "summary"].includes(subcommand) || rest.length % 2 !== 0) return null;
   const parsed = { subcommand };
   for (let index = 0; index < rest.length; index += 2) {
     const key = KEYS[rest[index]];
@@ -746,5 +771,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const parsed = parseCli(process.argv.slice(2));
   const output = await runReviewFan(parsed ?? {});
   process.stdout.write(`${JSON.stringify(output)}\n`);
-  if (output.verdict !== "pass" || output.decision?.ready === false) process.exitCode = 1;
+  if (output.verdict !== "pass") process.exitCode = 1;
 }

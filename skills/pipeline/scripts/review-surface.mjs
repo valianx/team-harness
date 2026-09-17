@@ -27,7 +27,6 @@ export const ERROR_CODES = new Set([
  */
 export const CHECKERS = [
   { name: "sync-skills", argv: ["tools/codex-runtime/sync-skills.mjs", "--check"] },
-  { name: "sync-hooks", argv: ["tools/codex-runtime/sync-hooks.mjs", "--check"] },
 ];
 
 /**
@@ -36,7 +35,6 @@ export const CHECKERS = [
  * so it stays in review even though a checker regenerates it.
  */
 const MIRRORS = [
-  [/^plugins\/team-harness\/hooks\/dist\/(policy-block|gcp-guard|gate-guard)\.cjs$/, (m) => `hooks/ts/dist/${m[1]}.cjs`, "sync-hooks"],
   [/^plugins\/team-harness\/(agents\/.+)$/, (m) => m[1], "sync-skills"],
   [/^plugins\/team-harness\/(hooks\/.+)$/, (m) => m[1], "sync-skills"],
   [/^plugins\/team-harness\/(docs\/.+)$/, (m) => m[1], "sync-skills"],

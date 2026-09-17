@@ -1,7 +1,6 @@
 // hooks/ts/bodies/hook-profile.ts
 // TS port of hooks/_hook-profile.sh — TH_HOOK_PROFILE resolver.
-// ONLY imported by observability/notification bodies.
-// ENFORCEMENT FLOORS MUST NEVER import this module.
+// Imported by optional observability and notification bodies.
 //
 // Provides:
 //   getHookProfile()         — returns normalized profile: minimal | standard | strict.
@@ -11,10 +10,10 @@
 //   Profile   | idle-notify | pipeline-observability
 //   ----------|-------------|------------------------
 //   minimal   | suppressed  | suppressed
-//   standard  | enabled     | enabled      (default)
+//   standard  | enabled     | enabled
 //   strict    | enabled     | enabled
 //
-// Fail-safe: TH_HOOK_PROFILE unset/unrecognized → "standard" (observability on).
+// Fail-safe: TH_HOOK_PROFILE unset/unrecognized → "minimal" (observability off).
 
 export type HookProfile = "minimal" | "standard" | "strict";
 export type ObservabilityClass = "idle-notify" | "pipeline-observability";
@@ -28,8 +27,8 @@ export function getHookProfile(): HookProfile {
   if (val === "minimal" || val === "standard" || val === "strict") {
     return val;
   }
-  // Unset, empty, or unrecognized → default: standard.
-  return "standard";
+  // Unset, empty, or unrecognized → default: minimal.
+  return "minimal";
 }
 
 export function observabilityEnabled(cls: ObservabilityClass): boolean {

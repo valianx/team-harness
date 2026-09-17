@@ -1,177 +1,60 @@
-# Contributing to Team Harness
+# Contributing
 
-Thanks for your interest in contributing. Team Harness is an open-source,
-multi-runtime agent harness for Claude Code, Codex, and opencode. This guide
-covers how to propose a change. The **binding rules** for any change live in
-[`CLAUDE.md` §6 — Mandatory Working Agreements](./CLAUDE.md#6-mandatory-working-agreements);
-this document summarizes them and shows you the contribution flow.
+Contributions can use any coding tool. TH itself and the retired developer-mode
+style are not prerequisites.
 
-## You do not need the `th` plugin or developer mode to contribute
-
-Installing the `th` plugin and running developer mode is the **maintainer's local
-workflow**, not a contribution prerequisite. To contribute a change you only need
-`git`, a GitHub account, and (recommended) the `gh` CLI. The free verification
-suite runs with `bash`, `python3`, and `uv`.
-
-## Fork-PR flow (outside contributors)
-
-If you are not a collaborator on `valianx/team-harness`, contribute via a fork:
-
-1. **Fork** `valianx/team-harness` to your own account (GitHub UI → "Fork", or
-   `gh repo fork valianx/team-harness --clone`).
-2. **Clone** your fork:
-   `git clone https://github.com/<you>/team-harness.git`
-3. **Add upstream** so you can stay in sync:
-   `git remote add upstream https://github.com/valianx/team-harness.git`
-4. **Branch** from an up-to-date `main` using the repo's naming convention:
-   `git checkout main && git pull upstream main`
-   `git switch -c feat/<kebab>` (or `fix/`, `chore/`, `docs/`, `refactor/`).
-5. **Make your change** and commit with a
-   [conventional-commit](https://www.conventionalcommits.org/) message:
-   `git commit -m "feat(area): short description"`
-6. **Push to your own fork:**
-   `git push -u origin feat/<kebab>`
-7. **Open a PR against upstream:**
-   `gh pr create --repo valianx/team-harness --base main`
-   (or use the GitHub UI "Compare & pull request" button).
-
-> A direct `git push` to `valianx/team-harness` returns a 403 unless you are a
-> collaborator — that is expected. The fork-PR flow above is the path for outside
-> contributors.
-
-**Collaborators** with write access may skip the fork and branch directly in the
-upstream repo, but still open a PR — no one pushes to `main` directly.
-
-## The binding rules (summary — see CLAUDE.md §6 for the authority)
-
-These are the floor for every change. The full, authoritative text is in
-[`CLAUDE.md` §6](./CLAUDE.md#6-mandatory-working-agreements) — this is a summary,
-not a second source of truth.
-
-- **Branch naming:** `feat/`, `fix/`, `chore/`, `docs/`, or `refactor/` + `<kebab>`. Never commit on `main`.
-- **Conventional commits:** `feat(area): …`, `fix(area): …`, `docs(area): …`, etc.
-- **Never push to `main`** — every change ships via pull request.
-- **Changelog fragment:** add `changelog.d/{slug}.md` (a Keep-a-Changelog block —
-  `### Added` / `### Changed` / `### Fixed` / `### Security`). One file per PR; the
-  delivery step assembles them at release. Do not edit `## [Unreleased]` inline.
-- **Distributed-asset version bump:** if your change touches `agents/`, `skills/`,
-  `hooks/`, or another distributed runtime input, you MUST bump the shared
-  version across the four sites documented in
-  [`docs/codex-runtime.md`](./docs/codex-runtime.md#install-and-lifecycle). Without
-  it a marketplace or installer can serve a stale update. Pure docs/governance
-  changes (like this file) do NOT bump the version.
-- **Tests green before you push:** run `bash tests/run-all.sh` — it must exit 0.
-- **Never commit secrets** — tokens, API keys, `.env` files, certificates, private keys.
-
-See [`CLAUDE.md` §6](./CLAUDE.md#6-mandatory-working-agreements) for the complete
-agreements, governance escalation rules, and the anti-pattern list.
+Use a feature branch, make a focused change, and open a PR against `main`.
+Outside contributors use a fork; collaborators can use a branch in this
+repository. Prefer conventional commits and the existing PR template. Preserve
+unrelated work and keep temporary evidence out of product files.
 
 ## Cross-runtime development
 
-A change made while using Claude Code is not automatically a Claude-only change:
-the files changed determine which runtimes receive it. Shared semantic intent has
-one canonical source, while runtime packaging and execution details use explicit
-adapters. Do not assume that editing one agent prompt updates every runtime.
+| Source | Integration |
+| --- | --- |
+| `agents/*.md` | Update relevant Codex instruction adapters when semantics change |
+| `runtime/schema/codex-agents.json` and `runtime/codex/instructions/` | Generate native role TOMLs and roster |
+| `skills/` | Sync canonical skill projections and shared assets |
+| Runtime-specific setup/update/reload overrides | Verify the actual affected native integration |
+| Claude hooks | Build tracked observational bundles; Codex/OpenCode have no TH command hooks |
+| `cmd/install/` | Run Go installer tests with fixture config roots |
 
-| Change | Shared or canonical source | What Codex receives |
-|---|---|---|
-| Model or effort for any canonical Team Harness agent | Frontmatter in its `agents/{role}.md` | The generator updates the complete comparison roster. For the ten installed Codex specialists it also rewrites the generated TOML. |
-| Semantic behavior for one of those ten specialists | The matching `agents/{role}.md` role contract | Review and, when necessary, update `runtime/codex/instructions/{role}.md`; Codex adapters are concise and the generator does not translate the full Claude prompt body. |
-| Any other Claude agent | Its file under `agents/` | Nothing automatically. Codex ships only the ten roles registered in `runtime/schema/codex-agents.json`. |
-| Orchestrator, intake, pipeline, or workflow behavior | Claude's `agents/orchestrator.md`, pipeline references, and relevant root `skills/` | Update the corresponding Codex plugin skill under `plugins/team-harness/skills/` (`init`, `pipeline`, or another explicit adapter). |
-| General skill behavior | The relevant root `skills/{name}/SKILL.md` | Nothing automatically unless the capability has a Codex plugin counterpart; update that counterpart deliberately. |
-| Hook policy | Shared TypeScript bodies where applicable, plus runtime entrypoints | Build the TypeScript hooks, sync the plugin bundle, and validate the runtime-specific manifest. Codex's native sandbox and approval semantics remain authoritative. |
+The current general agent coordinates. Use bounded specialist work and
+independent review where useful. TH workflows do not add an execution
+authorization protocol over the runtime.
 
-After changing any canonical agent's model/effort, one of the ten installed
-role contracts, its Codex adapter, or the Codex registry, run
-`$sync-codex-agents` in Codex, or run the equivalent commands:
+## Verification
 
 ```bash
 node tools/codex-runtime/generate.mjs
+node tools/codex-runtime/sync-skills.mjs
 node tools/codex-runtime/generate.mjs --check
 node tools/codex-runtime/test_generate.mjs
-```
-
-Commit the generated `.codex/agents/*.toml` and `.codex/README.md` changes; never
-edit them by hand. For plugin skills, marketplace packaging, install/update
-behavior, and the complete Codex verification set, follow the
-[Codex runtime guide](./docs/codex-runtime.md).
-
-For opencode, most existing surfaces remain cross-harness with no extra work —
-agents, skills, and rules (`CLAUDE.md` / `AGENTS.md`) are read as documented by
-that runtime. Two rules apply when a change touches its runtime-specific surfaces:
-
-- **Hooks remain a Claude Code surface.** Do not project new hook behavior into
-  OpenCode; use OpenCode's native permissions and approvals instead. TypeScript
-  remains the canonical implementation language for Claude Code hooks.
-- **Project this repo's own assets between harness formats** with the repo-local
-  `/harness-migrate <to-opencode|to-claude-code>` command (`tools/harness-migrate/`)
-  — never by hand-editing frontmatter. It is a contributor tool, not a distributed
-  asset.
-
-Background and the per-asset-type process:
-[`docs/opencode-migration-guide.md`](./docs/opencode-migration-guide.md).
-
-## Agent and pipeline changes
-
-Per [`CLAUDE.md` §14](./CLAUDE.md#14-subagent-orchestration):
-
-- Adding or modifying an agent → route through `architect` first, then `agent-builder` writes the prompt.
-- Installer / hooks / MCP server changes → `architect` then `security` review (elevated privileges on the user's machine).
-- Pipeline phase changes → architecture review mandatory; update `agents/ref-pipeline.md` + `agents/_shared/gate-contract.md` + affected references atomically. Activation-boundary changes also update `agents/orchestrator.md`.
-
-## Verifying your change
-
-```
 bash tests/run-all.sh
 ```
 
-This runs the policy-block, structure, and frontmatter suites. CI runs the same
-command on every PR. See [`docs/testing.md`](./docs/testing.md) for the suite registry.
+Run meaningful checks for changed behavior. Tests use temporary installations,
+not live user configuration. Review agent/skill prose for coherence instead of
+adding wording assertions. See [testing](docs/testing.md).
 
-### Verifying gh-fallback paths locally
+## Delivery and release
 
-To smoke-test the graceful degradation introduced in v2.10.0 without needing to actually uninstall `gh`:
+Use `create-pr` for candidate preparation and publication. Check the full diff,
+durable-file scope and relevant OpenSpec archive readiness. Include completed,
+verified archive with implementation in the same PR.
 
-1. Set `has_gh=false` in your test by temporarily running with a dummy `GH_TOKEN` and no `gh` auth (e.g., `GH_TOKEN="" gh auth logout --hostname github.com` in a scratch env).
-2. In a Claude Code session, run `/issue #N` for a real issue number on a public GitHub repo — the skill should fetch the issue via the `curl` Tier A fallback and report "gh CLI unavailable. Fetched issue #N via the GitHub REST API instead."
-3. For Tier B write paths, run `/deliver` on a feature branch — if `GH_TOKEN` is set, it should attempt a curl PR creation; if not, it should emit the compare URL and a body file, then report `blocked-manual-push`.
-4. For Tier D (project board), verify the orchestrator logs "Project board update skipped — gh CLI unavailable" rather than erroring out.
+Distributed changes update the shared version in
+`.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`,
+`plugins/team-harness/.codex-plugin/plugin.json` and `cmd/install/main.go`.
+Record the release's behavior in the changelog; a fragment under `changelog.d/`
+can be assembled at release.
 
-This is a manual smoke test. No automated suite covers agent/skill prose — see README.md § "What gets a test" for why prose assertions are not registered.
+After merge, a separately authorized release tags the version and pushes the tag.
+The release workflow builds installer binaries; Pages publishes bootstrap
+scripts. A PR or merge request alone does not ask for a release.
 
-## Release process
+## Community
 
-The release flow is operator-side. The coordinator's deterministic publication mechanics bump the declared version sites and add a `[X.Y.Z]` block to `CHANGELOG.md`; Delivery only drafts publication prose. Neither path runs `git tag` — the human decides when to publish.
-
-After a PR merges:
-
-```bash
-git checkout main && git pull origin main
-git tag -a vX.Y.Z -m "Release vX.Y.Z — short description"
-git push origin vX.Y.Z
-```
-
-The tag push triggers `release.yml` (builds 5 cross-compiled binaries → GitHub Releases) and `pages.yml` (publishes the three bootstrap scripts to GitHub Pages on `release: published`).
-
-Pre-requisite (one-time, repo-level): repo Settings → Pages → Source = **GitHub Actions** + an environment named `github-pages` configured to allow deployments from the relevant tags / branches.
-
-## Reporting issues
-
-- **Bugs / features / questions about the repo:** open a
-  [GitHub issue](https://github.com/valianx/team-harness/issues/new/choose) using
-  one of the templates.
-- **Problems with the `th` plugin specifically** (an agent, a skill, a gate): the
-  convenience path is `/th:report-issue <bug|feature|docs|question> "<summary>"`
-  from inside Claude Code — it builds the issue with the right pattern and an
-  environment block. Plain GitHub issues are equally welcome.
-
-## Code of Conduct
-
-This project follows the [Contributor Covenant](./CODE_OF_CONDUCT.md). By
-participating you agree to uphold it.
-
-## Security
-
-Do not open public issues for security vulnerabilities. See
-[`SECURITY.md`](./SECURITY.md) for private reporting.
+Use [GitHub issues](https://github.com/valianx/team-harness/issues/new/choose)
+for bugs and feature requests. Follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+Report security vulnerabilities privately through [SECURITY.md](SECURITY.md).

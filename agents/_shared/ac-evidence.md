@@ -1,15 +1,13 @@
-# Acceptance evidence (v5)
+# Acceptance evidence
 
-Acceptance evidence travels only inside a result envelope as contained paths,
-hash-bound artifacts, structured findings, and closure evidence. Main accepts it
-once through a `result_accepted` control event and derives the human-readable
-acceptance view. A report, receipt, checklist, or projection is not authority.
+Acceptance evidence connects the requested outcome and OpenSpec scenarios to
+observable behavior. Keep it close to its source: command or test results,
+inspected paths, reproduction steps, and relevant review findings. A report or
+checklist summarizes evidence; it does not authorize delivery.
 
-Every changed Freeze requires one fresh independent QA verifier that owns the
-combined evidence audit and semantic OpenSpec verdict. A separate tester runs
-only for the closed independent-test predicate: bug reproduction, migration or
-data safety, public compatibility, security-control change, stale independently
-authored evidence, or an explicit operator request. Security evidence is fresh
-when changed impact is true or unknown. Missing, stale,
-identity-mismatched, or incomplete evidence remains an open finding and cannot
-be hidden by a projection counter.
+For each scenario, state what was checked, the result, the source or command,
+and any limitation or unknown. Reuse evidence while the candidate and behavior
+remain unchanged; refresh it when the candidate changes. Choose tests and
+independent reviewers according to the objective, the changed behavior, and
+the risk. Missing or inconclusive evidence stays visible for the coordinator
+to assess.

@@ -15,11 +15,12 @@ capabilities:
 # Matcher: startup|resume|clear
 # Timeout: 5s
 # Output format: { "additionalContext": "<string>" } on stdout (NOT a permissionDecision).
-# 4 loads: orchestrator (unconditional), language, english_learning, workspace_mode.
+# 4 loads: workflow discovery (unconditional), language, english_learning, workspace_mode.
 # NEVER blocks. FAIL-OPEN: any error → empty stdout (no additionalContext).
 # Security: SEC-DR-A full-string validation (^[a-z]{2}$); SEC-DR-B fixed-template emit.
-# DOES NOT import hook-profile (enforcement floor).
+# Does not import hook-profile: session context remains available in minimal mode.
 notes: >
   SessionStart hooks emit additionalContext, not a permissionDecision. The CC entry
   writes { "additionalContext": "..." } to stdout. NEVER blocks session start.
-  Load 1 (orchestrator) is UNCONDITIONAL per SEC-DR-2 re-founding (v2.89.0).
+  Load 1 (workflow discovery) is unconditional so the native agent knows which
+  optional Team Harness skills are available.

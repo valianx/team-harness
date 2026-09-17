@@ -97,7 +97,7 @@ function rejectPollutionKeys(obj) {
     }
   }
 }
-function buildNormalized(parsed, runtime) {
+function buildNormalized(parsed) {
   const rawEvent = parsed["event"];
   if (typeof rawEvent !== "string" || !VALID_EVENTS.has(rawEvent)) {
     throw new ShimRejectError(
@@ -131,7 +131,7 @@ function buildNormalized(parsed, runtime) {
     throw new ShimRejectError("SEC-07: 'dataHome' must be a string or absent");
   }
   const dataHome = typeof rawDataHome === "string" ? rawDataHome : null;
-  return { event, tool, workspace, runtime, dataHome };
+  return { event, tool, runtime: "claude-code", workspace, dataHome };
 }
 function parseCCPayload(raw) {
   let parsed;
@@ -163,7 +163,7 @@ function inboundCC(raw) {
   checkSize(raw);
   checkDepth(raw);
   const mapped = parseCCPayload(raw);
-  return buildNormalized(mapped, "claude-code");
+  return buildNormalized(mapped);
 }
 
 // bodies/language-user-prompt.ts

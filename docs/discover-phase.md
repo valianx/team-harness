@@ -328,7 +328,7 @@ projection field is needed.
 
 ## 11. Initiative detection — multi-project grouping (opt-in)
 
-This section supplies initiative context for `agents/ref-intake-flows.md § "Initiative Detection and Confirm"`, invoked during Design workspace resolution before binding the workspace identity.
+This section supplies optional initiative context for `agents/ref-intake-flows.md § "Intake"`, invoked during workspace resolution before binding the workspace identity.
 
 ### 11.1 Purpose and gating
 
@@ -380,7 +380,7 @@ using the **date-agnostic glob + frontmatter-confirm** rule:
 2. For each candidate, confirm `initiative: {slug}` in frontmatter — the frontmatter slug is the
    authoritative join key for the descriptive overview, not pipeline authority.
 
-- **CREATE** — if no candidate confirms: write it from the template in `agents/ref-dispatch-machinery.md § "overview.md — you are the sole writer"`; the new folder carries today's date prefix (`{YYYY-MM-DD}_{slug}`).
+- **CREATE** — if no candidate confirms: write a concise overview using `agents/ref-dispatch-machinery.md § "Multi-repository coordination"`; the new folder carries today's date prefix (`{YYYY-MM-DD}_{slug}`).
 - **JOIN** — on first confirmed match: read-modify-write, replacing this project's row in-place if it exists, appending a new row if absent. Rows are keyed by `project` slug; no row is ever duplicated.
 
 The join is idempotent: running the same project's pipeline twice updates its single row.
@@ -400,8 +400,8 @@ The join is idempotent: running the same project's pipeline twice updates its si
 
 Before Main treats candidate paths as separate service bindings, it runs a deterministic repo-identity
 test so one repository is never counted twice. One coordinator owns the initiative root, consolidated
-Gate 1, and serial service order; no second coordinator is spawned (`agents/ref-dispatch-machinery.md
-§ "Multi-project sequencing"`). Full contract: `agents/ref-dispatch-machinery.md § "Repo-identity verification"`.
+Gate 1, and serial service order; no second coordinator is spawned. Current coordination guidance:
+`agents/ref-dispatch-machinery.md § "Multi-repository coordination"`.
 
 For each candidate project path `{p}`, read two signals:
 

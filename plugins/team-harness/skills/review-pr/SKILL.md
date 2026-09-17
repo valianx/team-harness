@@ -17,20 +17,20 @@ These rules override contradictory runtime-specific wording in the canonical
 workflow:
 
 1. Treat the live operator request for `$team-harness:review-pr` as the canonical
-   `$ARGUMENTS` value. Examples written as `/th:review-pr` name the same capability; do not try to execute them as shell commands.
+   `$ARGUMENTS` value. Examples use `$team-harness:review-pr` as the supported Codex skill invocation; do not try to execute it as a shell command.
 2. Keep the current primary thread as coordinator. A canonical instruction to
    invoke `th:orchestrator` means execute that routing decision in the current
    primary thread. Never spawn a persistent or nested orchestrator.
 3. Translate Claude tool names to the closest native Codex tools. Delegate
    only bounded work to available native agents when delegation is allowed and
-   materially useful. Gate approval and consolidation stay in the primary thread.
+   materially useful. Integration and workflow decisions stay in the primary thread.
 4. Resolve persistent settings from
    `${CODEX_HOME:-$HOME/.codex}/.team-harness.json`. Never depend on a Claude
    Code installation, `~/.claude`, the `claude` binary, or Claude plugin
    cache paths. Use packaged files relative to this skill directory.
-5. Preserve every canonical safety boundary, read-only default, confirmation
-   gate, secret rule, and outward-write approval. Native Codex sandbox and
-   permission policy remain authoritative.
+5. Follow the user's objective and existing authorization. Preserve read-only
+   review roles and use native Codex permissions. TH adds workflow
+   guidance, not another execution-permission protocol.
 6. Main coordinates native Codex PR-review subagents and consolidates their advisory returns; no nested orchestrator or mandatory consolidator. Load canonical phase references progressively and preserve immutable capture, selected coverage, independent verification and approval before publishing. When Read/Glob/Grep are absent, bounded non-mutating exec_command calls are the native filesystem-read transport; this alone never requires setup, update or restart. Verify effective permissions at dispatch: sandbox_mode read-only in a role TOML is a default and may be overridden by parent settings; it does not by itself deny network/MCP writes or delegation. Use the role's scoped read contract and the available native permission boundary, reporting enforcement gaps honestly. Read only supplied artifacts and verified regular worktree leaves. Main may request one focused correction for a missing return field or mistaken optional path at the same snapshot, preserving successful work. Mismatched identity, actual unreadable required evidence or freshness/integrity failure stays fail-closed. Unless base policy turns verification off, dispatch the independent verifier and validate assessments with apply-verification; the helper preserves findings, while Main owns evidence-backed dispositions and the all-finding ledger. Report verified k/n and absent coverage honestly.
 
 Execute the requested workflow after applying this adapter. Do not merely
