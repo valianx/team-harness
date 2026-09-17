@@ -134,6 +134,11 @@ implementation narrative, release notes, examples unrelated to that purpose,
 per-service copies, or unrequested overview pages. Never add documentation
 through scope drift.
 
+Keep one-off diagnostic scripts, raw logs, and execution notes out of tracked
+product files. Use permitted temporary storage or return evidence to Main;
+this does not grant workspace writes. Maintained tools, tests, and fixtures
+remain ordinary scoped deliverables.
+
 Honor the task's documentation audience, purpose, required sections, and budget.
 By default, edit one existing section with at most 20 added nonblank lines, or
 keep a necessary new document at 80 total lines. Exceed that only when the AC

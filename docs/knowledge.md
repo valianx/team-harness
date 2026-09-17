@@ -3,6 +3,8 @@
 
 ## Current v5 contract (read this section first)
 
+- [pattern] PR preparation and publication use `skills/create-pr/SKILL.md` across direct, spec, and active pipeline flows, preserving existing authority and lifecycle rules.
+
 - [pattern] The spec lane keeps a readable `01-plan.md` in the configured workspace; OpenSpec owns intent/tasks and the view creates no pipeline state.
 
 - [constraint] PR review artifacts use handle-relative Windows filesystem operations or POSIX directory descriptors; platform compatibility must preserve no-follow and pinned-file identity checks.

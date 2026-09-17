@@ -32,6 +32,7 @@ Convention: parse arguments, build a task payload, route to the `orchestrator` a
 
 ## Routing
 
+- **Shared PR preparation/publication:** `/th:create-pr`, selected automatically by relevant requests and by spec/pipeline delivery in the current coordinator.
 - **Explicit gated activation:** `/th:pipeline` (operator-only, `disable-model-invocation: true`).
 - **Explicit compatibility activation:** `/th:issue`, `/th:plan` in `plan-and-execute` mode, and `/th:recover` for persisted state.
 - **Routes to the direct orchestrator kernel:** plain `/th:plan`, `/th:design`, `/th:plan-review`, `/th:research`, `/th:learn`, `/th:spike`, `/th:test`, `/th:test-cross-browser`, `/th:test-pipeline`, `/th:validate`, `/th:define-ac`, `/th:security`, `/th:audit`, `/th:review-pr`, `/th:deliver`, `/th:diagram`, `/th:likec4-diagram`, `/th:d2-diagram`, `/th:translate`, `/th:bootstrap`, `/th:eval`, `/th:gcp-costs`, `/th:cross-repo`, `/th:inline`.

@@ -24,6 +24,7 @@ text. Keep mode names and invocations exact.
 | `background` | Dispatch bounded work through the active runtime's native background mechanism. | Claude Code + opencode + Codex |
 | `bootstrap` | Initialize repository conventions and its runtime-native instruction file. | Claude Code + opencode + Codex |
 | `clickup` | Configure, list, and route ClickUp tasks. | Claude Code + opencode + Codex |
+| `create-pr` | Prepare and publish a PR from direct, spec, or pipeline work. | Claude Code + opencode + Codex |
 | `cross-repo` | Analyze dependencies and changes across repositories. | Claude Code + opencode + Codex |
 | `d2-diagram` | Create technical diagrams with the D2 language. | Claude Code + opencode + Codex |
 | `define-ac` | Define acceptance criteria for a feature or task. | Claude Code + opencode + Codex |

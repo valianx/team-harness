@@ -10,3 +10,6 @@ ran from omissions despite exit zero. Report omission reasons and unknown counts
 honestly; unrelated optional skips do not invalidate sufficient evidence. Reuse
 sufficient tests, commands or inspection; use real integration evidence when the
 behavior depends on it. Add no test quota or specialist dispatch.
+Keep scratch scripts, raw logs, and execution notes in permitted temporary
+storage or return them to Main. Preserve maintained tools, tests, and fixtures;
+temporary evidence does not grant workspace writes.

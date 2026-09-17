@@ -18,6 +18,14 @@ Main SHALL surface concrete conflicts between affected requirements and relevant
 - **WHEN** Main prepares to create or update a PR with related open OpenSpec changes, including direct work outside the OpenSpec lane or pipeline
 - **THEN** it compares their requirements and tasks with implementation and verification evidence, validates their structure and delta coherence, and reports each as ready to archive, pending or needing reconciliation with its reason, excluding unrelated changes
 
+#### Scenario: A supported flow prepares and publishes a PR
+- **WHEN** direct work, the spec lane, or an explicitly active pipeline reaches PR preparation or publication
+- **THEN** Main uses the shared create-pr skill without requiring its explicit invocation, performs content preparation before final review or Freeze, and publishes under the existing authority without changing the accepted candidate or adding another gate
+
+#### Scenario: PR preparation has no relevant OpenSpec change
+- **WHEN** a requested PR contains ordinary repository work with no relevant OpenSpec change
+- **THEN** Main uses the same create-pr skill without starting OpenSpec, creating pipeline state, or requiring unrelated changes to be archived
+
 #### Scenario: Archive output is verified before publication
 - **WHEN** the authorized archive has updated living specs and moved the change
 - **THEN** strict validation covers both the archived change and affected living specs before the final candidate is published
@@ -69,3 +77,7 @@ Main SHALL surface concrete conflicts between affected requirements and relevant
 #### Scenario: Implementation or verification is not yet established
 - **WHEN** implementation or its relevant checks are incomplete despite checked tasks
 - **THEN** Main reports the missing work or evidence and leaves archive pending
+
+#### Scenario: Working evidence accompanies a change
+- **WHEN** implementation or review produces raw logs, transcripts, execution notes, or scratch scripts
+- **THEN** Main retains them in the configured workspace or permitted temporary storage, preserves maintained tools and tests, and keeps observable requirements in existing living specs without treating execution debris as canonical archive content

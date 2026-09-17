@@ -114,7 +114,7 @@ skill mention with `$team-harness`, or invoke the alphabetical catalog:
 $team-harness:modes
 ```
 
-The same 57 canonical capability names are shipped to Claude Code, Codex, and
+The same canonical capability catalog is shipped to Claude Code, Codex, and
 opencode. Runtime adapters translate native paths, tools, permissions, and
 delegation without maintaining separate feature lists.
 

@@ -1,5 +1,10 @@
 # Delivery phase
 
+Apply [create-pr](../../create-pr/SKILL.md)'s publication checkpoint after existing review,
+acceptance, and release conditions. Its selection is automatic by relevance and does not activate
+the pipeline; preserve live authority and the exact accepted Freeze SHA/tree. Do not rerun tests
+or edit files during post-Freeze delivery.
+
 Current v5 delivery receives one capability lease and returns one result
 envelope. Main accepts it into the control log before projecting delivery
 evidence. Only a valid live authority event can permit an outward action; a

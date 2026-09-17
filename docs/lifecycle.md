@@ -55,8 +55,8 @@ One tag, one release event, N runtime artifacts, one version namespace. Re-runni
 The Go installer (`cmd/install/`) manages opencode assets and the twelve generated Codex agent TOMLs. It does not install marketplace plugins and does not modify Codex `config.toml`; plugin install/update/remove remains marketplace-owned. Claude Code has no reachable binary-install path.
 
 The Claude marketplace is the Claude Code install channel. All three runtimes
-now expose the same 57 canonical skill names. Claude Code consumes the source
-skills directly; Codex packages ten native contracts plus 47 generated
+expose the same canonical skill names. Claude Code consumes the source
+skills directly; Codex packages ten native contracts plus generated
 adapters; opencode receives generated adapters plus six native lifecycle or
 session overrides. The Codex setup/update flow separately places seven specialists for the gated
 pipeline, one direct inline reviewer, and four read-only specialists for PR review. The Go binary remains the opencode

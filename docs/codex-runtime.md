@@ -119,8 +119,8 @@ reviewed without stopping for a human prompt. This avoids shared predictable
 directories remain protected by Codex and any test that constructs them still
 requires a narrowly scoped live approval.
 
-The plugin supplies all 57 canonical Team Harness skills. Ten lifecycle and
-pipeline contracts remain hand-authored for Codex; the other 47 are generated
+The plugin supplies all canonical Team Harness skills. Ten lifecycle and
+pipeline contracts remain hand-authored for Codex; the remaining skills use generated
 runtime adapters that package the canonical workflow, references, scripts, and
 assets while translating invocation, configuration paths, tools, delegation,
 and permission boundaries. This includes the diagram family and both GCP

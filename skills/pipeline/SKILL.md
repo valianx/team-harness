@@ -36,3 +36,7 @@ When input is empty, ask for the task to run and stop. Do not start an empty pip
   later roles are validated immediately before their first possible dispatch.
 - Dispatch carries one just-in-time capability lease and every
   specialist returns one result envelope. Counts and elapsed time never route.
+
+Within an explicitly active pipeline, use [create-pr](../create-pr/SKILL.md) for PR
+preparation and publication at its two checkpoints. Relevance selects it automatically;
+that selection does not activate this pipeline.
