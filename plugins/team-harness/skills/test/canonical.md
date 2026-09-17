@@ -31,6 +31,8 @@ plans, and source. Use the diff and repository history to identify changed
 paths, then inspect nearby integration boundaries and existing test conventions.
 Choose meaningful unit, integration, contract, or browser checks that can expose
 the relevant regression; do not create tests merely to mirror the implementation.
+For a requested browser-engine or channel matrix, use
+[test-cross-browser](../test-cross-browser/SKILL.md) with the same target.
 
 Add or update tests with the repository's normal tools and run the narrowest
 relevant checks first, followed by broader checks when the change warrants them.

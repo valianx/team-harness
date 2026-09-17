@@ -286,11 +286,16 @@ node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
   --candidate HEAD \
   --checkpoint post_implementation \
   --checks test,format_check,lint,crap \
+  --required-checks test \
   --policy-mode measure
 ```
 
-Select optional checks only when the manifest declares them; `test` leads and
-each declared `format_check`, `lint`, and `crap` follows in that order.
+Pass all eight required options: `--repo`, `--workspace`, `--manifest`,
+`--base`, `--candidate`, `--checkpoint`, `--checks` and `--required-checks`.
+Select comma-separated check IDs declared by the manifest. Required checks
+must be included in the selection; pass an empty string explicitly when none
+is required. The order of `--checks` is the execution order; choose it for the
+repository and task rather than inferring a mandatory global check set.
 
 Successful command output is counted but not replayed. Failure diagnostics use
 the existing bounded-command envelope: independently counted stdout/stderr,
@@ -314,8 +319,8 @@ the security boundary.
 
 ## Coordinator integration
 
-When a coordinator selects the runner, pass the repository, workspace,
-manifest, base and candidate explicitly and record the receipt alongside the
+When a coordinator selects the runner, use the complete invocation above,
+including checkpoint, selected and required checks. Record the receipt alongside the
 task's other temporary evidence. Reuse the receipt only while the candidate
 and manifest identity remain unchanged. A failed command is evidence to
 diagnose; it is not a permission decision or an automatic retry instruction.

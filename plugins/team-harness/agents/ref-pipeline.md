@@ -49,8 +49,9 @@ checks. Record the candidate revision and meaningful outcomes so evidence can
 be reused while applicable. A changed candidate needs checks relevant to that
 change; an unchanged candidate needs no repeated full run. If the repository
 declares a quality manifest, the optional quality runner can execute selected
-checks with an explicit `--repo`, workspace, base, candidate and manifest. It
-is a deterministic evidence helper, not an implicit Freeze or validation gate.
+checks. Read the current `validate` skill for its complete invocation inputs
+and the shipped helper interface. It supplies deterministic evidence without
+creating an implicit Freeze or validation gate.
 
 If a plan includes sketches, reviewers and validators may read the applicable
 files and report mismatches. Note missing design evidence when acceptance

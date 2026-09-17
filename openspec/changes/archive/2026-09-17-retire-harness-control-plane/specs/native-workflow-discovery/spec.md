@@ -43,6 +43,10 @@ mandatory work artifact.
 - **WHEN** an implementation is available in the current repository or OpenSpec plan without numbered workspace reports
 - **THEN** the test skill resolves the intended behavior and relevant checks from that context without requiring those reports
 
+#### Scenario: Cross-browser coverage is requested
+- **WHEN** the user requests browser-matrix testing without legacy workspace reports
+- **THEN** the skill resolves the current target, loads its browser testing method and reports the engines or channels exercised and unavailable coverage
+
 #### Scenario: An experiment is discarded
 - **WHEN** a spike has answered its hypothesis and the user chooses to discard it
 - **THEN** the workflow identifies and cleans up its own temporary experiment while preserving unrelated work
