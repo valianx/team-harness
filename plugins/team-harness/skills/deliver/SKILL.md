@@ -6,8 +6,8 @@ description: Complete standard delivery after an accepted pipeline receives a va
 # Deliver
 
 Use [create-pr](../create-pr/SKILL.md) for relevant PR preparation and publication. Its
-selection is automatic by relevance and does not activate the pipeline; publication preserves
-the existing authority and accepted Freeze SHA/tree.
+selection is automatic by relevance and does not activate the pipeline. Publication preserves
+existing authority; only active pipeline publication requires the accepted Freeze SHA/tree.
 
 Use only the exact `00-state.md` already selected by the current pipeline thread
 or by an explicit validated feature argument. Never scan for an arbitrary
