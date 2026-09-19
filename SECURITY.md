@@ -2,8 +2,9 @@
 
 ## Supported Versions
 
-Team Harness ships as a Claude Code plugin. Only the latest released version
-receives security fixes — update with `/th:update` then `/reload-plugins`.
+Team Harness ships integrations for Claude Code, Codex, and OpenCode. Only the
+latest released version receives security fixes. Use the installed runtime's
+Team Harness update and reload workflows to refresh it.
 
 | Version | Supported |
 |---------|-----------|
@@ -27,13 +28,14 @@ timeline after triage.
 
 ## What this repository already does
 
-- **`hooks/policy-block.sh`** — a deterministic secret-scan gate that denies
-  high-confidence secrets in file writes and in commit commands before they are
-  committed (`.env.example` is allowlisted).
+- **Native execution permissions** — the host runtime's configured permissions
+  govern tool execution. TH supplies workflows and context/observation hooks;
+  it does not install permission-interception hooks or promise an equivalent
+  deny policy across hosts.
 - **CI (`.github/workflows/`)** — runs `bash tests/run-all.sh` on every pull
-  request and push to `main`; this includes the `policy-block.sh` functional test
-  suite.
+  request and push to `main`, including retained hook behavior, installation
+  preservation, runtime projections, and the shipped-asset security self-scan.
 
-Team Harness distributes agent prompts, skills, and hooks — it executes no remote
-code beyond the installer and the operator-configured MCP servers. Report any
-behavior that could leak credentials, exfiltrate data, or bypass a gate.
+Team Harness distributes agent prompts, skills, hooks, and installation helpers.
+Its workflows can invoke native tools and operator-configured services. Report
+behavior that could leak credentials, exfiltrate data, or bypass native permissions.

@@ -6,22 +6,22 @@
 
 ## Testing principles
 
-Normative for every agent that authors a test here (primarily `tester`, also `qa` and `security`). Codified after issue #298 — a permission-widening bug in the dev-guard hook that shipped despite a green suite.
+Normative for every agent that authors a test here (primarily `tester`, also `qa` and `security`). Codified after issue #298 — a permission-widening bug in the now-retired dev-guard hook that shipped despite a green suite.
 
 ### (i) The oracle is the spec, not the implementation output
 
 The expected value in an assertion must be derived from the contract, specification, or documented intent — NEVER from running the code under test and recording what it emits. A test whose expected value is "what the code currently does" is a snapshot of present behaviour: it cannot catch a defect already present when the snapshot is taken, and it turns red when that defect is later fixed. It actively defends the bug.
 
-**#298 case study.** `tests/test_dev_guard.sh` asserted `assert_allow` on exactly the buggy default paths of the dev-guard hook. The oracle was "the script outputs `allow`", which was true, and which was the bug. The correct oracle is the permission-gate contract: a guard hook's non-covered default is *defer / no-decision* (exit 0, empty stdout), so the assertion must be `assert_nodecision`. Suite 83 flipped those assertions; this principle prevents the class from recurring.
+**Historical #298 case study.** The retired `tests/test_dev_guard.sh` asserted `assert_allow` on exactly the buggy default paths of the former dev-guard hook. The oracle was "the script outputs `allow`", which was true, and which was the bug. Its contract required the non-covered default to *defer / no-decision* (exit 0, empty stdout), so the correct assertion was `assert_nodecision`. The hook and its exclusive suite have since been removed; the lesson about deriving expectations from intent still applies.
 
-### (ii) Hook, permission, and gate behaviour is validated in an isolated environment
+### (ii) Config-dependent behaviour is validated in an isolated environment
 
-A test exercising a `PreToolUse` hook, a permission gate, or any config-dependent security control MUST run in a clean environment containing ONLY the plugin's own hooks and wiring — never the developer's personal `~/.claude` config. Two masks make personal-config testing unsafe for this class:
+A config-dependent hook or integration test uses temporary configuration and controlled payloads, without depending on the developer's personal settings. Two masks make personal-config testing unreliable:
 
 - **Config bleed** — the developer's own `settings.json` and permission mode can mask a plugin-level bug whose symptom depends on environment.
 - **Perceptual mask** — dialog-free operation on Edit/Write/benign-Bash is the *expected feel*, so a bug that auto-approves those actions produces exactly the experience the operator already expects. There is no symptom to notice. This is precisely how #298 escaped its author.
 
-`tests/test_isolated_hook_env.sh` implements this: it builds a throwaway `HOME` wired with only the plugin's hooks (read from `.claude-plugin/hooks.json`), drives the chain with controlled tool payloads, and asserts the emitted decision comes solely from the installed hooks. It proves the hook *defers*; it cannot prove the GUI dialog renders — headless CI cannot observe Claude Code's real dialog, and that boundary is stated in the suite's own scope note.
+The retained session, language and subagent suites exercise context and observation behavior. `tests/test_opencode_session_enforcement.sh` uses temporary `OPENCODE_CONFIG_DIR` fixtures and a mock client to exercise session context. `tests/test_hook_registration.mjs` checks the shipped wiring. These checks do not prove how a host's native permission dialog renders or what a live user's policy allows.
 
 ### (iii) A failing test names a defect in code, not a missing sentence
 
@@ -77,11 +77,10 @@ contracts listed below.
 | `test_security_scan.py` | Exact source allowlists for all five PR agents, optional Codex projection validation, read-only-tier Bash grants, secrets, and roster reachability |
 | `test_review_context.py` | PR security-selection reason enums and capture validity, review-policy parsing, preserved findings and advisory verifier assessments, exact coverage and status-specific evidence, selected preflight blockers, snapshot mergeability classification, hash/freshness comparison, rendering, and conversation capture behavior |
 | `test_regression_evidence.mjs` | Real base/head assertion comparisons, preexisting failures, inconclusive execution, deadlines, bounded diagnostics, stale/tampered evidence and unchanged operator checkout; no model calls |
-| `test_codex_windows_hooks.mjs` | Windows hook bootstrap and adapter decisions; executes literal `commandWindows` through both PowerShell 7 and Windows PowerShell, including paths with spaces and symbols. Registered in native Windows CI; skips on other platforms. |
+| `test_hook_registration.mjs` | Retained context/observation hook registration, launcher bundles and OpenCode integration; retired enforcement wiring is absent. |
 | `test_openspec_launcher.mjs` | Executes the Windows npm JavaScript entrypoint transport with literal arguments and paths containing spaces/symbols; checks missing runtime and invalid input. Runs in Linux and native Windows CI. |
 | `test_codex_binary_resolution.py` | Resolves a real Windows directory junction or POSIX directory symlink, executes the pinned binary with an empty PATH, and rejects relative, missing, traversal, control-character, directory and non-executable candidates. |
 | `test_pipeline_control_plane.mjs` | Closed leases/results, actual Git scope reconciliation, Main-only mutation, safe specialist exports, canonical log replay/projections, causal recovery, Freeze quality, capsules, and the administrative close of a workspace without a control log (symlinked control or events paths refused) |
-| `test_permission_disjointness.py` | The permission-allowlist disjointness invariant (#18312 floor) |
 | `test_flow_event_schema_sync.py` | Cross-repo flow-event schema sync |
 | `test_lane_marker_identity.py` | Lane-marker byte identity |
 | `test_openspec_scope.py` | Every active OpenSpec change against the repository-owned rules in `openspec/config.yaml` — a non-empty delta, a declared capability, proposal words, task items, requirement ceiling, and the presence of the real-run baseline. A change whose every task is checked but is not archived prints a WARN. |
@@ -95,7 +94,7 @@ contracts listed below.
 | Suite | Covers |
 |---|---|
 | `go test ./cmd/install/` | The Go installer — preservation, mode transform, import candidates, platform behaviour |
-| `test_opencode_config_resolver.sh` | opencode config-path resolution (SEC-OC-R3) |
+| `test_opencode_session_enforcement.sh` | OpenCode session context injection, temporary configuration fixtures, and fail-silent behavior with a mock client. |
 | `test_th_update_block_sync.sh` | The `/th:update` managed-block sync matrix |
 | `test_update_opencode_sh.sh` | `update-opencode.sh` non-interactive pre-check |
 | `test_bin_tty_execbit.py`, `test_bin_tty_behavioral.sh` | `bin/` TTY openability and exec bit (#473) |

@@ -36,7 +36,7 @@ team-harness/
 │   ├── obsidian-bases/
 │   ├── json-canvas/
 │   └── obsidian-cli/
-├── hooks/               Gate/observability logic (TypeScript) + fail-closed launcher
+├── hooks/               Context/observability logic (TypeScript) + fail-open launcher
 │   ├── run-ts-hook.sh   hooks.json's only wiring path (no gate logic)
 │   ├── sketch-guard.sh  Not an event hook — runs via the Bash tool
 │   └── ts/              bodies/ (logic) + entry/ (per-runtime) + dist/ (tracked)

@@ -98,9 +98,21 @@ never authorized merely by escalation approval.
 
 ## Stage B — converge once
 
-The running prose may still come from the old snapshot. From this point use
-only the validated helper under `NEW_PLUGIN`. Reuse the canonical `PYTHON_BIN`
-and `CODEX_BIN` already pinned in Stage A:
+The running prose may still come from the old snapshot. Read
+`NEW_PLUGIN/skills/update/SKILL.md` from the validated installation before
+continuing Stage B. Use that version's helper arguments, receipt schema and
+recovery instructions; do not interpret a new receipt with the old skill's
+remembered contract. Retain the paths, versions and authorization from Stage A
+without repeating marketplace refresh or installation.
+
+If a receipt has already been returned, read the selected version's skill and
+interpret that same receipt before deciding it is malformed. Refreshing these
+instructions requires neither another convergence call nor a restart. This
+handoff cannot replace instructions already held in memory by an older agent;
+that agent must read the installed skill to adopt the current contract.
+
+Use only the validated helper under `NEW_PLUGIN`. Reuse the canonical
+`PYTHON_BIN` and `CODEX_BIN` already pinned in Stage A:
 
 ```text
 PYTHON_BIN NEW_PLUGIN/skills/update/scripts/converge.py --old-plugin OLD_PLUGIN --old-version OLD_VERSION --new-plugin NEW_PLUGIN --new-version NEW_VERSION --codex-bin CODEX_BIN
