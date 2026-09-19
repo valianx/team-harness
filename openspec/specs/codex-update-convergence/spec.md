@@ -1,7 +1,7 @@
 # codex-update-convergence Specification
 
 ## Purpose
-Make Team Harness updates on Codex fast and predictable while preserving native plugin authority, operator-owned configuration, explicit persistent-runtime approval, and recoverable partial convergence.
+Make Team Harness updates on Codex fast and predictable while preserving native plugin authority, operator-owned configuration and execution preferences, and recoverable convergence of TH-owned installation domains.
 
 ## Requirements
 

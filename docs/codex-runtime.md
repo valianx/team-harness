@@ -17,7 +17,7 @@ Then invoke `$team-harness:setup`. The marketplace only distributes code;
 setup converges the operational installation. It writes native settings to
 `${CODEX_HOME:-$HOME/.codex}/.team-harness.json`, configures workspace and
 language preferences and optional GitHub identity routes, offers Memory/context7
-MCP registration, verifies the native permission and approval profile, and places twenty bundled specialist
+MCP registration, preserves native execution preferences, and places twenty bundled specialist
 agents in project or global scope: seven standard logical roles, seven
 spawn-overridable `pipeline-*` identities, one direct read-only inline reviewer,
 and five for immutable PR review.
@@ -39,9 +39,9 @@ codex plugin marketplace add valianx/team-harness \
 Use `$team-harness:update` for the normal update flow. It refreshes the
 marketplace, compares versions, refreshes the installed plugin through an
 idempotent native `codex plugin add` under native permissions, then runs one
-versioned convergence helper for the bridge, native settings, persistent
-runtime classification, required features, all twenty bundled agents, MCP
-inspection, and final postconditions. The already-current path
+versioned convergence helper for the bridge, TH settings, required features,
+all twenty bundled agents, MCP inspection, and final postconditions.
+Native execution policy is not a convergence domain. The already-current path
 performs no domain writes; a stale domain is repaired only when classification
 requires it. The helper returns one closed receipt, so the coordinator does not
 repeat each inspection after convergence.
@@ -56,10 +56,11 @@ Without suitable controls, affected components remain unverified. A reconnect
 is warranted only for a demonstrated activation requirement, preserving the
 same conversation. See [reload](../skills/reload/SKILL.md) for runtime procedures.
 
-Persistent runtime-profile changes remain a live operator decision. The first
-pass completes the automatically authorized domains and returns a short
-redacted summary; an unambiguous `yes`, `no`, or natural-language adjustment is
-sufficient, without copying a recovery command or using a prescribed phrase.
+The schema-v3 receipt describes five retained domains and has no runtime-policy
+approval state. Read the selected installation's current update skill before
+interpreting its receipt. A proposal retained from an older runtime-profile flow
+does not authorize a policy write; the legacy `--runtime-approval` argument is
+accepted as a no-op while the current updater converges the retained domains.
 A real active old snapshot is preserved so its already-known skill and resource
 paths remain operational, while a missing or previously bridged path may follow
 the new snapshot. The updater never overwrites a real cached directory or an
