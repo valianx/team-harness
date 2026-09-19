@@ -160,7 +160,7 @@ STATE_FILE=""
 if [ -f "${DOCS_ROOT}/00-state.md" ]; then
     STATE_FILE="${DOCS_ROOT}/00-state.md"
 else
-    # Fall back to find (same pattern as checkpoint-guard.sh, bounded depth).
+    # Fall back to find within the workspace, bounded by depth.
     while IFS= read -r f; do
         STATE_FILE="$f"
         break

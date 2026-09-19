@@ -1,6 +1,6 @@
 ---
 name: setup
-description: "Configure or reconfigure the complete Team Harness Codex installation: native settings, bundled specialist agents, optional MCP servers, workspace preferences, and hook verification. Use when the operator invokes Team Harness setup or asks to configure any Codex integration."
+description: "Configure or reconfigure the complete Team Harness Codex installation: native settings, bundled specialist agents, optional MCP servers, workspace preferences, and integration verification. Use when the operator invokes Team Harness setup or asks to configure any Codex integration."
 ---
 
 # Team Harness setup for Codex
@@ -127,18 +127,18 @@ migration, and preserve every unrelated value.
      `sandbox_workspace_write.writable_roots`; never append only the current
      `{repo-name}` child, which would make the configuration unusable from other
      repositories.
-     A settings write does not update a running session's sandbox: require a
-     Codex restart or new tab before reporting the external workspace ready.
-     The pipeline's non-escalated live write probe remains authoritative.
+     A settings write alone does not prove a running session's sandbox changed.
+     Use the installed reload flow to assess supported activation and explain
+     any demonstrated reconnect need. The pipeline's non-escalated live write
+     probe remains authoritative before reporting the external workspace ready.
    - Keep `approval_policy = "on-request"` and set
      `approvals_reviewer = "auto_review"`. This is Codex's automatic review
      path for sandbox escalations, including ordinary local Git metadata writes,
      benign pushes, and PR creation; it is not a blanket command allow rule.
      Never add a repository `.git` directory to writable roots and never install
-     a blanket `git`, `git push`, `gh pr create`, or `git worktree add` rule,
-     because an allow rule could outrank a deterministic deny hook. Force-push
-     remains denied by `gate-guard`, while server-side GitHub branch protection
-     remains authoritative for the default branch.
+     a blanket `git`, `git push`, `gh pr create`, or `git worktree add` rule.
+     Native permission settings and server-side GitHub branch protection remain
+     authoritative; TH no longer supplies an additional force-push interceptor.
      A pipeline still submits one exact `git worktree add -b <branch>
      <absolute-path> <immutable-base-sha>` native escalation after Gate 1;
      `auto_review` evaluates it without a human prompt. If that reviewer times
@@ -204,8 +204,8 @@ migration, and preserve every unrelated value.
    (`ensure`, behind the same confirmation gate as every config write) fixes
    the global config, but the shadowing itself is fixed only by updating the
    checkout or regenerating the project config so it stops declaring
-   `writable_roots`. Restarting Codex alone does not clear shadowing; give the
-   restart instruction only after the shadowing fix.
+   `writable_roots`. Restarting Codex alone does not clear shadowing; after the
+   fix, use reload to assess activation and any demonstrated reconnect need.
 
 7. Reconcile all twenty bundled specialists in the persisted scope on every full
    setup, and whenever `agents` is targeted:
@@ -244,29 +244,20 @@ migration, and preserve every unrelated value.
      printing it, then run
      `codex mcp add context7 --env DEFAULT_MINIMUM_TOKENS=10000 -- npx -y @upstash/context7-mcp@3.2.5`.
 
-9. Verify the installed plugin's `hooks/hooks.json`. Codex supports the
-   deterministic deny hooks only: `policy-block`, the catastrophic-deny
-   portion of `gcp-guard`, and `gate-guard`'s force-push floor. `gate-guard`
-   denies direct force flags, `--force-with-lease`, `+refspec` forms, and the
-   statically resolved wrapper forms covered by its bounded command analyzer,
-   even after `ship`. It does not guarantee detection when a push is assembled
-   from runtime-only shell state such as variables, aliases, functions, PATH,
-   or Git configuration; this accepted limitation is not expanded in setup,
-   and server-side GitHub branch protection remains authoritative. Benign push
-   and ordinary GitHub approval ownership remain native. Approval-classifying
-   `ask` guards are intentionally not registered because Codex's native
-   permission flow owns approvals.
-   Explain that the operator must review and trust hooks through `/hooks`;
-   never approve or bypass trust.
+9. The Codex distribution has no TH permission-hook manifest or launcher.
+   Treat those retired assets as unnecessary; do not recreate them or request
+   hook trust, repair, or restart because they are absent. Preserve the
+   operator's native permissions and unrelated hooks. Native policies are not
+   claimed to duplicate the checks removed from TH.
 
 10. Re-run the applicable helper inspections and `codex mcp list --json`; re-run
     `codex features list` only when step 4 ran. Report one compact result:
     native config path, workspace/language, agent scope and twenty agent statuses,
-    GitHub route count when configured, feature-flag status when checked, MCP registrations, hook
-    verification/trust, global execution-default status, pending activation or
+    GitHub route count when configured, feature-flag status when checked, MCP registrations,
+    global execution-default status, pending activation or
     same-conversation reconnect, and for Obsidian whether the writable-root grant
-    is effective. Also report that ordinary Git/push/PR approval requests route
-    through automatic review, while force-push remains denied. Never print
+    is effective. Report the configured native approval policy without promising
+    an additional TH execution restriction. Never print
     imported opaque values, secrets, or environment-variable values.
 
 The flow is idempotent. Blank input preserves current values; unrelated native

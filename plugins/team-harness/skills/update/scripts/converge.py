@@ -21,15 +21,14 @@ from types import ModuleType
 from typing import BinaryIO, Callable
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 PLUGIN_NAME = "team-harness"
 REQUIRED_FEATURES = ("multi_agent", "multi_agent_v2")
-DOMAIN_NAMES = ("bridge", "config", "runtime", "features", "agents", "mcp", "hooks")
+DOMAIN_NAMES = ("bridge", "config", "runtime", "features", "agents", "mcp")
 OVERALL_STATUSES = {"current", "converged", "pending-approval", "partial-convergence"}
 RECOVERY_INVOCATION = "$team-harness:update"
 MAX_NATIVE_OUTPUT = 256 * 1024
 NATIVE_TIMEOUT_SECONDS = 30
-MAX_HOOK_MANIFEST = 64 * 1024
 MAX_RECEIPT_BYTES = 128 * 1024
 MAX_LIST_ITEMS = 128
 WINDOWS_CREATE_NEW_PROCESS_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
@@ -40,16 +39,8 @@ NON_FATAL_ALIAS_WARNING = (
     "WARNING: proceeding, even though we could not create PATH aliases: "
     "Read-only file system (os error 30)"
 )
-HOOK_DIGESTS = {
-    "hooks/hooks.json": "9ae7d0ec178d1d8dbb4ce9a8bd914f802412eeb934930873658dd54aafa917a5",
-    "hooks/dist/codex-launcher.cjs": "ff444bd8ae65a96f62113888b31248f4778b9116823e1af1a5a7212c572fca64",
-    "hooks/run-codex-hook.sh": "6e13c288ceed9feba3493d1eb886237971b96818d3819b0279917bc71496ac5b",
-    "hooks/dist/policy-block.cjs": "33ca2b19d7e26c78477ad6a56ab5be4620eceea76e8312168e4e9cc37127a98c",
-    "hooks/dist/gcp-guard.cjs": "1016604dbb885fa5dd58410c33a068f0c1979a3b2bc7a6b7da54b9c7268c8acc",
-    "hooks/dist/gate-guard.cjs": "405d76c700ec7f225fd7935d16946fea16064a76b7b06b0951b33ab81006aa52",
-}
 HELPER_DIGESTS = {
-    "skills/update/scripts/bridge_snapshot.py": "606a16f312326350333c95518eed578a2cecdc415c70bf463bca3be56155b046",
+    "skills/update/scripts/bridge_snapshot.py": "52da3ca0233c3d9f145a46a9f0b6648aa65f01bd867cd4d7b0870053b8f2f99d",
     "skills/setup/scripts/manage_config.py": "49175207918335c7323deeb0cb38a6253c78b6595cd724c6b15e1c5ae46f4d31",
     "skills/setup/scripts/manage_runtime.py": "b96d3b25a82a039020954869e47b96001b6c957ae6578723f74f386c6a53f774",
     "skills/setup/scripts/manage_agents.py": "defb1ee1531bba5dee8a92756684f48f81b6c75a0a6938066779c5361b00b976",
@@ -298,7 +289,6 @@ def snapshot_identity(plugin: Path) -> str:
         ".codex-plugin/plugin.json",
         "skills/update/scripts/converge.py",
         *HELPER_DIGESTS,
-        *HOOK_DIGESTS,
     ]
     digest = hashlib.sha256()
     for relative in sorted(relative_paths):
@@ -438,51 +428,6 @@ def inspect_mcp(native_runner: NativeRunner, codex_bin: str, expected: tuple[str
     }
 
 
-def validate_hooks(plugin: Path) -> dict[str, object]:
-    root = codex_home_path()
-    for relative, expected_digest in HOOK_DIGESTS.items():
-        artifact = plugin / relative
-        assert_regular_chain(artifact, root)
-        try:
-            digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-        except OSError as exc:
-            raise ConvergenceError("HOOK_ARTIFACT_UNAVAILABLE") from exc
-        if digest != expected_digest:
-            raise ConvergenceError("HOOK_ARTIFACT_IDENTITY_MISMATCH")
-    path = plugin / "hooks/hooks.json"
-    size = path.stat().st_size
-    if size > MAX_HOOK_MANIFEST:
-        raise ConvergenceError("HOOK_MANIFEST_TOO_LARGE")
-    try:
-        manifest = json.loads(path.read_bytes())
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ConvergenceError("HOOK_MANIFEST_INVALID") from exc
-    if not isinstance(manifest, dict) or set(manifest) != {"description", "hooks"}:
-        raise ConvergenceError("HOOK_MANIFEST_INVALID")
-    hooks = manifest.get("hooks")
-    if not isinstance(hooks, dict) or set(hooks) != {"PreToolUse"}:
-        raise ConvergenceError("HOOK_MANIFEST_INVALID")
-    groups = hooks["PreToolUse"]
-    if not isinstance(groups, list):
-        raise ConvergenceError("HOOK_MANIFEST_INVALID")
-    if len(groups) != 2:
-        raise ConvergenceError("HOOK_ADAPTER_COUNT_INVALID")
-    for group in groups:
-        if set(group) != {"matcher", "hooks"} or not isinstance(group["matcher"], str):
-            raise ConvergenceError("HOOK_MANIFEST_INVALID")
-        hooks_list = group["hooks"]
-        if not isinstance(hooks_list, list) or len(hooks_list) != 1:
-            raise ConvergenceError("HOOK_MANIFEST_INVALID")
-        hook = hooks_list[0]
-        if not isinstance(hook, dict) or set(hook) != {"type", "command", "commandWindows", "timeout", "statusMessage"}:
-            raise ConvergenceError("HOOK_MANIFEST_INVALID")
-        if hook["type"] != "command" or not isinstance(hook["command"], str) or hook["timeout"] != 10:
-            raise ConvergenceError("HOOK_MANIFEST_INVALID")
-        if not isinstance(hook["commandWindows"], str) or not hook["commandWindows"].strip():
-            raise ConvergenceError("HOOK_MANIFEST_INVALID")
-    return {"status": "current", "adapterCount": 2, "restartRequired": False}
-
-
 def domain_error(exc: Exception) -> dict[str, object]:
     if isinstance(exc, ConvergenceError):
         code = exc.code
@@ -605,7 +550,6 @@ def validate_receipt(receipt: object) -> dict[str, object]:
         "features": {"status", "changed", "required", "restartRequired"},
         "agents": {"status", "scope", "changedCount", "customDefaultsPreserved", "restartRequired"},
         "mcp": {"status", "registeredCount", "missingExpected", "restartRequired"},
-        "hooks": {"status", "adapterCount", "restartRequired"},
     }
     domain_statuses = {
         "bridge": {"not-run", "current", "changed", "preserved", "failed"},
@@ -614,7 +558,6 @@ def validate_receipt(receipt: object) -> dict[str, object]:
         "features": {"not-run", "current", "changed", "failed"},
         "agents": {"not-run", "current", "changed", "failed"},
         "mcp": {"not-run", "current", "preserved", "failed"},
-        "hooks": {"not-run", "current", "failed"},
     }
     for name, result in domains.items():
         if not isinstance(result, dict) or result.get("status") not in domain_statuses[name]:
@@ -650,7 +593,7 @@ def validate_receipt(receipt: object) -> dict[str, object]:
         raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
     if domains["agents"].get("scope") is not None and domains["agents"]["scope"] not in {"project", "global"}:
         raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
-    for name, key in (("agents", "changedCount"), ("mcp", "registeredCount"), ("hooks", "adapterCount")):
+    for name, key in (("agents", "changedCount"), ("mcp", "registeredCount")):
         value = domains[name].get(key)
         if value is not None and (not isinstance(value, int) or isinstance(value, bool) or value < 0 or value > 4096):
             raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
@@ -882,8 +825,6 @@ def run_convergence(
         receipt["failedDomain"] = "mcp"
         return receipt
     if not apply_domain("mcp", lambda: inspect_mcp(runner, codex_bin, expected_mcp)):
-        return receipt
-    if not apply_domain("hooks", lambda: validate_hooks(new_plugin)):
         return receipt
 
     receipt["changedDomains"] = changed

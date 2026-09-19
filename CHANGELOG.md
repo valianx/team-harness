@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.31.0] - 2026-09-19
+
+### Changed
+- Retire Team Harness permission and process guards, their exclusive launchers and disconnected adapters. Execution decisions now belong to the configured native runtime; installation does not alter the operator's permission settings or promise identical policies.
+- Preserve workflow discovery, voice, language, workspace/Obsidian, session observations and recovery while removing the unused legacy Claude managed-block installer.
+- Complete native PR-review coordination support: specialists supply recommendations, Main consolidates evidence, and an unused consolidator does not prevent readiness.
+
+### Compatibility
+- Team Harness no longer contributes additional deny/ask hook decisions. Current native policies remain authoritative. Existing user customizations and historical ownership migration remain intact.
+
 ## [3.30.1] - 2026-09-18
 
 ### Changed

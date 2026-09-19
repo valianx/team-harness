@@ -190,7 +190,7 @@ Chat-driven Claude Code, run unguided, has documented failure modes that compoun
 | Multi-PR splits leave the WHY in nobody's head | Base PRs carry `Cleanup PR:` with operational rationale; secondary PRs carry `Base PR:` back-reference |
 | "Did the AC pass?" requires reading the whole plan | `01-plan.md § Task Index` routes to one task shard; its AC checkboxes mirror PASS |
 | Agents silently disappear when their frontmatter has invalid YAML | A structural test parses every agent and fails on broken YAML |
-| Destructive commands slip through inattention | `PreToolUse` policy blocks `rm -rf`, force push, secret-file writes |
+| Destructive operations need explicit scope and impact | TH workflows surface planned effects for review; configured native permissions govern execution |
 
 Each row is a real failure mode encountered and patched. See [`docs/knowledge.md`](./knowledge.md) for the canonical pattern / decision log.
 
@@ -200,7 +200,7 @@ Each row is a real failure mode encountered and patched. See [`docs/knowledge.md
 
 - **Agents.** 28 agents. The `orchestrator` coordination reference, used by selected workflows without replacing the native general agent, plus the specialists: `architect`, `implementer`, `tester`, `cleaner`, `qa`, `pr-review-qa`, `plan-reviewer`, `delivery`, `reviewer`, `reviewer-consolidator`, `pr-review-security`, `security`, `ux-reviewer`, `diagrammer`, `likec4-diagrammer`, `d2-diagrammer`, `documenter`, `translator`, `gcp-cost-analyzer`, `gcp-infra`, `init-project`, `agent-builder`, `mentor`, `researcher`, `research-consolidator`, `code-researcher`, `adversary`. How they relate at runtime: [`docs/agent-tree.md`](./agent-tree.md). Full roster, model tier (opus / sonnet / haiku), and effort matrix: [`agents/README.md`](../agents/README.md).
 - **Skills** (slash commands). `/th:pipeline` explicitly activates the gated flow; most others route through the direct kernel. Standalone utilities include `/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:update`, and `/th:background`. Common routed entries include `/th:design`, `/th:plan`, `/th:recover`, `/th:deliver`, `/th:review-pr`, and `/th:issue`. `/th:background` launches a background `claude -p` headless session for eligible long-running tasks — it does not route through `th:orchestrator`.
-- **Hooks.** Registered boundary hooks are intentionally narrow: `policy-block` blocks catastrophic recursive deletion and provider-shaped credentials; `dev-guard` gates Git/GitHub/ClickUp outward actions; `gcp-guard` classifies mutating gcloud verbs. Additional retained hook bodies may be unwired; `.claude-plugin/hooks.json` is the authority. Notification scripts are optional. Full catalog: [`hooks/README.md`](../hooks/README.md).
+- **Hooks.** Retained hooks provide session/language context, subagent observations, pre-compaction snapshots and optional notifications. `.claude-plugin/hooks.json` lists the Claude wiring; OpenCode retains session context integration. Native runtime permissions govern execution. Full catalog: [`hooks/README.md`](../hooks/README.md).
 - **External Memory MCP** server. Semantic memory across projects. The server (`context-harness-mcp` or any MCP-compatible service) lives outside this repo. Reference: [`docs/kg-content-policy.md`](./kg-content-policy.md).
 
 ---
@@ -209,7 +209,7 @@ Each row is a real failure mode encountered and patched. See [`docs/knowledge.md
 
 **The native general agent coordinates the selected TH workflow.** The developer-mode replacement style is retired. Workflow discovery, specialist coordination, voice and language preferences, and workspace/Obsidian context remain available through skills and managed guidance. Existing selections follow [the bounded migration](./dev-mode.md#retire-an-existing-developer-mode-selection). A selected pipeline retains its methods and specialist dispatch contract.
 
-**Outward-action gate.** The deterministic dev-guard hook covers only the minimal floor and fires unconditionally, gating by destination — the agent cannot auto-approve regardless of autonomy grants. A `git push` whose single recognized refspec targets a non-default branch on `origin` resolves to `allow` (no prompt); a push to the default branch, a tag push, a force push, and a PR merge (`gh pr merge` or a `gh api` merge endpoint) resolve to `ask`, requiring explicit operator approval. Every other outward write (`gh pr create/review/comment`, issue writes, MCP writes) is uncovered by the hook and governed by the host runtime's permission model.
+**Execution authority.** The coordinator carries out the operator-authorized workflow using the host's configured permissions. TH does not intercept Git, GitHub, cloud or MCP writes with its own permission hooks. Publication workflows retain scope, target identity and idempotent recovery; native permissions remain the execution boundary.
 
 **Every specialist dispatch goes through `Task`.** All specialist subagents (architect, implementer, tester, qa, etc.) are dispatched via `Task`, and none of them is itself a coordinator — there is no nested-dispatch takeover protocol to fall back to, because no coordinator is ever dispatched as a subagent. See `docs/subagent-orchestration.md`.
 
@@ -223,11 +223,13 @@ bash tests/run-all.sh
 
 | Suite | Catches |
 |---|---|
-| `test_policy_block.sh` | Destructive-command leakage at `PreToolUse` |
+| `test_hook_registration.mjs` | Retained hook wiring and absence of retired enforcement registrations |
 | `test_security_scan.py` | Read-only-tier agents carrying Bash, missing injection preambles, hook-manifest form, shipped secrets |
 | `test_agent_frontmatter.py` | Silent-agent-drop class of bug (invalid YAML in agent frontmatter) |
 
-Prompt behaviour itself only validates in live pipelines — restart Claude Code and smoke-test by hand.
+Prompt behaviour and live host activation need a real session check. Use the
+runtime's supported refresh first; reconnect only when a specific component
+cannot be refreshed in place.
 
 ---
 

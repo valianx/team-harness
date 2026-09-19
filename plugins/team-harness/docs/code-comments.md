@@ -78,7 +78,7 @@ The following are **forbidden** in any committed comment, regardless of surface:
 - Ownerless `TODO` or `FIXME` with no issue reference and no resolution condition.
 
 **File-header provenance line (documented exception).** A single top-of-file commit-shaped
-header (e.g., `dev-guard.sh:3` — `fix(dev-guard): … (F-016, #304)`) is tolerated as a
+header (e.g., `runtime-context.ts:3` — `fix(runtime): … (#304)`) is tolerated as a
 provenance marker. It sits at the very top of the file, one occurrence only. Inline mid-body
 comments referencing issues or steps (`// fix for issue #430`, `// per Step 6`) are
 forbidden without exception.
@@ -99,22 +99,19 @@ forbidden without exception.
 copied byte-identical.` A one-line doc comment per exported identifier is the authoring model;
 the adjacent invariants block is the bounded EXCEPTION above, not the general pattern to copy.
 
-### 5b. Hooks — `hooks/`
+### 5b. Runtime assets — retained Claude context/observation
 
-> Claude Code hooks are authored in TypeScript and use TSDoc/JSDoc rather than Bash `#`
-> headers. OpenCode uses native permissions and approvals and does not install these hooks.
+> Retained Claude runtime assets use the host's supported integration surface. Codex
+> and OpenCode use their native permissions and approvals; Team Harness does not add
+> a policy-hook layer to those runtimes.
 
 | | Guidance |
 |---|---|
-| **KEEP** | Security-floor rationale and threat-model explanation. Deterministic-gate behavior (`fail-CLOSED` vs `fail-OPEN` asymmetry). Non-obvious regex — state what it matches and why. Coverage catalogues (what the gate DOES and DOES NOT cover). Cross-hook fail-mode comparisons. |
-| **CUT** | Comments that restate an obvious shell builtin or a standard flag. Session/workspace narration. |
-| **EXCEPTION — never strip** | The security-floor rationale, threat-model explanation, coverage catalogue, and fail-mode comparison in a deterministic outward-action gate's decision-function header (`hooks/ts/bodies/dev-guard.ts`) — bounded to those categories, not the file's entire comment surface. Portability-rationale comments explaining why a construct works identically on Git Bash, macOS, and Linux. Full rationale: `docs/dev-mode.md § Outward-Action Gate` and `§ Threat Model`. |
+| **KEEP** | Non-obvious rationale for retained context or observation behavior, portability constraints, and cross-file installer invariants. |
+| **CUT** | Claims that a retired hook enforces a permission boundary, session/workspace narration, and comments that merely restate host behavior. |
+| **EXCEPTION — never strip** | A bounded rationale that explains why a retained runtime asset is needed and how its host activation works. Keep the limitation explicit; do not imply coverage beyond the host's own evidence. |
 
-**Exemplar:** `hooks/ts/bodies/dev-guard.ts:52` — `// Default: none (no-decision) —
-ask/deny/allow EXCLUSIVELY for covered actions.` A single WHY line for an ordinary decision
-point; the file's full security-floor header is the bounded EXCEPTION above, documented in
-`docs/dev-mode.md`, not the general authoring model.
-
+Historical hook examples may remain in migration notes, but they are not current authoring requirements.
 ### 5c. Agent and skill Markdown — `agents/`, `skills/`
 
 The prompt body IS the code. The analog of a WHY comment is inline rationale that tells a
@@ -184,8 +181,8 @@ The following categories are exempt from "minimize comments." Stripping them cau
 
 | Category | Why load-bearing | Example location |
 |---|---|---|
-| Security-floor / threat-model / fail-mode comments in hooks | Encodes why the gate behaves as it does; a future simplification could break the security property without this anchor | `hooks/ts/bodies/dev-guard.ts` |
-| Non-obvious regex intent | A regex is genuinely opaque; the intent comment is the only documentation | Any hook or lens trigger block |
+| Native permission and approval boundary rationale | Encodes what the host owns and what Team Harness does not claim to enforce | `docs/permission-provisioning.md` |
+| Non-obvious matcher intent | A matcher is genuinely opaque; the intent comment is the only documentation | Any retained runtime or lens trigger block |
 | Cross-file installer invariants | Non-local contract; a reader of one function cannot reconstruct it | `cmd/install/modes.go` invariants block |
 | Cross-platform portability rationale | "Works on Git Bash AND macOS AND Linux because X" — a future edit could break one OS silently | Hooks, bootstrap scripts |
 | Go doc-comments on exported identifiers | Mandated by Go convention and by `godoc`; the public surface has no other documentation | All `cmd/install/*.go` exported symbols |

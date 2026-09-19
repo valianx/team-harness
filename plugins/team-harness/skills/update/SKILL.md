@@ -98,9 +98,21 @@ never authorized merely by escalation approval.
 
 ## Stage B — converge once
 
-The running prose may still come from the old snapshot. From this point use
-only the validated helper under `NEW_PLUGIN`. Reuse the canonical `PYTHON_BIN`
-and `CODEX_BIN` already pinned in Stage A:
+The running prose may still come from the old snapshot. Read
+`NEW_PLUGIN/skills/update/SKILL.md` from the validated installation before
+continuing Stage B. Use that version's helper arguments, receipt schema and
+recovery instructions; do not interpret a new receipt with the old skill's
+remembered contract. Retain the paths, versions and authorization from Stage A
+without repeating marketplace refresh or installation.
+
+If a receipt has already been returned, read the selected version's skill and
+interpret that same receipt before deciding it is malformed. Refreshing these
+instructions requires neither another convergence call nor a restart. This
+handoff cannot replace instructions already held in memory by an older agent;
+that agent must read the installed skill to adopt the current contract.
+
+Use only the validated helper under `NEW_PLUGIN`. Reuse the canonical
+`PYTHON_BIN` and `CODEX_BIN` already pinned in Stage A:
 
 ```text
 PYTHON_BIN NEW_PLUGIN/skills/update/scripts/converge.py --old-plugin OLD_PLUGIN --old-version OLD_VERSION --new-plugin NEW_PLUGIN --new-version NEW_VERSION --codex-bin CODEX_BIN
@@ -111,9 +123,7 @@ bridges the running snapshot path, attests every imported helper before
 execution, ensures native Team Harness settings,
 classifies the persistent runtime profile, enables only missing multi-agent
 features, synchronizes agents only when stale, inspects MCP registrations
-without replacing them, validates that the exact hook manifest contains only
-the deterministic `policy-block`, `gcp-guard`, and deny-only `gate-guard`
-adapters, verifies changed
+without replacing them, verifies changed
 postconditions, and emits exactly one closed JSON receipt. It must use fixed
 native argv, bounded output and timeouts, preserve opaque/operator-owned
 configuration and custom agent defaults, reject unmanaged conflicts and unsafe
@@ -128,8 +138,12 @@ This case does not require enabling Developer Mode or granting broader permissio
 During a retry scoped to another domain, the optional alias can also remain
 unchanged as `skipped-read-only`, also without asserting a restart requirement.
 
-Accept a receipt only when it has `schemaVersion: 1`, the exact seven domains
-`bridge`, `config`, `runtime`, `features`, `agents`, `mcp`, and `hooks`, one of
+Retired permission-hook assets are neither installation prerequisites nor a
+convergence domain. Their absence requires no repair or restart; preserve native
+permission settings and unrelated hooks.
+
+Accept a receipt only when it has `schemaVersion: 2`, the exact six domains
+`bridge`, `config`, `runtime`, `features`, `agents`, and `mcp`, one of
 the overall statuses `current | converged | pending-approval |
 partial-convergence`, and all required identity, changed-domain, restart,
 pending, failure, and recovery fields. Invalid, missing, extra, or multiple

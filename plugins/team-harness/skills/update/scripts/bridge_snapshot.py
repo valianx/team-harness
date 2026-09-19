@@ -67,15 +67,12 @@ def validate_new_snapshot(path: Path) -> tuple[Path, str]:
     cache_parent = resolved.parent
     validate_cache_parent(cache_parent)
     manifest_path = resolved / ".codex-plugin/plugin.json"
-    runner_path = resolved / "hooks/run-codex-hook.sh"
     try:
         manifest = json.loads(manifest_path.read_text())
     except (FileNotFoundError, json.JSONDecodeError) as exc:
         fail(f"new plugin manifest is unavailable or invalid: {exc}")
     if manifest.get("name") != PLUGIN_NAME:
         fail(f"new snapshot manifest is not {PLUGIN_NAME}")
-    if not runner_path.is_file():
-        fail(f"new snapshot hook runner is missing: {runner_path}")
     return resolved, str(manifest.get("version", resolved.name))
 
 

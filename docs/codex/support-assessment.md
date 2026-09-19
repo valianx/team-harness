@@ -199,7 +199,7 @@ Runtime-specific vocabulary belongs in adapters:
 | Persistent project guidance | `CLAUDE.md` | opencode rules/config | `AGENTS.md` |
 | Reusable workflow | skill/command | skill/command | skill |
 | Specialist definition | Markdown frontmatter | transformed Markdown | TOML custom agent |
-| Lifecycle policy | Claude hooks | opencode plugin hooks | Codex hooks |
+| Lifecycle policy | Claude context/observation assets | native permissions/approvals | native permissions/approvals |
 
 ## Go/no-go criteria
 
@@ -210,7 +210,7 @@ Proceed from spike to beta only if:
 - the parent receives a bounded specialist result;
 - model and effort distribution works as configured;
 - installation and uninstall leave operator-owned configuration intact; and
-- Codex-native permissions make most Team Harness blocking hooks unnecessary.
+- Codex-native permissions make a Team Harness blocking-hook layer unnecessary.
 
 Do not proceed to broad parity if the runtime requires loading the complete agent
 fleet or pipeline contract into every session.
@@ -219,11 +219,11 @@ fleet or pipeline contract into every session.
 
 1. What explicit skill invocation surface is most stable across Codex CLI, IDE, and
    app?
-2. Can plugin lifecycle hooks cover the minimum required events without a global
+2. Which native lifecycle controls cover the minimum required events without a global
    user hook install?
 3. Should core custom agents be installed globally, project-scoped, or offered in
    both scopes?
-4. Which existing boundary hooks add protection beyond Codex's sandbox and approval
+4. Which existing workflow boundaries add value beyond Codex's sandbox and approval
    model?
 5. What concrete model mapping preserves the current cost distribution without
    coupling canonical prompts to a short-lived model catalog?

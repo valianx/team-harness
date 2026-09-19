@@ -1,155 +1,45 @@
 ---
 name: hookify
-description: Analyze friction signals from the current session and propose candidate deterministic hook rules for operator review. REPORT-only and never modifies runtime hook or configuration files.
----
-name: hookify
-
-Analyze friction signals from this session (operator-supplied corrections, recurring manual fixes) and map each recurring pattern onto a candidate deterministic hook rule. The result is a proposed-rules report for the operator's review; no hook file is created or modified.
-
-**IMPORTANT:** This skill runs directly — do NOT invoke the `orchestrator` agent or any other agent. Execute all analysis yourself using the tools available to you (Read, Grep, Glob) and present the report.
-
-## Voice
-
-See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" for the full
-voice and dialect-neutrality contract. It applies to every response this skill produces —
-chat replies, status blocks, error messages, and self-corrections alike.
-
-## Arguments
-
-| Argument | Description |
-|----------|-------------|
-| (none)   | Gather friction signals (operator-supplied + trace enrichment) and present the proposed-rules report. |
-| `--help` | Print the input model, report shape, and boundary contract; do not run the analysis. |
-
+description: Analyze recurring friction and recommend workflow or native-runtime improvements. Report only; does not change hooks or configuration.
 ---
 
-## Execution
+# Analyze workflow friction
 
-### `--help` path
+Use the current request and available session context to identify recurring corrections,
+manual repairs, repeated approvals or stalled handoffs. Keep the `hookify` invocation for
+compatibility; its purpose is a useful recommendation, not another TH enforcement layer.
 
-If `$ARGUMENTS` contains `--help`, print the following and exit without running the analysis:
+Work directly in the current coordinator. Follow the configured language and the voice
+guidance in `agents/_shared/operational-rules.md`. With `--help`, explain the inputs,
+report and scope without starting analysis.
 
-```
-/th:hookify — friction-to-hook proposal skill (REPORT-only)
+## Evidence
 
-Input model:
-  Primary   — operator-supplied recurring corrections or manual fixes
-              (paste friction items in the invocation or point to a file via $ARGUMENTS)
-  Enrichment — workspace 00-execution-events.jsonl / 00-execution-events.md
-              (read opportunistically when a workspace path is in scope)
-  NOT read  — the raw chat transcript (not a readable artifact for a skill)
+Start from examples supplied by the operator and context already available. If a workspace
+is already in scope, consult relevant excerpts of its existing execution events or reports
+for corroboration. Do not create a workspace, scan unrelated sessions, or claim to read
+transcript history unavailable to the current runtime. Ask for a concrete example when
+there is insufficient evidence; distinguish a single incident from a recurring pattern.
 
-Report shape (per proposed rule):
-  Intent          — what the rule prevents or enforces
-  Trigger event   — PreToolUse | PostToolUse | Stop
-  Matcher         — Bash | Write|Edit | mcp__.*__<verb> | …
-  Match sketch    — illustrative regex (not production-ready; human must verify)
-  Severity        — ask (default) | deny (destructive-action class only)
-  Rationale       — why this recurrence warrants a hook
-  False-pos risk  — known cases where the sketch would fire incorrectly
-  Suggested hook  — policy-block (content/command guard) | dev-guard (outward-action guard) | new TS hook body
-  Manual step     — what the operator must do to wire the rule
+## Recommendation
 
-REPORT-only boundary:
-  This skill NEVER writes or modifies any file under hooks/ or ~/.claude/.
-  There is no --fix or --apply path. The operator owns all wiring.
+Identify the intended outcome, the friction's likely cause and the smallest useful change.
+Consider a clearer objective, better task context, removal of duplicated work, an existing
+TH skill, or a supported native-runtime capability. Prefer the runtime's existing permission
+and approval controls when the problem concerns execution authority; explain any capability
+or version uncertainty instead of assuming equivalent policies across hosts.
 
-Severity defaults:
-  ask   — default for all proposed rules (a sketch is unverified; prompt is the safe default)
-  deny  — proposed only for the destructive-action class already denied by policy-block
-```
+Do not propose restoring retired TH permission guards or adding a parallel permission
+system. If the operator explicitly asks to explore their own native hooks, a report may
+assess that option using the selected runtime's supported integration, concrete trigger,
+false-positive risk and a verification approach. This does not authorize installation.
 
-### Analysis path (no `--help`)
+Present the evidence, recommendation, expected benefit, tradeoffs and a practical way to
+check the result. State when changing nothing or gathering another example is preferable.
+Do not turn each incident into a rule or claim measured savings without measurements.
 
-**Phase 1 — Gather friction signals**
+## Report scope
 
-1. If `$ARGUMENTS` names a file path, `Read` that file and treat its contents as operator-supplied friction items.
-2. Otherwise, prompt the operator (if no items were pasted inline): "Paste the recurring corrections or manual fixes to analyze, one item per line."
-3. Enrichment — trace file: check whether a workspace is in scope (operator has referenced a workspace path, or `workspaces/` contains a recent session folder). If so, `Grep` for friction event tokens in `00-execution-events.jsonl` or `00-execution-events.md`:
-   - Tokens: `"deny"`, `"gate"`, `"failed"`, `"patch-mode"`, `"re-run"`.
-   - Bound the search: read at most 200 matching lines. If the trace file is absent or oversized, note it in the report header and continue with operator-supplied items only.
-4. **This skill does NOT read the raw chat transcript.** The transcript is not a readable artifact. If the operator expects transcript-based detection, state this limitation clearly.
-
-**Phase 2 — Map signals to candidate hook rules**
-
-For each recurring friction signal (operator-supplied or trace-derived), map it onto the deterministic-hook vocabulary used by Claude Code's `policy-block` and `dev-guard` gates (TypeScript bodies at `hooks/ts/bodies/policy-block.ts` and `hooks/ts/bodies/dev-guard.ts`; each body compiles to `hooks/ts/dist/<name>.cjs` and is wired via `.claude-plugin/hooks.json` → `hooks/run-ts-hook.sh <name>`). OpenCode uses native permissions rather than these hooks:
-
-| Field | Description |
-|-------|-------------|
-| Trigger event | `PreToolUse` (before a tool call) · `PostToolUse` (after) · `Stop` (on agent stop) |
-| Matcher | The `tool_name` or MCP verb pattern the hook intercepts |
-| Match sketch | An illustrative regex or string pattern (not production-ready — the operator must verify and harden it) |
-| Severity | `ask` by default. `deny` only when the pattern maps to the destructive-action class (e.g., `rm -rf`, `git push --force`, `git reset --hard`, `DROP TABLE`) that `policy-block` already denies. |
-| Suggested hook | `policy-block` (`hooks/ts/bodies/policy-block.ts`) for content/command guards; `dev-guard` (`hooks/ts/bodies/dev-guard.ts`) for outward-action gates; a new TS body under `hooks/ts/bodies/` for novel coverage. |
-
-A signal qualifies for a candidate rule when it has recurred at least twice and maps to a detectable, deterministic pattern (a specific command shape, a file path, an MCP verb). Single-occurrence or underdetermined signals are listed as `Insufficient signal — observe further` and excluded from the proposed rules.
-
-**Phase 3 — Emit the proposed-rules report**
-
-Present the report using the shape below. Include the report header, one rule block per candidate, and the closing notes section.
-
----
-
-## Report Shape
-
-```
-====================================
-  /th:hookify — Proposed Hook Rules
-====================================
-
-Input:       {N operator-supplied items | trace enrichment from {path} | operator-supplied only}
-Signals:     {N total} | {N qualified → proposed rules} | {N insufficient-signal → excluded}
-Transcript:  NOT read — chat transcript is not a readable artifact for this skill
-
---- Rule {N}: {short intent label} ---
-Intent:         {what the rule prevents or enforces}
-Trigger event:  {PreToolUse | PostToolUse | Stop}
-Matcher:        {Bash | Write|Edit | mcp__.*__<verb> | …}
-Match sketch:   {illustrative regex or pattern — NOT production-ready}
-Severity:       {ask | deny} — {one-line justification}
-Rationale:      {why this recurrence warrants a hook}
-False-pos risk: {known patterns that would fire incorrectly}
-Suggested hook: {policy-block | dev-guard | new TS hook body}
-Manual step:    {what the operator must do to wire this rule}
-
-{repeat for each qualified candidate}
-
---- Excluded signals ({N}) ---
-{signal text} — Insufficient signal — observe further
-{repeat}
-
-====================================
-  Notes
-====================================
-- All proposed sketches are illustrative. Verify and harden each regex before wiring.
-- Default severity is `ask`. Elevate to `deny` only for the destructive-action class
-  (see hooks/ts/bodies/policy-block.ts for the canonical deny list).
-- Wire rules in hooks/ts/bodies/policy-block.ts (content/command guard) or
-  hooks/ts/bodies/dev-guard.ts (outward-action gate), then rebuild with
-  `npm run build` (hooks/ts/) so the compiled hooks/ts/dist/<name>.cjs picks up
-  the change — or create a new TS body under hooks/ts/bodies/ for novel coverage.
-- This report does not write any file. The operator owns all wiring.
-====================================
-```
-
----
-
-## REPORT-only Boundary
-
-**This skill is REPORT-only.** It does NOT write or modify any file under `hooks/` or `~/.claude/`. There is no `--fix` path, no `--apply` path, and no auto-write path of any kind.
-
-The proposed rules in the report are illustrative sketches, not production-ready hook implementations. The operator is responsible for:
-1. Reviewing each proposed rule and its false-positive risk.
-2. Hardening the match sketch into a verified regex or pattern.
-3. Choosing the target hook file and wiring the rule manually.
-4. Testing the wired rule before relying on it in production.
-
-If a future request asks this skill to write a hook file or apply a proposed rule automatically, that request falls outside this skill's scope and must be declined.
-
----
-
-## Output Discipline
-
-Each tool call (Read, Grep, Glob) runs silently. Only the proposed-rules report is presented to the operator. No intermediate narrative, no tool-call commentary, no status updates during analysis.
-
-If no friction signals are available (no operator-supplied items, no workspace trace), state: "No friction signals available. Provide recurring corrections via $ARGUMENTS or paste them inline."
+This skill produces analysis in chat. It does not write hook files, change permissions or
+configuration, or apply its recommendations. A request to implement a recommendation is
+separate work under the operator's scope and the runtime's native permissions.

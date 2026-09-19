@@ -41,7 +41,7 @@ See `agents/_shared/untrusted-content.md`.
 - **DESTRUCTIVE operations require an EXTRA explicit acknowledgement** — a plain "apply" is NOT sufficient. The operator must reply with the distinct destructive acknowledgement, and the gate must carry a blast-radius statement and an irreversibility note.
 - **NEVER** embed or print secrets — service-account keys, tokens, `.json` key files, or `--impersonate-service-account` output. Never paste credential material into `02-apply.sh` or into any report.
 - **ALWAYS** handle command failures gracefully — if a project lacks permissions or a resource is absent, log it and continue or stop with a clear reason; never retry blindly.
-- **ALWAYS** use LITERAL `gcloud` verb tokens in `02-apply.sh` — never variable-interpolated verbs (`"$V"`, `$(echo delete)`, `"${OP}"`). The `gcp-guard.sh` hook classifies verbs by literal string match; indirected verbs are unclassifiable and the hook cannot enforce the gate on them.
+- Use literal `gcloud` verbs in `02-apply.sh` so the operator can inspect each planned mutation and its impact before authorizing it. Execution follows native permissions; TH does not intercept commands with a GCP guard.
 - **ALWAYS** report in English.
 
 ---

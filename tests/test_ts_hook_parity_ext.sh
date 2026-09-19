@@ -1,195 +1,66 @@
 #!/bin/bash
-# Extension sections 8-12 for test_ts_hook_parity.sh
-# Golden-fixture regression checks for all rewritten hook bodies (AC-9, AC-10,
-# AC-11) — converted from Bash<->TS parity to literal expected-decision
-# assertions once the Bash oracle was retired (issue #446).
-# This file is SOURCED by test_ts_hook_parity.sh after Section 7.
-# Variables PASS, FAIL, FAILURES, REPO_ROOT are inherited from the parent.
+# Retained context and observability checks sourced by test_ts_hook_parity.sh.
+# PASS, FAIL, FAILURES, REPO_ROOT, and DIST_DIR are inherited from the parent.
 
-# Shared extraction helper (matches nested {"hookSpecificOutput":{"permissionDecision":"..."}})
-ext_decision() {
-    local out="$1"
-    if [ -z "$out" ] || ! echo "$out" | grep -q '"permissionDecision"'; then
-        echo "none"
-        return
-    fi
-    echo "$out" | grep -oE '"permissionDecision"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 \
-        | sed -E 's/.*"permissionDecision"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/'
+assert_pass() {
+    PASS=$((PASS + 1))
+    echo "  [PASS] $1"
 }
 
-# ---------------------------------------------------------------------------
-# policy-block has its focused boundary suite in test_policy_block.sh. Its
-# former entropy/workflow fixtures were retired with those policies.
-# Section 9 — gcp-guard golden-fixture smoke check (AC-10)
-# The exhaustive gcp-guard suite lives in tests/test_gcp_guard.sh (Suite 87);
-# this section stays as a lightweight cross-check exercised from this harness.
-# ---------------------------------------------------------------------------
-echo ""
-echo "--- Section 9: gcp-guard golden-fixture smoke check (AC-10) ---"
-GCP_TS_CJS="$REPO_ROOT/hooks/ts/dist/gcp-guard.cjs"
-
-gcp_assert_expected() {
-    local label="$1" cmd="$2" expected="$3"
-    local payload ts_out ts_dec
-    payload=$(python3 -c "import json,sys; print(json.dumps({'tool_name':'Bash','tool_input':{'command':sys.argv[1]}}))" "$cmd" 2>/dev/null)
-    ts_out=$(echo "$payload" | node "$GCP_TS_CJS" 2>/dev/null)
-    ts_dec=$(ext_decision "$ts_out")
-    if [ "$ts_dec" = "$expected" ]; then
-        PASS=$((PASS + 1)); echo "  [PASS] $label (TS=$ts_dec)"
-    else
-        FAIL=$((FAIL + 1)); FAILURES+=("AC-10 gcp-guard: $label (expected=$expected TS=$ts_dec)")
-        echo "  [FAIL] $label (expected=$expected TS=$ts_dec)"
-    fi
+assert_fail() {
+    FAIL=$((FAIL + 1))
+    FAILURES+=("$1")
+    echo "  [FAIL] $1"
 }
 
-if [ ! -f "$GCP_TS_CJS" ]; then
-    echo "  [SKIP] gcp-guard.cjs not found"
+echo "--- SessionStart context ---"
+SESSION_START="$DIST_DIR/session-start.cjs"
+if [ ! -s "$SESSION_START" ]; then
+    assert_fail "session-start bundle unavailable"
 else
-    gcp_assert_expected "gcloud list" "gcloud compute instances list" "none"
-    gcp_assert_expected "gcloud describe" "gcloud compute instances describe my-vm" "none"
-    gcp_assert_expected "gcloud create" "gcloud compute instances create my-vm" "ask"
-    gcp_assert_expected "gcloud delete" "gcloud compute instances delete my-vm" "ask"
-    gcp_assert_expected "gcloud projects delete" "gcloud projects delete my-project" "deny"
-    gcp_assert_expected "non-gcloud ls" "ls -la" "none"
-fi
-
-# ---------------------------------------------------------------------------
-# Section 10 — checkpoint-guard fail-open (AC-10)
-# ---------------------------------------------------------------------------
-echo ""
-echo "--- Section 10: checkpoint-guard fail-open (AC-10) ---"
-CP_TS_CJS="$REPO_ROOT/hooks/ts/dist/checkpoint-guard.cjs"
-
-if [ ! -f "$CP_TS_CJS" ]; then
-    echo "  [SKIP] checkpoint-guard.cjs not found"
-else
-    # The Bash oracle's allow() always emits an explicit permissionDecision:
-    # "allow" JSON (checkpoint-guard.sh:30-33) — including every fail-open
-    # branch (no workspace found, non-Task dispatch). "none" (empty stdout)
-    # was never the oracle's actual contract for these cases; the TS body is
-    # now aligned to it (T6c).
-    cp_task=$(python3 -c "import json; print(json.dumps({'tool_name':'Task','tool_input':{'description':'do it'}}))")
-    cp_out=$(echo "$cp_task" | node "$CP_TS_CJS" 2>/dev/null)
-    cp_dec=$(ext_decision "$cp_out")
-    if [ "$cp_dec" = "allow" ]; then
-        PASS=$((PASS + 1)); echo "  [PASS] AC-10: checkpoint-guard no-workspace → fail-open (explicit allow)"
+    ss_home="$(mktemp -d)"
+    mkdir -p "$ss_home/.claude"
+    ss_input='{"type":"startup","session_id":"retained-hook-test"}'
+    ss_output=$(printf '%s\n' "$ss_input" | HOME="$ss_home" USERPROFILE="$ss_home" node "$SESSION_START" 2>/dev/null)
+    ss_status=$?
+    ss_context=$(printf '%s' "$ss_output" | node -e 'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(String(JSON.parse(s||"{}").hookSpecificOutput?.additionalContext||""))}catch{}})' 2>/dev/null)
+    rm -rf "$ss_home"
+    if [ "$ss_status" -eq 0 ] && printf '%s' "$ss_context" | grep -qF "Team Harness workflow discovery" && printf '%s' "$ss_context" | grep -qF "/th:spec"; then
+        assert_pass "SessionStart exposes workflow discovery"
     else
-        FAIL=$((FAIL + 1)); FAILURES+=("AC-10: checkpoint-guard fail-open got=$cp_dec")
-        echo "  [FAIL] AC-10: fail-open expected allow, got=$cp_dec"
+        assert_fail "SessionStart workflow discovery is missing"
     fi
-    cp_bash_p=$(python3 -c "import json; print(json.dumps({'tool_name':'Bash','tool_input':{'command':'ls'}}))")
-    cp_nt_out=$(echo "$cp_bash_p" | node "$CP_TS_CJS" 2>/dev/null)
-    cp_nt=$(ext_decision "$cp_nt_out")
-    if [ "$cp_nt" = "allow" ]; then
-        PASS=$((PASS + 1)); echo "  [PASS] AC-10: checkpoint-guard non-Task → explicit allow"
+
+    configured_home="$(mktemp -d)"
+    mkdir -p "$configured_home/.claude"
+    printf '%s' '{"language":"es","english_learning":true,"logs-mode":"obsidian","logs-path":"/vault/work","logs-subfolder":"work-logs"}' > "$configured_home/.claude/.team-harness.json"
+    configured_output=$(printf '%s\n' "$ss_input" | HOME="$configured_home" USERPROFILE="$configured_home" node "$SESSION_START" 2>/dev/null)
+    configured_context=$(printf '%s' "$configured_output" | node -e 'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(String(JSON.parse(s||"{}").hookSpecificOutput?.additionalContext||""))}catch{}})' 2>/dev/null)
+    rm -rf "$configured_home"
+    if printf '%s' "$configured_context" | grep -qF "Spanish" && printf '%s' "$configured_context" | grep -qF "english-learning mode is active" && printf '%s' "$configured_context" | grep -qF "/vault/work/work-logs"; then
+        assert_pass "SessionStart preserves configured language and workspace context"
     else
-        FAIL=$((FAIL + 1)); FAILURES+=("AC-10: checkpoint non-Task got=$cp_nt")
-        echo "  [FAIL] AC-10: non-Task expected allow, got=$cp_nt"
+        assert_fail "SessionStart configured context is missing"
     fi
 fi
 
-# ---------------------------------------------------------------------------
-# Section 11 — worktree-guard advisory (AC-10)
-# ---------------------------------------------------------------------------
-echo ""
-echo "--- Section 11: worktree-guard advisory (AC-10) ---"
-WT_TS_CJS="$REPO_ROOT/hooks/ts/dist/worktree-guard.cjs"
-
-if [ ! -f "$WT_TS_CJS" ]; then
-    echo "  [SKIP] worktree-guard.cjs not found"
+echo "--- language and observation hook envelopes ---"
+LANGUAGE_PROMPT="$DIST_DIR/language-user-prompt.cjs"
+if [ -s "$LANGUAGE_PROMPT" ]; then
+    lp_output=$(printf '%s\n' '{"type":"user_prompt","message":"hello"}' | node "$LANGUAGE_PROMPT" 2>/dev/null)
+    if [ -z "$lp_output" ] || printf '%s' "$lp_output" | node -e 'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{try{JSON.parse(s);process.exit(0)}catch{process.exit(1)}})' 2>/dev/null; then
+        assert_pass "language-user-prompt emits an empty or valid JSON envelope"
+    else
+        assert_fail "language-user-prompt emits invalid output"
+    fi
 else
-    wt_trig_p=$(python3 -c "import json; print(json.dumps({'tool_name':'Bash','tool_input':{'command':'git checkout -b feat/new'}}))")
-    wt_trig_out=$(echo "$wt_trig_p" | node "$WT_TS_CJS" 2>/dev/null)
-    wt_d=$(ext_decision "$wt_trig_out")
-    if [ "$wt_d" = "ask" ]; then
-        PASS=$((PASS + 1)); echo "  [PASS] AC-10: worktree-guard trigger → ask"
-    else
-        FAIL=$((FAIL + 1)); FAILURES+=("AC-10: worktree trigger got=$wt_d")
-        echo "  [FAIL] AC-10: trigger expected ask, got=$wt_d"
-    fi
-
-    wt_nt_p=$(python3 -c "import json; print(json.dumps({'tool_name':'Bash','tool_input':{'command':'git status'}}))")
-    wt_nt_out=$(echo "$wt_nt_p" | node "$WT_TS_CJS" 2>/dev/null)
-    wt_nd=$(ext_decision "$wt_nt_out")
-    if [ "$wt_nd" = "none" ]; then
-        PASS=$((PASS + 1)); echo "  [PASS] AC-10: worktree-guard non-trigger → none"
-    else
-        FAIL=$((FAIL + 1)); FAILURES+=("AC-10: worktree non-trigger got=$wt_nd")
-        echo "  [FAIL] AC-10: non-trigger expected none, got=$wt_nd"
-    fi
-
-    wt_add_p=$(python3 -c "import json; print(json.dumps({'tool_name':'Bash','tool_input':{'command':'git worktree add -b feat/x ../wt origin/main'}}))")
-    wt_add_out=$(echo "$wt_add_p" | node "$WT_TS_CJS" 2>/dev/null)
-    wt_ad=$(ext_decision "$wt_add_out")
-    if [ "$wt_ad" = "ask" ]; then
-        PASS=$((PASS + 1)); echo "  [PASS] AC-10: git worktree add → ask"
-    else
-        FAIL=$((FAIL + 1)); FAILURES+=("AC-10: git worktree add got=$wt_ad")
-        echo "  [FAIL] AC-10: worktree add expected ask, got=$wt_ad"
-    fi
+    assert_fail "language-user-prompt bundle unavailable"
 fi
 
-# ---------------------------------------------------------------------------
-# Section 12 — session-start + language-user-prompt (AC-11)
-# ---------------------------------------------------------------------------
-echo ""
-echo "--- Section 12: session-start + language-user-prompt (AC-11) ---"
-SS_TS_CJS="$REPO_ROOT/hooks/ts/dist/session-start.cjs"
-LP_TS_CJS="$REPO_ROOT/hooks/ts/dist/language-user-prompt.cjs"
-
-if [ ! -f "$SS_TS_CJS" ]; then
-    echo "  [SKIP] session-start.cjs not found"
-else
-    # additionalContext lives under hookSpecificOutput (T6c envelope fix) —
-    # not at the top level. code.claude.com/docs/en/hooks; matches the Bash
-    # oracle (session-start.sh:272).
-    ss_in=$(python3 -c "import json; print(json.dumps({'type':'startup','session_id':'t123'}))")
-    ss_empty_home=$(mktemp -d)
-    mkdir -p "$ss_empty_home/.claude"
-    ss_out=$(printf '%s\n' "$ss_in" | HOME="$ss_empty_home" USERPROFILE="$ss_empty_home" node "$SS_TS_CJS" 2>/dev/null)
-    ss_exit=$?
-    rm -rf "$ss_empty_home"
-    ss_text=$(echo "$ss_out" | python3 -c "import json,sys; print(json.loads(sys.stdin.read() or '{}').get('hookSpecificOutput',{}).get('additionalContext',''))" 2>/dev/null || echo "")
-    if [ "$ss_exit" -eq 0 ] && [ -n "$ss_text" ] && echo "$ss_text" | grep -qF "Team Harness workflow discovery" && echo "$ss_text" | grep -qF "/th:spec" && echo "$ss_text" | grep -qF "/th:pipeline" && echo "$ss_text" | grep -qF "/th:review-pr" && echo "$ss_text" | grep -qF "/th:create-pr" && echo "$ss_text" | grep -qF "current SKILL.md"; then
-        PASS=$((PASS + 1)); echo "  [PASS] AC-11: session-start exposes workflow discovery without config"
+for observer in notify-stage.cjs subagent-trace.cjs precompact-snapshot.cjs; do
+    if [ -s "$DIST_DIR/$observer" ]; then
+        assert_pass "observation bundle remains available: $observer"
     else
-        FAIL=$((FAIL + 1)); FAILURES+=("AC-11: session-start workflow discovery missing")
-        echo "  [FAIL] AC-11: workflow discovery missing without configuration"
+        assert_fail "observation bundle unavailable: $observer"
     fi
-
-    ss_config_home=$(mktemp -d)
-    mkdir -p "$ss_config_home/.claude"
-    printf '%s' '{"language":"es","english_learning":true,"logs-mode":"obsidian","logs-path":"/vault/work","logs-subfolder":"work-logs"}' > "$ss_config_home/.claude/.team-harness.json"
-    ss_cfg_out=$(printf '%s\n' "$ss_in" | HOME="$ss_config_home" USERPROFILE="$ss_config_home" node "$SS_TS_CJS" 2>/dev/null)
-    ss_cfg_exit=$?
-    rm -rf "$ss_config_home"
-    ss_cfg_text=$(echo "$ss_cfg_out" | python3 -c "import json,sys; print(json.loads(sys.stdin.read() or '{}').get('hookSpecificOutput',{}).get('additionalContext',''))" 2>/dev/null || echo "")
-    if [ "$ss_cfg_exit" -eq 0 ] && [ -n "$ss_cfg_text" ] && echo "$ss_cfg_text" | grep -qF "Spanish" && echo "$ss_cfg_text" | grep -qF "english-learning mode is active" && echo "$ss_cfg_text" | grep -qF "/vault/work/work-logs"; then
-        PASS=$((PASS + 1)); echo "  [PASS] AC-11: configured language, learning, and workspace context retained"
-    else
-        FAIL=$((FAIL + 1)); FAILURES+=("AC-11: configured SessionStart context missing")
-        echo "  [FAIL] AC-11: configured language/learning/workspace context missing"
-    fi
-    for retired in "orchestrator disposition" "You are th:orchestrator" "FINAL" "SILENT" "agents/orchestrator.md"; do
-        if echo "$ss_cfg_text" | grep -qF "$retired"; then
-            FAIL=$((FAIL + 1)); FAILURES+=("AC-11: retired SessionStart token present: $retired")
-            echo "  [FAIL] AC-11: retired SessionStart token present: $retired"
-        else
-            PASS=$((PASS + 1)); echo "  [PASS] AC-11: no retired SessionStart token '$retired'"
-        fi
-    done
-fi
-
-if [ ! -f "$LP_TS_CJS" ]; then
-    echo "  [SKIP] language-user-prompt.cjs not found"
-else
-    lp_in=$(python3 -c "import json; print(json.dumps({'type':'user_prompt','message':'hello'}))")
-    lp_out=$(echo "$lp_in" | node "$LP_TS_CJS" 2>/dev/null)
-    # Valid output: empty string OR valid JSON (no crash).
-    if [ -z "$lp_out" ] || echo "$lp_out" | python3 -c "import json,sys; json.loads(sys.stdin.read())" 2>/dev/null; then
-        PASS=$((PASS + 1)); echo "  [PASS] AC-11: language-user-prompt produces valid output (or empty)"
-    else
-        FAIL=$((FAIL + 1)); FAILURES+=("AC-11: language-user-prompt invalid output")
-        echo "  [FAIL] AC-11: language-user-prompt invalid output"
-    fi
-fi
+done

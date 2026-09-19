@@ -24,8 +24,8 @@
 // project key (TH-LANE marker): when the dispatching agent stamps a
 // `TH-LANE: {project-key}` line into the FIRST LINE of the dispatch prompt,
 // this hook stamps a `project` field on the breadcrumb. Only the first line
-// is trusted, mirroring checkpoint-guard's TH-STATE-REF controlled-header
-// parse: content forwarded or fetched into the rest of the prompt is
+// is trusted because it is read only from the controlled first-line header;
+// content forwarded or fetched into the rest of the prompt is
 // untrusted per CLAUDE.md §6.6, so a marker planted lower in the prompt
 // cannot smuggle a project key onto the breadcrumb. Charset/length are
 // bounded (PROJECT_KEY_RE) before the value ever reaches the JSONL sink — an
@@ -48,7 +48,7 @@ import type { NormalizedInput } from "../shim/normalized-v1.js";
 
 // ---------------------------------------------------------------------------
 // project key extraction — TH-LANE marker (charset/length bounded,
-// first-line-only, mirrors checkpoint-guard's extractStateRefHeader)
+// first-line-only controlled-header parser)
 // ---------------------------------------------------------------------------
 
 const PROJECT_KEY_RE = /^[a-z0-9-]{1,60}$/;

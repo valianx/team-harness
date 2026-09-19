@@ -111,11 +111,10 @@ means verify and continue; any partial or mismatched branch/worktree state is a
 collision that stops for operator direction without destructive repair.
 
 > **U1 boundary statement (canonical):** A human's own-terminal `git checkout -b` cannot be
-> intercepted by any hook. Git has no client-side pre-checkout hook. The `worktree-guard.sh`
-> advisory hook fires only on agent-issued Bash tool calls and explicitly cannot cover operations
-> a human types in a separate terminal or a second Claude session's own Bash. This start-gate is
-> discipline for the human-two-session path — not a technical gate. The mechanical guard only
-> covers the orchestrator-driven path.
+> intercepted by Team Harness. This start-gate is workflow discipline for the human-two-session
+> path, not a technical permission boundary. Native host permissions govern writes and branch
+> operations; the coordinator still performs the documented collision checks before using a
+> worktree.
 
 ---
 
@@ -443,11 +442,10 @@ worktrees will keep being reported as candidates at every boot and likely need p
 
 ### Nature of the operation
 
-`git worktree remove` is a **local** git operation — it is not an outward action, and it is NOT
-gated by `dev-guard`. It may still prompt for local filesystem-write permission under the
-operator's own permission system; that prompt is expected and acceptable for a destructive-lite
-local operation, and is a separate concern from the outward-action gate. Never use `--no-verify` or
-bypass a hook to force a removal through.
+`git worktree remove` is a **local** git operation. It may still prompt for local
+filesystem-write permission under the operator's own permission system; that prompt is
+expected and acceptable for a destructive-lite local operation. Never use `--no-verify`
+or bypass native permissions to force a removal through.
 
 ### Composition with Rule 6
 
@@ -482,9 +480,9 @@ setting. Rules 1 and 5 mandate an explicit `git fetch origin main` + `git worktr
 <path> origin/main` + `git log --oneline -1` verification instead. Do not use `worktree.baseRef:
 "fresh"` as a substitute for the explicit fetch-and-base sequence.
 
-### Advisory hook scope
+### Former advisory hook scope (historical)
 
-`hooks/worktree-guard.sh` fires only on agent-issued `git checkout -b`, `git switch -c`, and
-`git worktree add` commands. It does not fire on human-typed terminal commands, commands run in a
-second Claude session, or commands run inside a worktree's own Claude session. It is advisory and
-fail-open — it cannot be used as a security gate for the human-two-session path.
+The former `worktree-guard.sh` advisory is retired and does not run in the current
+Team Harness flow. The U1 limitation remains: workflow guidance cannot intercept a
+human's separate terminal; native host permissions and the documented collision checks
+remain the authority.

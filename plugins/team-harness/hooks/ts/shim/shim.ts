@@ -1,6 +1,6 @@
 // hooks/ts/shim/shim.ts
-// Format-shim: enforces SEC-07 on inbound payloads and translates
-// canonical NormalizedDecision into the runtime's native control signal.
+// Format-shim: validates SEC-07 on inbound payloads and translates runtime
+// input into the normalized shape consumed by context and observation hooks.
 //
 // SEC-07 contract (inbound):
 //   1. Size bound — O(n) length check BEFORE JSON.parse (CWE-770).
@@ -14,21 +14,18 @@
 //      keys cause hard-reject BEFORE named-key read (redundant by design with #4).
 //   6. Schema validate — wrong type = hard reject (no coercion); absent = null.
 //
-// Outbound (CC): decision → stdout JSON + process.exit(0).
-// Outbound (opencode): decision → return (allow/none) or throw (deny/ask→throw
-//   for outward/gcp gates per fail-closed mapping). NEVER writes output.args.
+// Retained hooks own their output envelopes because they emit context or
+// observation records rather than permission decisions.
 
 import {
   NormalizedInput,
-  NormalizedDecision,
   MAX_PAYLOAD_BYTES,
   MAX_NESTING_DEPTH,
   VALID_EVENTS,
 } from "./normalized-v1.js";
 
-/** SEC-07 hard-reject signal. The entry wrapper maps this to the gate's
- *  per-gate fail-closed default (deny for security gates, none for no-op
- *  gates like dev-guard on non-covered Bash). */
+/** SEC-07 hard-reject signal. Retained entry wrappers handle this as a
+ * fail-open no-op so context and observation hooks never block a session. */
 export class ShimRejectError extends Error {
   constructor(message: string) {
     super(message);
@@ -289,40 +286,4 @@ export function inboundOpencode(
   Object.freeze(result);
 
   return result as Readonly<NormalizedInput>;
-}
-
-// ---------------------------------------------------------------------------
-// Public API — Outbound
-// ---------------------------------------------------------------------------
-
-/** Outbound (CC): decision → stdout JSON + process.exit(0).
- *  "none" → empty stdout + exit 0.
- *  "deny"/"ask"/"allow" → hookSpecificOutput permissionDecision JSON. */
-export function outboundCC(d: NormalizedDecision): never {
-  if (d.decision === "none") {
-    process.stdout.write("");
-    process.exit(0);
-  }
-  const payload = {
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: d.decision,
-      permissionDecisionReason: d.reason,
-    },
-  };
-  process.stdout.write(JSON.stringify(payload) + "\n");
-  process.exit(0);
-}
-
-/** Outbound (opencode): decision → return (allow/none) or throw (deny/ask→throw).
- *  Reads ONLY the body's decision; NEVER writes opencode's mutable output.args.
- *  ask→throw for outward/gcp gates (fail-closed mapping — opencode has no interactive
- *  operator-confirm; an un-prompted outward action is exactly the harm dev-guard prevents). */
-export function outboundOpencode(d: NormalizedDecision): void {
-  if (d.decision === "allow" || d.decision === "none") {
-    return;
-  }
-  // deny and ask both throw (fail-closed mapping for opencode).
-  // Error.message names the pattern CLASS, never the captured value (CWE-200).
-  throw new Error(d.reason || d.decision);
 }

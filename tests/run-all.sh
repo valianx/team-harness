@@ -37,11 +37,9 @@ report_skip_or_fail() {
 # Runs the test script against the compiled TS artifact when node is present.
 # A missing node under TH_REQUIRE_RUNTIMES=1 reports FAIL via
 # report_skip_or_fail — this leg can never silently skip in CI. Used by the
-# 8 functional suites that exercise a hook family (policy-block,
-# checkpoint-guard, dev-guard, session-start, language-user-prompt,
-# prepublish-guard, gcp-guard, worktree-guard). The Bash oracle leg was
-# retired with the hook Bash->TS cutover (issue #446) — the TS artifact is
-# now the single source of gate logic.
+# Functional hook suites exercise the retained context and observability
+# hooks. The Bash oracle leg was retired with the hook Bash->TS cutover
+# (issue #446) — the TS artifact is now the single source of hook logic.
 run_ts_hook_suite() {
     local label="$1" script="$2"
     if command -v node >/dev/null 2>&1; then
@@ -71,12 +69,6 @@ run_node_suite() {
     fi
 }
 
-echo "############################################################"
-echo "# Suite 1: hooks/ts/bodies/policy-block.ts — functional tests"
-echo "############################################################"
-run_ts_hook_suite "policy-block" "test_policy_block.sh"
-
-echo
 echo "############################################################"
 echo "# Suite 3: agents — YAML frontmatter validity"
 echo "############################################################"
@@ -217,20 +209,6 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 3e: Codex hook launcher and manifest floor"
-echo "# Requires: node. Skipped when node is absent."
-echo "############################################################"
-if ! command -v node >/dev/null 2>&1; then
-    report_skip_or_fail "codex-hooks" "node not found"
-elif bash "$TESTS_DIR/test_codex_hooks.sh"; then
-    echo "codex-hooks: PASS"
-else
-    echo "codex-hooks: FAIL"
-    FAILED=$((FAILED + 1))
-fi
-
-echo
-echo "############################################################"
 echo "# Suite 3b: review context snapshot helper — behavioral tests"
 echo "############################################################"
 if [ -n "$PY" ] && $PY "$TESTS_DIR/test_review_context.py"; then
@@ -242,19 +220,6 @@ else
     echo "review-context: FAIL"
     FAILED=$((FAILED + 1))
 fi
-
-echo
-echo "############################################################"
-echo "# Suite 4: hooks/ts/bodies/checkpoint-guard.ts — functional tests"
-echo "# Retained body-level regression suite; not wired in either runtime."
-echo "############################################################"
-run_ts_hook_suite "checkpoint-guard" "test_checkpoint_guard.sh"
-
-echo
-echo "############################################################"
-echo "# Suite 5: hooks/ts/bodies/dev-guard.ts — behavioral tests"
-echo "############################################################"
-run_ts_hook_suite "dev-guard" "test_dev_guard.sh"
 
 echo
 echo "############################################################"
@@ -276,28 +241,6 @@ if bash "$TESTS_DIR/test_sketch_guard.sh"; then
     echo "sketch-guard: PASS"
 else
     echo "sketch-guard: FAIL"
-    FAILED=$((FAILED + 1))
-fi
-
-echo
-echo "############################################################"
-echo "# Suite 9: hooks isolated-env harness (Suite 84)"
-echo "############################################################"
-if bash "$TESTS_DIR/test_isolated_hook_env.sh"; then
-    echo "isolated-hook-env: PASS"
-else
-    echo "isolated-hook-env: FAIL"
-    FAILED=$((FAILED + 1))
-fi
-
-echo
-echo "############################################################"
-echo "# Suite 10: hook-gates-hardening behavioral (Suite 85)"
-echo "############################################################"
-if bash "$TESTS_DIR/test_hook_gates_hardening.sh"; then
-    echo "hook-gates-hardening: PASS"
-else
-    echo "hook-gates-hardening: FAIL"
     FAILED=$((FAILED + 1))
 fi
 
@@ -345,42 +288,6 @@ else
         echo "ts-hook-parity: SKIP (hooks/ts/package.json not found)"
     fi
 fi
-
-echo
-echo "############################################################"
-echo "# Suite 16: release-only bump-floor checks"
-echo "############################################################"
-if [ "${TH_RELEASE_TESTS:-0}" = "1" ]; then
-    run_ts_hook_suite "prepublish-bump-floor" "test_prepublish_bump_floor.sh"
-else
-    echo "prepublish-bump-floor: SKIP (set TH_RELEASE_TESTS=1 for release preparation)"
-fi
-
-echo
-echo "############################################################"
-echo "# Suite 25: hooks/ts/bodies/prepublish-guard.ts — Check 2 command-execution (registry Suite 135)"
-echo "# Retained body-level regression suite; not wired in either runtime."
-echo "############################################################"
-run_ts_hook_suite "prepublish-guard" "test_prepublish_guard.sh"
-
-echo
-echo "############################################################"
-echo "# Suite 87: hooks/ts/bodies/gcp-guard.ts — gcp-guard-hook-behavior"
-echo "############################################################"
-run_ts_hook_suite "gcp-guard" "test_gcp_guard.sh"
-
-echo
-echo "############################################################"
-echo "# Suite 133: hooks/ts/bodies/worktree-guard.ts — worktree-guard-hook-behavior"
-echo "# Retained body-level regression suite; not wired in either runtime."
-echo "############################################################"
-run_ts_hook_suite "worktree-guard" "test_worktree_guard.sh"
-
-echo
-echo "############################################################"
-echo "# Suite 136: hooks/run-ts-hook.sh — launcher-fail-closed-on-corrupt-artifact"
-echo "############################################################"
-run_ts_hook_suite "launcher-fail-closed" "test_launcher_fail_closed.sh"
 
 echo
 echo "############################################################"
@@ -469,7 +376,7 @@ else
     run_node_suite "openspec-launcher" "test_openspec_launcher.mjs" "node not found — install Node.js to run this suite"
     run_node_suite "review-surface" "test_review_surface.mjs" "node not found — install Node.js to run this suite"
     run_node_suite "regression-evidence" "test_regression_evidence.mjs" "node not found — install Node.js to run this suite"
-    run_node_suite "codex-windows-hooks" "test_codex_windows_hooks.mjs" "node not found — install Node.js to run this suite"
+    run_node_suite "hook-registration" "test_hook_registration.mjs" "node not found — install Node.js to run this suite"
 fi
 
 echo
@@ -545,24 +452,6 @@ run_node_suite "codex-pipeline-benchmark" "test_codex_pipeline_benchmark.mjs" "n
 
 echo
 echo "############################################################"
-echo "# Suite 19: opencode config-path resolver (AC-10 / SEC-OC-R3)"
-echo "# Requires: node, npm, npx (esbuild). Skipped when absent."
-echo "############################################################"
-if ! command -v node >/dev/null 2>&1; then
-    report_skip_or_fail "opencode-config-resolver" "node not found — install Node.js to run this suite"
-elif ! command -v npm >/dev/null 2>&1; then
-    report_skip_or_fail "opencode-config-resolver" "npm not found"
-else
-    if bash "$TESTS_DIR/test_opencode_config_resolver.sh"; then
-        echo "opencode-config-resolver: PASS"
-    else
-        echo "opencode-config-resolver: FAIL"
-        FAILED=$((FAILED + 1))
-    fi
-fi
-
-echo
-echo "############################################################"
 echo "# Suite 21: Go installer — opencode Windows completeness"
 echo "# (buildImportCandidate 7-key read, accept/decline, SEC-004,"
 echo "#  .ps1 static verify, banner gate logic)"
@@ -615,22 +504,6 @@ else
         echo "subagent-start: PASS"
     else
         echo "subagent-start: FAIL"
-        FAILED=$((FAILED + 1))
-    fi
-fi
-
-echo
-echo "############################################################"
-echo "# Suite 147: permission-disjointness-invariant (#18312 floor)"
-echo "# Requires: python3. Skipped when absent."
-echo "############################################################"
-if ! command -v python3 >/dev/null 2>&1; then
-    report_skip_or_fail "permission-disjointness" "python3 not found — install Python 3 to run this suite"
-else
-    if python3 "$TESTS_DIR/test_permission_disjointness.py"; then
-        echo "permission-disjointness: PASS"
-    else
-        echo "permission-disjointness: FAIL"
         FAILED=$((FAILED + 1))
     fi
 fi

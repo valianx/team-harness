@@ -35,11 +35,11 @@ These artifacts live inside the plugin cache directory (`~/.claude/plugins/cache
 **Artifacts in this class:**
 - `agents/*.md` — all agent system prompts
 - `skills/<name>/SKILL.md` — all namespaced plugin skills (e.g. `/th:update`, `/th:setup`)
-- Hooks registered in `.claude-plugin/hooks.json` — loaded via `${CLAUDE_PLUGIN_ROOT}` (the plugin runtime variable that resolves to the cache directory at runtime)
+- Retained session context and observation assets — loaded by the applicable native host integration
 
-**Evidence:** `.claude-plugin/hooks.json` registers every hook using the form `bash ${CLAUDE_PLUGIN_ROOT}/hooks/<name>.sh`. The runtime resolves `${CLAUDE_PLUGIN_ROOT}` to the newly-downloaded version directory after `/reload-plugins`, so the updated hooks take effect automatically without a copy step.
+**Evidence:** the plugin runtime resolves the installed skill and agent resources from the selected version after `/reload-plugins`; host-native permissions and approvals remain separate and authoritative.
 
-**Implication:** to ship a new agent, skill, or hook, it is sufficient to add the file to the repo and release. No sync step in `/th:update` is required for these artifacts.
+**Implication:** to ship a new agent or skill, it is sufficient to add the file to the repo and release. No sync step in `/th:update` is required for cache artifacts.
 
 ### Fixed-path artifacts (explicit sync required)
 
@@ -52,7 +52,7 @@ These artifacts must land at a specific absolute path under `~/.claude/` that th
 | `orchestrator-dispatch-rule` managed block | `~/.claude/CLAUDE.md` (marker-delimited section) | Destructive marker-bounded replace or append |
 | `voice-rule` managed block | `~/.claude/CLAUDE.md` (marker-delimited section) | Destructive marker-bounded replace or append |
 
-> **Retired entry mechanisms:** the `dev-mode`, `nested-dispatch-takeover` and `dev-mode-entry` blocks, activation marker and developer-mode output style are no longer installed. Update removes the retired managed blocks and follows [bounded style migration](dev-mode.md#retire-an-existing-developer-mode-selection) for existing selections. Session startup supplies workflow discovery, language and workspace context. Existing execution guards remain independent of style selection.
+> **Retired entry mechanisms:** the `dev-mode`, `nested-dispatch-takeover` and `dev-mode-entry` blocks, activation marker and developer-mode output style are no longer installed. Update removes the retired managed blocks and follows [bounded style migration](dev-mode.md#retire-an-existing-developer-mode-selection) for existing selections. Session startup supplies workflow discovery, language and workspace context. Native host permissions and approvals remain independent of style selection.
 
 For the exact per-OS command blocks (bash and PowerShell), see `skills/update/SKILL.md` Step 6.
 
@@ -66,10 +66,11 @@ A `th` update is three distinct steps. The skill performs two; the operator perf
    Updates the marketplace metadata so the CLI knows a newer version exists. Downloads nothing.
 
 2. **Download the new version** — `claude plugin update th@team-harness-marketplace`
-   Fetches the new version into the plugin cache. The CLI prints `Restart to apply changes`. This is the step that actually downloads; the catalog refresh alone does not.
+   Fetches the new version into the plugin cache. This is the step that actually downloads; the catalog refresh alone does not.
 
-3. **Activate** — `/reload-plugins` (or restart Claude Code)
-   Loads the downloaded version into the running session.
+3. **Activate** — `/reload-plugins`
+   Loads the downloaded version into the running session. Reconnect only when
+   the host reports that a changed component cannot activate in place.
 
 `/th:update` performs steps 1 and 2 from Bash, then runs the Step 6 fixed-path sync described in [Fixed-path artifacts (explicit sync required)](#fixed-path-artifacts-explicit-sync-required). Step 3 is operator-driven — the skill cannot reload the session.
 

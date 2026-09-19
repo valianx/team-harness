@@ -4,16 +4,10 @@ tests/test_lane_marker_identity.py
 
 Suite 151 — lane-marker-byte-identity
 
-AC-7.4 (`01-plan.md`): a structural test asserting byte-identity of the
-dispatch-marker literal `TH-STATE-REF` between the PARSER side (the hook
-body that reads the marker) and the INJECTOR side (the coordinator's
-specialist-dispatch payload).
-
-Extraction is structural, not hand-duplicated: each parser's own anchored
-regex source (`^TH-STATE-REF:` / `^TH-LANE:`) is what proves the parser
-recognizes that literal — this script does not separately assert "the
-parser looks for X" by re-typing X from memory, it greps the parser's own
-anchor and then checks the SAME literal appears in the injector.
+AC-7.4 (`01-plan.md`): a structural test asserting that the retained
+subagent-start observer still recognizes its controlled `TH-LANE` header.
+Extraction is structural, not hand-duplicated: the parser's own anchored
+regex source is what proves the parser recognizes that literal.
 
 `TH-LANE` retirement (coordinator-fusion). The `TH-LANE` INJECTOR — the
 controlled header a coordinator stamped when spawning a per-project lane
@@ -48,7 +42,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-CHECKPOINT_GUARD_TS = REPO_ROOT / "hooks" / "ts" / "bodies" / "checkpoint-guard.ts"
 SUBAGENT_START_TS = REPO_ROOT / "hooks" / "ts" / "bodies" / "subagent-start.ts"
 
 # Candidate sites that could carry a reintroduced TH-LANE injector: the
@@ -77,59 +70,36 @@ def parser_anchors(text: str, canonical: str) -> bool:
     return f"^{canonical}:" in text
 
 
-print("=== Suite 151: lane-marker-byte-identity ===")
+print("=== Suite 151: retained subagent marker ===")
 print()
 
 # ---------------------------------------------------------------------------
-# Parser side — hard requirement, both markers.
+# Parser side — hard requirement for the retained observer.
 # ---------------------------------------------------------------------------
-cg_exists = CHECKPOINT_GUARD_TS.exists()
 ss_exists = SUBAGENT_START_TS.exists()
-check("hooks/ts/bodies/checkpoint-guard.ts exists", cg_exists)
 check("hooks/ts/bodies/subagent-start.ts exists", ss_exists)
 
-if not (cg_exists and ss_exists):
+if not ss_exists:
     print()
     print("Parser-side hook files are missing — this is a hard failure.")
     sys.exit(1)
 
-checkpoint_guard_src = read(CHECKPOINT_GUARD_TS)
 subagent_start_src = read(SUBAGENT_START_TS)
 
-state_ref_anchored = parser_anchors(checkpoint_guard_src, "TH-STATE-REF")
 lane_anchored = parser_anchors(subagent_start_src, "TH-LANE")
 check(
-    "checkpoint-guard.ts anchors ^TH-STATE-REF: in its marker regex",
-    state_ref_anchored,
-    "extractStateRefHeader()'s regex source no longer anchors on this "
-    "literal — either the marker was renamed (update this test) or a real "
-    "regression",
-)
-check(
-    "subagent-start.ts anchors ^TH-LANE: in its marker regex (parser retained,"
-    " fails open, per docs/subagent-orchestration.md's retirement note)",
+    "subagent-start.ts anchors ^TH-LANE: in its marker regex",
     lane_anchored,
     "TH_LANE_MARKER_RE's source no longer anchors on this literal — "
     "either the marker was renamed (update this test) or a real "
     "regression",
 )
 
-if not (state_ref_anchored and lane_anchored):
+if not lane_anchored:
     print()
     print("Parser-side anchor extraction failed — cannot proceed to "
           "injector-side comparison.")
     sys.exit(1)
-
-# ---------------------------------------------------------------------------
-# Injector side — TH-STATE-REF: still stamped, hard requirement.
-# ---------------------------------------------------------------------------
-pipeline_src = read(REF_PIPELINE_MD)
-check(
-    "agents/ref-pipeline.md carries the identical TH-STATE-REF: literal",
-    "TH-STATE-REF:" in pipeline_src,
-    "ref-pipeline.md's specialist-dispatch payload does not stamp the "
-    "exact literal checkpoint-guard.ts parses — marker drift",
-)
 
 # ---------------------------------------------------------------------------
 # Injector side — TH-LANE: retired. Assert absence; fail on a near-miss

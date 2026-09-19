@@ -159,7 +159,7 @@ When you run the installer interactively it asks: `Install mode [s/l]? [s]:` —
 | `qa` | opus | xhigh | sonnet | high | Highest-capability post-code acceptance over the frozen tree and executable evidence; low-cost mode retains sonnet/high. |
 | `plan-reviewer` | sonnet | medium | sonnet | medium | No change — already at the floor; gate role is inviolable. |
 | `gcp-cost-analyzer` | opus | high | sonnet | medium | Non-blocking advisory report; human decides on all output. |
-| `gcp-infra` | opus | xhigh | sonnet | medium | Irreversible-but-gated mutation planning (verb classification, blast-radius, reversibility, alternatives, runbook + rollback); gates: `gcp-guard.sh` + validation audit checkpoint + STOP. Standard raises to xhigh; low-cost stays medium (gated output, human approves every apply). |
+| `gcp-infra` | opus | xhigh | sonnet | medium | Mutation planning with verb classification, blast radius, reversibility, alternatives, runbook and rollback; operator authorization and native permissions govern apply. Standard raises to xhigh; low-cost stays medium. |
 | `init-project` | haiku | medium | sonnet | medium | Haiku→sonnet upgrade in low-cost mode; human edits output before first commit. |
 | `implementer` | sonnet | high | sonnet | medium | Model stays sonnet; effort drops to medium (more iteration loops via tester+qa). |
 | `tester` | sonnet | high | sonnet | medium | Effort high in standard; drops to medium in low-cost. |

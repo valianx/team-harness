@@ -62,16 +62,15 @@ form.
 
 ## Enforcement
 
-**Prose-only.** No hook enforces this checkpoint. `hooks/checkpoint-guard.sh` does not exist —
-it was removed in the TypeScript cutover, and `.claude-plugin/hooks.json` records that
-`checkpoint-guard` has been unregistered since v2.139.0 along with `gate-guard`,
-`prepublish-guard` and `worktree-guard`, because they enforced process over a non-deterministic
-agent flow and accumulated false positives faster than they prevented incidents.
+**Prose-only.** No Team Harness hook enforces this checkpoint. The coordinator
+honours the advance contract by reading its own `00-state.md` before a gated
+dispatch; native runtime permissions and approvals remain the authority for
+actions. The checkpoint is workflow guidance, not a replacement for host
+controls.
 
 The coordinator therefore honours the advance contract above by reading its own `00-state.md`
 before a gated dispatch. Its worst case is a skipped pedagogical pause, not a bypassed security
-control — the security floor and the outward-action floor are separate and are enforced
-elsewhere. Treat `.claude-plugin/hooks.json` as the authority on what actually runs.
+control. Treat native host permission and approval state as the authority on what actions can run.
 
 ### Attribution and failure direction (B1)
 

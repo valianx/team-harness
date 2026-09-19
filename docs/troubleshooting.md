@@ -9,13 +9,14 @@ plugin with `codex plugin marketplace list` and `codex plugin list`. Plugin
 installation does not install `.codex/agents/*.toml`; run the separate agent
 installer when those roles are wanted.
 
-## Codex hooks do not run
+## Codex permissions or agents do not behave as expected
 
-Hooks have POSIX and native PowerShell launchers and require explicit trust.
-Review `plugins/team-harness/hooks/hooks.json` through the host's native trust
-flow, then use `reload` to check discovery and actual hook execution. Trust or
-missing execution evidence alone does not establish a restart requirement.
-Do not use the hook-trust bypass on unreviewed code.
+Codex action boundaries are owned by its native sandbox, permissions and
+approval reviewer. Team Harness does not install a Codex policy-hook layer.
+Run `reload` to refresh skills, commands and agents, then inspect the native
+runtime status. Missing evidence alone does not establish a restart
+requirement; reconnect only when the host reports a stale component that
+cannot be activated in place.
 
 ## Plugin install fails: "source type not supported"
 
@@ -70,7 +71,7 @@ Then retry `/plugin install th`.
 
 ## 0 skills loaded after install
 
-**Symptom:** `/reload-plugins` shows `0 skills` even though agents and hooks load correctly.
+**Symptom:** `/reload-plugins` shows `0 skills` even though agents load correctly.
 
 **Cause:** Skills require YAML frontmatter with a `description` field to be discovered by the plugin system. If the SKILL.md files don't have frontmatter, the plugin loader skips them.
 
@@ -94,7 +95,7 @@ Then retry `/plugin install th`.
 
 **Cause:** Claude Code's subagent-nesting depth is configurable, not a permanent cap, via the `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` environment variable in `~/.claude/settings.json`. It defaults to unset, in which case a subagent one level deep does not retain the tools its own contract grants.
 
-**Fix:** Run `/th:setup` (or `/th:update` on an already-installed machine) — both provision `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: "2"` after an explicit confirmation. Restart the session (or start a new one) — the value resolves at session start and does not take effect mid-session. This is depth headroom for a specialist leaf agent, not a coordinator-dispatch fallback: `th:orchestrator` is always the top-level session agent and never itself runs nested, so there is no second-coordinator handoff to relay. Full mechanism: `docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`; `docs/subagent-orchestration.md § "Nested-context dispatch — RETIRED protocol, retained provisioning"`.
+**Fix:** Run `/th:setup` (or `/th:update` on an already-installed machine) — both provision `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: "2"` after an explicit confirmation. Restart the session (or start a new one) only because this native setting resolves at session start and does not take effect mid-session. This is depth headroom for a specialist leaf agent, not a coordinator-dispatch fallback: `th:orchestrator` is always the top-level session agent and never itself runs nested, so there is no second-coordinator handoff to relay. Full mechanism: `docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`; `docs/subagent-orchestration.md § "Nested-context dispatch — RETIRED protocol, retained provisioning"`.
 
 ---
 
@@ -110,10 +111,13 @@ Then retry `/plugin install th`.
 rm -rf ~/.claude/agents/
 rm -rf ~/.claude/commands/
 rm -rf ~/.claude/skills/
-rm ~/.claude/hooks/policy-block.sh ~/.claude/hooks/notify-*.sh ~/.claude/hooks/config.json
+# Remove only files explicitly recorded as Team Harness-owned legacy assets;
+# preserve unrelated user hooks and configuration.
 ```
 
-Also remove hook entries from `~/.claude/settings.json` that reference `~/.claude/hooks/` (the plugin registers its own hooks).
+Do not remove arbitrary user hooks or settings entries. Preserve native
+permission configuration and any context/observation integration that is not
+owned by the retired installer path.
 
 The files that must be preserved (they hold your configuration):
 - `~/.claude.json` — MCP server config
@@ -141,4 +145,5 @@ The files that must be preserved (they hold your configuration):
 /reload-plugins
 ```
 
-If changes still don't appear, restart Claude Code.
+If changes still don't appear, reconnect only after confirming that reload
+was unavailable or the host reports the running session is stale.
