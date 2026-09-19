@@ -79,8 +79,10 @@ migration, and preserve every unrelated value.
 3. For a full setup, refresh marketplace metadata and inspect the installed
    plugin with `codex plugin marketplace upgrade team-harness --json` and
    `codex plugin list --json`. If code is stale, run `$team-harness:update`
-   before continuing. An unavailable network is non-blocking when the installed
-   snapshot is usable.
+   before continuing. After update, read `skills/setup/SKILL.md` from the
+   validated installed root and continue with that version's procedure instead
+   of the remembered setup steps. An unavailable network is non-blocking when
+   the installed snapshot is usable.
 
 4. Only for a full setup or an explicit `features` target, enable Codex
    multi-agent V2 with Codex's native feature writer; do not hand-rewrite the

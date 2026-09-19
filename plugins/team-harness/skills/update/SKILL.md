@@ -172,5 +172,11 @@ only for a demonstrated remaining need, explaining the affected component and
 impact while respecting the operator's constraints.
 Do not run reload after a partial result or invalid receipt.
 
+When returning to a setup request, read `NEW_PLUGIN/skills/setup/SKILL.md` before
+continuing setup. This instruction refresh is independent of the optional
+snapshot alias and of activation for agents, hooks or MCP; it needs no restart.
+Continue with the selected installation's setup procedure rather than replaying
+retired policy-repair steps from an older cached skill.
+
 An equal-version run still executes Stage B: update remains the supported
 repair command as well as the version updater.
