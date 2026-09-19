@@ -1,8 +1,10 @@
 # GCP Infra Agent — Flow Contract
 
-This document is the canonical reference for the `gcp-infra` agent and the `gcp-guard.sh` hook.
-Both the agent prompt and the hook classify verbs according to the table in this file.
-When the classification here and elsewhere differ, this file wins.
+This document is the canonical reference for the `gcp-infra` agent's planning workflow.
+It classifies intended GCP operations so the plan can state impact, validation,
+authorization, and rollback clearly. Team Harness does not install a GCP-specific
+policy hook or an equivalent deny policy; native runtime permissions and approvals,
+cloud IAM, and provider-side protections govern execution.
 
 ---
 
@@ -66,7 +68,7 @@ Required conventions for every generated script:
 - Quoted expansions throughout: `"$VARIABLE"`, not `$VARIABLE`.
 - No interactive prompts (`-q` / `--quiet` only after the operator gate confirms — never before).
 - No embedded secrets: no SA `.json` key files, no bearer tokens, no `--impersonate-service-account` credential output.
-- Each mutating/destructive line is annotated with its class: `# MUTATING — gated` or `# DESTRUCTIVE — gated`.
+- Each mutating/destructive line is annotated with its class: `# MUTATING — review before apply` or `# DESTRUCTIVE — review before apply`.
 - Idempotency where feasible: prefer `--update-if-exists` or describe-before guards.
 
 ### Phase 3 — Validation
@@ -136,7 +138,7 @@ No apply happens until you reply. Default action is to STOP.
 
 - Apply ONLY on explicit operator approval.
 - Destructive operations require the distinct acknowledgement form: `"apply destructive: <resource>"`.
-- There is NO bypass path. The `gcp-guard.sh` hook enforces this at the OS level independently of this prompt.
+- This review is a planning and authorization step in the agent conversation. Native runtime permissions and approvals remain authoritative when the command is executed; this document does not create an OS-level deny policy or remove a native approval path.
 
 ### Phase 5 — Gated Apply
 
@@ -147,65 +149,17 @@ and produce a completion report. Phase 5 is never reached without Phase 4 approv
 
 ## Verb Classification Table
 
-This table is the single source of truth. `gcp-guard.sh` and the agent prompt both reference it.
+Use this table as a planning vocabulary. It describes the intended impact and
+the evidence the plan should carry; it is not a hook decision table or an
+execution filter.
 
-| Class | Example verbs | Hook decision | Approval required |
-|---|---|---|---|
-| **read-only** | `list`, `describe`, `get`/`get-*`, `search-all-resources`, `simulator`/`replay-recent-access`, `recommendations`, `print-*`, any invocation with `--dry-run`/`--validate-only` | nodecision | None |
-| **mutating** | `create`, `update`, `patch`, `add-*`, `set-*`, `enable`, `disable`, `resize`, `start`, `stop`, `deploy`, `import`, `add-iam-policy-binding`, `set-iam-policy` | `permissionDecision: ask` | Operator types `apply` |
-| **destructive** | `delete`, `remove-*`, `remove-iam-policy-binding`, `purge`, `clear-*`, `destroy` | `permissionDecision: ask` (irreversibility reason) | Operator types `apply destructive: <resource>` |
-| **catastrophic** (denylist) | `projects delete`, `resource-manager folders delete`, `organizations * delete` | `permissionDecision: deny` | Permanently blocked |
+| Class | Example verbs | Planning treatment |
+|---|---|---|
+| **read-only** | `list`, `describe`, `get`/`get-*`, `search-all-resources`, `simulator`/`replay-recent-access`, `recommendations`, `print-*`, and supported `--dry-run`/`--validate-only` invocations | Capture the describe/list baseline. Do not generate an apply script for a read-only request. |
+| **mutating** | `create`, `update`, `patch`, `add-*`, `set-*`, `enable`, `disable`, `resize`, `start`, `stop`, `deploy`, `import`, `add-iam-policy-binding`, `set-iam-policy` | State the intended change, validation evidence, blast radius, rollback, and the operator authorization needed before apply. |
+| **destructive** | `delete`, `remove-*`, `remove-iam-policy-binding`, `purge`, `clear-*`, `destroy` | Identify irreversible impact, exact resource scope, recovery or rollback limits, and the explicit operator authorization needed before apply. |
+| **catastrophic** | `projects delete`, `resource-manager folders delete`, `organizations * delete` | Treat as the highest-impact classification. Stop for explicit scope and authorization; native IAM, provider controls, and runtime permissions determine whether execution is allowed. |
 
-Precedence when a command has multiple gcloud invocations: the strongest class wins.
-
----
-
-## `gcp-guard.sh` Hook — Fail-Mode Contract
-
-The hook is wired as an additive `PreToolUse` `Bash` entry, separate from `policy-block.sh` and `dev-guard.sh`.
-It classifies every `gcloud` verb in any Bash command before Claude Code executes it.
-
-**Decision table:**
-
-| Input | Output |
-|---|---|
-| Non-Bash tool call | nodecision |
-| Bash command with no `gcloud` token | nodecision |
-| `gcloud` + read-only verbs only | nodecision |
-| `gcloud` + any `--dry-run` / `--validate-only` | nodecision (treated as read-only) |
-| `gcloud` + mutating verbs | `permissionDecision: ask` with blast-radius reason |
-| `gcloud` + destructive verbs | `permissionDecision: ask` with irreversibility reason |
-| catastrophic denylist match | `permissionDecision: deny` |
-
-**Fail-closed behaviour on parse failure:**
-
-If the JSON payload is unparseable but the raw input contains a `gcloud` token:
-- If a catastrophic token is present → `deny`.
-- If a destructive token is present → `ask`.
-- Otherwise → `nodecision`.
-
-The hook NEVER returns `allow` for mutating or destructive verbs.
-There is NO agent-writable self-approval marker. Operator approval flows exclusively
-through the Claude Code interactive permission prompt that `ask` triggers.
-
-### Known limits of the static classifier
-
-The hook classifies `gcloud` verbs by string matching on the literal command text.
-Two classes of bypass cannot be resolved by any static string gate — they are shared
-limitations with `dev-guard.sh` and `policy-block.sh`, documented here for transparency:
-
-1. **Verb indirection via variable or command substitution** — `V=delete; gcloud compute instances "$V" vm-1`
-   or `gcloud compute instances $(echo delete) vm-1`. The hook sees `"$V"` or `$(echo delete)` as the verb
-   token; neither matches a known class. The segment degrades to `nodecision`. Mitigation: the agent
-   contract routes all mutation to `02-apply.sh` with literal `gcloud` verbs (never variable-interpolated),
-   the operator STOP gate (Phase 4) reviews the script before any apply, and `policy-block.sh` scans the
-   Write. Variable-interpolated verbs in a generated script are a contract violation — see `agents/gcp-infra.md`
-   CRITICAL RULES.
-
-2. **`bash -c "…"` and `xargs` with destructive verbs** — the hook normalises separators and scans each
-   segment in full (as of the SEC-001/002 hardening). Standard cases like
-   `bash -c "gcloud … delete …"` and `… | xargs gcloud … delete` now classify as destructive → `ask`.
-   Exotic obfuscation (verbs in heredocs, process-substitution layers, deeply nested quoting) may still
-   degrade to the fail-safe (`ask` or `deny`, never `allow`) if the destructive token is not present as a
-   literal word in the segment. The fail-safe is fail-closed: an unclassifiable gcloud command degrades to
-   `nodecision`, not `allow`.
+When a command contains multiple GCP operations, plan against the strongest
+impact class present. Native permissions, cloud IAM, server-side protections,
+and the operator's authorization remain the execution boundaries.

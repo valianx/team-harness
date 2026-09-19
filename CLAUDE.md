@@ -36,7 +36,7 @@ team-harness/
 │   ├── obsidian-bases/
 │   ├── json-canvas/
 │   └── obsidian-cli/
-├── hooks/               Gate/observability logic (TypeScript) + fail-closed launcher
+├── hooks/               Context/observability logic (TypeScript) + fail-open launcher
 │   ├── run-ts-hook.sh   hooks.json's only wiring path (no gate logic)
 │   ├── sketch-guard.sh  Not an event hook — runs via the Bash tool
 │   └── ts/              bodies/ (logic) + entry/ (per-runtime) + dist/ (tracked)
@@ -63,7 +63,7 @@ team-harness/
 │   └── workflows/
 │       ├── release.yml  Cross-compile workflow: tag v* → 5 binaries + SHA256SUMS
 │       ├── pages.yml    Publish bootstrap scripts to GitHub Pages on release
-│       └── test.yml     PR/main verification: policy-block + structure + frontmatter suites
+│       └── test.yml     PR/main verification: structure + frontmatter suites
 ├── assets.go            go:embed entry point (package teamharness) — embeds agents/, skills/, hooks/
 ├── go.mod               Go module (Go 1.25.8)
 ├── docs/
@@ -90,7 +90,7 @@ team-harness/
 | Bootstrap scripts | Bash/PowerShell/cmd.exe entry points download the released agent-installer binary. Codex plugin install/update/remove remains a separate marketplace lifecycle. |
 | Agents / skills | Markdown with YAML frontmatter |
 | Complex skills | Markdown + referenced scripts (Python/Node via `uv run` or CLIs) |
-| Hooks | Shared TypeScript bodies compile to tracked Claude Code bundles and are projected into the Codex plugin. Codex hooks are POSIX-only beta and require explicit repository trust; OpenCode uses its native permission and approval model. |
+| Hooks | Retained Claude Code context and observation assets stay plugin-local. Codex and OpenCode use native permissions and approvals; Team Harness does not add a policy-hook layer there. |
 | Memory MCP | External service (e.g., `context-harness-mcp` on Railway/Render/Fly/Docker). Configured by URL in `~/.claude.json`. Not bundled in this repo. |
 | Config | `~/.claude.json` merge for `mcpServers`; CC hooks wired in `.claude-plugin/hooks.json` |
 | Visuals | Excalidraw (`.excalidraw` JSON), PNG preview |
@@ -113,8 +113,7 @@ All commands run from the repo root.
 | Build installer from source (contributors) | `go run ./cmd/install` |
 | Validate agents/skills health | `/th:lint` inside Claude Code |
 | Run security self-scan | `/th:audit-security` inside Claude Code |
-| Run free verification suite (hooks, gates, frontmatter, security scan) | `bash tests/run-all.sh` |
-| Run policy-block functional tests | `bash tests/test_policy_block.sh` |
+| Run free verification suite (repository structure, frontmatter, security scan) | `bash tests/run-all.sh` |
 | Run security self-scan directly | `python3 tests/test_security_scan.py` |
 | Run agent YAML frontmatter validator | `uv run --with PyYAML python tests/test_agent_frontmatter.py` |
 | Run deterministic behavioral suite (no model calls, no cost) | `bash tests/run-behavioral.sh` |
@@ -183,11 +182,11 @@ All commands run from the repo root.
 - **Coordination state has one writer.** Only `orchestrator` writes `00-state.md`, the execution trace, the decision ledger, and the pipeline summary. Specialists return status blocks and artifact pointers; they never edit coordination state. `agents/_shared/orchestrator-state.md`.
 - **Gate UX is concise and semantic.** Gate 1 displays `1 approve`, `3 edit`, `4 reject` — every approval preauthorizes through the draft PR (`release_policy: auto-ship`). Gate 3 STOPs only on a closed-list exception, displaying `1 ship`, `2 amend`, `3 abort`; a green run records a mechanical `auto-ship` release citing the Gate-1 event. Numbers and `N: detail` remain shortcuts, while unambiguous live semantic equivalents and complete natural-language amendments are accepted. Ambiguity releases nothing. The nonce-bound authority event and live Gate-1 approval remain mandatory; projections carry no independent authority. `agents/_shared/gate-contract.md`.
 - **Discover phase + intake survey + spec co-authoring.** Depth DIAL, not a stage switch; security floors non-surveyable. `docs/discover-phase.md`, `docs/spec-coauthoring.md`.
-- **Native workflow entry.** The general agent retains its native identity and discovers TH through the selected current skill. Session context preserves language, English learning and workspace preferences. The minimal outward floor (default-branch/force/tag push, PR merge) remains gated by `dev-guard`, independently of the retired output style. `docs/dev-mode.md`.
+- **Native workflow entry.** The general agent retains its native identity and discovers TH through the selected current skill. Session context preserves language, English learning and workspace preferences. Native runtime permissions and approvals govern outward actions; Team Harness does not replace them with a hook policy. `docs/dev-mode.md`.
 - **Obsidian interlinking.** 3-tier MOC, knowledge allowlist: `docs/obsidian-linking.md`.
 - **Obsidian-mode diagram embed.** D2/LikeC4 render to vault + `![[…]]` embed in `05-diagram.md`. `docs/conventions.md`.
 - **Milestone standard.** milestones = commits, NOT PRs; default `Delivery Grouping` is `all-tasks-one-pr`. `agents/ref-special-flows.md § Milestone-Build Flow`.
-- **Hook gates guard the boundary, not the flow (v2.139.0).** Registered in `.claude-plugin/hooks.json`: `policy-block` (catastrophic recursive deletion and provider-shaped credentials only), `dev-guard` (minimal outward floor: default-branch/force/tag push and PR merge; every other outward write defers to the host permission model), `gcp-guard` (destructive gcloud verbs). `policy-block` deliberately does not police git workflow, SQL text, reads, filenames, configuration choices, or probabilistic secret shapes. **Unwired, code retained:** `gate-guard`, `checkpoint-guard`, `prepublish-guard`, `worktree-guard` — they enforced process over a non-deterministic agent flow and accumulated false positives faster than they prevented incidents. Prose elsewhere in this repo describing any of these four as an active hook enforcer (reading or gating live via `.claude-plugin/hooks.json`) is stale until the follow-up cleanup lands; treat `.claude-plugin/hooks.json` as the authority on what actually runs. The gate CONTRACT itself — the dual-record release, the bare-literal field requirement, and the no-repair invariant in `agents/_shared/gate-contract.md` — is current, enforced as prose only, and is NOT stale. Rationale and the retain/unwire test: `docs/dev-mode.md § "Boundary, not flow"`.
+- **Native action boundaries.** Team Harness preserves workflow guidance, session context and observability while the host runtime decides tool permissions and approvals. Retired guard names may remain in historical migration records, but they are not active enforcement and no Team Harness policy-hook layer is required for Codex or OpenCode.
 - **Plan-stage sketches.** `docs/plan-sketches.md`.
 - **Worktree discipline.** Each concurrent effort runs in its own `git worktree`. Before any branch op, `git status` + `git worktree list` — STOP on unfamiliar WIP. Human own-terminal `git checkout -b` is discipline, not a gate (U1 limit). Full 5-rule contract: `docs/worktree-discipline.md`.
 - **Parallel batch implementation.** ADDITIVE items concurrently, consolidated into ONE PR. `docs/parallel-batch-implementation.md`.
@@ -382,7 +381,7 @@ Git & delivery rules are now part of §6 Mandatory Working Agreements (see Durin
 
 Routing table and escalation rules: `docs/subagent-orchestration.md § Routing Table and Escalation Rules`.
 
-**The general agent retains its native identity while coordinating.** No filesystem marker is required. The retained coordination reference has a 2,528-word ceiling and the pipeline reference a 1,647-word ceiling (both recorded in `tests/fixtures/authoring-baseline.json`). Direct work does not load the pipeline reference; after explicit activation, the same coordinator loads phase sections and dispatches specialists. It never dispatches another coordinator. `dev-guard` gates the minimal outward floor regardless of posture.
+**The general agent retains its native identity while coordinating.** No filesystem marker is required. The retained coordination reference has a 2,528-word ceiling and the pipeline reference a 1,647-word ceiling (both recorded in `tests/fixtures/authoring-baseline.json`). Direct work does not load the pipeline reference; after explicit activation, the same coordinator loads phase sections and dispatches specialists. It never dispatches another coordinator. Native runtime permissions and approvals govern outward actions regardless of posture.
 
 **No nested-handoff/takeover protocol.** The `dispatch_handoff`/`blocked-no-dispatch` machinery that used to back up a coordinator dispatched as a nested subagent is retired — no coordinator is ever dispatched that way any more, so the scenario it backstopped has no producer. What remains, retained as harmless headroom rather than as a mechanism: Claude Code's subagent-nesting depth setting (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` in `~/.claude/settings.json`, provisioned to `"2"` by `/th:setup`/`/th:update` — `docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`), which still matters for a specialist leaf agent invoked one level deep (a skill wrapper, an `@`-mention inside an ongoing session). Full retirement note and protocol: `docs/subagent-orchestration.md § "Nested-context dispatch — RETIRED protocol, retained provisioning"`.
 

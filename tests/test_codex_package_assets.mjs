@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { syncClaudePackageAssets } from "../tools/codex-runtime/sync-skills.mjs";
 
 const rootDir = await mkdtemp(join(tmpdir(), "th-package-assets-"));
-const shipped = ["ts/dist/gcp-guard.cjs", "ts/entry/session-enforcement.opencode.ts"];
+const shipped = ["ts/dist/session-start.cjs", "ts/entry/session-enforcement.opencode.ts"];
 const scratch = ["ts/dist/opencode-plugin.cjs", "ts/dist/session-enforcement.opencode.cjs"];
 try {
   for (const directory of [".claude-plugin", "agents", "docs", "hooks/ts/dist", "hooks/ts/entry"]) {
@@ -32,7 +32,7 @@ try {
   }
   await syncClaudePackageAssets({ rootDir, check: true });
 
-  const leftover = join(rootDir, "plugins/team-harness/hooks/ts/dist/checkpoint-guard.opencode.cjs");
+  const leftover = join(rootDir, "plugins/team-harness/hooks/ts/dist/retired-hook.opencode.cjs");
   await writeFile(leftover, "old packaged scratch with no source counterpart\n");
   await assert.rejects(syncClaudePackageAssets({ rootDir, check: true }), /assets are stale/);
   assert.equal(await readFile(leftover, "utf8"), "old packaged scratch with no source counterpart\n");

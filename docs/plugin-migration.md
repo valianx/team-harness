@@ -27,7 +27,7 @@ The namespace prefix `th:` is mandatory in plugin mode. The coordinator (`@th:or
 |---|---|
 | `~/.claude/commands/*.md` | `${CLAUDE_PLUGIN_ROOT}/skills/<name>/SKILL.md` |
 | `~/.claude/agents/*.md` | `${CLAUDE_PLUGIN_ROOT}/agents/*.md` |
-| `~/.claude/hooks/policy-block.sh` | `${CLAUDE_PLUGIN_ROOT}/hooks/policy-block.sh` |
+| Retired Team Harness policy hooks | No plugin replacement; native permissions and approvals remain the action boundary |
 | `~/.claude.json` mcpServers block | Managed by `/th:setup` via `.team-harness.json` |
 
 ### Skill file format
@@ -60,10 +60,8 @@ rm ~/.claude/commands/*.md
 # Remove installer-managed agent files (if you have no custom agents)
 rm ~/.claude/agents/*.md
 
-# Remove installer-managed hooks (optional — the plugin will register its own)
-rm ~/.claude/hooks/policy-block.sh
-rm ~/.claude/hooks/notify-*.sh
-rm ~/.claude/hooks/notify-stage.sh
+# Do not remove arbitrary user hooks. Remove only legacy files recorded as
+# Team Harness-owned by the installer ledger, if they are still present.
 ```
 
 On Windows (PowerShell):
@@ -71,9 +69,7 @@ On Windows (PowerShell):
 ```powershell
 Remove-Item "$env:USERPROFILE\.claude\commands\*.md"
 Remove-Item "$env:USERPROFILE\.claude\agents\*.md"
-Remove-Item "$env:USERPROFILE\.claude\hooks\policy-block.sh"
-Remove-Item "$env:USERPROFILE\.claude\hooks\notify-*.sh"
-Remove-Item "$env:USERPROFILE\.claude\hooks\notify-stage.sh"
+# Preserve unrelated user hooks and native permission settings.
 ```
 
 ### 2. Install the plugin

@@ -17,7 +17,7 @@ Then invoke `$team-harness:setup`. The marketplace only distributes code;
 setup converges the operational installation. It writes native settings to
 `${CODEX_HOME:-$HOME/.codex}/.team-harness.json`, configures workspace and
 language preferences and optional GitHub identity routes, offers Memory/context7
-MCP registration, verifies hook trust, and places twenty bundled specialist
+MCP registration, verifies the native permission and approval profile, and places twenty bundled specialist
 agents in project or global scope: seven standard logical roles, seven
 spawn-overridable `pipeline-*` identities, one direct read-only inline reviewer,
 and five for immutable PR review.
@@ -41,7 +41,7 @@ marketplace, compares versions, refreshes the installed plugin through an
 idempotent native `codex plugin add` under native permissions, then runs one
 versioned convergence helper for the bridge, native settings, persistent
 runtime classification, required features, all twenty bundled agents, MCP
-inspection, hook validation, and final postconditions. The already-current path
+inspection, and final postconditions. The already-current path
 performs no domain writes; a stale domain is repaired only when classification
 requires it. The helper returns one closed receipt, so the coordinator does not
 repeat each inspection after convergence.
@@ -50,7 +50,8 @@ After a successful update, `$team-harness:reload` attempts session activation
 separately. It refreshes requested skill instructions and uses only reload
 controls exposed by the current backend. It verifies native components before
 reporting them active; installed manifests, skill discovery, queued refreshes,
-and manual hook tests do not prove that a running conversation uses new hooks.
+and installed manifests or queued refreshes do not prove that a running
+conversation uses the new resources.
 Without suitable controls, affected components remain unverified. A reconnect
 is warranted only for a demonstrated activation requirement, preserving the
 same conversation. See [reload](../skills/reload/SKILL.md) for runtime procedures.
@@ -59,7 +60,7 @@ Persistent runtime-profile changes remain a live operator decision. The first
 pass completes the automatically authorized domains and returns a short
 redacted summary; an unambiguous `yes`, `no`, or natural-language adjustment is
 sufficient, without copying a recovery command or using a prescribed phrase.
-A real active old snapshot is preserved so its already-known skill and hook
+A real active old snapshot is preserved so its already-known skill and resource
 paths remain operational, while a missing or previously bridged path may follow
 the new snapshot. The updater never overwrites a real cached directory or an
 unrelated symlink and still repairs current-version installations. The native
@@ -67,8 +68,9 @@ snapshot sequence remains `codex plugin marketplace upgrade team-harness`,
 followed by `codex plugin add team-harness@team-harness --json` only when the
 semantic version comparison requires installation or an equal-version refresh
 was forced.
-Never remove the active plugin during an update: trusted `PreToolUse` hooks use
-its versioned cache path and fail closed when that runtime disappears.
+Never remove the active plugin during an update: keep its versioned cache path
+until replacement is verified, so the running conversation has a stable resource
+root.
 If post-install reconciliation stops partway through, rerun
 `$team-harness:update`; the receipt identifies the failed domain, completed
 idempotent work is skipped on the next pass, and the updater preserves both the
@@ -82,30 +84,15 @@ the development cache key changes; then run
 `reload` in the same thread. If no source byte has changed, Codex may correctly reuse the same
 cached snapshot.
 
-Codex requires explicit trust before repository hooks execute. The plugin wires
-only deterministic-deny hooks (`policy-block` and the catastrophic branch of
-`gcp-guard`); approval-classifying guards are omitted because Codex has no
-hook-level `ask` and native permissions own approvals. Review
-`plugins/team-harness/hooks/hooks.json` and its scripts before trusting the
-checkout; never bypass hook trust for an unreviewed repository. Hooks provide a
-native Windows `commandWindows` override written for PowerShell and using Node,
-tested through both PowerShell 7 and Windows PowerShell with the same deny-only
-decisions and no Bash dependency. The launcher resolves node.exe from PATH to an
-absolute executable path, excluding the implicit current-directory search. PATH
-must identify a trusted Node installation. Malformed or throwing launchers deny
-the action without reflecting their errors. The installer
-beta's remaining shell workflows still require POSIX. An update can bridge paths
-the current thread already knows. Reload assesses skills, commands, agents,
-configuration, MCP services and hooks through the active host's supported
-controls. New declarations require verified discovery and activation; they do
-not by themselves require a new thread. A missing optional alias or unavailable
-observation does not demonstrate a restart requirement.
-Hook commands prefer Codex's native
-`PLUGIN_ROOT`, accept the `CLAUDE_PLUGIN_ROOT` compatibility alias that Codex
-itself provides without requiring Claude Code. POSIX commands also recover a replacement
-snapshot from the same Codex cache. When no plugin runtime can be resolved,
-the launcher reports the broken cache as a system message and leaves the
-decision to native Codex permissions instead of denying every tool call.
+Codex does not receive a Team Harness policy-hook layer. Setup and update
+converge the native sandbox, permission and approval profile, skills, agents and
+MCP registrations; reload verifies those resources through controls exposed by
+the active host. Native Codex permissions and approvals remain authoritative.
+A changed declaration or unavailable activation evidence does not by itself
+establish a restart requirement; reconnect only when the host reports that a
+specific component cannot activate in place. Claude-only context or
+observation integrations are documented with their owning runtime and are not
+projected into Codex.
 
 For contributors, the generated project `.codex/config.toml` keeps
 `workspace-write` plus `on-request` approvals and enables dependency network
@@ -200,8 +187,8 @@ never as an in-memory byte attestation. Setup/update that leaves the definition
 and scope unchanged preserves valid activation evidence on the same backend.
 A changed definition or scope requires activation verification; missing evidence
 makes the lens unavailable without proving a restart is needed.
-Shipped Codex hooks cannot attest session start or loaded
-agent bytes. Main resolves each range endpoint separately with hardened globals
+No hook layer is used to attest session start or loaded agent bytes. Main resolves
+each range endpoint separately with hardened globals
 and `rev-parse --verify --end-of-options <rev>^{commit}`, accepting one full
 commit OID only, binds `<oid>^{tree}`, and uses only those IDs. It rejects
 dash-prefixed/control/range-as-endpoint/abbreviated/multi-output input. Codex
@@ -280,22 +267,15 @@ session because project instructions are discovered at startup.
 `.codex/README.md` is the generated roster. After editing canonical role
 metadata or adapters, run `$sync-codex-agents`; do not hand-edit generated TOML.
 
-Codex's native sandbox and permission path remain authoritative. Only
-deterministic deny floors emit a hook decision; hook-level `ask` and classifier
-`allow` are never translated into authorization.
+Codex's native sandbox, permission and approval path remains authoritative.
+Team Harness workflow guidance never translates a hook decision into
+authorization.
 
-**Accepted risk — fail-open launcher fallback.** When the hook launcher cannot
-resolve a valid plugin root (stale or replaced cache, unmounted path, invalid
-`PLUGIN_ROOT`), it surfaces one `systemMessage` (`plugin runtime missing`) and
-makes no permission decision: the deny floor (`policy-block`, `gcp-guard`) is
-inactive until the plugin is reinstalled, and native Codex permissions are the
-only boundary. This is deliberate, not an oversight: the floor is a narrow
-backstop against destructive actions under the honest-developer threat model
-(`docs/dev-mode.md § "Threat model — honest-developer disposition"`), and a
-broken cache denying every Bash call would convert a packaging failure into a
-development outage. `tests/test_codex_hooks.sh` proves the safety half that is
-non-negotiable either way: an unresolvable or unsafe root never executes a
-fallback runner.
+**Activation limit.** If the installed resource root cannot be resolved or
+the host exposes no supported reload control, report the affected component
+as unverified. Native Codex permissions remain in force; reconnect only when
+the host demonstrates that the current conversation is using stale resources
+and reload cannot correct them.
 
 ## Controlled pipeline-efficiency A/B benchmark
 
@@ -376,8 +356,6 @@ node tools/codex-runtime/generate.mjs --check
 node tools/codex-runtime/test_generate.mjs
 node tools/codex-runtime/sync-skills.mjs --check
 node tools/codex-runtime/validate-marketplace.mjs
-node tools/codex-runtime/sync-hooks.mjs --check
-bash tests/test_codex_hooks.sh
 python3 tests/test_codex_runtime.py
 python3 ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/team-harness
 ```

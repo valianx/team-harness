@@ -73,7 +73,6 @@ class ConvergenceFixture(unittest.TestCase):
         self.plugin = self.codex_home / "plugins/cache/team-harness/team-harness" / PLUGIN_VERSION
         (self.plugin / ".codex-plugin").mkdir(parents=True)
         shutil.copy2(PLUGIN / ".codex-plugin/plugin.json", self.plugin / ".codex-plugin/plugin.json")
-        shutil.copytree(PLUGIN / "hooks", self.plugin / "hooks")
         shutil.copytree(PLUGIN / "skills/setup", self.plugin / "skills/setup")
         shutil.copytree(PLUGIN / "skills/update/scripts", self.plugin / "skills/update/scripts")
         self.project = self.base / "project"
@@ -268,7 +267,7 @@ class ConvergenceFixture(unittest.TestCase):
         self.assertEqual(receipt["changedDomains"], ["config"])
         self.assertEqual(receipt["domains"]["bridge"]["bridgeStatus"], "skipped-read-only")
         self.assertFalse(receipt["restartRequired"])
-        self.assertEqual(receipt["domains"]["hooks"]["status"], "current")
+        self.assertNotIn("hooks", receipt["domains"])
         self.assertFalse(os.path.lexists(args.old_plugin))
 
     def test_native_missing_old_snapshot_bridge_reports_optional_alias_omission(self) -> None:
@@ -286,7 +285,7 @@ class ConvergenceFixture(unittest.TestCase):
         else:
             self.assertEqual(bridge["bridgeStatus"], "linked")
             self.assertEqual(Path(args.old_plugin).resolve(), self.plugin.resolve())
-        self.assertEqual(receipt["domains"]["hooks"]["status"], "current")
+        self.assertNotIn("hooks", receipt["domains"])
 
     def test_feature_repair_is_conditional_and_verified(self) -> None:
         native = FakeCodex(features={"multi_agent": False, "multi_agent_v2": True})
@@ -321,7 +320,7 @@ class ConvergenceFixture(unittest.TestCase):
         self.assertIn("features", resumed["changedDomains"])
         self.assertTrue(resumed["restartRequired"])
 
-    def test_missing_required_native_output_and_unsafe_hook_are_bounded_failures(self) -> None:
+    def test_missing_required_native_output_and_unsafe_helper_are_bounded_failures(self) -> None:
         malformed = FakeCodex()
         malformed.invalid_features = True
         failed = self.converge(malformed)
@@ -330,11 +329,11 @@ class ConvergenceFixture(unittest.TestCase):
         self.assertFalse(any(call[:3] == (CODEX_BIN, "features", "enable") for call in malformed.calls))
 
         self.converge(FakeCodex(), authorize_runtime=True)
-        hooks = self.plugin / "hooks/hooks.json"
-        target = self.base / "unsafe-hooks.json"
+        helper = self.plugin / "skills/setup/scripts/manage_config.py"
+        target = self.base / "unsafe-helper.py"
         target.write_text("{}", encoding="utf-8")
-        hooks.unlink()
-        hooks.symlink_to(target)
+        helper.unlink()
+        helper.symlink_to(target)
         unsafe = self.converge(FakeCodex())
         self.assertEqual(unsafe["failedDomain"], "preflight")
         self.assertEqual(unsafe["domains"]["bridge"]["errorCode"], "SNAPSHOT_COMPONENT_SYMLINK")
@@ -377,26 +376,39 @@ class ConvergenceFixture(unittest.TestCase):
         with self.assertRaisesRegex(CONVERGE.ConvergenceError, "RECEIPT_SCHEMA_INVALID"):
             CONVERGE.validate_receipt(open_shape)
         nested_open = json.loads(json.dumps(receipt))
-        nested_open["domains"]["hooks"]["unexpected"] = True
+        nested_open["domains"]["mcp"]["unexpected"] = True
         with self.assertRaisesRegex(CONVERGE.ConvergenceError, "RECEIPT_SCHEMA_INVALID"):
             CONVERGE.validate_receipt(nested_open)
 
-    def test_snapshot_components_and_hook_identity_reject_tampering(self) -> None:
-        hooks = self.plugin / "hooks"
-        real_hooks = self.plugin / "hooks-real"
-        hooks.rename(real_hooks)
-        hooks.symlink_to(real_hooks, target_is_directory=True)
+    def test_snapshot_components_and_helper_identity_reject_tampering(self) -> None:
+        scripts = self.plugin / "skills/setup/scripts"
+        real_scripts = self.plugin / "skills/setup/scripts-real"
+        scripts.rename(real_scripts)
+        scripts.symlink_to(real_scripts, target_is_directory=True)
         linked = self.converge(FakeCodex())
         self.assertEqual(linked["failedDomain"], "preflight")
         self.assertEqual(linked["domains"]["bridge"]["errorCode"], "SNAPSHOT_COMPONENT_SYMLINK")
 
-        hooks.unlink()
-        real_hooks.rename(hooks)
-        manifest = hooks / "hooks.json"
-        manifest.write_text(manifest.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+        scripts.unlink()
+        real_scripts.rename(scripts)
+        helper = scripts / "manage_config.py"
+        helper.write_text(helper.read_text(encoding="utf-8") + "\n", encoding="utf-8")
         tampered = self.converge(FakeCodex())
-        self.assertEqual(tampered["failedDomain"], "hooks")
-        self.assertEqual(tampered["domains"]["hooks"]["errorCode"], "HOOK_ARTIFACT_IDENTITY_MISMATCH")
+        self.assertEqual(tampered["failedDomain"], "preflight")
+        self.assertEqual(tampered["domains"]["bridge"]["errorCode"], "HELPER_IDENTITY_MISMATCH")
+
+    def test_update_without_retired_hooks_is_idempotent(self) -> None:
+        self.assertFalse((self.plugin / "hooks").exists())
+        first = self.converge(FakeCodex(), authorize_runtime=True)
+        self.assertIsNone(first["failedDomain"])
+        config = self.codex_home / "config.toml"
+        before = config.read_bytes()
+        second = self.converge(FakeCodex())
+        self.assertEqual(second["status"], "current")
+        self.assertNotIn("hooks", second["domains"])
+        self.assertFalse(second["restartRequired"])
+        self.assertEqual(config.read_bytes(), before)
+        self.assertFalse((self.plugin / "hooks").exists())
 
     def test_runtime_approval_is_bound_to_exact_pending_delta(self) -> None:
         receipt = CONVERGE.run_convergence(

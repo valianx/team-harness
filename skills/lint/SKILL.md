@@ -153,7 +153,6 @@ Verify that each wired hook script is healthy and that the runtime environment s
 
 1. **python3 probe:** run `command -v python3`. If absent:
    - Report `[WARN] policy gate running degraded — install python3 for the full secret/entropy scan; the bash fallback still enforces the high-confidence floor`
-   - Note: `hooks/dev-guard.sh` is also affected (grep fallback active)
 2. **Wired-script-resolves-on-disk:** for each hook script referenced in `.claude-plugin/hooks.json` (and/or `~/.claude/settings.json` when readable), verify the script path resolves on disk via the documented chain:
    - `~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/hooks/<script>` (plugin installs)
    - `~/.claude/hooks/<script>` (Go-installer installs)

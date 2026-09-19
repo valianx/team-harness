@@ -33,8 +33,8 @@ Operators run this skill routinely; the value is a clean result, not a play-by-p
 A `th` update is not "refresh catalog + reload". It is three distinct steps, and skipping the middle one leaves `/reload-plugins` with nothing new to activate:
 
 1. **Refresh the catalog** — `claude plugin marketplace update team-harness-marketplace`. Updates the marketplace metadata (`marketplace.json`) so the CLI knows a newer version exists. **This does NOT download any plugin files.**
-2. **Download the new version** — `claude plugin update th@team-harness-marketplace`. Fetches the new version into the plugin cache (`~/.claude/plugins/cache/.../th/<new-version>/`). The CLI prints `Restart to apply changes`. **This is the step that actually downloads; the catalog refresh alone does not.**
-3. **Activate** — `/reload-plugins` (or restart Claude Code). Loads the downloaded version into the running session.
+2. **Download the new version** — `claude plugin update th@team-harness-marketplace`. Fetches the new version into the plugin cache (`~/.claude/plugins/cache/.../th/<new-version>/`). **This is the step that actually downloads; the catalog refresh alone does not.**
+3. **Activate** — `/reload-plugins`. If the host reports that reload cannot activate a changed component, propose the smallest supported reconnect; do not request a blanket restart.
 
 This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from Bash). It **cannot** perform step 3: `/reload-plugins` and `/plugin …` are Claude Code UI commands with no agent-callable tool. So the skill refreshes, downloads, syncs the managed blocks, reports — then stops. Do not claim the new version is active; it is not until the operator reloads.
 
@@ -55,7 +55,7 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
    - **Already current** (latest == installed): no download needed; skip to step 6 (block sync still runs). State that the plugin is current; no reload required.
    - **Installed ahead** (installed > latest): unusual; report both versions, note the catalog may not have propagated the latest release yet, and skip the download.
 
-5. **Download the new version** (only when an update is available). Run `claude plugin update th@team-harness-marketplace`. This fetches the new version into the plugin cache and prints `… updated from <X> to <Y>. Restart to apply changes.` Surface any error verbatim and stop on failure. Do NOT skip this — the catalog refresh in step 2 does not download files, so without this step `/reload-plugins` has nothing new to activate.
+5. **Download the new version** (only when an update is available). Run `claude plugin update th@team-harness-marketplace`. This fetches the new version into the plugin cache. Surface any error verbatim and stop on failure. Do NOT skip this — the catalog refresh in step 2 does not download files, so without this step `/reload-plugins` has nothing new to activate.
 
 6. **Sync the managed `~/.claude/CLAUDE.md` blocks (always — idempotent).** This is the recurring counterpart to `/th:setup`'s one-time bootstrap: `/th:setup` runs once to configure MCP servers and workspace mode; `/th:update` keeps the managed blocks aligned on every run. Do NOT tell the operator to re-run `/th:setup` for this — `/th:update` owns the recurring sync.
    - **Source of truth.** The two active managed blocks live in canonical files under `skills/setup/managed-blocks/` in the plugin cache. Read each file directly from the **highest version directory** present under `~/.claude/plugins/cache/team-harness-marketplace/th/` (semver-sorted) — after step 5 that is the just-downloaded version, so the synced blocks match the version the operator is about to activate:
@@ -456,16 +456,16 @@ print(json.dumps(outcomes))
 
 6b. **Runtime probe — python3 presence (advisory).** After the managed-block sync, run `command -v python3`. This step is advisory — update always completes regardless of the outcome. If python3 is available, record `python3: available` for the final report (Step 7) and continue silently.
 
-If python3 is absent: record `python3: WARN: absent — policy gate running degraded` for the final report, then recommend installing python3 with the rationale and offer a Y/n prompt. Because Step 6's output discipline requires a single final report, the Y/n prompt for python3 install is the ONLY inline message permitted by this step (all other progress is silent).
+If python3 is absent: record `python3: WARN: absent — python-dependent skills degraded` for the final report, then recommend installing python3 with the rationale and offer a Y/n prompt. Because Step 6's output discipline requires a single final report, the Y/n prompt for python3 install is the ONLY inline message permitted by this step (all other progress is silent).
 
 ## python3
 
 Present:
 
 ```
-python3 not found on PATH — policy gate running in degraded mode.
-  Bash denylist, sensitive-path, and HIGH_CONFIDENCE_SECRETS checks remain active (bash fallback).
-  Medium-confidence entropy scan requires python3.
+python3 not found on PATH — python-dependent skills are degraded.
+  Native runtime permissions and approvals remain the action boundary.
+  Medium-confidence entropy scan and other supporting scripts require python3.
 Install python3 now for full coverage? [Y/n]
 ```
 
@@ -503,9 +503,9 @@ Install python3 now for full coverage? [Y/n]
      downloaded version  <Y>
      managed blocks      <per-block outcome — examples: "in sync (2/2)", "orchestrator-dispatch-rule: updated; voice-rule: already current", "orchestrator-dispatch-rule: preserved (operator-edited); voice-rule: already current", "orchestrator-dispatch-rule: force-adopted; voice-rule: already current", "orchestrator-dispatch-rule: inserted; voice-rule: inserted">
      nesting             <"already provisioned" | "provisioned (restart required)" | "declined">
-     python3             <"available" | "WARN: absent — policy gate running degraded" | "installed — full coverage active" | "installed — restart the terminal for PATH refresh">
+     python3             <"available" | "WARN: absent — python-dependent skills degraded" | "installed — full coverage active" | "installed — restart the terminal for PATH refresh">
    ```
-   Closing line: `Next: /reload-plugins (or restart Claude Code) to activate <Y>.`
+   Closing line: `Next: /reload-plugins to activate <Y>; reconnect only if reload reports a specific remaining requirement.`
 
    **(b) Already current** (no download):
    ```
@@ -516,7 +516,7 @@ Install python3 now for full coverage? [Y/n]
      latest version      <X>
      managed blocks      <e.g. "in sync (2/2)" or "orchestrator-dispatch-rule: updated; voice-rule: already current" or "orchestrator-dispatch-rule: preserved (operator-edited); voice-rule: already current">
      nesting             <"already provisioned" | "provisioned (restart required)" | "declined">
-     python3             <"available" | "WARN: absent — policy gate running degraded" | "installed — full coverage active" | "installed — restart the terminal for PATH refresh">
+     python3             <"available" | "WARN: absent — python-dependent skills degraded" | "installed — full coverage active" | "installed — restart the terminal for PATH refresh">
    ```
    Closing line: `No action required.`
 
@@ -537,5 +537,5 @@ Install python3 now for full coverage? [Y/n]
 
 - This skill is for **plugin installations**. For legacy Go-installer installations, file syncing is a different path (deprecated).
 - The skill refreshes the marketplace catalog, downloads the new version into the plugin cache (`claude plugin update`), reports the version delta, syncs the marker-delimited managed blocks in `~/.claude/CLAUDE.md` to the version being activated, removes retired blocks (`dev-mode`, `nested-dispatch-takeover`, `dev-mode-entry`), and provisions the subagent-nesting-depth architecture prerequisite (Step 6a). It never edits repository files, **never writes an operator KEY to `~/.claude/.team-harness.json`** (that remains `/th:setup`'s domain) with one closed exception — Step 6a's `nested_spawn_depth.declined` key, which is not an operator KEY (`docs/setup-update-model.md § "The residual seam: new operator keys"`). It never touches `~/.claude/CLAUDE.md` content outside the managed-block markers, and never reloads the session — the reload/restart is always operator-driven.
-- **New hooks reach installed machines without re-running `/th:setup`.** The `session-start.sh` unified SessionStart hook is registered in `.claude-plugin/hooks.json`; the plugin runtime loads it automatically on the next update+reload (`/th:update` downloads the new version → `/reload-plugins` activates it). For Go-installer paths, the hook command is registered in `hooks/config.json` and is applied via the `mergeHookEntries` path on the next install run.
+ **New session context and observation assets reach installed machines without re-running `/th:setup`.** The plugin runtime loads updated assets after `/th:update` and `/reload-plugins`. This flow does not install a Codex or Go-installer policy-hook layer; retained runtime-specific context or observation integrations follow their host's activation rules.
 - Division of labour with `/th:setup`: setup is the one-time bootstrap (MCP servers, workspace mode, first write of the managed blocks); update is the repeatable command that keeps the catalog and the managed blocks in sync on every run. Re-running setup is never required as part of the update flow.

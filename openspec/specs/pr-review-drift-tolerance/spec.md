@@ -32,7 +32,7 @@ The configuration suffixes are the closed set `.json`, `.yaml`, `.yml`, `.toml`,
 
 #### Scenario: A config-only PR with no sensitive tokens
 - **WHEN** a PR changes only configuration files with no sensitive-token hits
-- **THEN** the security lens is not dispatched and the flow runs with the reviewer (and consolidator when applicable)
+- **THEN** the security lens is not dispatched and Main consolidates the required review evidence without a separate consolidator
 
 #### Scenario: A config file contains a credential-shaped token
 - **WHEN** the diff's content scan hits a sensitive-token pattern in any file
