@@ -83,13 +83,13 @@ historical authority.
 - **WHEN** `00-state.md` disagrees with the valid control log
 - **THEN** recovery rebuilds the projection and does not infer or revoke authority from the cache
 
-### Requirement: The deterministic guard covers only the minimal outward floor
-`dev-guard` SHALL cover only the irreversible publication boundary: pushes to the default branch, force/tag/non-benign pushes, and PR merge (`gh pr merge`, `gh api` merge endpoints) remain `ask`; the single clean non-default-branch push on `origin` remains `allow`. Every other outward write (`gh pr create/review/comment`, issue writes, non-merge API mutations, MCP tool writes) SHALL be uncovered by the hook — no decision — and governed by the host runtime's permission model. The `autogate` config mechanism SHALL be removed.
+### Requirement: Publication uses operator authorization and native permissions
+Workflow publication SHALL use the existing live operator authorization and native runtime permissions without a TH execution interceptor. Removing the hook SHALL NOT authorize an unrequested push, review, merge, deployment or a changed publication candidate. Existing identity, freshness and idempotency checks SHALL remain workflow evidence.
 
-#### Scenario: Auto-ship publishes the draft PR
-- **WHEN** delivery mechanics push the feature branch and create the draft PR under a recorded auto-ship policy
-- **THEN** the clean feature-branch push resolves to `allow` and `gh pr create` receives no hook decision, while merge and default-branch pushes still require live approval
+#### Scenario: Authorized delivery publishes its prepared candidate
+- **WHEN** Main has prepared and verified the authorized candidate
+- **THEN** it proceeds through the host's permission mechanism without a second TH guard approval
 
-#### Scenario: A stale autogate key exists in config
-- **WHEN** `~/.claude/.team-harness.json` still carries `autogate.pr_create: true`
-- **THEN** the hook never reads it and `gh pr create` produces no decision regardless of its value
+#### Scenario: A merge was not authorized
+- **WHEN** a workflow creates a PR without a live instruction covering merge
+- **THEN** hook retirement does not authorize merging it

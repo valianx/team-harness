@@ -64,8 +64,8 @@ the exact command because it writes refs and shared `.git/worktrees` metadata.
 Team Harness setup neither adds `.git` to writable roots nor installs a blanket
 Git command rule, because such a rule could outrank deterministic force-push
 denial. `approval_policy` remains `on-request`; the automatic reviewer handles
-the native on-request escalation for the exact worktree command while
-`gate-guard` retains the deny floor. A reviewer timeout leaves the pipeline
+the native on-request escalation for the exact worktree command. Team Harness
+does not add a Codex policy-hook floor. A reviewer timeout leaves the pipeline
 technically paused and recoverable; it is not a functional failure or denial.
 An additional writable root for an Obsidian Team Harness workspace changes only
 that external subtree. It takes effect for newly started Codex sessions and

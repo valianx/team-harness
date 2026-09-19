@@ -47,13 +47,6 @@ The frozen review worktree SHALL live under the git-ignored `workspaces/` tree (
 - **WHEN** review publication or abort finishes
 - **THEN** no prunable review worktrees remain outside the workspace tree
 
-### Requirement: Codex hook wiring carries the deny floor only
-The Codex plugin's PreToolUse wiring SHALL ship the deterministic deny floor (`policy-block`, `gcp-guard`); `gate-guard` is unwired or opt-in, receiving at most the minimal literal-compatibility update (`auto-ship`) and no new logic — matching Claude Code's v2.139.0 retirement of process-enforcing hooks.
-
-#### Scenario: A Bash call runs under the Codex plugin
-- **WHEN** the PreToolUse hook chain evaluates the call
-- **THEN** only deny-floor hooks gate it, and a broken plugin cache surfaces as a reported launcher error rather than blanket tool denial
-
 ### Requirement: Critical Codex roles use Astra and bounded roles use Luna
 The standard Team Harness Codex profile SHALL assign `gpt-6-astra` with `xhigh` reasoning to Opus source projections, including the installed architect, QA, security, and PR review verifier. Sonnet and Haiku source projections SHALL use `gpt-5.6-luna` with `max` reasoning. The standard pipeline dispatch matrix SHALL therefore use Luna/max for implementer, tester, cleaner, and delivery, and Astra/xhigh for architect, QA, and security. The project configuration SHALL preserve Main's selected chat model.
 
@@ -116,3 +109,31 @@ NOT authorize scope, gate release, or outward action.
 #### Scenario: The requested profile is unavailable
 - **WHEN** runtime preflight cannot resolve the persisted profile
 - **THEN** Main requests a new execution preference before dispatch without changing pipeline authority
+
+### Requirement: Codex uses native execution permissions
+The Codex plugin SHALL ship no TH PreToolUse permission interceptor or exclusive guard launcher. Setup, update and reload SHALL consider retired hook assets unnecessary and SHALL preserve the operator's native permission settings, configured models and available workflow roles. Documentation SHALL NOT claim the native policy is identical to the removed TH checks.
+
+#### Scenario: A tool call runs with the updated plugin
+- **WHEN** Codex evaluates a tool call after loading the updated distribution
+- **THEN** native runtime permissions decide execution without a TH guard response
+
+#### Scenario: Installation verification checks the updated release
+- **WHEN** no retired hook manifest or launcher exists
+- **THEN** verification succeeds based on retained components and does not request a repair or restart for removed assets
+
+### Requirement: Agent setup installs the complete packaged roster
+Codex agent setup SHALL inspect, install, and repair every bundled generated role,
+including `pr-review-verifier`, in both global and project scopes. Installing a
+missing role SHALL report changed installation state; reload SHALL assess its
+effective activation without requiring a new conversation solely from the
+installation receipt. Repeating sync on a current installation SHALL report no
+changed roles and no restart requirement. Regression coverage
+SHALL compare the installed roster and bytes with the packaged agent artifacts.
+
+#### Scenario: The review verifier is absent after an older installation
+- **WHEN** agent setup sync runs with the verifier missing and all other roles current
+- **THEN** it installs the packaged verifier and reports the changed role for activation assessment through supported refresh or reconnect
+
+#### Scenario: All bundled roles are current
+- **WHEN** agent setup sync runs again
+- **THEN** it reports no changed roles and no restart requirement

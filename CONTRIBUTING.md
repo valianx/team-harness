@@ -101,9 +101,10 @@ For opencode, most existing surfaces remain cross-harness with no extra work —
 agents, skills, and rules (`CLAUDE.md` / `AGENTS.md`) are read as documented by
 that runtime. Two rules apply when a change touches its runtime-specific surfaces:
 
-- **Hooks remain a Claude Code surface.** Do not project new hook behavior into
-  OpenCode; use OpenCode's native permissions and approvals instead. TypeScript
-  remains the canonical implementation language for Claude Code hooks.
+- **Retained context and observation remain a Claude Code surface.** Do not add
+  a Team Harness policy-hook layer to Codex or OpenCode; use each host's native
+  permissions and approvals instead. TypeScript remains canonical only for
+  retained Claude runtime assets.
 - **Project this repo's own assets between harness formats** with the repo-local
   `/harness-migrate <to-opencode|to-claude-code>` command (`tools/harness-migrate/`)
   — never by hand-editing frontmatter. It is a contributor tool, not a distributed
@@ -126,7 +127,7 @@ Per [`CLAUDE.md` §14](./CLAUDE.md#14-subagent-orchestration):
 bash tests/run-all.sh
 ```
 
-This runs the policy-block, structure, and frontmatter suites. CI runs the same
+This runs the repository's structure and frontmatter suites. CI runs the same
 command on every PR. See [`docs/testing.md`](./docs/testing.md) for the suite registry.
 
 ### Verifying gh-fallback paths locally

@@ -1,10 +1,9 @@
 // hooks/ts/shim/opencode-config.ts
 // Shared opencode config-root resolver and config reader.
 //
-// Extracted from checkpoint-guard.opencode.ts and prepublish-guard.opencode.ts
-// (byte-identical logic). Promoting to a shared module avoids triplication and
-// ensures all three opencode entries (checkpoint-guard, prepublish-guard,
-// session-enforcement) use the same hardened resolver (SEC-OC-R3).
+// Shared by the OpenCode session-context entry and any future context
+// adapters. Keeping resolution here gives every adapter one hardened path
+// (SEC-OC-R3) without coupling it to a permission hook.
 //
 // Security (SEC-OC-R3):
 //   - OPENCODE_CONFIG_DIR override is validated before use: must be absolute

@@ -93,8 +93,10 @@ This mirrors `/th:update` Steps 1–4. Run quietly; emit operator-facing output 
      Setup is running on a stale th version.
        installed version  <X>
        latest version     <Y>
-     Recommended: run /th:update, then /reload-plugins, then re-run /th:setup
-     so configuration runs against the current contract.
+     Recommended: run /th:update, then reload the plugin, then re-run /th:setup
+     so configuration runs against the current contract. A restart is only
+     needed when the host reports that reload cannot activate the updated
+     component.
      ```
      Ask whether to proceed with setup anyway or stop to update first. If the operator proceeds, continue to Step 1. Do NOT hard-block.
    - **Installed == latest:** continue to Step 1 silently (no version output).
@@ -219,7 +221,7 @@ The obsidian vault sits outside the current project's working tree, so every sub
      Bash(gh auth switch:*), mcp__memory__*
    ```
 
-This sub-step never adds a rule for an outward action (`git push`, `gh pr *`, any GitHub/ClickUp API write, any form of `gh api`) — the read-only allowlist set is disjoint from dev-guard's outward-action catalogue by construction (`docs/permission-provisioning.md § "Read-only allowlist — disjointness invariant"`, enforced by `tests/test_permission_disjointness.py`); the `Edit`/`Write`/`additionalDirectories` rules stay scoped strictly to the obsidian workspace base resolved in Step 3. Outward actions stay gated exclusively by `dev-guard` (CLAUDE.md).
+This sub-step never adds a rule for an outward action (`git push`, `gh pr *`, any GitHub/ClickUp API write, any form of `gh api`). The read-only allowlist stays limited to inert inspection commands and the explicitly listed read-only integrations; the `Edit`/`Write`/`additionalDirectories` rules stay scoped strictly to the obsidian workspace base resolved in Step 3. Native host permissions and approvals remain the authority for outward actions.
 
 **Existing-install coverage.** Active pipeline activation consumes this same contract before the first write to a workspace outside the repository root. It performs the already-present check, shows the bounded delta, and requires the documented live confirmation; it does not create a separate provisioning schema or allowlist. See `plugins/team-harness/skills/pipeline/references/activation.md § Workspace and repository identity` and `docs/permission-provisioning.md § Provisioning surfaces`.
 
@@ -438,9 +440,8 @@ Run: `command -v python3`
 Report the degraded-mode advisory:
 ```
 python3 not found on PATH.
-  The deny-floor hooks (policy-block, dev-guard, and the other enforcement gates) are
-  unaffected — they run entirely on node via the compiled hooks/ts/dist/*.cjs bundles,
-  launched by hooks/run-ts-hook.sh, and fail closed regardless of python3 presence.
+  Native runtime permissions and approvals remain active regardless of python3
+  presence. Team Harness does not install a policy hook layer for this check.
   Some `th` skills (lint, audit-security, excalidraw-diagram) invoke python3 for
   supporting scripts and remain in degraded/unavailable mode without it.
   For full skill coverage, install python3.
@@ -475,7 +476,7 @@ Install python3 now for full skill coverage? [Y/n]
 - If python3 is now on PATH: report `python3 installed — full skill coverage now active.`
 - If python3 is still absent (re-probe fails): **Windows caveat** — a winget-installed python3 may not appear on PATH in the current Git Bash session. When the re-probe fails immediately after a reported-successful winget install, report `python3 installed — restart the terminal for PATH refresh` (not an error). On other platforms: report the degraded-mode advisory and continue.
 
-**Failed install, absent manager, or elevated command declined:** fall back to the degraded-mode advisory printed above. The deny-floor hooks are unaffected — they run on node regardless of python3 presence; only the python3-dependent skills remain in degraded/unavailable mode.
+**Failed install, absent manager, or elevated command declined:** fall back to the degraded-mode advisory printed above. Native runtime permissions and approvals remain the action boundary; only the python3-dependent skills remain in degraded/unavailable mode.
 
 ### 6c. Nested-lane capability confirmation — RETIRED
 

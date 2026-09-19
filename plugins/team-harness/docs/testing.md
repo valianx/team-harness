@@ -56,32 +56,25 @@ no test quota, universal full-suite run, or specialist dispatch.
 
 Everything below has inputs, outputs, and exit codes.
 
-**Hook and gate logic** (`hooks/ts/bodies/*.ts` → `dist/*.cjs`, the single source of gate logic since the Bash→TS cutover, issue #446). Each suite feeds tool-call JSON payloads and asserts the emitted decision.
+**Retained runtime and behavior checks.**
 
-| Suite | Covers |
-|---|---|
-| `test_policy_block.sh` | Secret-scanning and destructive-command denial: `rm` on `/`/`~`/`$HOME`/wildcards, `git --force`/`--no-verify`/`reset --hard`/`clean -f`, SQL `DROP`/`TRUNCATE`, sensitive paths (`.env`, `.pem`, `.ssh/`, `.aws/credentials`), the `.env.example`-class allowlist, malformed payloads (fail-open) |
-| `test_dev_guard.sh` | Minimal outward floor by destination — a non-default-branch push allows; default-branch, tag and force pushes and PR merges (`gh pr merge`, `gh api` merge endpoints) ask; uncovered outward writes (pr create/review/comment, issue, ClickUp) produce no decision |
-| `test_gcp_guard.sh` | Destructive `gcloud` verb gating |
-| `test_session_start.sh` | SessionStart config read and language-directive injection |
-| `test_language_user_prompt.sh` | UserPromptSubmit language handling |
-| `test_subagent_start.sh` | The deterministic PreToolUse breadcrumb |
-| `test_checkpoint_guard.sh`, `test_prepublish_guard.sh`, `test_worktree_guard.sh` | Retained body-level regression suites; unwired from Claude Code and not installed in OpenCode |
-| `test_prepublish_bump_floor.sh` | Release-only version-coordination checks; run by `TH_RELEASE_TESTS=1 bash tests/run-all.sh`, not by ordinary development verification |
-| `test_gate_guard.sh` | Unwired; code retained |
-| `test_isolated_hook_env.sh` | The isolated-environment harness itself (principle ii) |
-| `test_hook_gates_hardening.sh` | Runtime execution of the hardening findings, including the ClickUp MCP matcher (F-008) |
-| `test_launcher_fail_closed.sh` | `hooks/run-ts-hook.sh` fails closed on a corrupt artifact |
-| `test_ts_hook_parity.sh`, `test_ts_hook_parity_ext.sh` | Decision parity across hook entry points |
-| `test_sketch_guard.sh` | `hooks/sketch-guard.sh` (Bash, invoked via the Bash tool — not an event hook) |
+Claude context and observation behavior is checked through the retained session-start,
+language-prompt and subagent-context suites where those assets are installed. The
+host's native permission and approval UI remains outside the repository's headless
+test boundary. Retired policy, outward-action and process-hook suites are not a
+current Team Harness enforcement surface and are not listed as required checks.
 
+Repository behavior suites continue to cover installer preservation, agent and skill
+frontmatter, security review selection, evidence handling, pipeline control-plane
+state, OpenSpec lifecycle validation, and other executable or machine-readable
+contracts listed below.
 **Structure that is machine-readable, not prose.**
 
 | Suite | Covers |
 |---|---|
 | `test_agent_frontmatter.py` | YAML frontmatter parses for every `agents/*.md`, via PyYAML. Catches the silent-agent-drop class: an unquoted `": "` in a description breaks parsing, and Claude Code then drops the agent from the registered `subagent_type` list with no error surfaced |
 | `test_opencode_agent_frontmatter.sh` | The same, for the opencode transform |
-| `test_security_scan.py` | Exact source allowlists for all five PR agents, optional Codex projection validation, read-only-tier Bash grants, hook injection patterns, secrets, and roster reachability |
+| `test_security_scan.py` | Exact source allowlists for all five PR agents, optional Codex projection validation, read-only-tier Bash grants, secrets, and roster reachability |
 | `test_review_context.py` | PR security-selection reason enums and capture validity, review-policy parsing, preserved findings and advisory verifier assessments, exact coverage and status-specific evidence, selected preflight blockers, snapshot mergeability classification, hash/freshness comparison, rendering, and conversation capture behavior |
 | `test_regression_evidence.mjs` | Real base/head assertion comparisons, preexisting failures, inconclusive execution, deadlines, bounded diagnostics, stale/tampered evidence and unchanged operator checkout; no model calls |
 | `test_codex_windows_hooks.mjs` | Windows hook bootstrap and adapter decisions; executes literal `commandWindows` through both PowerShell 7 and Windows PowerShell, including paths with spaces and symbols. Registered in native Windows CI; skips on other platforms. |
@@ -113,7 +106,7 @@ Everything below has inputs, outputs, and exit codes.
 
 ## When to add a test
 
-Add one when you change code that has an exit code. A new `policy-block` denylist or allowlist case needs an `assert_deny`/`assert_allow` line. A new hook decision path needs a payload case. A new installer behaviour needs a Go test. A new agent file is picked up automatically by `test_agent_frontmatter.py` — no manual registration.
+Add one when you change code that has an exit code. A new runtime behavior needs an observable test case. A new installer behaviour needs a Go test. A new agent file is picked up automatically by `test_agent_frontmatter.py` — no manual registration.
 
 Do **not** add one for a new pipeline phase, a new agent contract field, or a new mandatory prose section. That is the retired class: the contract belongs in the agent's own file, where it is actually read, and review is what enforces it.
 
@@ -121,7 +114,8 @@ Do **not** add one for a new pipeline phase, a new agent contract field, or a ne
 
 - **Agent prompt behaviour.** Whether a model actually applies a contract it has been given is a behavioural question no assertion here answers.
 - **Agent and skill prose.** No suite reads it. Deliberate — principle (iii).
-- **Hook integration with the host.** The suites prove a hook's decision given a payload, not that the payload arrives; whether the host invokes a hook on every Bash/Write/Edit depends on its own wiring.
+- **Native host activation.** Repository suites do not prove how the host presents permission prompts or reloads a running session; report that boundary explicitly and use the host's own evidence.
 - **Live pipeline runs.** Phase transitions only fire inside a real pipeline.
 
-For all four, restart the host and smoke-test by hand.
+For host activation limits, reconnect only when the host demonstrates that a
+specific changed component cannot be refreshed in place.

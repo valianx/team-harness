@@ -111,9 +111,7 @@ bridges the running snapshot path, attests every imported helper before
 execution, ensures native Team Harness settings,
 classifies the persistent runtime profile, enables only missing multi-agent
 features, synchronizes agents only when stale, inspects MCP registrations
-without replacing them, validates that the exact hook manifest contains only
-the deterministic `policy-block`, `gcp-guard`, and deny-only `gate-guard`
-adapters, verifies changed
+without replacing them, verifies changed
 postconditions, and emits exactly one closed JSON receipt. It must use fixed
 native argv, bounded output and timeouts, preserve opaque/operator-owned
 configuration and custom agent defaults, reject unmanaged conflicts and unsafe
@@ -128,8 +126,12 @@ This case does not require enabling Developer Mode or granting broader permissio
 During a retry scoped to another domain, the optional alias can also remain
 unchanged as `skipped-read-only`, also without asserting a restart requirement.
 
-Accept a receipt only when it has `schemaVersion: 1`, the exact seven domains
-`bridge`, `config`, `runtime`, `features`, `agents`, `mcp`, and `hooks`, one of
+Retired permission-hook assets are neither installation prerequisites nor a
+convergence domain. Their absence requires no repair or restart; preserve native
+permission settings and unrelated hooks.
+
+Accept a receipt only when it has `schemaVersion: 2`, the exact six domains
+`bridge`, `config`, `runtime`, `features`, `agents`, and `mcp`, one of
 the overall statuses `current | converged | pending-approval |
 partial-convergence`, and all required identity, changed-domain, restart,
 pending, failure, and recovery fields. Invalid, missing, extra, or multiple

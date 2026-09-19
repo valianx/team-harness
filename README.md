@@ -60,14 +60,14 @@ Codex's native permission and hook-trust prompts. It can also import every
 missing setting from an existing Claude Code or opencode Team Harness config;
 opaque values are copied directly and never displayed.
 
-After setup, update, or an agent sync, restart Codex before dispatching an
-inline reviewer. Inline dispatch requires the fresh session that loaded the
-verified managed profile; an on-disk digest cannot attest a profile already
-loaded by an older session.
+After setup, update, or an agent sync, continue in the current Codex thread
+when the host reports the components active. Start a new thread only when
+reload reports a changed profile that cannot be activated in place; no blanket
+restart is needed.
 
-Review the [plugin hook manifest](./plugins/team-harness/hooks/hooks.json) and
-its referenced scripts, then explicitly trust the repository before enabling
-those hooks. Plugin installation and agent installation are separate. The
+Codex uses its native permissions and approvals. Team Harness does not install
+a Codex policy-hook layer, so there is no hook manifest to trust for this
+workflow. Plugin installation and agent installation are separate. The
 plugin provides the Team Harness skills; the thirteen generated agents are installed
 by the setup skill from the marketplace snapshot.
 
@@ -166,7 +166,7 @@ curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash
 iwr https://valianx.github.io/team-harness/install-opencode.ps1 | iex
 ```
 
-This installs all agents, skills, commands, and hooks. The bare form requires no environment variables — MCP server registration is optional and skipped when credentials are absent.
+This installs all agents, skills, commands, and retained runtime context assets. The bare form requires no environment variables — MCP server registration is optional and skipped when credentials are absent.
 
 To auto-register MCP servers at install time, supply them via environment:
 
@@ -220,7 +220,7 @@ Run the update command, then reload:
 /reload-plugins
 ```
 
-`/th:update` refreshes the marketplace catalog, downloads the new version into the plugin cache, and syncs the managed `~/.claude/CLAUDE.md` blocks. `/reload-plugins` (or restarting Claude Code) activates it — that step is operator-driven and cannot be automated.
+`/th:update` refreshes the marketplace catalog, downloads the new version into the plugin cache, and syncs the managed `~/.claude/CLAUDE.md` blocks. `/reload-plugins` activates it when a new version was downloaded; reconnect only if reload reports a specific component that cannot activate in place.
 
 > **Note — manual fallback, only if `/th:update` fails.** Run the three steps yourself, then reload:
 > ```
@@ -291,7 +291,7 @@ Learn mode (explain a codebase, library, or concept with a layered teaching pack
 
 ## Native agent and Team Harness workflows
 
-The general agent retains its native coding instructions. Team Harness adds workflow discovery, specialist coordination, voice and language preferences, and workspace/Obsidian context. The developer-mode replacement style is retired. Existing execution guards remain independent of style selection; their evaluation is a separate change.
+The general agent retains its native coding instructions. Team Harness adds workflow discovery, specialist coordination, voice and language preferences, and workspace/Obsidian context. The developer-mode replacement style is retired. Native permissions and approvals remain the authority for execution boundaries.
 
 Full contract: docs/dev-mode.md.
 

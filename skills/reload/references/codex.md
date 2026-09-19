@@ -14,7 +14,7 @@ active host and supported by its installed protocol:
 | Skills and commands | `skills/list` with the current `cwds` and `forceReload: true`; native command refresh if separately supported | Check all returned Team Harness paths against the target and have the host refresh discovery/inject the active workflow. Already refreshed native discovery is evidence for this component only. |
 | MCP | `config/mcpServer/reload`, when its scope is compatible with this task | This queues refresh for loaded threads. Inspect coverage before use; do not disrupt unrelated services. Wait for completion and inspect the affected Team Harness server/tool status; acknowledgement alone is pending. |
 | Config and agents | Host-supported runtime config reload, if available | Check its version-specific coverage and effective thread role settings. A config file or installed TOML does not prove a loaded role changed. Preserve custom settings; do not write dummy config edits to trigger a reload. |
-| Hooks | Native discovery plus actual execution evidence | `hooks/list` lists discovery; it is not a hook reload method. Compare the command/identity actually executed by this thread with the installed target. |
+| Hooks | Applicable legacy activation only | The current Codex distribution has no TH permission hooks. Their absence is not applicable, not a missing component. If actual execution still invokes a retired TH hook, use supported refresh and report that stale activation specifically. Preserve unrelated hooks. |
 
 Do not fabricate `codex plugin reload` or assume that every host exposes App
 Server requests as model tools. If a bound control is missing, refresh the
@@ -34,9 +34,8 @@ after exiting the old process. Resolve the CLI normally and pass the observed
 ID as a literal argument; do not use `--last` when the thread ID is known. In an
 app, use its conversation history after restarting the affected backend.
 
-Native hook trust remains a separate condition. Report a changed hook requiring
-trust through the host's native hooks UI; do not trust hashes on the operator's
-behalf or describe an untrusted/skipped hook as active.
+Do not ask the operator to trust, recreate or repair retired TH hooks. Any
+unrelated native hook trust remains outside this reload's scope.
 
 For local inline reviews, activation is specific to the selected reviewer
 profile and scope. Preserve its verified activation basis when setup made no

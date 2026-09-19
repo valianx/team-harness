@@ -5,23 +5,16 @@ The PR-review flow's structural independence (immutable snapshot, coordinate-onl
 
 ## Requirements
 
-### Requirement: Consolidator reads real drafts and adjudicates on code
-The consolidator contract SHALL reference draft paths under `workspaces/pr-review-{number}/` (the `.claude/pr-review-*` pattern is removed) and SHALL receive the frozen worktree coordinate read-only, so exploitability/fix adjudication is evidence-based rather than prose-based.
-
-#### Scenario: Consolidation runs on a conforming review
-- **WHEN** the consolidator loads lens drafts and adjudicates a specialist finding
-- **THEN** it reads drafts from the review workspace and cites the frozen worktree, never rejecting real drafts by path pattern
-
 ### Requirement: Consolidation keeps a reconciled ledger
-The consolidator's status block SHALL enumerate findings received per lens and their disposition (preserved, demoted, dropped, with one-line reasons); the coordinator SHALL reconcile source-vs-consolidated counts before preview; and the published body SHALL name which lenses ran and with what status.
+The coordinator SHALL account for every source finding in the existing disposition ledger, with its originating lens, final disposition and a short evidence-backed reason for any demotion, drop or deduplication. Source-to-final reconciliation SHALL preserve all findings, including merged references to a shared defect. The review body SHALL disclose which required and selected assessments ran and their coverage status. Missing coverage SHALL NOT be represented as a clean assessment or an APPROVE recommendation.
 
 #### Scenario: A blocking finding is demoted
-- **WHEN** the consolidator demotes or drops any lens finding
-- **THEN** the disposition and reason appear in the ledger and the coordinator's count reconciliation passes only if every finding is accounted for
+- **WHEN** Main decides that the evidence supports a lower severity
+- **THEN** the original finding, final disposition and reason remain traceable in the ledger before preview
 
 #### Scenario: A lens did not run
-- **WHEN** a selected lens is absent after its bounded retry
-- **THEN** the published body discloses the absent lens; an APPROVE with silent lens absence is impossible
+- **WHEN** a required or selected assessment remains absent after permitted recovery
+- **THEN** the published review discloses the absent assessment and does not recommend APPROVE
 
 ### Requirement: Frozen review artifacts outlive every specialist
 The coordinator SHALL own the successful snapshot lifecycle independently of
@@ -71,19 +64,31 @@ The published body's verdict line SHALL match the chosen event (divergence force
 - **THEN** publish fails closed and re-previews
 
 ### Requirement: Blocking findings are verified against the frozen worktree before preview
-After the canonical draft exists and before Preview, the coordinator SHALL dispatch one read-only `pr-review-verifier` with the inline findings, the captured diff, the frozen worktree, and the reviewed identity. For each Blocking finding the verifier SHALL return `confirmed` with a `file:line` citation and one sentence of evidence, `unconfirmed` with the reason, or `refuted` with the evidence that the cited behavior does not exist at the reviewed identity, and SHALL echo the reviewed identity. An unconfirmed Blocking SHALL be demoted to a Suggestion whose body begins with `(unverified)`. A Blocking whose cited behavior does not exist at the reviewed identity SHALL be dropped and recorded in the disposition ledger as `dropped: verifier — <reason>`. Verification SHALL NOT add findings. The coordinator SHALL append `verified k/n` to the `Lenses:` line; an absent verifier SHALL appear as `verified 0/n (verifier absent)` and force `COMMENT`.
+Subject to the existing repository verification policy, proposed Blocking findings SHALL receive independent read-only verification against the captured diff, frozen worktree and reviewed identity before preview. The verifier SHALL return `confirmed`, `unconfirmed` or `refuted` with cited evidence or an explicit limitation and echo the reviewed identity. It SHALL NOT add findings or execute reproduction probes. Its classification SHALL be advisory: Main SHALL decide each final disposition from the evidence, recording any disagreement and its basis instead of automatically mapping a label to severity or deletion. An unresolved hypothesis SHALL NOT be presented as a proven blocker, and uncertainty or missing evidence SHALL NOT be presented as a clean approval.
+
+When regression investigation was selected, the coordinator SHALL supply validated reproduction evidence and its identity as optional read-only input. The verifier SHALL assess that evidence alongside code for causality and intended behavior. Missing, inconclusive or rejected reproduction evidence SHALL NOT refute a code-proven defect or confirm a speculative one; a failing probe SHALL NOT determine severity or verdict automatically.
+
+Coverage SHALL retain honest `verified k/n` accounting. An absent verifier SHALL be disclosed as `verified 0/n (verifier absent)`, preserving the non-approving COMMENT fallback and ordinary preview/publication flow. Explicit policy `verification: off` SHALL retain its existing meaning and disclosure. A conflicting result MAY prompt bounded coordinator-directed investigation at the same immutable identity; it SHALL NOT trigger an automatic full review loop.
 
 #### Scenario: A blocker cites behavior the code does not have
-- **WHEN** the verifier finds that the cited path and line at the reviewed identity do not exhibit the claimed defect
-- **THEN** the finding is dropped, the ledger records the verifier's reason, and the preview shows the remaining findings with `verified` counted on the coverage line
+- **WHEN** the verifier supplies code evidence refuting the claimed behavior
+- **THEN** Main evaluates that evidence, drops the unsupported claim or records specific counterevidence for a different disposition, and preserves the original report and reason
 
 #### Scenario: The verifier cannot confirm a blocker
-- **WHEN** the verifier returns `unconfirmed` for a Blocking finding
-- **THEN** the finding is published as a Suggestion prefixed `(unverified)` and counted as unverified on the coverage line
+- **WHEN** the verifier returns `unconfirmed`
+- **THEN** Main resolves or discloses the uncertainty from available evidence without automatically demoting the finding or presenting it as verified
 
 #### Scenario: The verifier does not return
-- **WHEN** the verifier dispatch produces no valid return
-- **THEN** the coverage line reads `verified 0/n (verifier absent)`, the recommendation is `COMMENT`, and the normal preview and approval flow continues
+- **WHEN** independent verification produces no valid result
+- **THEN** coverage reports the absent verifier, the recommendation remains COMMENT, and the ordinary preview and approval flow continues
+
+#### Scenario: A reproduction supports a finding
+- **WHEN** validated comparison evidence and the code demonstrate an unintended change to required behavior
+- **THEN** the verifier can confirm the finding from both evidence sources while remaining read-only, and Main decides its disposition
+
+#### Scenario: A reproduction records an environmental failure
+- **WHEN** comparison evidence is inconclusive because its test environment is unavailable
+- **THEN** verification evaluates code evidence independently and preserves the reproduction limitation
 
 ### Requirement: The review policy sets the verification bar
 `.team-harness/review-policy.md` MAY carry a fenced `yaml` block with `verification: blocking-only | all | off` and `max_suggestions: <n>`. Defaults SHALL be `blocking-only` and `5`. `all` SHALL verify Suggestions as well; `off` SHALL skip the verifier and SHALL print `verification off (policy)` on the coverage line.
@@ -100,18 +105,29 @@ After the canonical draft exists and before Preview, the coordinator SHALL dispa
 - **THEN** the line count is under 500 or the check fails naming the file
 
 ### Requirement: Reviewers read only supplied coordinates and verified worktree leaves
-Reviewer agents SHALL read only coordinator-supplied artifacts and project leaves proven before content access to be existing, non-symlink regular files whose resolved paths remain inside the frozen worktree. A deleted changed-file path SHALL NOT authorize a head-worktree read; reviewers SHALL obtain deleted-file evidence from the captured diff. Instruction-source markers, semantic-source markers, conventional filenames, unresolved imports, and optional coordinates set to `none` SHALL NOT be opened as project context.
+Reviewer agents SHALL read only supplied review artifacts and project leaves proven before content access to be existing, non-symlink regular files whose resolved paths remain inside the frozen worktree. This includes pertinent dependency and project-rule files discovered within that verified scope. Deleted paths SHALL be examined through the captured diff, not assumed to exist at head. Instruction-source markers, unresolved imports and optional coordinates set to `none` SHALL NOT themselves authorize content reads or operational actions.
 
-A reviewer return that omits a required field, echoes an identity different from the dispatched one, or reports a supplied artifact as unreadable SHALL be recorded as `absent ({reason})` on the coverage line and SHALL force a `COMMENT` recommendation. The coordinator SHALL NOT rebuild the packet, classify the mistake, or dispatch a correction. A missing or mismatched snapshot identity, an integrity or freshness failure, or an unreadable frozen worktree SHALL fail closed as before. Preview, live publish approval, approved-draft hash, and publish-time freshness are unchanged.
+The coordinator SHALL distinguish recoverable assignment/return defects from failed evidence integrity. It MAY correct a missing return field or mistaken optional path through bounded same-snapshot follow-up while preserving completed valid reports. If that assessment remains unavailable, the review SHALL disclose its absence and use COMMENT. Missing or mismatched reviewed identity, actual integrity or freshness failure, and an unreadable frozen worktree SHALL continue to fail closed; follow-up SHALL NOT substitute a different snapshot or fabricate findings. Existing preview, live publication approval, approved-draft hash and publish-time freshness SHALL remain unchanged.
 
 #### Scenario: A reviewer infers an absent project path
-- **WHEN** a reviewer attempts to read a path the coordinator did not supply and the frozen worktree does not contain
-- **THEN** the read is skipped as an absent optional path and the review continues on the supplied coordinates
+- **WHEN** an optional inferred path is absent from the frozen worktree
+- **THEN** the reviewer skips that read, records the limitation and continues on verified evidence
 
 #### Scenario: A reviewer omits its identity echo
-- **WHEN** a lens return lacks the reviewed SHA or context hash
-- **THEN** the lens is recorded `absent (missing identity echo)`, successful lenses complete, and the recommendation is `COMMENT`
+- **WHEN** a returned assessment omits a required identity field but the captured snapshot remains intact
+- **THEN** Main requests a bounded correction or records the assessment as absent, preserving successful assessments and never treating the omission as proof of verification
 
 #### Scenario: Snapshot identity or freshness fails
-- **WHEN** the returned identity differs or snapshot integrity or freshness no longer matches
-- **THEN** the review fails closed without preview or publication
+- **WHEN** the returned identity differs or snapshot integrity or freshness actually fails
+- **THEN** the review fails closed without preview or publication, preserving existing drift handling
+
+### Requirement: The coordinator consolidates real drafts against code
+The primary coordinator SHALL read every completed lens draft from the captured review workspace and consolidate its findings against the frozen worktree and supplied evidence. A separate consolidator SHALL NOT be required for one or multiple drafts. Disagreement over severity, exploitability or remedy SHALL be resolved with code-grounded reasoning, preserving independently evidenced defects. Neither the number of reviewers agreeing nor a specialist verdict SHALL grant operational authority or replace evidence.
+
+#### Scenario: Consolidation runs on a conforming review
+- **WHEN** Main loads completed lens drafts and adjudicates a specialist finding
+- **THEN** it reads the captured review workspace and cites the frozen worktree without rejecting real drafts by a legacy path pattern
+
+#### Scenario: Multiple reviewers disagree about a defect
+- **WHEN** completed drafts recommend different dispositions for the same behavior
+- **THEN** Main examines their evidence at the reviewed identity, records its reasoned disposition and prepares the canonical review without a mandatory consolidator dispatch

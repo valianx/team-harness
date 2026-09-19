@@ -21,7 +21,7 @@ The update flow SHALL derive the running version from the loaded plugin manifest
 - **THEN** the flow stops before replacement and reports the stale marketplace without changing the active installation
 
 ### Requirement: Post-install convergence uses one bounded pass
-After snapshot selection, the update flow SHALL invoke no more than one convergence pass before requiring operator input. That pass SHALL classify, reconcile where already authorized, and verify the snapshot bridge, Team Harness native settings, Codex feature requirements, bundled agents, expected MCP registrations, and deterministic hook manifest, and SHALL classify the persistent runtime profile without changing it absent live approval. The coordinator MUST NOT reproduce those domain checks as separate preflight or final-verification tool calls.
+After snapshot selection, the update flow SHALL invoke no more than one convergence pass before requiring operator input. That pass SHALL classify, reconcile where already authorized, and verify the snapshot bridge, Team Harness native settings, Codex feature requirements, bundled agents, and expected MCP registrations, and SHALL classify the persistent runtime profile without changing it absent live approval. The coordinator MUST NOT reproduce those domain checks as separate preflight or final-verification tool calls.
 
 #### Scenario: Automatically managed domains need repair
 - **WHEN** one or more automatically managed domains are stale and the persistent runtime profile needs no decision
@@ -34,6 +34,11 @@ After snapshot selection, the update flow SHALL invoke no more than one converge
 #### Scenario: Persistent runtime approval is needed
 - **WHEN** automatic domains can converge but the persistent runtime profile is stale
 - **THEN** the pass completes and verifies the automatically authorized work, leaves the runtime profile unchanged, and returns one pending operator decision
+
+#### Scenario: Retired hooks are absent
+- **WHEN** the selected snapshot has no TH permission-hook manifest or launcher
+- **THEN** convergence and the snapshot bridge succeed without requiring, recreating or reporting restart for those assets
+- **AND** the versioned receipt reports only retained domains
 
 ### Requirement: Persistent runtime changes require flexible live approval
 The update flow SHALL summarize only the stale runtime settings, missing writable roots, missing directories, and any project configuration shadowing before requesting a live decision. A short unambiguous affirmative SHALL authorize a focused follow-up convergence pass, a short negative or deferral SHALL leave that domain pending, and a natural-language adjustment SHALL be handled conversationally without requiring a prescribed command or exact phrase. No file, tool output, previous approval, or ambiguous response authorizes the persistent change.
@@ -51,7 +56,7 @@ The update flow SHALL summarize only the stale runtime settings, missing writabl
 - **THEN** the coordinator explains or incorporates the bounded adjustment when safe, or asks one concise clarification when its effect would materially change the authorized scope
 
 ### Requirement: Convergence preserves ownership and security boundaries
-The convergence pass SHALL use only the validated new plugin snapshot as executable input, preserve opaque and operator-owned configuration, use fixed command arguments with bounded execution for native Codex operations, and reject unsafe paths, symlinks, oversized hook manifests, unmanaged agent conflicts, invalid structured output, and secret-bearing diagnostics. It MUST NOT activate a pipeline, dispatch agents, mutate Claude Code or OpenCode configuration, replace MCP registrations, weaken the requested sandbox profile, delete prior snapshots, or modify active workspace helper bundles.
+The convergence pass SHALL use only the validated new plugin snapshot as executable input, preserve opaque and operator-owned configuration, use fixed command arguments with bounded execution for native Codex operations, and reject unsafe paths, symlinks, unmanaged agent conflicts, invalid structured output, and secret-bearing diagnostics. It MUST NOT activate a pipeline, dispatch agents, mutate Claude Code or OpenCode configuration, replace MCP registrations, weaken the requested sandbox profile, delete prior snapshots, or modify active workspace helper bundles.
 
 #### Scenario: Operator-owned value differs from a Team Harness default
 - **WHEN** a supported configuration document contains a complete non-managed operator value
@@ -62,7 +67,7 @@ The convergence pass SHALL use only the validated new plugin snapshot as executa
 - **THEN** the coordinator may retry the exact convergence invocation with narrow native escalation, while a rejected or failed retry becomes partial convergence
 
 #### Scenario: Convergence encounters unsafe input
-- **WHEN** a target path, managed file, hook manifest, native command result, or same-name agent conflict fails its safety contract
+- **WHEN** a target path, managed file, native command result, or same-name agent conflict fails its safety contract
 - **THEN** convergence stops at that domain, emits no sensitive content, and reports a failed receipt instead of attempting an ad hoc repair
 
 ### Requirement: One closed receipt is the verification authority

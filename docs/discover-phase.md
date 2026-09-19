@@ -511,7 +511,7 @@ When the real residual scope is empty (every claimed item is already fixed or no
 
 1. **Do NOT open a no-op PR.** A PR with zero substantive delta wastes reviewer time and pollutes the git history.
 2. **Recommend close-with-evidence.** Produce a per-item `file:line` comment block suitable for posting on the issue/PR as a closing comment. The comment names each item, the evidence (commit ref, grep result showing absence, `changelog.d/` fragment), and states clearly that the report is resolved in the current tree.
-3. **Record the recommendation at STAGE-GATE-1.** Surface the close-with-evidence recommendation in the STOP block. The operator decides whether to close the issue — closing is an outward action gated by `dev-guard.sh`, and the pipeline NEVER auto-closes.
+3. **Record the recommendation at STAGE-GATE-1.** Surface the close-with-evidence recommendation in the STOP block. The operator decides whether to close the issue — closing is an outward action subject to the host's native permissions and approvals, and the pipeline NEVER auto-closes.
 4. **Never auto-close.** The pipeline has no authority to close a GitHub issue or ClickUp task. The recommendation is advisory; the operator acts on it.
 
 ### 13.6 Relationship to CLAUDE.md §6.6
