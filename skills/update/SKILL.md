@@ -67,7 +67,7 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
      - `<!-- nested-dispatch-takeover:start -->` … `<!-- nested-dispatch-takeover:end -->` (retired — takeover machinery scoped to opencode docs only)
      - `<!-- dev-mode-entry:start -->` … `<!-- dev-mode-entry:end -->` (retired earlier — trigger-phrase mechanism replaced by output style)
      For each: if both start and end markers are present in `~/.claude/CLAUDE.md`, remove the entire block (inclusive of markers). If absent, no action.
-   - **Developer-mode output style sync.** After syncing managed blocks, re-copy `output-styles/developer-mode.md` from the plugin cache to `~/.claude/output-styles/developer-mode.md` (create the directory if absent). This keeps the output style aligned with the installed plugin version.
+   - **Retired style migration.** Do not copy or recreate an output style. After syncing managed blocks, follow [the bounded style migration](../../docs/dev-mode.md#retire-an-existing-developer-mode-selection). Preserve custom files and unrelated settings; report any active selection that remains unresolved.
    - **Provenance tracking — co-located hash comment.** A `<!-- th-managed: <block> sha256=<64-hex> -->` comment placed immediately above each block's start marker records the SHA-256 hash of what the harness last wrote. Hash canonicalization: take the live block text from `<!-- <block>:start -->` through `<!-- <block>:end -->` inclusive → normalize CRLF to LF → `rstrip` → SHA-256 → lowercase hex. The comment sits OUTSIDE the hashed region (above the start marker) and is never part of its own hash.
    - **Five-row decision matrix (applied per block, in order):** Let `current_hash` = hash of live block, `canonical_hash` = hash of block to write, `stored_hash` = value from the provenance comment (or absent).
 
@@ -252,15 +252,7 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
 
    $syncResult = $outcomes | ConvertTo-Json -Compress
 
-   # Sync developer-mode output style (skip-if-identical write — no unconditional copy)
-   $outputStyleSrc = "$($latestDir.FullName)\output-styles\developer-mode.md"
-   $outputStyleDst = "$env:USERPROFILE\.claude\output-styles\developer-mode.md"
-   $outputStyleDir = Split-Path $outputStyleDst
-   if (-not (Test-Path $outputStyleDir)) { New-Item -ItemType Directory -Path $outputStyleDir | Out-Null }
-   $srcContent = Get-Content $outputStyleSrc -Raw
-   if (-not (Test-Path $outputStyleDst) -or (Get-Content $outputStyleDst -Raw) -ne $srcContent) {
-       Set-Content $outputStyleDst $srcContent -NoNewline
-   }
+   # Style migration is handled separately after inspecting the effective selection.
    ```
 
    **Unix/macOS (bash) — run this block verbatim on Linux/macOS:**
@@ -433,11 +425,7 @@ if content != original:
 print(json.dumps(outcomes))
 ')
 
-   # Sync developer-mode output style (write-if-different — no unconditional cp)
-   OUTPUT_STYLE_SRC="$PLUGIN_BASE/$LATEST_DIR/output-styles/developer-mode.md"
-   OUTPUT_STYLE_DST="$HOME/.claude/output-styles/developer-mode.md"
-   [ -d "$(dirname "$OUTPUT_STYLE_DST")" ] || mkdir -p "$(dirname "$OUTPUT_STYLE_DST")"
-   cmp -s "$OUTPUT_STYLE_SRC" "$OUTPUT_STYLE_DST" || cp "$OUTPUT_STYLE_SRC" "$OUTPUT_STYLE_DST"
+   # Style migration is handled separately after inspecting the effective selection.
    ```
 
 6a. **Provision the subagent-nesting-depth prerequisite (gated).** Full mechanism: `docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`. This step applies only the concrete values below — it does not restate the mechanism.

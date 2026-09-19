@@ -262,10 +262,12 @@ Alternatively, type `/th-update` inside opencode. The command instructs the agen
 
 ## Quick start
 
-After install, open Claude Code. The top-level session agent is **`th:orchestrator`** — the operator's single point of contact. Talking to it directly stays lightweight; start the gated flow explicitly when you want its stages and specialist reviews. The entry points are:
+After install, work with your runtime's native general agent. It discovers Team Harness skills and coordinates the workflow you select without replacing its native identity. The entry points in Claude Code are:
 
-- `th:orchestrator` — direct conversation, inspection, review, and bounded changes
+- `/th:spec <request>` — develop from written intent, tasks, and independent review
 - `/th:pipeline <request>` — activate the gated multi-agent pipeline
+- `/th:review-pr <PR>` — review an existing pull request
+- `/th:create-pr` — prepare and publish completed work using existing authorization
 - `/th:setup` — configure logs-mode, vault path, and verify MCP connectivity
 - `/th:update` — update to the latest release
 
@@ -283,13 +285,13 @@ Learn mode (explain a codebase, library, or concept with a layered teaching pack
 /th:learn how does the LLM work in this ADK project --resume
 ```
 
-> **`th:orchestrator` is the canonical entry point.** It starts in lightweight direct mode. Use `/th:pipeline {request}` when you want the gated multi-agent flow; skills such as `/th:design` and `/th:deliver` remain direct shortcuts, while `/th:recover` resumes an existing pipeline. See [`docs/agent-tree.md`](./docs/agent-tree.md) for the runtime relationship.
+> **The native general agent coordinates Team Harness workflows.** Use `/th:spec` for written intent and tasks, `/th:pipeline` for broader coordination, `/th:review-pr` for PR review and `/th:create-pr` for preparation/publication. Read the selected current skill; `/th:recover` remains available for an existing pipeline.
 
 ---
 
-## Orchestrator disposition
+## Native agent and Team Harness workflows
 
-The top-level session agent is **`th:orchestrator`**. Its small startup kernel handles conversation, inspection, review, and bounded reversible changes directly. It loads the gated pipeline (architect → implementer → tester/qa/security → delivery) only after a live `/th:pipeline`, an explicit request to start one, or `/th:recover` for persisted state. A deterministic gate (`hooks/dev-guard.sh`) still governs outward actions independently of either posture.
+The general agent retains its native coding instructions. Team Harness adds workflow discovery, specialist coordination, voice and language preferences, and workspace/Obsidian context. The developer-mode replacement style is retired. Existing execution guards remain independent of style selection; their evaluation is a separate change.
 
 Full contract: docs/dev-mode.md.
 

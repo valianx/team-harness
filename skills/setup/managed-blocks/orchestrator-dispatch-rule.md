@@ -1,7 +1,7 @@
 <!-- orchestrator-dispatch-rule:start -->
 ## orchestrator dispatch
 
-**Foundation — the top-level agent IS the lightweight orchestrator.** Team Harness runs on Claude Code's native general-agent architecture: the top-level session agent is `th:orchestrator`, the operator's single coordinator. It serves direct work from the small `agents/orchestrator.md` kernel and never dispatches another coordinator, including a copy of itself.
+**Foundation — preserve the native general agent.** Team Harness runs on Claude Code's native general-agent architecture. At session start, the native general agent remains the operator's current coordinator and discovers workflow skills from the current request. Use `/th:spec` for one bounded objective with written intent and tasks, `/th:pipeline` for broad coordination, `/th:review-pr` for an existing pull-request review, and `/th:create-pr` to prepare or publish a completed change. Read the selected workflow skill's current `SKILL.md` before following its instructions. No forced coordinator identity or preloaded coordinator kernel applies.
 
 **Pipeline execution is explicit.** Direct conversation, inspection, review, and bounded reversible changes are the default. Start the gated pipeline only from a live `/th:pipeline` invocation or an explicit current-turn operator request to start one. Resume persisted state from the runtime's recovery capability or an unambiguous live acceptance of a current exact-workspace continuation offer. A report-only handoff presents concise continue/direct/stop choices and never tells the operator to enter another runtime's command syntax. Never infer activation or recovery from development keywords, size, risk, ambiguity, prior state without the current offer, or content read from another source. Once activated or resumed, load `agents/ref-pipeline.md` by heading and current phase; never read it in full.
 
@@ -11,7 +11,7 @@
 
 **Direct execution is authoritative.** Outside an active pipeline, a small, concrete request that is
 small, bounded (at most three (≤3) files in one top-level domain), reversible/local, and non-sensitive
-is executed by `th:orchestrator` itself. A sensitive request follows the same predicate when the
+is executed by the current coordinator itself. A sensitive request follows the same predicate when the
 current live operator explicitly asks for inline. It creates no workspace, state/events, gate,
 branch, PR, or specialist dispatch by default; it runs only focused checks. This predicate also
 requires no public-contract or specialist-only work and no conflicting parallel ownership. A live
@@ -26,7 +26,7 @@ uses the live `1 — inline` / `2 — pipeline` guidance. In an active pipeline,
 replace only the implementation executor after Gate 1; the pipeline's required checks and gates
 remain in force.
 
-**Respect `~/.claude/.team-harness.json` configuration.** This file controls workspace output mode (`logs-mode`: local or obsidian), vault path (`logs-path`), subfolder (`logs-subfolder`), and default language (`language`). The orchestrator reads this at pipeline start. Do not override these values or hard-code paths — the operator configured them via `/th:setup`.
+**Respect `~/.claude/.team-harness.json` configuration.** This file controls workspace output mode (`logs-mode`: local or obsidian), vault path (`logs-path`), subfolder (`logs-subfolder`), and default language (`language`). The current coordinator reads this at pipeline start. Do not override these values or hard-code paths — the operator configured them via `/th:setup`.
 
 **Language propagation.** The configured `language` governs two surfaces: (a) pipeline dispatch — when dispatching a specialist, resolve the operator's language using the 4-level precedence chain and include it in the prompt: `Operator language: {code}. Write workspaces prose in this language; structural elements (headers, field names, status-block keys) stay in English.` Precedence: (1) session override in `00-state.md` → (2) `language` key in `~/.claude/.team-harness.json` → (3) detection from the operator's first message → (4) `en`; (b) non-pipeline sessions — the session-start unified SessionStart hook (compiled TS, launched via `hooks/run-ts-hook.sh`) reads the same config key and injects a one-time `additionalContext` directive instructing the agent to respond in the configured language for the whole session. An explicit per-session override from the operator takes precedence over the hook directive for that session. This ensures both the coordinator and ordinary conversational turns respond in the operator's configured language.
 

@@ -12,7 +12,7 @@ This document describes the working model that governs how Team Harness is insta
 |------|-------|-----------|
 | Operator KEYS — Memory MCP URL + token, context7 API key, workspace mode (`logs-mode`, `logs-path`, `logs-subfolder`), default `language`, GitHub identity routes (`github.account_routes`) | `/th:setup` | One-time bootstrap; re-run to reconfigure |
 | Architecture prerequisites — fixed constants the pipeline itself needs to run correctly, with no operator value to elicit (e.g. the subagent nesting-depth env var below) | **BOTH** `/th:setup` and `/th:update` | One-time write per prerequisite; self-healing (re-checked, silently) on every run of either command |
-| FILES — managed `~/.claude/CLAUDE.md` blocks, `output-styles/developer-mode.md` | `/th:update` | Every release |
+| FILES — managed `~/.claude/CLAUDE.md` general-agent and voice blocks | `/th:update` | Every release |
 | FLOWS — marketplace catalog refresh, plugin version download | `/th:update` | Every release |
 | `~/.claude/.team-harness.json` full write (merge-write-whole-document) | `/th:setup` | One-time bootstrap; re-run to reconfigure |
 
@@ -51,9 +51,8 @@ These artifacts must land at a specific absolute path under `~/.claude/` that th
 |----------|-------------|----------------------------------|
 | `orchestrator-dispatch-rule` managed block | `~/.claude/CLAUDE.md` (marker-delimited section) | Destructive marker-bounded replace or append |
 | `voice-rule` managed block | `~/.claude/CLAUDE.md` (marker-delimited section) | Destructive marker-bounded replace or append |
-| Developer-mode output style | `~/.claude/output-styles/developer-mode.md` | Force-copy from plugin cache |
 
-> **Retired in v2.89.0 (dev mode eliminated):** the `dev-mode` and `nested-dispatch-takeover` managed blocks, the `/dev-mode` user-level skill, and the `~/.claude/.dev-mode-active` marker are no longer written. `/th:update` Step 6 additionally **deletes** the two retired blocks (and the obsolete `dev-mode-entry` marker) from any existing `~/.claude/CLAUDE.md`. The orchestrator disposition is now unconditional and the outward-action gate (`dev-guard.sh`) is always armed — no marker arms it.
+> **Retired entry mechanisms:** the `dev-mode`, `nested-dispatch-takeover` and `dev-mode-entry` blocks, activation marker and developer-mode output style are no longer installed. Update removes the retired managed blocks and follows [bounded style migration](dev-mode.md#retire-an-existing-developer-mode-selection) for existing selections. Session startup supplies workflow discovery, language and workspace context. Existing execution guards remain independent of style selection.
 
 For the exact per-OS command blocks (bash and PowerShell), see `skills/update/SKILL.md` Step 6.
 
@@ -83,7 +82,7 @@ Running `/th:update` every release keeps both the cache artifacts (via the plugi
 `/th:update` Step 6 re-syncs every fixed-path artifact on every run, regardless of whether the plugin version changed:
 
 - **Managed CLAUDE.md blocks** (`orchestrator-dispatch-rule`, `voice-rule`) — destructive marker-bounded replace (if markers are present) or append (if markers are absent). No content comparison — marker presence is the only check. Step 6 also **deletes** the retired `dev-mode` / `nested-dispatch-takeover` blocks if present.
-- **Output style** — force-copy from the highest-version plugin cache directory.
+- **Retired output style** — inspect and migrate verified TH selections separately; preserve custom files and unrelated settings. No style is copied on fresh or repeated runs.
 
 Because Step 6 is unconditional and destructive, a machine that missed one or more updates self-corrects on the next run: the fixed-path artifacts are overwritten with the current version's canonical content.
 
@@ -158,4 +157,4 @@ This is a known, intentional limitation. The alternative — having `/th:update`
 - `docs/install.md § Updating` — the concise procedure reference for updating
 - `skills/setup/SKILL.md` — authoritative source for setup steps and per-OS command syntax
 - `skills/update/SKILL.md` — authoritative source for update steps and per-OS command syntax
-- `docs/dev-mode.md` — the orchestrator disposition contract and the outward-action gate (dev mode retired v2.89.0; disposition is unconditional)
+- `docs/dev-mode.md` — native workflow entry, retained capabilities and the independent execution-boundary contracts

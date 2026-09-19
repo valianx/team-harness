@@ -144,22 +144,40 @@ else
     # not at the top level. code.claude.com/docs/en/hooks; matches the Bash
     # oracle (session-start.sh:272).
     ss_in=$(python3 -c "import json; print(json.dumps({'type':'startup','session_id':'t123'}))")
-    ss_out=$(echo "$ss_in" | node "$SS_TS_CJS" 2>/dev/null)
-    ss_has=$(echo "$ss_out" | grep -c '"additionalContext"' 2>/dev/null || echo "0")
-    ss_nonempty=$(echo "$ss_out" | python3 -c "import json,sys; d=json.loads(sys.stdin.read() or '{}'); print('yes' if d.get('hookSpecificOutput',{}).get('additionalContext') else 'no')" 2>/dev/null || echo "no")
-    if [ "$ss_has" -ge 1 ] && [ "$ss_nonempty" = "yes" ]; then
-        PASS=$((PASS + 1)); echo "  [PASS] AC-11: session-start emits non-empty additionalContext"
+    ss_empty_home=$(mktemp -d)
+    mkdir -p "$ss_empty_home/.claude"
+    ss_out=$(printf '%s\n' "$ss_in" | HOME="$ss_empty_home" USERPROFILE="$ss_empty_home" node "$SS_TS_CJS" 2>/dev/null)
+    ss_exit=$?
+    rm -rf "$ss_empty_home"
+    ss_text=$(echo "$ss_out" | python3 -c "import json,sys; print(json.loads(sys.stdin.read() or '{}').get('hookSpecificOutput',{}).get('additionalContext',''))" 2>/dev/null || echo "")
+    if [ "$ss_exit" -eq 0 ] && [ -n "$ss_text" ] && echo "$ss_text" | grep -qF "Team Harness workflow discovery" && echo "$ss_text" | grep -qF "/th:spec" && echo "$ss_text" | grep -qF "/th:pipeline" && echo "$ss_text" | grep -qF "/th:review-pr" && echo "$ss_text" | grep -qF "/th:create-pr" && echo "$ss_text" | grep -qF "current SKILL.md"; then
+        PASS=$((PASS + 1)); echo "  [PASS] AC-11: session-start exposes workflow discovery without config"
     else
-        FAIL=$((FAIL + 1)); FAILURES+=("AC-11: session-start should emit additionalContext")
-        echo "  [FAIL] AC-11: additionalContext missing or empty"
+        FAIL=$((FAIL + 1)); FAILURES+=("AC-11: session-start workflow discovery missing")
+        echo "  [FAIL] AC-11: workflow discovery missing without configuration"
     fi
-    ss_orch=$(echo "$ss_out" | python3 -c "import json,sys; d=json.loads(sys.stdin.read() or '{}'); c=d.get('hookSpecificOutput',{}).get('additionalContext',''); print('yes' if 'orchestrator disposition is active' in c else 'no')" 2>/dev/null || echo "no")
-    if [ "$ss_orch" = "yes" ]; then
-        PASS=$((PASS + 1)); echo "  [PASS] AC-11: orchestrator disposition present (load 1 unconditional)"
+
+    ss_config_home=$(mktemp -d)
+    mkdir -p "$ss_config_home/.claude"
+    printf '%s' '{"language":"es","english_learning":true,"logs-mode":"obsidian","logs-path":"/vault/work","logs-subfolder":"work-logs"}' > "$ss_config_home/.claude/.team-harness.json"
+    ss_cfg_out=$(printf '%s\n' "$ss_in" | HOME="$ss_config_home" USERPROFILE="$ss_config_home" node "$SS_TS_CJS" 2>/dev/null)
+    ss_cfg_exit=$?
+    rm -rf "$ss_config_home"
+    ss_cfg_text=$(echo "$ss_cfg_out" | python3 -c "import json,sys; print(json.loads(sys.stdin.read() or '{}').get('hookSpecificOutput',{}).get('additionalContext',''))" 2>/dev/null || echo "")
+    if [ "$ss_cfg_exit" -eq 0 ] && [ -n "$ss_cfg_text" ] && echo "$ss_cfg_text" | grep -qF "Spanish" && echo "$ss_cfg_text" | grep -qF "english-learning mode is active" && echo "$ss_cfg_text" | grep -qF "/vault/work/work-logs"; then
+        PASS=$((PASS + 1)); echo "  [PASS] AC-11: configured language, learning, and workspace context retained"
     else
-        FAIL=$((FAIL + 1)); FAILURES+=("AC-11: orchestrator disposition missing from session-start")
-        echo "  [FAIL] AC-11: orchestrator disposition missing"
+        FAIL=$((FAIL + 1)); FAILURES+=("AC-11: configured SessionStart context missing")
+        echo "  [FAIL] AC-11: configured language/learning/workspace context missing"
     fi
+    for retired in "orchestrator disposition" "You are th:orchestrator" "FINAL" "SILENT" "agents/orchestrator.md"; do
+        if echo "$ss_cfg_text" | grep -qF "$retired"; then
+            FAIL=$((FAIL + 1)); FAILURES+=("AC-11: retired SessionStart token present: $retired")
+            echo "  [FAIL] AC-11: retired SessionStart token present: $retired"
+        else
+            PASS=$((PASS + 1)); echo "  [PASS] AC-11: no retired SessionStart token '$retired'"
+        fi
+    done
 fi
 
 if [ ! -f "$LP_TS_CJS" ]; then

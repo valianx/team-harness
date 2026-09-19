@@ -1,8 +1,8 @@
-# Orchestrator Disposition — Contract
+# Native workflows and execution boundaries
 
-The top-level Claude Code agent IS the orchestrator. This is the CC native architecture, not a mode that activates or deactivates. The security property that protects outward actions is enforced by the `dev-guard` gate (`.claude-plugin/hooks.json` → `hooks/run-ts-hook.sh dev-guard` → `hooks/ts/dist/dev-guard.cjs`), which fires UNCONDITIONALLY for every covered outward action and gates by destination — no filesystem marker required or consulted.
+The native general agent coordinates the Team Harness workflow selected for the task. Installing TH does not replace that agent's coding instructions or identity. The existing `dev-guard` gate (`.claude-plugin/hooks.json` → `hooks/run-ts-hook.sh dev-guard` → `hooks/ts/dist/dev-guard.cjs`) continues to govern its covered outward actions independently of workflow or style selection.
 
-**SEC-DR-2 re-founding (v2.89.0).** The former "dev mode" was a conditional disposition controlled by `~/.claude/.dev-mode-active`. That model was retired when empirical testing (M1 probe, 2026-06-14) confirmed that nested foreground subagents retain the `Task` tool — the foundational premise behind the handoff machinery was obsolete on the CC path. The disposition is now unconditional: the general agent is always the orchestrator, and the gate is always armed.
+**Migration history.** The old `.dev-mode-active` marker, replacement output style and unconditional startup role are retired. Useful coordination and collaboration guidance remains in the skills, managed guide and configured session context; the execution controls below are retained for separate evaluation.
 
 ## Runtime postures
 
@@ -208,7 +208,7 @@ on the actions that remain gated.
 
 ## Inline Orchestration Permit (SEC-DR-2) — superseded routing text
 
-**Historical note.** Re-founding the top-level agent as the coordinator remains current, but the
+**Historical note.** Coordination by the current general agent remains useful, but the
 older rule that every development task “belongs in the pipeline” is superseded by the two-posture
 contract. The top-level coordinator serves direct `inline` work by default. It enters `pipeline`
 only after a current live `/th:pipeline` (or equivalent explicit request) or `/th:recover` for an
@@ -222,28 +222,31 @@ a pipeline on the coordinator's behalf.
 
 ---
 
-## Disposition mechanism: output-style replaces the base (persistent strong floor)
+## Native workflow entry and retained capabilities
 
-**Why output-style, not a skill.** A prior implementation used a `/dev-mode` skill (commit 18ea492). A live test proved that mechanism structurally insufficient: the skill LAYERED the orchestrator contract OVER the base "make-progress" disposition of the general agent, and the base won — the agent operated inline, merged a PR to main without a pipeline, and rationalised the skip. A skill superposes; the base built-in beats it.
+The developer-mode output style and forced startup identity are retired. The
+native general agent retains its coding instructions and coordinates the selected
+Team Harness workflow. SessionStart provides skill discovery and configured
+context; it does not load a replacement orchestrator contract or print a banner.
 
-The correction is a change of MECHANISM, not of content. The `developer-mode` output style with `keep-coding-instructions: false` REPLACES the built-in software engineering instructions (how to scope changes, write comments, verify work) instead of layering over them. There is no base to beat — it is gone. The orchestrator contract (routing Step 6 + Discover + reasoning-checkpoint + anti-rushing/triage) becomes the governing set of instructions for the session.
+| Useful contribution | Where it remains |
+| --- | --- |
+| Written intent and implementation tasks | `skills/spec/SKILL.md` and OpenSpec lifecycle |
+| Broader coordination and recovery | `skills/pipeline/SKILL.md`, `skills/recover/SKILL.md` and their references |
+| Independent review and delivery | `skills/review-pr/SKILL.md`, `skills/create-pr/SKILL.md` and specialist roles |
+| Bounded specialist delegation | Selected workflow and the managed general-agent guide |
+| Voice, language and English learning | Managed voice rule, settings and session context |
+| Workspace and Obsidian continuity | Configured workspace preferences and workflow helpers |
+| Existing execution boundaries | Registered hooks and the contracts retained in this document |
 
-**What `keep-coding-instructions: false` discards — and why its loss is not a security gap (AC-18).**
+Read the current selected skill when work calls for its method. Its references
+provide the detailed procedure; the general agent does not preload every method.
+The existing execution guards are independent of output styles and are unchanged
+by this retirement. Their future evaluation is a separate scoped change.
 
-The Claude Code docs describe this flag precisely: *"Custom output styles leave out Claude Code's built-in software engineering instructions, such as how to scope changes, write comments, and verify work."* And the framing: *"Output styles change how Claude responds, not what Claude knows."*
-
-This distinction is load-bearing:
-- **What is discarded:** SWE WORKFLOW guidance (how to scope, comment, verify). This is disposition of process, NOT a security control. Its absence degrades workflow tidiness, not safety. The orchestrator contract loaded by the style replaces this guidance with a more explicit version: the SDD pipeline IS scoping + verification.
-- **What is NOT discarded:** The model's harm-rejection and safety layer ("what Claude knows" — Anthropic's constitutional training). An output style adjusts the system prompt; it does NOT disarm the model's refusal to produce harmful outputs, exfiltrate data, or follow malicious instructions. That layer does not live in the "software engineering instructions" block.
-- **Claude Code security floors are PROMPT-INDEPENDENT (hooks, not prompt):** these PreToolUse hooks fire regardless of which Claude Code system prompt is active. Every gate below runs through `hooks/run-ts-hook.sh <name>`, a fail-closed launcher that execs `node` against the matching `hooks/ts/dist/<name>.cjs` bundle. OpenCode relies on its native permission and approval model. The Claude Code catalogue is:
-  - `policy-block` — matcher `Bash|Write|Edit|NotebookEdit`. Blocks only catastrophic recursive deletion (`/`, `~`, `$HOME`, bare wildcard) and provider-shaped credentials in write content or obvious Bash carriers. It does not gate git workflow, SQL text, reads, filenames, config edits, JWT/Bearer strings, or entropy guesses.
-  - `dev-guard` — one dedicated `Bash`-only PreToolUse entry: gates the minimal outward floor unconditionally (git push by destination, `gh pr merge`, `gh api` merge endpoints; see § Outward-Action Gate). The former ClickUp MCP matcher entry was removed with the minimal-floor recalibration — MCP writes are governed by the host runtime's permission model. The entry survives the output-style swap intact.
-
-**Conclusion:** `keep-coding-instructions: false` is safe for this harness because the security floors are hooks, not prompt. No security-relevant default lives exclusively in the discarded SWE instructions that the orchestrator contract + hooks do not re-establish.
-
-**Default-on disposition (v2.89.0+):** The `SessionStart` hook (`session-start`, run via `hooks/run-ts-hook.sh session-start`) fires an orchestrator disposition directive at every session start — no marker needed. Operators can optionally select the `developer-mode` output style via `/config` → Output style → `developer-mode` for the strong base-replacement (`keep-coding-instructions: false`).
-
-**`force-for-plugin` is NOT set** on the `developer-mode` output style — it is never applied automatically via the plugin mechanism. The output style is an opt-in strong floor. `force-for-plugin` is intentionally omitted to preserve the per-operator escape hatch.
+For an installed legacy style, follow
+[the bounded migration](#retire-an-existing-developer-mode-selection).
+The historical filename of this document is retained for existing links.
 
 ---
 
@@ -282,11 +285,11 @@ On Claude Code the position is the same: `checkpoint-guard` has been unregistere
 
 ---
 
-## Role Adoption
+## Workflow references
 
-At startup the coordinator reads no gated contract. Resolve these files only at their trigger:
+Read the selected current skill first. Resolve these workflow references only when that skill needs them:
 
-- `agents/orchestrator.md` — lightweight direct kernel.
+- `agents/orchestrator.md` — workflow coordination reference, not a mandatory startup identity.
 - `agents/ref-pipeline.md` — activation sections and current phase after `/th:pipeline`.
 - `docs/discover-phase.md` — only after activation reaches Intake.
 - `docs/reasoning-checkpoint.md` — only when an active pipeline reaches B1/B2/B3.
@@ -329,8 +332,54 @@ This disposition is narrowly scoped to the residual class described above. It do
 
 ## Installation
 
-`/th:setup` installs the outward-action gate by:
-1. Copying `output-styles/developer-mode.md` from the plugin cache to `~/.claude/output-styles/developer-mode.md` (makes the `developer-mode` style available in `/config` as an opt-in strong floor).
-2. Writing the `orchestrator-dispatch-rule` managed block to `~/.claude/CLAUDE.md` (operator-facing documentation of the feature).
+`/th:setup` and `/th:update` synchronize the managed general-agent and voice
+guides. They do not install or recreate a replacement output style. Existing
+selections follow [the bounded migration](#retire-an-existing-developer-mode-selection).
+The registered hook manifest supplies the existing execution guards independently
+of these guides. Update still removes retired `dev-mode`, `nested-dispatch-takeover`
+and `dev-mode-entry` managed blocks. No activation marker is written.
 
-`/th:update` re-synchronizes the output style and managed blocks on every run. It removes any retired `dev-mode`, `nested-dispatch-takeover`, and `dev-mode-entry` blocks from existing `~/.claude/CLAUDE.md` files. No marker is written.
+## Retire an existing developer-mode selection
+
+Team Harness no longer distributes a replacement output style. Its useful guidance
+lives in the workflow skills, the managed general-agent guide and voice rule, and
+the session's language and workspace context. Execution guards are independent of
+the retired style and remain unchanged by this migration.
+
+Use this procedure from Claude setup or update when an older installation exists.
+It is a bounded migration, not a scan or rewrite of every project on the machine.
+
+1. Inspect the effective `outputStyle` and its source using the host's settings
+   controls. Account for user, current project/local and managed overrides; a
+   user setting alone does not prove the active selection. Respect a configured
+   Claude config directory. Do not print unrelated settings or credentials.
+2. If the selected style is TH's retired `developer-mode` (including a host-qualified
+   identifier), resolve the actual style file, including a
+   project style shadowing the user copy. Compare its complete content with the
+   same file from a known previous TH release/cache. A filename or frontmatter
+   alone does not establish ownership. If the file is customized, missing or
+   unverifiable, preserve it and report the selection and specific migration
+   decision that remains; do not claim deactivation.
+3. For a verified stock TH selection, use the available native style picker to
+   select **Default**. If the host exposes no picker, change only the `outputStyle`
+   property whose current value is the verified retired-style identifier in its
+   identified, authorized settings file to the host's native default, preserving
+   all other keys. Never rewrite malformed JSON,
+   managed policy or a file outside the authorized setup/update scope. In
+   particular, update does not silently modify repository settings: report the
+   native selection action for that scope instead.
+4. Verify the effective style after the switch. Only then remove the verified
+   unmodified user-level TH style file, using its exact path. Preserve custom,
+   project and managed files. An unselected stock user copy can also be removed
+   after verifying that it is not the active resolved style. Do not search other
+   repositories for selections; report this scope limit when it matters.
+5. Report whether the style was already absent, migrated, or preserved pending
+   a specific action. Distinguish disk cleanup from the running session's active
+   style. Use supported refreshes and identify a demonstrated host limitation
+   before recommending a new session or restart.
+
+Claude's [output-style documentation](https://code.claude.com/docs/en/output-styles)
+describes the native selector, the `outputStyle` setting and version-dependent
+activation behavior. Its [settings documentation](https://code.claude.com/docs/en/settings)
+describes precedence. Consult the current host capabilities instead of assuming
+that changing a file always refreshes a running session.
