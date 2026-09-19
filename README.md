@@ -262,10 +262,12 @@ Alternatively, type `/th-update` inside opencode. The command instructs the agen
 
 ## Quick start
 
-After install, open Claude Code. The top-level session agent is **`th:orchestrator`** — the operator's single point of contact. Talking to it directly stays lightweight; start the gated flow explicitly when you want its stages and specialist reviews. The entry points are:
+After install, work with your runtime's native general agent. It discovers Team Harness skills and coordinates the workflow you select without replacing its native identity. The entry points in Claude Code are:
 
-- `th:orchestrator` — direct conversation, inspection, review, and bounded changes
+- `/th:spec <request>` — develop from written intent, tasks, and independent review
 - `/th:pipeline <request>` — activate the gated multi-agent pipeline
+- `/th:review-pr <PR>` — review an existing pull request
+- `/th:create-pr` — prepare and publish completed work using existing authorization
 - `/th:setup` — configure logs-mode, vault path, and verify MCP connectivity
 - `/th:update` — update to the latest release
 

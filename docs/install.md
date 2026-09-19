@@ -123,12 +123,12 @@ After installing, two optional scaffolds are available via `/th:bootstrap`:
 
 ## Invoking the bug-fix and feature pipelines
 
-The canonical entry point after install is the `orchestrator` agent — the top-level Claude Code session agent, not a subagent spawned by anything. Type `@th:orchestrator <task>` in your Claude Code session:
+After install, the native general agent discovers TH skills and coordinates the workflow you select. In Claude Code, use `spec` for written intent and independent review, or select the broader pipeline explicitly:
 
 ```
-@th:orchestrator fix the pagination bug in the users list
-@th:orchestrator add an export-to-CSV feature to the invoices page
-@th:orchestrator refactor the auth middleware to use the new JWT library
+/th:spec fix the pagination bug in the users list
+/th:spec add an export-to-CSV feature to the invoices page
+/th:pipeline refactor the auth middleware to use the new JWT library
 ```
 
 **Slash-command shortcuts** select an explicit coordinator flow:
@@ -136,7 +136,7 @@ The canonical entry point after install is the `orchestrator` agent — the top-
 | Command | Equivalent to |
 |---|---|
 | `/th:pipeline <request>` | Activates the gated pipeline and loads its contract progressively |
-| `/issue #N` | `@th:orchestrator` with the GitHub issue body fetched automatically |
+| `/issue #N` | Starts from the fetched GitHub issue body |
 | `/design <feature>` | Routes to design direct mode |
 | `/deliver` | Routes to delivery direct mode |
 | `/recover <feature>` | Resumes an interrupted pipeline |
@@ -154,7 +154,7 @@ The canonical entry point after install is the `orchestrator` agent — the top-
 2. **Download the new version** — `claude plugin update th@team-harness-marketplace` (fetches the new version into the plugin cache).
 3. **Activate** — `/reload-plugins` (or restart Claude Code) to load the downloaded version.
 
-`/th:update` performs steps 1 and 2 from Bash, then re-syncs the fixed-path artifacts that the plugin runtime does **not** auto-load (the managed `~/.claude/CLAUDE.md` blocks and `output-styles/developer-mode.md`). Step 3 is operator-driven — the skill cannot reload the session. Running `/th:update` every release keeps both the cache and the fixed-path artifacts aligned; re-running `/th:setup` is **not** part of the update flow. For the full mental model — division of labour, the cache-vs-fixed-path propagation model, and the self-healing property — see [`setup-update-model.md`](./setup-update-model.md).
+`/th:update` performs steps 1 and 2 from Bash, then re-syncs the managed general-agent and voice blocks in `~/.claude/CLAUDE.md`. It no longer copies a replacement output style; existing selections follow [the bounded migration](./dev-mode.md#retire-an-existing-developer-mode-selection). Step 3 is operator-driven — the skill cannot reload the session. Running `/th:update` every release keeps both the cache and the fixed-path artifacts aligned; re-running `/th:setup` is **not** part of the update flow. For the full mental model — division of labour, the cache-vs-fixed-path propagation model, and the self-healing property — see [`setup-update-model.md`](./setup-update-model.md).
 
 **Legacy installer:** re-run the bootstrap. Unchanged files are skipped; files that differ from the embedded release bytes are overwritten.
 

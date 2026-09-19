@@ -1,9 +1,9 @@
 # Agent Tree
 
-How Team Harness agents relate at runtime. The top-level session agent is **`th:orchestrator`** — the operator's single point of contact. It runs intake, Discover/framing, Specify, and the gated pipeline itself, and dispatches every specialist directly. No agent in this roster spawns another coordinator; there is exactly one coordinator node in any run.
+How Team Harness agents relate at runtime. The **native general agent** remains the operator's point of contact and coordinates the selected TH workflow. The `orchestrator` reference supplies coordination methods when a workflow uses them; it does not replace the native agent's identity. The tree below shows the retained pipeline and specialist relationships when selected.
 
 ```
-th:orchestrator  ── top-level session agent · the operator's single point of contact
+native general agent  ── coordinates the selected TH workflow
 │    Owns: Intake · Discover/framing · Specify · spec+AC co-authoring ·
 │    config/language resolution · initiative + overview.md · the gated pipeline
 │    (design → waiting_gate1 → implementation → validation → waiting_gate3 →
@@ -45,7 +45,7 @@ release a gate.
 
 | Agent | Tier | Dispatched by | Owns gates? |
 |---|---|---|---|
-| `th:orchestrator` | lightweight direct coordination; gated execution after activation | — (top-level session agent) | Yes, only during an active pipeline |
+| Native general agent using TH coordination guidance | lightweight direct coordination; gated execution after activation | — (current session) | Yes, only during an active pipeline |
 | `architect` | analysis | orchestrator (or research/design direct mode) | No |
 | `plan-reviewer` | analysis | orchestrator (explicit `/th:plan-review` only) | No |
 | `implementer` | implementation | orchestrator after Gate 1 | No |
@@ -66,7 +66,7 @@ release a gate.
 
 ## Invariants
 
-- **Exactly one coordinator node.** `th:orchestrator` never spawns another orchestrator. The small kernel stays direct until `/th:pipeline`; the activated contract retains the specialist-only dispatch invariant (`agents/ref-pipeline.md § Dispatch invariants`).
+- **One coordinator for a selected pipeline.** The native general agent coordinates it directly; the activated contract retains the specialist-only dispatch invariant (`agents/ref-pipeline.md § Dispatch invariants`).
 - **Gate authority has a single writer.** Main presents each Gate inline and appends the nonce-bound operator decision to the control log before rebuilding projections; no specialist can relay or forge it (`agents/_shared/gate-contract.md § "Authority event and projection"`).
 - **Inline direct work has no STAGE-GATE or pipeline state** — the coordinator acts directly or
   dispatches the explicitly requested ad hoc specialist. This includes `/th:plan-review` and

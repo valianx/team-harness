@@ -4,13 +4,14 @@
 
 ## CC Top-Level Orchestration — the only path
 
-`th:orchestrator` IS the top-level Claude Code session agent — not a subagent spawned by anything.
+The native general agent coordinates the selected Team Harness workflow without replacing its identity or coding instructions.
 There is no second coordinator to hand off to and no `dispatch_handoff` round-trip on this path:
 the top-level agent has `Task` from the start of the session and dispatches leaf agents
 (`architect`, `implementer`, `tester`, `cleaner`, `qa`, `security`, `adversary`, `plan-reviewer`, `delivery`,
 `ux-reviewer`, `diagrammer`, `gcp-cost-analyzer`, `gcp-infra`) directly. Full contract:
-`docs/dev-mode.md`. The optional `developer-mode` output style (`/config` → Output style →
-`developer-mode`) provides a strong base-replacement floor (`keep-coding-instructions: false`).
+`docs/dev-mode.md`. Workflow discovery and the selected current skill provide the
+coordination guidance. The developer-mode replacement style is retired; existing
+selections follow [the bounded migration](./dev-mode.md#retire-an-existing-developer-mode-selection).
 
 ## Nested-context dispatch — RETIRED protocol, retained provisioning
 

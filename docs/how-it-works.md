@@ -9,9 +9,9 @@ successful profile, workspace, commit-anchor, and branch checks silent.
 
 ---
 
-## Entry point: talk to th:orchestrator
+## Entry point: choose a workflow with your general agent
 
-**`th:orchestrator` is the top-level session agent and your single point of contact.** Its 881-word kernel handles conversation, inspection, review, and bounded reversible work directly. It does not load pipeline stages, gates, workspace contracts, or delivery mechanics at startup.
+**Your runtime's native general agent remains your point of contact.** Team Harness adds workflow discovery and coordination guidance. Use `spec` for development with written intent, tasks, and independent review; `pipeline` for broader coordination; `review-pr` for an existing PR; and `create-pr` for preparation and publication. The agent reads the selected skill's current instructions when that workflow is needed.
 
 Start the gated flow explicitly:
 
@@ -198,16 +198,16 @@ Each row is a real failure mode encountered and patched. See [`docs/knowledge.md
 
 ## What ships
 
-- **Agents.** 28 agents. The coordination agent — `orchestrator` (top-level session agent) — plus the specialists: `architect`, `implementer`, `tester`, `cleaner`, `qa`, `pr-review-qa`, `plan-reviewer`, `delivery`, `reviewer`, `reviewer-consolidator`, `pr-review-security`, `security`, `ux-reviewer`, `diagrammer`, `likec4-diagrammer`, `d2-diagrammer`, `documenter`, `translator`, `gcp-cost-analyzer`, `gcp-infra`, `init-project`, `agent-builder`, `mentor`, `researcher`, `research-consolidator`, `code-researcher`, `adversary`. How they relate at runtime: [`docs/agent-tree.md`](./agent-tree.md). Full roster, model tier (opus / sonnet / haiku), and effort matrix: [`agents/README.md`](../agents/README.md).
+- **Agents.** 28 agents. The `orchestrator` coordination reference, used by selected workflows without replacing the native general agent, plus the specialists: `architect`, `implementer`, `tester`, `cleaner`, `qa`, `pr-review-qa`, `plan-reviewer`, `delivery`, `reviewer`, `reviewer-consolidator`, `pr-review-security`, `security`, `ux-reviewer`, `diagrammer`, `likec4-diagrammer`, `d2-diagrammer`, `documenter`, `translator`, `gcp-cost-analyzer`, `gcp-infra`, `init-project`, `agent-builder`, `mentor`, `researcher`, `research-consolidator`, `code-researcher`, `adversary`. How they relate at runtime: [`docs/agent-tree.md`](./agent-tree.md). Full roster, model tier (opus / sonnet / haiku), and effort matrix: [`agents/README.md`](../agents/README.md).
 - **Skills** (slash commands). `/th:pipeline` explicitly activates the gated flow; most others route through the direct kernel. Standalone utilities include `/th:lint`, `/th:pipelines`, `/th:kg`, `/th:tmux`, `/th:update`, and `/th:background`. Common routed entries include `/th:design`, `/th:plan`, `/th:recover`, `/th:deliver`, `/th:review-pr`, and `/th:issue`. `/th:background` launches a background `claude -p` headless session for eligible long-running tasks — it does not route through `th:orchestrator`.
 - **Hooks.** Registered boundary hooks are intentionally narrow: `policy-block` blocks catastrophic recursive deletion and provider-shaped credentials; `dev-guard` gates Git/GitHub/ClickUp outward actions; `gcp-guard` classifies mutating gcloud verbs. Additional retained hook bodies may be unwired; `.claude-plugin/hooks.json` is the authority. Notification scripts are optional. Full catalog: [`hooks/README.md`](../hooks/README.md).
 - **External Memory MCP** server. Semantic memory across projects. The server (`context-harness-mcp` or any MCP-compatible service) lives outside this repo. Reference: [`docs/kg-content-policy.md`](./kg-content-policy.md).
 
 ---
 
-## Dev mode (top-level-is-orchestrator, SEC-DR-2)
+## Native coordination and execution boundaries
 
-**The top-level Claude Code agent IS `th:orchestrator`** — the coordination agent, not a specialist. No filesystem marker, no mode flag, and no special invocation is required — when Claude Code runs at the top level, it operates with the full `th:orchestrator` role: it handles intake/discover/specify directly and runs the gated pipeline itself, dispatching every specialist subagent (architect, implementer, tester, qa, etc.) via `Task`. It never dispatches another coordinator, including another copy of itself; there is no split to verify and no monolith fallback, because there is no second coordinator for the pipeline to fall back from.
+**The native general agent coordinates the selected TH workflow.** The developer-mode replacement style is retired. Workflow discovery, specialist coordination, voice and language preferences, and workspace/Obsidian context remain available through skills and managed guidance. Existing selections follow [the bounded migration](./dev-mode.md#retire-an-existing-developer-mode-selection). A selected pipeline retains its methods and specialist dispatch contract.
 
 **Outward-action gate.** The deterministic dev-guard hook covers only the minimal floor and fires unconditionally, gating by destination — the agent cannot auto-approve regardless of autonomy grants. A `git push` whose single recognized refspec targets a non-default branch on `origin` resolves to `allow` (no prompt); a push to the default branch, a tag push, a force push, and a PR merge (`gh pr merge` or a `gh api` merge endpoint) resolve to `ask`, requiring explicit operator approval. Every other outward write (`gh pr create/review/comment`, issue writes, MCP writes) is uncovered by the hook and governed by the host runtime's permission model.
 
