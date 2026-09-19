@@ -6,10 +6,10 @@ covers how to propose a change. The **binding rules** for any change live in
 [`CLAUDE.md` §6 — Mandatory Working Agreements](./CLAUDE.md#6-mandatory-working-agreements);
 this document summarizes them and shows you the contribution flow.
 
-## You do not need the `th` plugin or developer mode to contribute
+## Contributing with native tools
 
-Installing the `th` plugin and running developer mode is the **maintainer's local
-workflow**, not a contribution prerequisite. To contribute a change you only need
+Team Harness workflows are optional contributor tools. The native general agent
+can invoke the selected skill without a replacement output style. To contribute a change you only need
 `git`, a GitHub account, and (recommended) the `gh` CLI. The free verification
 suite runs with `bash`, `python3`, and `uv`.
 

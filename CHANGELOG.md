@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.30.1] - 2026-09-18
+
+### Changed
+
+- Retire the developer-mode replacement style and forced startup identity while retaining native-agent workflow discovery, specialist coordination, voice, language and workspace/Obsidian support.
+- Setup and update stop copying the style and guide migration of existing selections while preserving customized files and unrelated settings. Execution guards remain unchanged.
+
 ## [3.30.0] - 2026-09-17
 
 ### Added

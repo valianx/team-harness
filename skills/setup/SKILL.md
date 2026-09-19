@@ -348,21 +348,14 @@ written, which is exactly the divergence step 4a exists to prevent. Write the fi
 verbatim between the `<!-- orchestrator-dispatch-rule:start -->` and
 `<!-- orchestrator-dispatch-rule:end -->` markers.
 
-### 4e. Copy the developer-mode output style
+### 4e. Preserve native entry and migrate the retired style
 
-Copy the output style idempotently from the plugin cache (`~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/`), overwriting any existing version. Create the target directory if absent.
-
-1. **Output style** (the optional strong floor): `output-styles/developer-mode.md` -> `~/.claude/output-styles/developer-mode.md`.
-
-After the copy, tell the operator:
-
-```
-Orchestrator disposition configured.
-  Gate:    fires unconditionally, minimal floor by destination — non-default branch push to origin: allow; default/tag/force push, PR merge: ask; other outward writes: host permission model
-  Style:   /config -> Output style -> developer-mode  (optional — replaces coding instructions with orchestrator contract)
-```
-
-**The `developer-mode` output style is NOT force-installed** (`force-for-plugin` is false). The orchestration disposition is always active; the output style is an opt-in strong floor for operators who want `keep-coding-instructions: false`. Force-for-plugin is intentionally omitted to preserve the per-operator escape hatch (see `docs/dev-mode.md § Default-on disposition`).
+The general agent uses its native coding instructions and discovers TH workflows
+through the managed guide and session context. Do not install an output style.
+For an existing installation, follow
+[the bounded style migration](../../docs/dev-mode.md#retire-an-existing-developer-mode-selection), preserving
+customized styles and unrelated settings and reporting any unresolved selection.
+Keep the voice rule below and the configured language/workspace context.
 
 ### 4c. Write voice-rule block
 

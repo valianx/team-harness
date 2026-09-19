@@ -86,15 +86,9 @@ async function createFixture() {
     "3.26.0"
   );
   const managedBlocks = path.join(versionRoot, "skills", "setup", "managed-blocks");
-  const outputStyles = path.join(versionRoot, "output-styles");
   const scriptPath = path.join(profile, "update-block.ps1");
   await mkdir(managedBlocks, { recursive: true });
-  await mkdir(outputStyles, { recursive: true });
   await cp(path.join(root, "skills", "setup", "managed-blocks"), managedBlocks, { recursive: true });
-  await cp(
-    path.join(root, "output-styles", "developer-mode.md"),
-    path.join(outputStyles, "developer-mode.md")
-  );
   // Run the exact extracted block from a file so Windows' command-line length
   // limit cannot truncate the script or change its quoting semantics.
   await writeFile(
@@ -162,6 +156,15 @@ async function runRegression(shell) {
     await rm(fixture.backup, { force: true });
     const missing = runBlock(shell, fixture.profile, fixture.scriptPath);
     assertSuccessfulRun(missing, `${shell.label} missing file`);
+    await assert.rejects(access(path.join(fixture.claudeDir, "output-styles", "developer-mode.md")),
+      `${shell.label}: update does not recreate the retired style`);
+    // A custom legacy copy belongs to the operator; block sync must preserve it.
+    const legacyStyle = path.join(fixture.claudeDir, "output-styles", "developer-mode.md");
+    await mkdir(path.dirname(legacyStyle), { recursive: true });
+    const customStyle = "---\nname: developer-mode\n---\nMy custom instructions.\n";
+    await writeFile(legacyStyle, customStyle);
+    assertSuccessfulRun(runBlock(shell, fixture.profile, fixture.scriptPath), `${shell.label} custom style`);
+    assert.equal(await readFile(legacyStyle, "utf8"), customStyle, `${shell.label}: custom style preserved`);
     const created = (await readFile(fixture.claudeMd)).toString("utf8");
     assert.match(created, /<!-- orchestrator-dispatch-rule:start -->/);
     assert.match(created, /<!-- voice-rule:start -->/);

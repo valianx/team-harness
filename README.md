@@ -283,13 +283,13 @@ Learn mode (explain a codebase, library, or concept with a layered teaching pack
 /th:learn how does the LLM work in this ADK project --resume
 ```
 
-> **`th:orchestrator` is the canonical entry point.** It starts in lightweight direct mode. Use `/th:pipeline {request}` when you want the gated multi-agent flow; skills such as `/th:design` and `/th:deliver` remain direct shortcuts, while `/th:recover` resumes an existing pipeline. See [`docs/agent-tree.md`](./docs/agent-tree.md) for the runtime relationship.
+> **The native general agent coordinates Team Harness workflows.** Use `/th:spec` for written intent and tasks, `/th:pipeline` for broader coordination, `/th:review-pr` for PR review and `/th:create-pr` for preparation/publication. Read the selected current skill; `/th:recover` remains available for an existing pipeline.
 
 ---
 
-## Orchestrator disposition
+## Native agent and Team Harness workflows
 
-The top-level session agent is **`th:orchestrator`**. Its small startup kernel handles conversation, inspection, review, and bounded reversible changes directly. It loads the gated pipeline (architect → implementer → tester/qa/security → delivery) only after a live `/th:pipeline`, an explicit request to start one, or `/th:recover` for persisted state. A deterministic gate (`hooks/dev-guard.sh`) still governs outward actions independently of either posture.
+The general agent retains its native coding instructions. Team Harness adds workflow discovery, specialist coordination, voice and language preferences, and workspace/Obsidian context. The developer-mode replacement style is retired. Existing execution guards remain independent of style selection; their evaluation is a separate change.
 
 Full contract: docs/dev-mode.md.
 
