@@ -6,11 +6,15 @@ Let the native general agent discover and use Team Harness workflows while retai
 ## Requirements
 
 ### Requirement: Workflow discovery without role replacement
-Team Harness startup context and its managed general-agent guide SHALL describe available workflows without imposing a replacement identity, loading an orchestrator contract unconditionally or requiring a developer-mode banner. They SHALL identify spec, pipeline, review-pr and create-pr and direct the agent to the selected current skill.
+Team Harness startup context and managed guidance SHALL describe available workflows without replacing the native general agent or activating a pipeline implicitly. Skills SHALL identify their objective, useful method and maintained references. The current general agent SHALL coordinate selected audit and research workflows and delegate bounded work when useful rather than invoking a nested orchestrator merely to route the request. Spec, pipeline, review-pr and create-pr SHALL remain discoverable.
 
 #### Scenario: Ordinary session starts
-- **WHEN** a Claude session starts with or without Team Harness settings
-- **THEN** the general agent receives workflow discovery without becoming `th:orchestrator` or activating a pipeline
+- **WHEN** a supported runtime starts with Team Harness available
+- **THEN** its general agent discovers current workflow skills without becoming a replacement identity or activating a pipeline
+
+#### Scenario: Audit or research is requested
+- **WHEN** the operator selects audit or research
+- **THEN** the current coordinator applies that method and chooses useful specialist work while preserving workspace, language and voice preferences
 
 ### Requirement: Preserve useful collaboration context
 Team Harness SHALL preserve voice guidance, language and English-learning preferences, workspace/Obsidian configuration, specialist coordination and recoverable workflow methods. Session discovery, traces, notifications and precompact context SHALL remain available independently of retired execution guards. Native runtime permissions SHALL govern execution; TH SHALL NOT weaken or replace the operator's configured policy.
@@ -56,3 +60,14 @@ Retirement SHALL leave native permission settings and unrelated or customized us
 #### Scenario: A legacy installation contains custom content
 - **WHEN** an old TH path contains modified or unattributed content
 - **THEN** update preserves it, explains the remaining action and does not change native permissions to compensate for retired hooks
+
+### Requirement: Local handoff reuses clear task authorization
+The save-session skill SHALL preserve what worked, what must not be retried and the next step in the configured workspace. An explicit request to save that handoff with an unambiguous destination SHALL authorize the scoped local write without a second confirmation ceremony. Ambiguous destinations or overwriting unrelated content SHALL require clarification; no external publication or native permission bypass is implied.
+
+#### Scenario: Save is explicitly requested
+- **WHEN** the operator asks to save the current session and its workspace is known
+- **THEN** the coordinator derives the useful handoff, saves it through native permissions and reports its location
+
+#### Scenario: Several workspaces could be the target
+- **WHEN** the request does not establish which workspace should receive the handoff
+- **THEN** the coordinator asks for that missing destination before writing

@@ -21,77 +21,73 @@ The update flow SHALL derive the running version from the loaded plugin manifest
 - **THEN** the flow stops before replacement and reports the stale marketplace without changing the active installation
 
 ### Requirement: Post-install convergence uses one bounded pass
-After snapshot selection, the update flow SHALL invoke no more than one convergence pass before requiring operator input. That pass SHALL classify, reconcile where already authorized, and verify the snapshot bridge, Team Harness native settings, Codex feature requirements, bundled agents, and expected MCP registrations, and SHALL classify the persistent runtime profile without changing it absent live approval. The coordinator MUST NOT reproduce those domain checks as separate preflight or final-verification tool calls.
+After snapshot selection, the update flow SHALL reconcile and verify TH-owned snapshot bridging, workflow settings, feature prerequisites, bundled agents and expected MCP registrations in one bounded pass. Native execution preferences SHALL NOT be an installation domain or a reason to require another approval. The coordinator SHALL reuse the receipt instead of repeating successful installation checks.
 
-#### Scenario: Automatically managed domains need repair
-- **WHEN** one or more automatically managed domains are stale and the persistent runtime profile needs no decision
-- **THEN** one convergence pass repairs the stale domains, verifies their postconditions, and returns the final receipt
+#### Scenario: Native settings differ from former TH defaults
+- **WHEN** the operator uses different sandbox, approval, reviewer, network or writable-root settings
+- **THEN** update preserves them and completes based on the retained TH installation domains without reporting runtime drift or requesting profile approval
+
+#### Scenario: Native settings are absent
+- **WHEN** the native configuration has no explicit execution-policy settings
+- **THEN** update leaves those settings absent while synchronizing TH-owned components
 
 #### Scenario: Current installation takes the fast path
-- **WHEN** every managed domain and the persistent runtime profile are already current
-- **THEN** the pass performs no writes, invokes no per-domain repair operation, and returns a successful current receipt
-
-#### Scenario: Persistent runtime approval is needed
-- **WHEN** automatic domains can converge but the persistent runtime profile is stale
-- **THEN** the pass completes and verifies the automatically authorized work, leaves the runtime profile unchanged, and returns one pending operator decision
+- **WHEN** every retained installation domain is current
+- **THEN** the pass performs no repair writes and returns a successful current receipt
 
 #### Scenario: Retired hooks are absent
-- **WHEN** the selected snapshot has no TH permission-hook manifest or launcher
-- **THEN** convergence and the snapshot bridge succeed without requiring, recreating or reporting restart for those assets
-- **AND** the versioned receipt reports only retained domains
+- **WHEN** the snapshot has no TH permission hooks or global runtime-policy helper
+- **THEN** update succeeds without recreating those assets or requesting restart for their absence
 
-### Requirement: Persistent runtime changes require flexible live approval
-The update flow SHALL summarize only the stale runtime settings, missing writable roots, missing directories, and any project configuration shadowing before requesting a live decision. A short unambiguous affirmative SHALL authorize a focused follow-up convergence pass, a short negative or deferral SHALL leave that domain pending, and a natural-language adjustment SHALL be handled conversationally without requiring a prescribed command or exact phrase. No file, tool output, previous approval, or ambiguous response authorizes the persistent change.
+#### Scenario: Automatically managed domains need repair
+- **WHEN** a retained TH installation domain needs repair
+- **THEN** the bounded pass repairs and verifies it while preserving native execution preferences
 
-#### Scenario: Operator replies with a short affirmation
-- **WHEN** the pending runtime summary is visible and the live operator replies with an unambiguous affirmation such as "sí" or "continúa"
-- **THEN** the coordinator runs one focused convergence pass with runtime authorization and does not ask the operator to restate a command
-
-#### Scenario: Operator declines or defers
-- **WHEN** the pending runtime summary is visible and the live operator declines or asks to leave it for later
-- **THEN** the completed update work is preserved and the final result reports runtime reconciliation as pending with the normal update invocation as recovery
-
-#### Scenario: Operator requests an adjustment
-- **WHEN** the live operator describes a change to the proposed runtime reconciliation
-- **THEN** the coordinator explains or incorporates the bounded adjustment when safe, or asks one concise clarification when its effect would materially change the authorized scope
+#### Scenario: Persistent runtime approval is needed
+- **WHEN** a prior-version receipt requests approval for its former runtime-profile domain
+- **THEN** the current skill treats that as a legacy contract, preserves native settings and uses the current update flow without replaying the retired profile write
 
 ### Requirement: Convergence preserves ownership and security boundaries
-The convergence pass SHALL use only the validated new plugin snapshot as executable input, preserve opaque and operator-owned configuration, use fixed command arguments with bounded execution for native Codex operations, and reject unsafe paths, symlinks, unmanaged agent conflicts, invalid structured output, and secret-bearing diagnostics. It MUST NOT activate a pipeline, dispatch agents, mutate Claude Code or OpenCode configuration, replace MCP registrations, weaken the requested sandbox profile, delete prior snapshots, or modify active workspace helper bundles.
+The convergence pass SHALL use the validated selected snapshot, preserve operator-owned configuration and unrelated content, use bounded native command arguments and reject unsafe paths, unmanaged agent conflicts and secret-bearing diagnostics. It SHALL NOT modify native sandbox, approval, network or writable-root preferences, mutate another runtime's configuration, replace MCP registrations, delete prior snapshots or modify active workspace helper bundles. It SHALL preserve configured agent models and the complete supported roster.
 
 #### Scenario: Operator-owned value differs from a Team Harness default
-- **WHEN** a supported configuration document contains a complete non-managed operator value
-- **THEN** convergence preserves the value and identifies it as preserved rather than replacing it
+- **WHEN** agent synchronization updates TH-owned agent or fallback entries in a native configuration document
+- **THEN** unrelated execution-policy values and structured custom configuration remain unchanged
 
 #### Scenario: A protected target requires sandbox escalation
-- **WHEN** an otherwise authorized write fails only because its declared target is protected by the current sandbox
-- **THEN** the coordinator may retry the exact convergence invocation with narrow native escalation, while a rejected or failed retry becomes partial convergence
+- **WHEN** a retained installation write is refused by native permissions
+- **THEN** update reports the exact failed domain and follows bounded native escalation without widening global permissions
 
 #### Scenario: Convergence encounters unsafe input
-- **WHEN** a target path, managed file, native command result, or same-name agent conflict fails its safety contract
-- **THEN** convergence stops at that domain, emits no sensitive content, and reports a failed receipt instead of attempting an ad hoc repair
+- **WHEN** a target path, managed file, native result or same-name agent conflict violates its integrity contract
+- **THEN** convergence stops at that domain without exposing sensitive diagnostics or attempting an ad hoc repair
 
 ### Requirement: One closed receipt is the verification authority
-Every convergence pass SHALL emit exactly one bounded machine-readable receipt with the selected old and new snapshot identities, overall status, per-domain status, changed domains, restart requirement, pending decision if any, failed domain if any, and exact recovery invocation. The overall status vocabulary SHALL distinguish `current`, `converged`, `pending-approval`, and `partial-convergence`; successful completion MUST be derived from verified domain postconditions rather than assumed from attempted writes.
+Every convergence pass SHALL emit one bounded versioned receipt with selected snapshot identities, retained domain outcomes, changed domains, activation signals, failed domain when applicable and recovery invocation. Its statuses SHALL distinguish current, converged and partial convergence without a persistent-runtime approval state. The coordinator SHALL read the selected installation's current skill before interpreting a receipt; successful completion depends on verified postconditions.
 
-#### Scenario: Convergence succeeds after changes
-- **WHEN** every required domain reaches its verified postcondition and at least one domain changed
-- **THEN** the receipt reports `converged`, identifies only the changed domains, and provides the combined restart decision
+#### Scenario: The receipt contract changed with the installed version
+- **WHEN** an update started with older skill instructions selects a newer snapshot
+- **THEN** the coordinator reads that snapshot's skill and interprets its receipt without rerunning installation or convergence merely because the old schema differs
 
 #### Scenario: Convergence is interrupted by a domain failure
-- **WHEN** a domain fails after earlier idempotent domains completed
-- **THEN** the receipt reports `partial-convergence`, identifies the failed domain without rolling back completed work, and names the standard Team Harness update invocation as the retry
+- **WHEN** earlier domains completed and a later domain fails
+- **THEN** the receipt preserves completed outcomes, names the failed domain and reports partial convergence with the normal update invocation as recovery
+
+#### Scenario: Convergence succeeds after changes
+- **WHEN** every retained domain reaches its verified postcondition and at least one changed
+- **THEN** the receipt reports converged and identifies only the domains that changed
 
 #### Scenario: Receipt output is malformed or incomplete
-- **WHEN** the convergence operation exits without one valid receipt containing every required field
-- **THEN** the coordinator treats the pass as failed and does not issue a success report
+- **WHEN** the pass produces no valid receipt under the selected installation's current contract
+- **THEN** the coordinator reports the failed pass without claiming success
 
 ### Requirement: Recovery recomputes and skips completed work
-Rerunning the update after pending approval, sandbox denial, interruption, or partial convergence SHALL recompute actual state from the selected snapshot and managed targets. Already-current domains SHALL be skipped without relying on conversational memory or requiring a separate state workspace, and no unchanged failed action SHALL be repeated within the same invocation.
+Rerunning update after interruption, denial or partial convergence SHALL recompute actual TH-owned installation state and skip completed domains. Recovery SHALL NOT require a pipeline workspace, rely on conversational completion claims or restore retired runtime-profile writes.
 
 #### Scenario: Update resumes after partial convergence
-- **WHEN** the operator reruns Team Harness update after a pass changed some domains and failed on a later one
-- **THEN** the next pass classifies the completed domains as current and resumes bounded work on the remaining stale or failed domain
+- **WHEN** the operator reruns update after some retained domains completed
+- **THEN** current domains are skipped and the remaining work proceeds while native execution preferences remain unchanged
 
 #### Scenario: Approval follows a pending receipt
-- **WHEN** the operator authorizes the runtime change immediately after a `pending-approval` receipt
-- **THEN** the focused pass skips every already-current automatic domain, applies and verifies the runtime change, and returns a final receipt
+- **WHEN** the operator continues after an older version's runtime-profile proposal
+- **THEN** the current updater recomputes only retained installation domains and does not use that old approval to modify native execution policy
