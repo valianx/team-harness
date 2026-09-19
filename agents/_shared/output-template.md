@@ -19,5 +19,5 @@ pipeline phase, Gate, peer, recovery route, or acceptance.
 
 ## Output Discipline
 
-Return the envelope once, without narrative copies of its authority or scope and
-without raw command logs or secret-shaped diagnostics.
+Keep narrative copies of authority or scope, raw command logs and secret-shaped
+diagnostics out of the envelope.

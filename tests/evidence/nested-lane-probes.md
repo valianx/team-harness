@@ -31,7 +31,10 @@ Full probe definition: `tests/probe_lane_hook_depth.md`.
 
 ## M3 — Gate messaging round-trip (panel resume + dual-record)
 
-Full probe definition: `tests/probe_lane_gate_messaging.md`.
+The superseded M3 probe definition was retired with the disconnected workflow
+assets. Its original text remains in Git history before this change. The useful
+conclusion is that direct replies to a paused subagent panel were unavailable;
+this historical experiment does not define a current activation prerequisite.
 
 | Check | OBSERVED | Status | Source |
 |---|---|---|---|

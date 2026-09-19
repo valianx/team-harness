@@ -85,26 +85,26 @@ the development cache key changes; then run
 cached snapshot.
 
 Codex does not receive a Team Harness policy-hook layer. Setup and update
-converge the native sandbox, permission and approval profile, skills, agents and
-MCP registrations; reload verifies those resources through controls exposed by
-the active host. Native Codex permissions and approvals remain authoritative.
+maintain TH workflow settings, skills, agents and integration prerequisites;
+they preserve native sandbox, approval, network and writable-root preferences.
+Reload assesses activation through controls exposed by the active host.
 A changed declaration or unavailable activation evidence does not by itself
 establish a restart requirement; reconnect only when the host reports that a
 specific component cannot activate in place. Claude-only context or
 observation integrations are documented with their owning runtime and are not
 projected into Codex.
 
-For contributors, the generated project `.codex/config.toml` keeps
-`workspace-write` plus `on-request` approvals and enables dependency network
-access. It deliberately omits `writable_roots`, allowing the global
-setup/update reconciliation to supply the standard Go, uv, npm, and Go module
-caches, Codex's private temp directory, preserved operator roots, and the
-configured Obsidian Team Harness subtree. The same global profile selects
-`approvals_reviewer = "auto_review"` so eligible CLI and Git escalations are
-reviewed without stopping for a human prompt. This avoids shared predictable
-`/tmp` paths and broad write access to `$HOME`. Temporary `.git`
-directories remain protected by Codex and any test that constructs them still
-requires a narrowly scoped live approval.
+For contributors, the generated project `.codex/config.toml` registers TH agents
+and their defaults without selecting a project execution policy. Agent-role
+read-only defaults remain part of those roles. Setup/update preserve existing
+operator preferences, including values installed by older TH versions; they do
+not reset them or add cache and vault paths to native permissions.
+
+Workspace/Obsidian selection remains a TH preference resolved by the existing
+workspace mechanism. A configured path is a destination, not a permission grant.
+When a real write fails, report the affected target and available native remedy.
+Use native permission controls for an explicitly requested access change; do not
+treat a different policy or unavailable activation evidence as update failure.
 
 The plugin supplies all canonical Team Harness skills. Ten lifecycle and
 pipeline contracts remain hand-authored for Codex; the remaining skills use generated

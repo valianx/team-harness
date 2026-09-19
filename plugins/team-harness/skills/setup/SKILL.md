@@ -20,12 +20,6 @@ write:
 
 - `scripts/manage_config.py` validates, backs up, and atomically writes native
   settings with mode `0o600`.
-- `scripts/manage_runtime.py` converges the global Codex sandbox, automatic
-  approval reviewer, network access, tool caches, runtime temp directory, and
-  configured shared Obsidian root `{logs-path}/{logs-subfolder}` without
-  removing operator-owned writable roots. The grant is deliberately above the
-  per-repository directory because pipelines resolve
-  `{logs-path}/{logs-subfolder}/{repo-name}/{feature}` from their own cwd.
 - `scripts/manage_agents.py` installs or refreshes the twenty bundled generated
   agents without overwriting an unmanaged same-name file.
 - `scripts/manage_github_identities.py` validates and atomically manages the
@@ -121,30 +115,16 @@ migration, and preserve every unrelated value.
 
    - Workspace defaults to `local`. For `obsidian`, require an existing
      absolute vault path plus a safe relative subfolder. Reject filesystem
-     roots, the user home, traversal, globs, and symlink escapes. Runtime
-     reconciliation creates the shared `{logs-path}/{logs-subfolder}` subtree
-     when needed and appends that canonical path to
-     `sandbox_workspace_write.writable_roots`; never append only the current
-     `{repo-name}` child, which would make the configuration unusable from other
-     repositories.
-     A settings write alone does not prove a running session's sandbox changed.
-     Use the installed reload flow to assess supported activation and explain
-     any demonstrated reconnect need. The pipeline's non-escalated live write
-     probe remains authoritative before reporting the external workspace ready.
-   - Keep `approval_policy = "on-request"` and set
-     `approvals_reviewer = "auto_review"`. This is Codex's automatic review
-     path for sandbox escalations, including ordinary local Git metadata writes,
-     benign pushes, and PR creation; it is not a blanket command allow rule.
-     Never add a repository `.git` directory to writable roots and never install
-     a blanket `git`, `git push`, `gh pr create`, or `git worktree add` rule.
-     Native permission settings and server-side GitHub branch protection remain
+     roots, the user home, traversal, globs, and symlink escapes. Preserve the
+     configured destination as a Team Harness preference; writing there remains
+     subject to the host's native permission boundary. The pipeline's
+     non-escalated live write probe remains authoritative before reporting the
+     external workspace ready. If that probe fails, report the exact target and
+     native refusal rather than rewriting global policy.
+   - Preserve the native `sandbox_mode`, `approval_policy`,
+     `approvals_reviewer`, `network_access`, and `writable_roots` values. Native
+     permission settings and server-side GitHub branch protection remain
      authoritative; TH no longer supplies an additional force-push interceptor.
-     A pipeline still submits one exact `git worktree add -b <branch>
-     <absolute-path> <immutable-base-sha>` native escalation after Gate 1;
-     `auto_review` evaluates it without a human prompt. If that reviewer times
-     out or denies the command, the pipeline remains technically paused and may
-     make the contract's single bounded resubmission; setup never rewrites
-     permission state or treats that technical boundary as a functional failure.
    - Language is a two-letter lowercase code or absent for automatic detection.
    - English learning, Obsidian Tasks, and flow telemetry are booleans;
      telemetry defaults off.
@@ -181,33 +161,11 @@ migration, and preserve every unrelated value.
    directory with `GH_CONFIG_DIR=<dir> gh auth login` remains an operator action;
    never read, print, copy, or store token bytes.
 
-6. Reconcile global Codex execution defaults on every setup, including a
-   targeted setup, after applying any selected workspace values:
+6. Preserve native execution policy after applying any selected workspace
+   values. Setup does not inspect or reconcile global sandbox, approval,
+   network, or writable-root settings.
 
-   ```bash
-   python3 scripts/manage_runtime.py inspect
-   python3 scripts/manage_runtime.py ensure
-   ```
-
-   The helper atomically updates `${CODEX_HOME:-$HOME/.codex}/config.toml`,
-   preserves unrelated keys and all existing writable roots, and ensures
-   `workspace-write`, `on-request`, `auto_review`, sandbox network access, the
-   standard Go/uv/npm caches, `${CODEX_HOME:-$HOME/.codex}/tmp`, and the active
-   Obsidian Team Harness subtree. It never adds `.git` or a command rule. A
-   changed runtime config requires verified activation before it is effective.
-
-   When `inspect` reports `projectConfigShadowing: true`, the checked-out
-   tree's `.codex/config.toml` declares its own `writable_roots` (or is
-   degraded and unreadable) and replaces the operator-level list for sessions
-   started in that tree. Warn the operator explicitly, naming the reported
-   `projectConfig.path`, before running `ensure`: the operator-level repair
-   (`ensure`, behind the same confirmation gate as every config write) fixes
-   the global config, but the shadowing itself is fixed only by updating the
-   checkout or regenerating the project config so it stops declaring
-   `writable_roots`. Restarting Codex alone does not clear shadowing; after the
-   fix, use reload to assess activation and any demonstrated reconnect need.
-
-7. Reconcile all twenty bundled specialists in the persisted scope on every full
+6. Reconcile all twenty bundled specialists in the persisted scope on every full
    setup, and whenever `agents` is targeted:
 
    ```bash
@@ -234,7 +192,7 @@ migration, and preserve every unrelated value.
    invalidate an already verified reviewer profile. Never require a new chat
    solely because setup ran.
 
-8. Configure selected MCP servers after `codex mcp list --json`. Preserve an
+7. Configure selected MCP servers after `codex mcp list --json`. Preserve an
    existing registration unless the operator explicitly requests replacement.
 
    - Memory: register a streamable HTTP URL, optionally with the name (not the
@@ -244,20 +202,19 @@ migration, and preserve every unrelated value.
      printing it, then run
      `codex mcp add context7 --env DEFAULT_MINIMUM_TOKENS=10000 -- npx -y @upstash/context7-mcp@3.2.5`.
 
-9. The Codex distribution has no TH permission-hook manifest or launcher.
+8. The Codex distribution has no TH permission-hook manifest or launcher.
    Treat those retired assets as unnecessary; do not recreate them or request
    hook trust, repair, or restart because they are absent. Preserve the
    operator's native permissions and unrelated hooks. Native policies are not
    claimed to duplicate the checks removed from TH.
 
-10. Re-run the applicable helper inspections and `codex mcp list --json`; re-run
+9. Re-run the applicable helper inspections and `codex mcp list --json`; re-run
     `codex features list` only when step 4 ran. Report one compact result:
     native config path, workspace/language, agent scope and twenty agent statuses,
     GitHub route count when configured, feature-flag status when checked, MCP registrations,
-    global execution-default status, pending activation or
-    same-conversation reconnect, and for Obsidian whether the writable-root grant
-    is effective. Report the configured native approval policy without promising
-    an additional TH execution restriction. Never print
+    workspace destination, pending activation or same-conversation reconnect,
+    and any exact native access failure observed while writing there. Report
+    that native execution policy was preserved; never print
     imported opaque values, secrets, or environment-variable values.
 
 The flow is idempotent. Blank input preserves current values; unrelated native

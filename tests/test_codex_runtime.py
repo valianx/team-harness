@@ -122,7 +122,15 @@ def check_registry_and_projections() -> None:
 
 
 def check_config_and_manifests() -> None:
+    registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
+    require("project_execution" not in registry, "Codex registry must not prescribe project execution policy")
     config = tomllib.loads((ROOT / ".codex/config.toml").read_text(encoding="utf-8"))
+    require("sandbox_mode" not in config, "project config must preserve native sandbox policy")
+    require("approval_policy" not in config, "project config must preserve native approval policy")
+    require("approvals_reviewer" not in config, "project config must preserve native approval reviewer")
+    require("network_access" not in config, "project config must preserve native network policy")
+    require("writable_roots" not in config, "project config must preserve native writable roots")
+    require("sandbox_workspace_write" not in config, "project config must preserve native writable roots")
     require(config.get("agents", {}).get("enabled") is True, "Codex subagents are disabled")
     require(config.get("features", {}).get("multi_agent_v2") is True, "Codex V2 is disabled")
     require(config.get("project_doc_fallback_filenames") == ["CLAUDE.md"], "fallback config drift")

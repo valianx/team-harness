@@ -142,24 +142,14 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
   if (contract.format_version !== 1 || contract.runtime !== "codex") {
     fail("unsupported contract format or runtime");
   }
+  if (Object.prototype.hasOwnProperty.call(contract, "project_execution")) {
+    fail("project_execution is no longer supported");
+  }
   if (!Number.isInteger(contract.max_concurrent_threads_per_session) || contract.max_concurrent_threads_per_session < 1) {
     fail("max_concurrent_threads_per_session must be a positive integer");
   }
   const allowedCapabilities = assertUniqueStringArray(contract.allowed_capabilities, "allowed_capabilities", { nonEmpty: true });
   const allowedSandboxModes = assertUniqueStringArray(contract.allowed_sandbox_modes, "allowed_sandbox_modes", { nonEmpty: true });
-  const projectExecution = contract.project_execution;
-  if (!projectExecution || typeof projectExecution !== "object" || Array.isArray(projectExecution)) {
-    fail("project_execution must be an object");
-  }
-  if (!allowedSandboxModes.has(projectExecution.sandbox_mode)) {
-    fail(`project_execution: unsupported sandbox mode ${projectExecution.sandbox_mode ?? "missing"}`);
-  }
-  if (projectExecution.approval_policy !== "on-request") {
-    fail("project_execution.approval_policy must be on-request");
-  }
-  if (typeof projectExecution.network_access !== "boolean") {
-    fail("project_execution.network_access must be a boolean");
-  }
   const projectDefaults = contract.project_defaults;
   if (!projectDefaults || typeof projectDefaults !== "object" || Array.isArray(projectDefaults)) {
     fail("project_defaults must be an object");
@@ -350,16 +340,11 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
 
   const config = [
     "# Code generated from runtime/schema/codex-agents.json; DO NOT EDIT.",
-    `sandbox_mode = ${JSON.stringify(projectExecution.sandbox_mode)}`,
-    `approval_policy = ${JSON.stringify(projectExecution.approval_policy)}`,
     `project_doc_fallback_filenames = [${projectDefaults.project_doc_fallback_filenames.map(value => JSON.stringify(value)).join(", ")}]`,
     "",
     "[features]",
     "multi_agent = true",
     "multi_agent_v2 = true",
-    "",
-    "[sandbox_workspace_write]",
-    `network_access = ${projectExecution.network_access}`,
     "",
     "[agents]",
     "enabled = true",

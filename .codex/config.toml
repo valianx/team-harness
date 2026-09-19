@@ -1,14 +1,9 @@
 # Code generated from runtime/schema/codex-agents.json; DO NOT EDIT.
-sandbox_mode = "workspace-write"
-approval_policy = "on-request"
 project_doc_fallback_filenames = ["CLAUDE.md"]
 
 [features]
 multi_agent = true
 multi_agent_v2 = true
-
-[sandbox_workspace_write]
-network_access = true
 
 [agents]
 enabled = true

@@ -14,7 +14,6 @@ When input is present, pass this payload verbatim:
 
 ```text
 Pipeline Activation: explicit
-Activation Source: live operator invocation of /th:pipeline
 Request: {operator input, verbatim}
 ```
 

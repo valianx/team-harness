@@ -44,33 +44,18 @@ without a build step. Do not edit generated files directly.
 
 The generated project config uses `gpt-5.6-luna` at `max` as its generic
 subagent fallback without overriding Main's selected model, adds `CLAUDE.md` as
-an ordered project-instruction fallback when `AGENTS.md` is absent, enables both
-`multi_agent` and `multi_agent_v2`, and uses
-`workspace-write` with `on-request` approvals. It enables dependency network
-access without shadowing the user-level writable roots reconciled by the
-packaged setup/update helper. That global helper preserves operator-owned roots
-and adds the standard Go, uv, npm, and Go module caches, Codex's private temp
-directory, and the configured Obsidian Team Harness subtree. It also selects
-Codex's `auto_review` approval reviewer, so ordinary Git metadata, push, and PR
-creation escalations do not stop for a human prompt. This keeps routine builds
-inside the sandbox without shared predictable `/tmp` directories or broad write
-access to the user home. Codex still
-protects `.git` directories in this mode, so tests that construct temporary Git
-repositories require a narrowly approved command or an equivalent external CI
-sandbox; the project config does not weaken that boundary.
-In particular, an approved Team Harness Gate 1 does not grant filesystem
-authority: `git worktree add` must use Codex's native on-request escalation for
-the exact command because it writes refs and shared `.git/worktrees` metadata.
-Team Harness setup neither adds `.git` to writable roots nor installs a blanket
-Git command rule, because such a rule could outrank deterministic force-push
-denial. `approval_policy` remains `on-request`; the automatic reviewer handles
-the native on-request escalation for the exact worktree command. Team Harness
-does not add a Codex policy-hook floor. A reviewer timeout leaves the pipeline
-technically paused and recoverable; it is not a functional failure or denial.
-An additional writable root for an Obsidian Team Harness workspace changes only
-that external subtree. It takes effect for newly started Codex sessions and
-does not make the repository's `.git` writable; `.git` remains protected by
-design in `workspace-write` mode.
+an ordered project-instruction fallback when `AGENTS.md` is absent, and enables
+both `multi_agent` and `multi_agent_v2`. It deliberately omits
+`sandbox_mode`, `approval_policy`, `approvals_reviewer`, `network_access`, and
+`writable_roots`, leaving those execution decisions to Codex and the operator.
+Setup and update preserve existing native values and never add global cache,
+temporary, repository, or Obsidian roots as Team Harness defaults. Reviewer
+agent projections retain their read-only sandbox class as a role capability;
+that declaration does not replace the host's global policy. Workspace settings
+select the Obsidian destination, while any write there remains subject to the
+native permission boundary. When an access probe fails, report its exact target
+and native refusal rather than prescribing a policy rewrite or restart without
+activation evidence.
 
 The distributable package lives under `plugins/team-harness/`; the repo-scoped
 catalog at `.agents/plugins/marketplace.json` exposes it to Codex. The root

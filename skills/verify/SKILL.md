@@ -1,77 +1,44 @@
 ---
 name: verify
-description: Run the inline verification fan over a committed range and decide its ship join — no workspace, no pipeline state.
+description: Review a committed local change with independent lenses and report the evidence and decision.
 ---
 
-# Verify (explicit direct mode)
+# Verify
 
-Requests the inline verification fan over an immutable committed range and reports its review
-decision. The lens contract is `agents/_shared/inline-review-contract.md`; this
-skill is its invocation surface, not a second copy of it.
+Review the operator's immutable committed target without activating a pipeline
+or publishing anything. Main coordinates independent reviewers and judges their
+evidence under the [inline review contract](../../agents/_shared/inline-review-contract.md).
+That contract owns target identity, native read-only dispatch, coverage and
+return handling; this skill does not restate those procedures.
 
-The skill creates no workspace, `00-state.md`, execution event, gate, Stage Gate, branch, commit,
-push, or delivery record. It never publishes.
+## Prepare and review
 
-## Flow
+Use `scripts/review-fan.mjs` from this selected skill installation. When developing
+TH itself, use the repository's canonical copy. Do not select a helper from another
+runtime's cache or an unbound newer directory.
 
-1. **Build the package.** Run `review-fan.mjs package` with the committed range, the operator's
-   lens set, and — when the work has an authored change — its active slug or exact
-   `archive/YYYY-MM-DD-<change>` reference through `--change`. Resolve the script in
-   order, taking the first that exists:
+Build the package with `review-fan.mjs package`, the canonical repository,
+committed range and requested lenses. Bind an authored OpenSpec change through
+`--change`, using its exact `archive/YYYY-MM-DD-<change>` location when archived.
+The helper supplies classification, required lenses, coverage and prerequisite
+diagnostics. Repair a reported operational prerequisite within the authorized
+scope; do not substitute an unbound manual result for missing evidence.
 
-   1. latest `~/.claude/plugins/cache/team-harness-marketplace/th/*/skills/verify/scripts/review-fan.mjs`
-   2. `~/.claude/skills/verify/scripts/review-fan.mjs`
-   3. the opencode skill install:
-      `${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/skills/verify/scripts/review-fan.mjs`
-      (Windows: `%APPDATA%\opencode\skills\verify\scripts\review-fan.mjs`; a project-scope
-      install uses `<repo>/.opencode/skills/verify/scripts/review-fan.mjs`)
-   4. `scripts/review-fan.mjs` resolved against this skill's own directory (the directory
-      containing this document) — the packaged copy on Codex and opencode installs
-   5. `./skills/verify/scripts/review-fan.mjs`
-   The script resolves the repository, refuses a dirty index or worktree, refuses a range whose
-   endpoints are not commits, derives the changed surface from the repository, binds the change's
-   validated requirements as `written-intent` criteria, classifies the security floor, and resolves
-   the required lens set. Every refusal comes from the script; none of it is operator discipline.
-   On Windows the helper runs npm's `npx-cli.js` through Node, keeping arguments
-   literal. `OPENSPEC_RUNTIME_UNAVAILABLE` means npm's launcher could not be
-   resolved; `CHANGE_NOT_VALIDATED` means validation failed or timed out. Repair
-   the reported prerequisite without substituting an unbound manual validation.
-   Main's validator may populate the package-manager cache; reviewers themselves
-   never run it, install packages, or access the network.
-2. **Dispatch.** Dispatch one `inline-reviewer` instance per lens in `required_lenses`, each
-   carrying the emitted package. For Codex, Main first verifies the selected
-   profile under the shared contract and adds `profile_session` in memory; the
-   filesystem-based package helper cannot attest native activation. If that
-   evidence is unavailable, report the missing prerequisite without dispatching.
-   Several lenses are one review, not several specialists.
-   When the package reports `fully_verified: true`, every changed path was proven by a green
-   checker: report the surface as fully checker-verified, naming those checkers, and dispatch
-   no lens rather than reviewing an empty surface.
-3. **Decide.** Collect the lens returns and run `review-fan.mjs gate` over them. It resolves
-   `ready` only when every required lens returned a pass with no blocker; an absent required return
-   is never a pass. Report the reasons verbatim when it resolves not-ready. This result belongs to
-   the reviewed revision. For subsequent spec-author publication, Main applies
-   [author-review closure](../spec/references/author-review.md#repair) without rewriting that result.
-4. **Report.** Present the decision, the blocking reasons, and the classification. `gate` splits
-   blocking findings into `covered` — a bound written-intent criterion anticipated it — and
-   `spec_defects` — none did. A covered finding is fixed and closed by executing that criterion's
-   scenario plus the deterministic suites. A spec defect above the floor returns to the authored
-   change for an operator-approved revision. Concerns go in the pull-request body. None of the
-   three opens another verification pass.
+Use the emitted package for every lens, following the shared contract's selected
+profile and activation checks. A checker-verified empty review surface needs no
+reviewer dispatch; report the actual checker evidence. Missing required coverage
+or unavailable native activation is a limitation, never an inferred pass.
 
-## Scope
+## Decide and report
 
-- `--scope full` is the first pass over a range, and the only review the flow runs by default.
-- `--prior-anchor <sha>` bounds a package to the range since that anchor. This exists for a
-  reviewed look at a fix that the operator explicitly asks for; it is not a step the flow falls
-  into. The script refuses full scope once an anchor exists, and a finding whose files fall
-  outside the bounded range is demoted to a concern.
+Collect the original returns and run `review-fan.mjs gate`. Report the findings,
+coverage limits and historical decision against the reviewed revision. Preserve
+the result after repairs; a subsequent spec-author publication follows
+[author-review closure](../spec/references/author-review.md) with a separately
+identified corrected head and evidence for each disposition.
 
-## Security floor
-
-When the script reports `security_floor.applies`, `security` and `adversary` are already in
-`required_lenses` — the floor is derived from the diff, not from recall, and an unscannable path
-leaves the classification ambiguous, which resolves sensitive. The derivation reads every line the
-change touches: removing a security control raises the same floor as adding one, because a scan
-that reads additions only fails open on exactly the change a security review exists to catch. A
-floor lens that is absent or returns a blocker holds the range at not-ready.
+The first review uses full scope. A requested review of fixes uses the shared
+contract's prior-anchor delta path; it is not an automatic second round. Security
+and adversary coverage selected by the package remain applicable. Main must close
+actual blockers and explain residual concerns rather than treating a reviewer's
+verdict as a new source of operator authority.

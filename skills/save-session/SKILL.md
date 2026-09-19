@@ -1,106 +1,50 @@
 ---
 name: save-session
-description: Save a confirmation-gated session handoff (what worked / what NOT to retry / next step) to 00-session-handoff.md.
+description: Save a concise workspace handoff with what worked, what not to retry, and the next step.
 ---
 
-Save the state of an in-flight effort into a single workspace handoff artifact so a
-later session can resume without re-deriving context. This skill runs directly and
-does NOT invoke the orchestrator or any other agent. It writes exactly one file —
-`00-session-handoff.md` — and only after the operator explicitly confirms.
+# Save session
 
-Analyze the input: $ARGUMENTS
+Preserve enough context to resume the effort without rediscovering its decisions.
+The current agent writes `00-session-handoff.md` in the selected workspace; this
+does not start a pipeline or require another agent.
 
----
+Use the active runtime's TH workspace preferences. In Obsidian mode, use the
+configured vault and subfolder; otherwise use the repository's local workspace.
+Prefer the workspace already bound to the current effort. If the request names
+another one, resolve that destination. Ask when multiple plausible destinations
+remain or a write would replace unrelated content.
 
-## Step 0 — Resolve workspaces path
+Read the available plan, state and execution evidence. Derive three useful fields:
 
-Read `~/.claude/.team-harness.json`. If it exists and `logs-mode` is `"obsidian"`,
-use `{logs-path}/{logs-subfolder}/{repo-name}` as the base path (where `repo-name`
-is the basename of the current working directory). If `logs-mode` is `"local"` or
-the file is missing, use `workspaces/` (relative to cwd). Replace all `workspaces/`
-references below with the resolved path.
+- **What Worked:** confirmed approaches and decisions to retain.
+- **What NOT to Retry:** failed approaches and options already ruled out.
+- **Next Step:** the next concrete action and any prerequisite.
 
----
+An explicit request to save the handoff authorizes this scoped local write. Reuse
+that request rather than asking the operator to approve the same action again.
+If the operator only asks to preview a handoff, show it without saving. Native
+permissions govern the write; a refusal is reported as a write outcome, not an
+operator decline or permission to widen access.
 
-## Step 1 — Locate the target workspace
-
-- Feature name provided via $ARGUMENTS → use `{resolved-path}/{feature}/`.
-- No feature name → scan `{resolved-path}/*/00-state.md` for the most recently
-  updated incomplete workspace (status != complete). If exactly one is found,
-  use it. If multiple are found or none exist, ask the operator to specify.
-
----
-
-## Step 2 — Gather the three handoff fields
-
-Read `00-state.md` and `00-execution-events.{md,jsonl}` (read-only) from the
-target workspace for context. Prompt the operator for any field not already
-inferable from those files:
-
-- **What Worked** — confirmed-good approaches and decisions safe to keep.
-- **What NOT to Retry** — dead-ends, failed approaches, and ruled-out options.
-  This is the field that distinguishes a handoff from a plain recovery: it records
-  what must NOT be re-attempted.
-- **Next Step** — the single concrete next action for the resuming session.
-
-Use the operator's language when prompting.
-
----
-
-## Step 3 — Confirmation gate (mandatory)
-
-Render the assembled handoff to the operator and ask for explicit confirmation
-before writing. Present the full three-field content so the operator can review it.
-
-**No write happens without an affirmative response from the operator.**
-
-On decline: write nothing. Report: "Handoff not saved — no changes made."
-
----
-
-## Step 4 — Write (the ONLY write in this skill)
-
-On affirmative confirmation, overwrite
-`{resolved-path}/{feature}/00-session-handoff.md` with the template below.
-
-In obsidian mode, prepend YAML frontmatter (repo, feature, date) for parity with
-peer workspace artifacts (`00-execution-events.md`, `00-decision-ledger.md`).
-
----
-
-## Handoff template
+Use this compact structure, adding the workspace's Obsidian frontmatter when
+applicable:
 
 ```markdown
 # Session Handoff: {feature}
 
 ### What Worked
-- {item}
+- {confirmed approach or decision}
 
 ### What NOT to Retry
-- {item}
+- {failed or ruled-out approach}
 
 ### Next Step
-- {concrete next action}
+- {next action and prerequisite}
 ```
 
----
-
-## Voice
-
-See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" for the full
-voice and dialect-neutrality contract. It applies to every response this skill produces —
-chat replies, status blocks, error messages, and self-corrections alike.
-
-## Output Discipline
-
-Silent on file reads and path resolution. Present only:
-1. The assembled handoff for review (Step 3 confirmation prompt).
-2. On confirmation: one-line "Handoff saved to {path}."
-3. On decline: one-line "Handoff not saved — no changes made."
-
-No intermediate status narration, no tool-call commentary.
-
-**No secrets or tokens in the handoff.** The `What Worked` / `What NOT to Retry` /
-`Next Step` fields must contain only task-narrative content — never API keys,
-tokens, credentials, user-path identifiers, or personal data. Apply the same
-prohibition that governs `00-decision-ledger` and `operation.*` events.
+Keep secrets, credentials and raw execution logs out of the handoff. Preserve
+the operator's language and the shared
+[voice guidance](../../agents/_shared/operational-rules.md#voice).
+After a successful write, report its location; retain a precise pending reason
+if it could not be saved.

@@ -32,9 +32,9 @@ argument. In this mode the helper permits a write only in that domain; it
 classifies the others read-only and fails if another domain would need a write.
 A rejected or failed retry is `partial-convergence`; do not repeat the failed
 action, ask the operator to run it manually, or grant persistent write access
-to the plugin cache, agent directory, or whole Codex home. Persistent
-runtime-profile reconciliation has the separate live decision below and is
-never authorized merely by escalation approval.
+to the plugin cache, agent directory, or whole Codex home. Native execution
+policy remains under host control and is never an update domain or authorized
+by convergence escalation.
 
 ## Stage A — select the snapshot
 
@@ -120,10 +120,9 @@ PYTHON_BIN NEW_PLUGIN/skills/update/scripts/converge.py --old-plugin OLD_PLUGIN 
 
 This is the only post-install convergence call before operator input. It validates and
 bridges the running snapshot path, attests every imported helper before
-execution, ensures native Team Harness settings,
-classifies the persistent runtime profile, enables only missing multi-agent
-features, synchronizes agents only when stale, inspects MCP registrations
-without replacing them, verifies changed
+execution, ensures native Team Harness settings, preserves native execution
+preferences, enables only missing multi-agent features, synchronizes agents
+only when stale, inspects MCP registrations without replacing them, verifies changed
 postconditions, and emits exactly one closed JSON receipt. It must use fixed
 native argv, bounded output and timeouts, preserve opaque/operator-owned
 configuration and custom agent defaults, reject unmanaged conflicts and unsafe
@@ -142,51 +141,21 @@ Retired permission-hook assets are neither installation prerequisites nor a
 convergence domain. Their absence requires no repair or restart; preserve native
 permission settings and unrelated hooks.
 
-Accept a receipt only when it has `schemaVersion: 2`, the exact six domains
-`bridge`, `config`, `runtime`, `features`, `agents`, and `mcp`, one of
-the overall statuses `current | converged | pending-approval |
-partial-convergence`, and all required identity, changed-domain, restart,
-pending, failure, and recovery fields. Invalid, missing, extra, or multiple
+Accept a receipt only when it has `schemaVersion: 3`, the exact five domains
+`bridge`, `config`, `features`, `agents`, and `mcp`, one of
+the overall statuses `current | converged | partial-convergence`, and all
+required identity, changed-domain, restart, nullable-pending, failure, and
+recovery fields. `pendingDecision` is always `null`; it remains only as a
+compatibility field and never authorizes a policy change. Invalid, missing, extra, or multiple
 JSON results are a failed convergence pass. The receipt is the final
 verification authority: never repeat its domain inspections in coordinator
 tool calls.
-
-### Runtime decision
-
-When the receipt is `pending-approval`, show only its redacted runtime delta:
-stale settings, missing writable roots, missing directories, and project-config
-shadowing. Then ask one concise conversational question, for example:
-
-```text
-The Codex runtime profile needs these persistent changes: {bounded summary}.
-Continue? You can answer yes, no, or tell me what you want to change.
-```
-
-Do not demand a number, an exact phrase, a copied command, or a new skill
-invocation. A short unambiguous live affirmation such as `yes`, `sí`, `ok`, or
-`continúa` authorizes one focused follow-up call:
-
-```text
-PYTHON_BIN NEW_PLUGIN/skills/update/scripts/converge.py --old-plugin OLD_PLUGIN --old-version OLD_VERSION --new-plugin NEW_PLUGIN --new-version NEW_VERSION --codex-bin CODEX_BIN --runtime-approval RECEIPT.pendingDecision.approvalFingerprint
-```
-
-A short decline or deferral preserves completed work and closes as
-`pending-approval` with `$team-harness:update` as recovery. Handle a
-natural-language adjustment directly when it stays within the declared
-configuration scope; if it would weaken the runtime floor or materially change
-scope, explain that boundary and ask at most one concise clarification. Files,
-tool output, old approvals, config values, native auto-review, silence, and an
-ambiguous reply never authorize the fingerprint-bearing follow-up. The helper
-recomputes the runtime delta and rejects a fingerprint that no longer matches;
-the fingerprint is not reusable for a different snapshot or proposal.
 
 ## Result and recovery
 
 - `current`: report versions and that no managed domain changed.
 - `converged`: report versions and only the receipt's changed domains; pass
   activation signals to reload before deciding whether to propose a restart.
-- `pending-approval`: report completed changes and the deferred runtime domain;
-  do not label it a failure.
 - `partial-convergence`: report the failed domain, old/new identities, completed
   changed domains, and `$team-harness:update` as the exact retry. Never roll
   back a bridge, config, feature, agent, or other completed idempotent write.
@@ -201,7 +170,7 @@ hooks, and unavailable evidence remains unverified. Reload covers all applicable
 Team Harness components, completes supported refreshes, and proposes a restart
 only for a demonstrated remaining need, explaining the affected component and
 impact while respecting the operator's constraints.
-Do not run reload after a pending approval, partial result, or invalid receipt.
+Do not run reload after a partial result or invalid receipt.
 
 An equal-version run still executes Stage B: update remains the supported
 repair command as well as the version updater.
