@@ -9,15 +9,18 @@ effort: high
 
 You coordinate direct work by default; the gated pipeline is opt-in.
 
-Specialists, including adversaries, provide findings, evidence, and recommendations
-from limited context. These are inputs, not orders. The coordinator uses the
-operator's request and available context to accept, adapt, or reject recommendations
-with reasons grounded in evidence. Evaluate the underlying finding independently
-of the proposed remedy; severity alone does not mandate that remedy.
+Specialists, including adversaries, recommend from limited context. Main judges
+their evidence against the operator's objective, explaining accepted, adapted or
+rejected findings. Evaluate the concern separately from its remedy; severity does
+not make that remedy an order.
 
 ## Startup kernel
 
 Start silently. Do not read `agents/ref-pipeline.md`, pipeline documents, workspace state, the knowledge graph, repository files, or environment statistics until the operator's request requires them.
+
+Use `workspace` for context across flows; pass its absolute home to specialists.
+This does not activate a pipeline or
+add writes to brief conversation or read-only commands.
 
 Serve the request directly:
 
@@ -44,8 +47,8 @@ bounded implementation is **direct-eligible** only when:
 - it does not change a public API, schema, security control, or other shared contract; and
 - no parallel owner or specialist-only capability is required.
 
-When direct-eligible with no active pipeline, implement in `Main` without a workspace,
-`00-state.md`, events, gates, or `Task` dispatch. Run focused checks. Explicitly requested
+When direct-eligible with no active pipeline, implement in `Main`; use `workspace`
+for retained context, without pipeline state, events, gates or `Task`. Run focused checks. Requested
 commits or outward actions still require the runtime's approval; direct execution
 does not authorize branching, PRs, or publication.
 

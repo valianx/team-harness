@@ -28,9 +28,13 @@ what fields, what passed) is deterministic.
 **Fidelity ceiling:** inside the canonical pipeline, sketches are LOW-fidelity and
 changed-surface-only. They are throwaway decision aids, not production polish.
 
-Sketches are pipeline artifacts. Inline direct work and live ad hoc tester/QA/security reviews do
-not create or require a sketch set; if an operator explicitly requests a standalone sketch, it is
-bounded evidence rather than pipeline state.
+Use the [sketch skill](../skills/sketch/SKILL.md) on demand in direct work or
+OpenSpec as well as pipeline work. Outside an active pipeline, select only the
+requested decision aids, keep them in the configured workspace and link them from
+the existing plan. They create no pipeline state, classification record or guard
+invocation. In `spec`, review them before the requested implementation and reflect
+agreed changes in canonical OpenSpec, using the flow's existing approval. The fixed
+sets, classification and gate procedures below apply only to active pipeline Design.
 
 **Representation ceiling (global):** token-cheap text that renders in Obsidian with zero
 dependency — Mermaid / ASCII / markdown tables / fenced code. **No verbose machine-JSON
@@ -98,7 +102,7 @@ post-Freeze security floor.
 
 ## 3. The 9 Sketches
 
-### Always (every task with a workspace)
+### Always (active pipeline Design)
 
 | Sketch | Trigger | Format | Tool | Fidelity ceiling | Representation ceiling | Home |
 |--------|---------|--------|------|-----------------|----------------------|------|
@@ -283,7 +287,7 @@ bash tests/run-all.sh
 ## 10. Workspace–Repository Boundary
 
 **Sketch conventions govern only the workspace.** Sketches (`sketches/*`) are throwaway
-decision aids produced for a single pipeline run. Their format, layout, and naming
+decision aids produced for pipeline work or an on-demand preview. Their format, layout, and naming
 conventions are workspace-internal and do not carry forward into the repository.
 
 **Repository files follow the repository's own conventions.** When an agent writes or

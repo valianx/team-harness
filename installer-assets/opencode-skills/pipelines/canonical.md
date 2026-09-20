@@ -11,7 +11,8 @@ read-only list of pending archives in the current or already-bound repositories.
 Include direct-mode changes; no pipeline state files does not suppress this list.
 Do not infer acceptance, delivery, or obsolescence from checked tasks alone.
 
-1. Resolve candidate roots with packaged `workspace-identity.mjs`; use persisted
+1. Use [workspace](../workspace/SKILL.md) read-only to establish candidate roots
+   with the existing packaged `workspace-identity.mjs`; use persisted
    identities and never synthesize today's path or merge local/Obsidian copies.
 2. Find coordinator-root `00-state.md` files, including active worktrees when available.
 3. Parse the literal v4 fields `pipeline_version`, `workspace_identity`, `phase`, `status`, `gate_pending`,

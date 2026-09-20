@@ -5,12 +5,16 @@ description: Design and run tests for a feature or component.
 
 Analyze the input: $ARGUMENTS
 
+Use [workspace](../workspace/SKILL.md) to select the existing effort in the
+configured local/Obsidian location. Pass its absolute root as `workspaces path:`
+in dispatch; output paths below refer to that root.
+
 ---
 name: test
 
 ## Frontend detection
 
-Before building the Direct Mode Task payload, check the feature's workspace path (or the current working directory when in Mode 2) for frontend markers:
+Before building the Direct Mode Task payload, check the effort's associated code repository for frontend markers:
 - Config files: `next.config.*`, `vite.config.*`, `nuxt.config.*`, `svelte.config.*`, `cypress.config.*`
 - Route directories: `src/pages/`, `src/app/`, `app/`, `pages/`
 - `package.json` dependencies: `react`, `vue`, `svelte`, `next`
@@ -19,11 +23,12 @@ When ANY marker matches, include `frontend_scope: true` in the Direct Mode Task 
 
 ## Mode 1 — Feature name provided
 
-1. Run the frontend detection step against the feature's workspace path
+1. Run frontend detection against the associated code repository
 2. Pass to the `orchestrator` agent:
    ```
    Direct Mode Task:
    - Mode: test
+   - workspaces path: {absolute-workspace-root}
    - Feature: {feature-name}
    - frontend_scope: true   # detected from repo markers; activates the tester's browser-test routing
    ```
@@ -31,10 +36,10 @@ When ANY marker matches, include `frontend_scope: true` in the Direct Mode Task 
 
 ## Mode 2 — No input provided
 
-1. Look for active `workspaces/*/` folders that contain `02-implementation.md`
+1. Find existing efforts in the configured workspace location containing `02-implementation.md`
 2. If exactly one found, use its feature name
 3. If multiple found, ask the user: "Multiple features found in workspaces. Which one do you want to test? {list}"
-4. If none found, tell the user: "No implementation found in workspaces/. Implement first or provide a feature name."
+4. If none found, report the checked location and ask for the intended feature; do not create a fallback workspace.
 5. Once the feature path is resolved, run the frontend detection step before building the payload
 
 ---

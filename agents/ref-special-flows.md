@@ -7,7 +7,9 @@ color: cyan
 
 # orchestrator — Special Flows Reference
 
-This file is read on-demand by `th:orchestrator` when executing a special flow. It is NOT part of its system prompt.
+Use `workspace` for context and continuity. Paths below refer to its selected
+home; preserve each flow's output formats and
+explicit deliverable destinations.
 
 **One coordinator, two postures.** `th:orchestrator` serves these direct flows from its startup kernel. When `/th:pipeline` is active, classification and phase pointers resolve to `agents/ref-pipeline.md`; conditional intake details remain in `agents/ref-intake-flows.md`. No flow dispatches another coordinator.
 
@@ -1077,7 +1079,7 @@ This section defines which task types and tiers derive design-surface hints and
 | `feature` / `refactor` / `enhancement` | Main derives hints from OpenSpec; an invoked architect may return them, never mirror them into `01-plan.md` | Yes — canonical OpenSpec acceptance and design | Per hints: an invoked architect produces every triggered file | Yes, at STAGE-GATE-1 |
 | `fix` Tier 2-4 | Main derives hints from OpenSpec; an invoked architect may return root-cause hints | Yes — canonical OpenSpec acceptance | Rare — only if the fix modifies a contract surface | Yes — no-op pass when no hint applies |
 | `fix` Tier 1 / `hotfix` | No architect; Main derives hints from bound OpenSpec | Yes — canonical OpenSpec acceptance | None when no hint applies | Yes — no-op pass (empty required set) |
-| direct inline implementation | **Exempt** — no pipeline artifacts | n/a | n/a | Not invoked (no `00-state.md`) |
+| direct/spec | No pipeline artifacts | n/a | Requested sketches only | Not invoked |
 | `docs` flow (Tier ≥1) | Architect docs-research mode → coordinator records all-false block (docs do not touch product contracts) | Yes (minimum AC in `§ Task List`) | None | Yes — no-op pass |
 | Research / Spike | No — architect does not produce `01-plan.md` § Task List with per-task AC | n/a | n/a | Not invoked (research/spike have no STAGE-GATE-1) |
 
@@ -1085,9 +1087,8 @@ This section defines which task types and tiers derive design-surface hints and
 for `sketch-guard.sh`. The compact generated `01-plan.md` never carries a
 classification mirror, and no all-false plan block is fabricated.
 
-**Direct inline:** the coordinator performs only the requested bounded edit; no plan, sketch, or
-Stage Gate is created. A live operator-requested review remains ad hoc and does not activate the
-pipeline.
+**Direct/spec:** use `sketch` for requested previews, without an automatic set or
+Stage Gate. Ad hoc review does not activate the pipeline.
 
 ---
 

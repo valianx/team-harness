@@ -31,7 +31,7 @@ workflow:
 5. Preserve every canonical safety boundary, read-only default, confirmation
    gate, secret rule, and outward-write approval. Native opencode sandbox and
    permission policy remain authoritative.
-6. Resolve workspace settings from opencode-native Team Harness configuration and preserve the confirmation gate.
+6. Use the shared workspace skill with opencode-native settings and reuse the operator's existing authorization for the scoped handoff write.
 
 Execute the requested workflow after applying this adapter. Do not merely
 summarize the canonical instructions.

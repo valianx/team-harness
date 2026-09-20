@@ -11,6 +11,10 @@ installation. Do not create a workspace, write pipeline state or events,
 present a stage gate, preflight custom agents, or dispatch a specialist merely
 because this skill loaded.
 
+When the requested work benefits from retained context, use the installed
+`workspace` skill. Reuse the effort's home without creating pipeline artifacts;
+intake alone and read-only inline reviewers still create no workspace.
+
 Two postures only exist: `inline` and `pipeline`. `inline` is the default;
 `pipeline` starts only from an explicit current-turn operator request or
 recovery of an existing run.
@@ -130,8 +134,8 @@ its snapshot, lens selection, consolidation, preview, or publication gate.
    three files in one domain, is reversible and local, is non-sensitive (or the
    current live operator explicitly selects `inline` for a sensitive change),
    does not alter a public API/schema/security or shared contract, and needs no
-   specialist-only capability. An eligible request runs without a workspace,
-   state, events, gate, branch, or specialist dispatch. A live request for a
+   specialist-only capability. An eligible request uses `workspace` for retained
+   context without pipeline state, events, gate, branch or specialist dispatch. A live request for a
    tester, QA, security, adversary, or other bounded review dispatches the
    runtime-native `inline-reviewer`; it creates no pipeline workspace, state,
    events, gates, Stage Gate, or delivery record. The explicit sensitive request is sufficient: do not ask for

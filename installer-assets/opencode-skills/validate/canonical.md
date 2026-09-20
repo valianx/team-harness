@@ -1,6 +1,10 @@
 
 Analyze the input: $ARGUMENTS
 
+Use [workspace](../workspace/SKILL.md) to select the existing effort in the
+configured local/Obsidian location before probing or dispatching. Pass its absolute
+root as `workspaces path:`; `WORKSPACE_PATH` and output examples mean that root.
+
 ---
 name: validate
 
@@ -53,15 +57,16 @@ name: validate
    ```
    Direct Mode Task:
    - Mode: validate
+   - workspaces path: {absolute-workspace-root}
    - Feature: {feature-name}
    ```
 
 ## Mode 2 — No input provided
 
-1. Look for active `workspaces/*/` folders that contain `02-implementation.md`
+1. Find existing efforts in the configured workspace location containing `02-implementation.md`
 2. If exactly one found, use its feature name
 3. If multiple found, ask the user: "Multiple features found in workspaces. Which one do you want to validate? {list}"
-4. If none found, tell the user: "No implementation found in workspaces/. Implement first or provide a feature name."
+4. If none found, report the checked location and ask for the intended feature; do not create a fallback workspace.
 
 ---
 name: validate

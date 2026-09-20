@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Workspace"
+  short_description: "Team Harness Workspace workflow"
+  default_prompt: "Use $team-harness:workspace for this request."

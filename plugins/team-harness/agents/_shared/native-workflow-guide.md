@@ -9,6 +9,8 @@ and independent review; choose `pipeline` when broader coordination helps and
 the user wants it. Use `review-pr` to review an existing PR and `create-pr` to
 prepare or publish completed work. Small direct tasks can stay direct. The
 `modes` skill lists other workflows, including audit, research and documentation.
+Use `sketch` on request to inspect a proposed result before implementation in any
+flow, including direct work and `spec`.
 
 Coordinate the work and judge specialist recommendations against the user's
 objective and the code. Reviewers have limited context; their findings inform
@@ -20,8 +22,13 @@ In the installation's `.team-harness.json`, read only relevant preferences:
 language, English learning, voice and workspace fields. Never print the whole
 configuration, which can contain credentials. Respect existing instructions.
 
-Use the configured local or Obsidian workspace for plans and handoffs. Preserve
-its canonical identity across sessions and worktrees; keep temporary scripts,
-execution logs and review evidence outside tracked product files. Follow the
+Use the installed `workspace` skill across workflows and substantive direct work
+to select or reuse the configured local or Obsidian home for retained context.
+Every flow respects that mode; workspace examples use the resolved absolute home.
+Write retained context notes in Markdown (`.md`) using the workspace skill's method.
+It owns the common workspace method; keep brief conversation and read-only status
+free of unnecessary writes. Pass the selected absolute workspace to specialists
+and preserve it across sessions and worktrees. Keep temporary scripts, execution
+logs and review evidence outside tracked product files. Follow the
 selected skill's OpenSpec lifecycle and include completed archive with the
 implementation in the same PR.

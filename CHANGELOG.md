@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.34.0] - 2026-09-20
+
+### Added
+- Shared `workspace` skill for substantive direct work and TH workflows, respecting the configured local or Obsidian mode across Claude Code, Codex and OpenCode without Context Harness.
+- Workspace context notes share Markdown (`.md`) in both modes without a universal template or mode-specific frontmatter; operational artifacts and deliverables retain their required formats.
+- On-demand `sketch` workflow previews proposed work in direct tasks and OpenSpec as well as pipeline, preserving Markdown/Mermaid sketches and HTML UI wireframes without adding a gate.
+
+### Fixed
+- Workspace consumers reuse the effort across sessions and worktrees, preserve source bindings in handoffs, and resolve workspace examples and discovery through the selected home. Read-only flows remain read-only.
+- Remove the stale generated confirmation gate from save-session adapters while preserving native permissions and the owning flow's write scope.
+
 ## [3.33.1] - 2026-09-20
 
 ### Fixed

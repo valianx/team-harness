@@ -14,14 +14,21 @@ The current general agent selects and reads the relevant skill:
 | Need | Workflow |
 | --- | --- |
 | Development with written intent and tasks | [`spec`](skills/spec/SKILL.md) |
+| Inspect a proposed solution before implementation | [`sketch`](skills/sketch/SKILL.md), on demand in any flow |
 | Broader coordination and recoverable execution | [`pipeline`](skills/pipeline/SKILL.md) |
 | Review an existing pull request | [`review-pr`](skills/review-pr/SKILL.md) |
 | Prepare or publish a completed change | [`create-pr`](skills/create-pr/SKILL.md) |
+| Keep useful context across tasks, flows and sessions | [`workspace`](skills/workspace/SKILL.md) |
 
 Independent specialists contribute findings and recommendations. The coordinator
 judges them against the objective and available evidence, verifies corrections,
 and continues the authorized work. Workspace and Obsidian support preserve
 useful context; voice and language guidance preserve the operator's preferences.
+
+The workspace skill is the common method for substantive work, including direct
+tasks outside a pipeline. It reuses one local or Obsidian home for decisions,
+evidence and handoffs without requiring Context Harness or creating empty records
+for brief conversations and read-only status requests.
 
 [![Version](https://img.shields.io/github/v/release/valianx/team-harness?label=version&color=blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
