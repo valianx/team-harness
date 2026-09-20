@@ -6,9 +6,10 @@
 
 ## Workspaces as the shared board
 
-A workspace is the shared working directory for a single pipeline session. Its
-persisted workspace identity is the sole location authority. Agents communicate
-through files and the operator uses the workspace as a review surface. Local
+A workspace is the shared context home for an effort, including substantive direct
+work. Use the [workspace skill](../skills/workspace/SKILL.md) across flows; pipeline
+identity and state apply only to pipeline work. Agents share useful artifacts and
+the operator uses the workspace as a review surface. Local
 `workspaces/` is always git-ignored; Obsidian mode creates no local duplicate.
 
 Beyond the root-tier docs (`00-state.md`, `01-plan.md`, `02-implementation.md`, `03-testing.md`, etc.), a workspace groups related artifacts under subfolders created implicitly on first `Write`: `plan/` for architecture, delivery, conditional invariants, and per-task shards; `sketches/` for plan-stage sketches; `research/` for research-family artifacts; and `reviews/` for review-family reports. Basenames never change merely because of grouping except where `docs/plan-shards.md` defines the plan layout.

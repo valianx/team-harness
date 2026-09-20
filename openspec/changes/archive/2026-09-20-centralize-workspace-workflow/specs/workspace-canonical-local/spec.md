@@ -13,8 +13,12 @@ create directories or artifacts solely to satisfy this preference.
 - **THEN** Main uses the shared workspace method without requiring explicit invocation or activating a pipeline
 
 #### Scenario: A read-only flow reports status
-- **WHEN** a status or resume flow reads an existing effort
+- **WHEN** a status or report-only resume flow reads an existing effort
 - **THEN** it may resolve the workspace but creates no missing workspace, state or artifacts
+
+#### Scenario: Flows respect the configured workspace mode
+- **WHEN** work moves between development, research, diagrams, testing, review or delivery in local or Obsidian mode
+- **THEN** every flow uses the selected workspace, passes its absolute path to specialists, and treats example paths as relative to that home; a separate artifact destination does not change the workspace mode
 
 ### Requirement: Workspace reuse preserves the effort across checkouts
 The shared method SHALL prioritize the existing effort's bound absolute workspace
@@ -27,6 +31,10 @@ SHALL use its designated working/output directory and SHALL NOT require Git.
 #### Scenario: Continuing from a differently named worktree
 - **WHEN** a handoff or plan binds the effort to an existing Obsidian workspace and the checkout changes
 - **THEN** the next workflow reuses that exact workspace without creating a local or newly dated copy
+
+#### Scenario: A saved handoff is discovered by feature name
+- **WHEN** a later session discovers a saved handoff
+- **THEN** it checks the recorded absolute workspace and canonical source association before using the context, and resolves missing or conflicting associations without guessing from the checkout basename
 
 #### Scenario: Artifact work has no repository
 - **WHEN** the user requests an artifact in an established non-repository working directory

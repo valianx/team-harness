@@ -38,7 +38,11 @@ or compose `{resolved-path}/{feature}` after the helper returned another path.
 
 ## Step 1 — Read the handoff (read-only)
 
-Read the helper's exact `handoff` path (read-only).
+Read the helper's exact `handoff` path (read-only). Check its recorded workspace
+and source against the selected effort before using its context. A matching
+feature or checkout basename is insufficient. For an older handoff without that
+binding, verify the association from its linked plan/source or ask for the missing
+association; do not use or overwrite a different effort's context.
 
 Also read its exact `state` path (read-only) for phase and status
 context.

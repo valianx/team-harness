@@ -22,6 +22,7 @@ configuration, which can contain credentials. Respect existing instructions.
 
 Use the installed `workspace` skill across workflows and substantive direct work
 to select or reuse the configured local or Obsidian home for retained context.
+Every flow respects that mode; workspace examples use the resolved absolute home.
 It owns the common workspace method; keep brief conversation and read-only status
 free of unnecessary writes. Pass the selected absolute workspace to specialists
 and preserve it across sessions and worktrees. Keep temporary scripts, execution

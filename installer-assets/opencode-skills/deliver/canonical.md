@@ -1,6 +1,9 @@
 
 Analyze the input: $ARGUMENTS
 
+Use [workspace](../workspace/SKILL.md) to resolve the effort in the configured
+local/Obsidian location. Pass its absolute root as `workspaces path:` in dispatch.
+
 Use [create-pr](../create-pr/SKILL.md) for relevant PR preparation and publication. Its
 selection is automatic by relevance and does not activate the pipeline. Publication preserves
 existing authority; only active pipeline publication requires the accepted Freeze identity.
@@ -20,7 +23,7 @@ Direct Mode Task:
 
 When no feature name is present:
 
-1. inspect only `workspaces/*/00-state.md`;
+1. inspect existing `00-state.md` files in the configured workspace location;
 2. select the sole workspace with completed verification and an unresolved
    release gate;
 3. when several qualify, ask the operator which feature to deliver; and

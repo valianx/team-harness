@@ -47,8 +47,8 @@ bounded implementation is **direct-eligible** only when:
 - it does not change a public API, schema, security control, or other shared contract; and
 - no parallel owner or specialist-only capability is required.
 
-When direct-eligible with no active pipeline, implement in `Main` without a workspace,
-`00-state.md`, events, gates, or `Task` dispatch. Run focused checks. Explicitly requested
+When direct-eligible with no active pipeline, implement in `Main`; use `workspace`
+for retained context, without pipeline state, events, gates or `Task`. Run focused checks. Requested
 commits or outward actions still require the runtime's approval; direct execution
 does not authorize branching, PRs, or publication.
 

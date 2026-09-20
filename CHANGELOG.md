@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.34.0] - 2026-09-20
+
+### Added
+- Shared `workspace` skill for substantive direct work and TH workflows, respecting the configured local or Obsidian mode across Claude Code, Codex and OpenCode without Context Harness.
+
+### Fixed
+- Workspace consumers reuse the effort across sessions and worktrees, preserve source bindings in handoffs, and resolve workspace examples and discovery through the selected home. Read-only flows remain read-only.
+- Remove the stale generated confirmation gate from save-session adapters while preserving native permissions and the owning flow's write scope.
+
 ## [3.33.1] - 2026-09-20
 
 ### Fixed

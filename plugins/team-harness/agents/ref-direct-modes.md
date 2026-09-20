@@ -23,8 +23,8 @@ color: cyan
 
 Locate the needed section by heading; do not read this file in full.
 
-For retained context, use the installed `workspace` skill. Preserve explicit
-deliverable destinations, helper-owned review runs and read-only behavior.
+Use `workspace` for retained context. Substitute its absolute home for workspace
+examples and pass it to specialists. Preserve explicit outputs and read-only scope.
 
 **Role mapping.** Every direct mode in this file is dispatched directly by `th:orchestrator` without activating the gated flow. Cross-references to pipeline mechanics resolve to `agents/ref-pipeline.md`.
 
@@ -159,13 +159,10 @@ When invoked with `Direct Mode Task: diagram`:
 
 ### Step 0 — Resolve output path
 
-If the task payload includes `Vault:` (non-null):
-1. Read `~/.claude/config/obsidian-vaults.json`. If missing, report `status: blocked` with "obsidian-vaults.json not found".
-2. Resolve the vault path from the config (use the named vault or `default`).
-3. If `Folder:` is set, append it to the vault path. Create the folder if it does not exist.
-4. Set output path to `{vault_path}/{folder}/diagram.excalidraw` (Excalidraw files render natively in Obsidian with the Excalidraw plugin).
-
-If no `Vault:` in payload → use default: `workspaces/{feature}/diagram.excalidraw`.
+Use `workspace` to resolve the configured local/Obsidian home. Default output:
+`{workspace}/diagram.excalidraw`. Honor an explicitly supplied `Vault:`/`Folder:`
+as a deliverable destination using the active runtime's vault mapping; ask only
+for a missing destination. Keep research and continuity in the selected workspace.
 
 ### Step 1 — Architect analyzes codebase context
 
@@ -214,13 +211,10 @@ When invoked with `Direct Mode Task: likec4-diagram`:
 
 ### Step 0 — Resolve output path
 
-If the task payload includes `Vault:` (non-null):
-1. Read `~/.claude/config/obsidian-vaults.json`. If missing, report `status: blocked` with "obsidian-vaults.json not found".
-2. Resolve the vault path from the config (use the named vault or `default`).
-3. If `Folder:` is set, append it to the vault path. Create the folder if it does not exist.
-4. Set output path to `{vault_path}/{folder}/diagram.c4`.
-
-If no `Vault:` in payload → use default: `workspaces/{feature}/diagram.c4`.
+Use `workspace` to resolve the configured local/Obsidian home. Default output:
+`{workspace}/diagram.c4`. Honor an explicitly supplied `Vault:`/`Folder:` as a
+deliverable destination using the active runtime's vault mapping; ask only for a
+missing destination. Keep research and continuity in the selected workspace.
 
 ### Step 1 — Architect analyzes codebase context
 
@@ -257,13 +251,10 @@ When invoked with `Direct Mode Task: d2-diagram`:
 
 ### Step 0 — Resolve output path
 
-If the task payload includes `Vault:` (non-null):
-1. Read `~/.claude/config/obsidian-vaults.json`. If missing, report `status: blocked` with "obsidian-vaults.json not found".
-2. Resolve the vault path from the config (use the named vault or `default`).
-3. If `Folder:` is set, append it to the vault path. Create the folder if it does not exist.
-4. Set output path to `{vault_path}/{folder}/diagram.d2`.
-
-If no `Vault:` in payload → use default: `workspaces/{feature}/diagram.d2`.
+Use `workspace` to resolve the configured local/Obsidian home. Default output:
+`{workspace}/diagram.d2`. Honor an explicitly supplied `Vault:`/`Folder:` as a
+deliverable destination using the active runtime's vault mapping; ask only for a
+missing destination. Keep research and continuity in the selected workspace.
 
 ### Step 1 — Architect analyzes codebase context
 
@@ -576,7 +567,7 @@ Step 6   Report to user
 
 ### Step 1 — Setup workspaces
 
-1. Create `workspaces/{feature-name}/` if it doesn't exist
+1. Resolve/create the effort's home through `workspace`; pass its absolute path to every translator.
 2. Write initial `00-state.md` with `phase: translate`, `status: in_progress`
 3. Initialize the events file (local mode: `00-execution-events.jsonl`; obsidian mode: `00-execution-events.md`) with the opening `pipeline.start` event so `/th:pipelines` and `/th:recover` see a trace alongside the state file
 

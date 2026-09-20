@@ -16,8 +16,8 @@ Read the available plan, state and execution evidence. Derive three useful field
 - **What NOT to Retry:** failed approaches and options already ruled out.
 - **Next Step:** the next concrete action and any prerequisite.
 
-An explicit request to save the handoff authorizes this scoped local write. Reuse
-that request rather than asking the operator to approve the same action again.
+An explicit save request or the owning flow's authorized context work covers this
+scoped write. Reuse that authority rather than asking for the same action again.
 If the operator only asks to preview a handoff, show it without saving. Native
 permissions govern the write; a refusal is reported as a write outcome, not an
 operator decline or permission to widen access.
@@ -27,6 +27,9 @@ applicable:
 
 ```markdown
 # Session Handoff: {feature}
+
+Workspace: {selected absolute workspace}
+Source: {canonical Git common directory or projectless working directory}
 
 ### What Worked
 - {confirmed approach or decision}

@@ -8,7 +8,7 @@ they retain their own output formats and authority. No explicit invocation is
 needed. Prefer reusing an existing workspace even for a small follow-up.
 
 Brief conversation needs no empty directory or note. Read-only status, preview
-and resume operations may resolve and read a workspace but do not create or
+and report-only `resume-session` may resolve and read a workspace but do not create or
 update one. A specialist receives the selected absolute workspace from Main and
 uses only the artifacts and write scope assigned to it.
 
@@ -18,7 +18,7 @@ uses only the artifacts and write scope assigned to it.
    handoff or pipeline identity. Check its source/repository association before
    using it. A different checkout name, date or configuration does not move an
    existing effort. An explicit relocation request is a separate scoped action.
-2. Without that binding, honor an explicit destination or read only the active
+2. Without that binding, honor an explicit workspace destination or read only the active
    runtime's relevant `logs-mode`, `logs-path` and `logs-subfolder` preferences.
    Claude Code uses its TH settings; Codex and OpenCode use their native TH
    settings, including configured scope overrides. Do not read another host's
@@ -33,6 +33,14 @@ uses only the artifacts and write scope assigned to it.
    directory. Work without a repository uses its established working/output
    directory or explicit workspace destination; it does not need Git initialization.
    If no destination can be established, ask only for that missing choice.
+
+Every flow respects the selected local/Obsidian mode. Workspace paths such as
+`workspaces/{feature}/` in flow instructions are templates for this absolute home,
+not an instruction to create a repository-local copy. A requested artifact output
+location does not change the workspace mode. Before writing, resolve existing
+parent directories to their physical targets; if a symlink/junction redirects
+outside the selected home, surface that destination conflict rather than silently
+writing there. This location check does not replace native access controls.
 
 Use the existing read-only [workspace identity helper](../pipeline/scripts/workspace-identity.mjs)
 for repository-backed layouts. It is an imported library, not a command that
@@ -52,7 +60,8 @@ the filesystem. Report missing or ambiguous context honestly.
 ## Keep context useful
 
 Create only artifacts the task needs. Record the workspace's absolute location,
-project/source association, objective, important decisions, progress, evidence
+project/source association (Git common directory for repository work, established
+working directory otherwise), objective, important decisions, progress, evidence
 links and next step in the flow's existing plan, report or handoff as applicable.
 For a task without such a note, a short handoff is enough when continuity matters;
 use [save-session](../save-session/SKILL.md). No parallel index, fixed folder tree,
