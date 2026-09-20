@@ -31,7 +31,7 @@ workflow:
 5. Preserve every canonical safety boundary, read-only default, confirmation
    gate, secret rule, and outward-write approval. Native Codex sandbox and
    permission policy remain authoritative.
-6. Keep read-and-plan as the default. For apply intent, use the available `security` and `qa` roles for review and require a fresh explicit operator approval before any mutation.
+6. Keep read-and-plan as the default and use native `security` and `qa` reviewers for a prepared change. Follow canonical scoped authorization: reuse clear approval for the unchanged plan, ask only for a missing decision, and preserve native permissions.
 
 Execute the requested workflow after applying this adapter. Do not merely
 summarize the canonical instructions.
