@@ -167,7 +167,7 @@ migration, and preserve every unrelated value.
    values. Setup does not inspect or reconcile global sandbox, approval,
    network, or writable-root settings.
 
-6. Reconcile all twenty bundled specialists in the persisted scope on every full
+7. Reconcile all twenty bundled specialists in the persisted scope on every full
    setup, and whenever `agents` is targeted:
 
    ```bash
@@ -194,7 +194,7 @@ migration, and preserve every unrelated value.
    invalidate an already verified reviewer profile. Never require a new chat
    solely because setup ran.
 
-7. Configure selected MCP servers after `codex mcp list --json`. Preserve an
+8. Configure selected MCP servers after `codex mcp list --json`. Preserve an
    existing registration unless the operator explicitly requests replacement.
 
    - Memory: register a streamable HTTP URL, optionally with the name (not the
@@ -204,13 +204,13 @@ migration, and preserve every unrelated value.
      printing it, then run
      `codex mcp add context7 --env DEFAULT_MINIMUM_TOKENS=10000 -- npx -y @upstash/context7-mcp@3.2.5`.
 
-8. The Codex distribution has no TH permission-hook manifest or launcher.
+9. The Codex distribution has no TH permission-hook manifest or launcher.
    Treat those retired assets as unnecessary; do not recreate them or request
    hook trust, repair, or restart because they are absent. Preserve the
    operator's native permissions and unrelated hooks. Native policies are not
    claimed to duplicate the checks removed from TH.
 
-9. Re-run the applicable helper inspections and `codex mcp list --json`; re-run
+10. Re-run the applicable helper inspections and `codex mcp list --json`; re-run
     `codex features list` only when step 4 ran. Report one compact result:
     native config path, workspace/language, agent scope and twenty agent statuses,
     GitHub route count when configured, feature-flag status when checked, MCP registrations,
