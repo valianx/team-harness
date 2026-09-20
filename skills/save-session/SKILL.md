@@ -9,11 +9,10 @@ Preserve enough context to resume the effort without rediscovering its decisions
 The current agent writes `00-session-handoff.md` in the selected workspace; this
 does not start a pipeline or require another agent.
 
-Use the active runtime's TH workspace preferences. In Obsidian mode, use the
-configured vault and subfolder; otherwise use the repository's local workspace.
-Prefer the workspace already bound to the current effort. If the request names
-another one, resolve that destination. Ask when multiple plausible destinations
-remain or a write would replace unrelated content.
+Use [workspace](../workspace/SKILL.md) to select or reuse the effort's home.
+An existing binding takes precedence over the current checkout name or date.
+Ask when multiple plausible destinations remain or a write would replace
+unrelated content.
 
 Read the available plan, state and execution evidence. Derive three useful fields:
 

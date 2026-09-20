@@ -105,10 +105,10 @@ new effect.
 ## Operator plan
 
 Use [assets/plan.md](assets/plan.md) as a small reading view, in the operator's language.
-Create `01-plan.md` in the workspace resolved from the active runtime's `logs-mode`,
-`logs-path`, and `logs-subfolder` preferences. Reuse the read-only resolver
-in `../pipeline/scripts/workspace-identity.mjs` with the change slug and creation date (`YYYY-MM-DD`); do not
-initialize a pipeline or persist its identity/control files. Obsidian mode creates no local copy.
+Use [workspace](../workspace/SKILL.md) to select or reuse the effort's home, then
+create `01-plan.md` there. Supply the change slug, source association and original
+creation date to its existing path-resolution method; do not initialize a pipeline
+or persist identity/control files. Obsidian mode creates no local copy.
 Reuse the same plan on later days by matching its `mode: spec`, change slug and canonical source
 path. Preserve an existing user or pipeline plan; use a separate `<date>_<change>-spec` directory
 for a collision. Do not infer a pipeline or approval from the document's existence.

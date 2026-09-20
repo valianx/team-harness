@@ -7,7 +7,9 @@ color: cyan
 
 # orchestrator — Intake Sub-Flows Reference
 
-This file is read on-demand by `th:orchestrator` during Intake and Classify. It is NOT part of the coordinator's core system prompt.
+Read applicable Intake/Classify sections on demand. Use the installed `workspace`
+skill for shared location and continuity; the sections here add initiative and
+milestone binding without relocating an existing effort.
 
 **LAZY-LOAD DIRECTIVE — consumers read only the section they need.** Do NOT
 read this entire file on every invocation. Each section below is triggered by

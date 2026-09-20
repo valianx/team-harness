@@ -5,6 +5,9 @@ description: Show feature observability and OpenSpec completion or retirement st
 
 Show pipeline observability for a single feature. This is a standalone read-only skill — does NOT route through the orchestrator and NEVER modifies state (no Edit, no Write, no JSONL append).
 
+Use [workspace](../workspace/SKILL.md) read-only for shared selection and
+continuity. Preserve the existing bound root; do not create missing context.
+
 ## Voice
 
 See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" for the full

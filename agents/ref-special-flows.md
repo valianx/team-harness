@@ -7,7 +7,9 @@ color: cyan
 
 # orchestrator — Special Flows Reference
 
-This file is read on-demand by `th:orchestrator` when executing a special flow. It is NOT part of its system prompt.
+Use `workspace` for context and continuity. Paths below refer to its selected
+home; preserve each flow's output formats and
+explicit deliverable destinations.
 
 **One coordinator, two postures.** `th:orchestrator` serves these direct flows from its startup kernel. When `/th:pipeline` is active, classification and phase pointers resolve to `agents/ref-pipeline.md`; conditional intake details remain in `agents/ref-intake-flows.md`. No flow dispatches another coordinator.
 

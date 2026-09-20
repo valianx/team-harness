@@ -64,7 +64,7 @@ text. Keep mode names and invocations exact.
 | `research-code` | Investigate a codebase with parallel, file-grounded evidence. | Claude Code + opencode + Codex |
 | `resume-session` | Read and summarize a saved session handoff without modifying state. | Claude Code + opencode + Codex |
 | `review-pr` | Review a PR against a fixed snapshot and publish only after approval. | Claude Code + opencode + Codex |
-| `save-session` | Save a confirmation-gated session handoff. | Claude Code + opencode + Codex |
+| `save-session` | Save a concise handoff in the effort's workspace. | Claude Code + opencode + Codex |
 | `security` | Audit a target against OWASP, CWE, and ASVS. | Claude Code + opencode + Codex |
 | `setup` | Configure Team Harness integrations and operator preferences. | Claude Code + opencode + Codex |
 | `spec` | Author and implement a short task through a coordinator-only OpenSpec lane. | Claude Code + opencode + Codex |
@@ -79,6 +79,7 @@ text. Keep mode names and invocations exact.
 | `update` | Update the installed Team Harness runtime. | Claude Code + opencode + Codex |
 | `validate` | Validate an implementation against its acceptance criteria. | Claude Code + opencode + Codex |
 | `verify` | Run the inline verification fan over a committed range and decide its ship join. | Claude Code + opencode + Codex |
+| `workspace` | Select, reuse and maintain a local or Obsidian workspace across workflows. | Claude Code + opencode + Codex |
 
 Do not load another skill, create pipeline state, dispatch an agent, or perform
 any listed action while rendering this catalog. A later explicit operator

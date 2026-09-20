@@ -11,6 +11,10 @@ installation. Do not create a workspace, write pipeline state or events,
 present a stage gate, preflight custom agents, or dispatch a specialist merely
 because this skill loaded.
 
+When the requested work benefits from retained context, use the installed
+`workspace` skill. Reuse the effort's home without creating pipeline artifacts;
+intake alone and read-only inline reviewers still create no workspace.
+
 Two postures only exist: `inline` and `pipeline`. `inline` is the default;
 `pipeline` starts only from an explicit current-turn operator request or
 recovery of an existing run.

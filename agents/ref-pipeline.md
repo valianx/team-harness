@@ -62,8 +62,8 @@ OpenSpec is the only semantic planning source. Bind the repository change root
 separately from the workspace root and require proposal, delta specs, design,
 and tasks.
 
-1. Resolve the workspace and validate the pipeline core. Before creating a new
-   workspace, load only the applicable sections of
+1. Select through the installed `workspace` skill and validate the pipeline core.
+   Before creation, read applicable sections of
    `agents/ref-intake-flows.md`: milestone continuity for a named plan
    milestone, initiative detection/confirmation before binding an initiative,
    and initiative create-or-join after confirmation. Then replay the selected

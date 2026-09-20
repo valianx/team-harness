@@ -20,8 +20,11 @@ In the installation's `.team-harness.json`, read only relevant preferences:
 language, English learning, voice and workspace fields. Never print the whole
 configuration, which can contain credentials. Respect existing instructions.
 
-Use the configured local or Obsidian workspace for plans and handoffs. Preserve
-its canonical identity across sessions and worktrees; keep temporary scripts,
-execution logs and review evidence outside tracked product files. Follow the
+Use the installed `workspace` skill across workflows and substantive direct work
+to select or reuse the configured local or Obsidian home for retained context.
+It owns the common workspace method; keep brief conversation and read-only status
+free of unnecessary writes. Pass the selected absolute workspace to specialists
+and preserve it across sessions and worktrees. Keep temporary scripts, execution
+logs and review evidence outside tracked product files. Follow the
 selected skill's OpenSpec lifecycle and include completed archive with the
 implementation in the same PR.

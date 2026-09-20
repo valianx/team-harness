@@ -17,6 +17,10 @@ Gate, security, ownership, or outward authority.
 
 ## Workspace and repository identity
 
+Use the installed `workspace` skill (`../../workspace/SKILL.md`) for shared
+selection and continuity. Preserve the pipeline's existing identity and bindings;
+workspace selection alone creates no control state or activation authority.
+
 Choose the configured repository or Obsidian workspace root and a stable
 feature slug. Preserve unrelated/untracked files. Resolve one canonical
 worktree per repository and ensure no other active lease owns it for writes.

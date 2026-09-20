@@ -14,11 +14,13 @@ Analyze the input: $ARGUMENTS
 
 ## Step 0 — Resolve workspaces path
 
-Read `~/.claude/.team-harness.json`. If it exists and `logs-mode` is `"obsidian"`,
-use `{logs-path}/{logs-subfolder}/{repo-name}` as the base path (where `repo-name`
-is the basename of the current working directory). If `logs-mode` is `"local"` or
-the file is missing, use `workspaces/` (relative to cwd). Replace all `workspaces/`
-references below with the resolved path.
+Use [workspace](../workspace/SKILL.md) in read-only mode. Reuse the effort's bound
+absolute workspace and source identity when available. Pass its parent directory
+as the base and its exact directory name as the feature below. Otherwise establish
+the configured workspace base for the owning project, including across worktrees,
+and use the requested feature. Do not derive project identity from the current
+checkout basename. Replace `workspaces/` references below with that resolved base.
+Do not create a workspace or handoff when lookup reports missing context.
 
 Resolve `scripts/resolve-workspace.mjs` relative to this skill's own directory,
 falling back to `./skills/resume-session/scripts/resolve-workspace.mjs` in a

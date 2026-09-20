@@ -23,7 +23,8 @@ color: cyan
 
 Locate the needed section by heading; do not read this file in full.
 
-This file is read on-demand by `th:orchestrator` when executing a direct mode. It is NOT part of its system prompt.
+For retained context, use the installed `workspace` skill. Preserve explicit
+deliverable destinations, helper-owned review runs and read-only behavior.
 
 **Role mapping.** Every direct mode in this file is dispatched directly by `th:orchestrator` without activating the gated flow. Cross-references to pipeline mechanics resolve to `agents/ref-pipeline.md`.
 
