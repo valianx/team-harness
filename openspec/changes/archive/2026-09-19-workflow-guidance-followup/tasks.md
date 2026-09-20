@@ -12,4 +12,4 @@
 
 - [x] 3.1 Regenerate distributions and validate affected workflows, specs and runtime projections.
 - [x] 3.2 Archive this completed change, obtain independent QA/security/adversary findings and resolve actual blockers.
-- [ ] 3.3 Publish one follow-up PR with precise scope, checks and limitations.
+- [x] 3.3 Publish one follow-up PR with precise scope, checks and limitations.
