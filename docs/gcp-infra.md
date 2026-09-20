@@ -68,7 +68,7 @@ Required conventions for every generated script:
 
 - Explicit `--project="$PROJECT"` on every gcloud command — never rely on ambient default at apply time.
 - Quoted expansions throughout: `"$VARIABLE"`, not `$VARIABLE`.
-- No interactive prompts during the authorized apply; `-q` / `--quiet` never supplies authorization itself.
+- Leave provider confirmation enabled in prepared scripts. After the concrete commands are authorized, add `-q` / `--quiet` for non-interactive execution and revalidate syntax, checking that the project, resources and effects still match the authorized plan. The flag never supplies authorization or requires a second approval for unchanged effects.
 - No embedded secrets: no SA `.json` key files, no bearer tokens, no `--impersonate-service-account` credential output.
 - Each mutating/destructive line is annotated with its class: `# MUTATING — review before apply` or `# DESTRUCTIVE — review before apply`.
 - Idempotency where feasible: prefer `--update-if-exists` or describe-before guards.

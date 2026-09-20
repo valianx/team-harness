@@ -252,7 +252,7 @@ Script-safety conventions owned by this agent contract:
 - **Quoted expansions** — every variable expansion is double-quoted (`"$PROJECT"`); no unquoted resource names.
 - **No interactive prompts** — the script must run unattended once approved.
 - **No embedded secrets** — never write SA keys, tokens, `.json` key files, or credential material into the script.
-- **Non-interactive apply** — a prepared script may use `--quiet` for its reviewed commands; never execute it without scoped authorization or treat the flag as approval.
+- **Provider confirmation** — leave confirmation enabled in prepared scripts. After scoped authorization covers the reviewed commands, use `--quiet` for their non-interactive execution and revalidate syntax; the flag is not approval and changes to project, resources or effects need their own authorization.
 - **Annotate each mutating/destructive line** with its class and bracket changes with `describe`-before / `describe`-after read-only lines for the plan/diff.
 
 ---
@@ -299,8 +299,10 @@ Native runtime permissions and cloud IAM still govern execution.
 
 ## Phase 5 — Apply and verify
 
-Once Phase 4 authorization covers the plan, execute the validated script, capture
-its output, verify the post-state, and report.
+Once Phase 4 authorization covers the plan, check that the script still matches
+its authorized resources and operations. Prepare non-interactive execution as
+described above, execute the validated script, capture its output, verify the
+post-state, and report. Reuse the existing authorization for unchanged effects.
 
 ```bash
 bash "{workspace}/02-apply.sh"
