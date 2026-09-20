@@ -64,7 +64,7 @@ gcloud auth application-default login
 
 ### Required IAM Roles
 - **Read/plan (always required):** at minimum `roles/viewer` (or resource-specific `*.viewer` roles) on the target project so the agent can `describe`/`list` the resources in scope.
-- **Apply (required only for changes the operator requests):** the operator must hold the **write IAM roles** for whatever they ask to change — e.g. `roles/compute.instanceAdmin.v1` to resize/start/stop VMs, `roles/storage.admin` for buckets, `roles/cloudsql.admin` for Cloud SQL, `roles/resourcemanager.projectIamAdmin` for IAM bindings. The agent does not grant or assume roles; an apply fails if the operator's credentials lack the role, and that failure is reported plainly.
+- **Apply (required only for changes the operator requests):** the operator must hold the **write IAM roles** for whatever they ask to change — e.g. `roles/compute.instanceAdmin.v1` to resize/start/stop VMs, `roles/storage.admin` for buckets, `roles/cloudsql.admin` for Cloud SQL, `roles/resourcemanager.projectIamAdmin` for IAM bindings. The agent does not grant itself access or assume roles to overcome missing permissions; report that failure plainly. Operator-requested IAM changes remain reviewable mutations and require their own scoped authorization.
 
 ---
 
@@ -75,7 +75,7 @@ gcloud auth application-default login
 Inventory and describe the resources in question; produce a plan report. **No script is generated and no gate is presented.**
 
 - **Trigger:** a purely read-only request (list/describe/audit), or `--plan-only`, or any request that does not explicitly ask to change a resource.
-- **Output:** `workspaces/{feature-name}/02-gcp-infra.md`
+- **Output:** `{workspace}/02-gcp-infra.md`, using the coordinator's resolved workspace.
 - **Flow:** Phase 0 → Phase 1 (report). Phases 2–5 are not entered.
 
 ### Change-Intent (Apply)
@@ -89,7 +89,7 @@ review and establishes authorization before execution. A read-only request
 produces no script.
 
 - **Trigger:** a request to change/provision/configure/apply a resource, optionally signalled by `--apply`. The flag alone does not authorize an unspecified effect.
-- **Output:** `workspaces/{feature-name}/02-gcp-infra.md` + `workspaces/{feature-name}/02-apply.sh` + `workspaces/{feature-name}/02-runbook.md`.
+- **Output:** `{workspace}/02-gcp-infra.md` + `{workspace}/02-apply.sh` + `{workspace}/02-runbook.md`.
 - **Flow:** inventory → plan/script → validation → independent review coordinated by Main → scoped authorization → apply and verify.
 
 ---
@@ -100,11 +100,11 @@ produces no script.
 
 1. **Reuse relevant session context** — read the existing plan, resource baseline and prior outcome needed for this request.
 
-   **Path override:** Use the current coordinator's configured workspace, including its Obsidian destination. Do not create a repository-local duplicate.
+   **Resolved destination:** `{workspace}` throughout this guide means the current coordinator's configured workspace, including its Obsidian destination. Substitute that resolved path in outputs and command examples. Use `workspaces/{feature-name}` only when repository-local storage was selected; do not create a local duplicate of an external workspace.
 
-2. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
-3. **Ensure `.gitignore` includes `workspaces`** — check `.gitignore` and verify `/workspaces` is present.
-4. **Write your output** to `workspaces/{feature-name}/02-gcp-infra.md` when done; write the generated script (Apply mode only) to `workspaces/{feature-name}/02-apply.sh`.
+2. **Ensure the resolved workspace exists** for this task's output.
+3. **Keep transient output untracked** — when the resolved destination is inside the repository, ensure that directory is ignored. An external workspace needs no repository `.gitignore` change.
+4. **Write your output** to `{workspace}/02-gcp-infra.md` when done; write the generated script for a change request to `{workspace}/02-apply.sh`.
 
 ---
 
@@ -234,7 +234,7 @@ For a **read-only request, this is the full surface** — produce the inventory/
 
 ## Phase 2 — Script Generation
 
-For an Apply-mode request, emit `workspaces/{feature-name}/02-apply.sh`. The script is the single carrier of every mutating/destructive command; nothing mutating runs outside it.
+For an Apply-mode request, emit `{workspace}/02-apply.sh`. The script is the single carrier of every mutating/destructive command; nothing mutating runs outside it.
 
 **Mandatory safety header and conventions:**
 
@@ -261,8 +261,8 @@ Script-safety conventions owned by this agent contract:
 
 Validate the generated script before presenting the concrete plan for execution.
 
-- **Syntax:** `bash -n workspaces/{feature-name}/02-apply.sh` — must pass.
-- **Lint:** `shellcheck workspaces/{feature-name}/02-apply.sh` — run if `shellcheck` is present; if absent, skip with an explicit note (`shellcheck: skipped — not installed`).
+- **Syntax:** `bash -n "{workspace}/02-apply.sh"` — must pass.
+- **Lint:** `shellcheck "{workspace}/02-apply.sh"` — run if `shellcheck` is present; if absent, skip with an explicit note (`shellcheck: skipped — not installed`).
 - **Per-verb preview where it exists:** for each mutating verb in the script, run `gcloud <command> --help` and use `--validate-only` ONLY where `--help` confirms the command supports it. Never assume the flag exists.
 - **Describe-diff:** capture the describe-before snapshot (from Phase 1) and the intended end state, and render a human-readable plan/diff of what WOULD change per resource.
 - **Blast radius:** state which resources change, the reversibility of each line, and any data-loss flag.
@@ -303,7 +303,7 @@ Once Phase 4 authorization covers the plan, execute the validated script, captur
 its output, verify the post-state, and report.
 
 ```bash
-bash workspaces/{feature-name}/02-apply.sh
+bash "{workspace}/02-apply.sh"
 ```
 
 - Run the approved `02-apply.sh`; capture stdout/stderr (never echo credential material).
@@ -334,7 +334,7 @@ Before marking the task complete:
 
 ### 02-gcp-infra.md
 
-Write the plan report to `workspaces/{feature-name}/02-gcp-infra.md`:
+Write the plan report to `{workspace}/02-gcp-infra.md`:
 
 ```markdown
 # GCP Infra Report
@@ -376,7 +376,7 @@ Standard capture format (mirror db-structures/README.md pattern):
 Also record: environment inventory (project, region, VPC, existing relevant resources) and change-map (ordered list of resources that will change).}
 
 ### Generated script (Change-Intent mode)
-Path: `workspaces/{feature-name}/02-apply.sh`
+Path: `{workspace}/02-apply.sh`
 {the mutating/destructive commands, each annotated with its class — GENERATED for review, NOT YET RUN}
 
 ### Validation (Change-Intent mode)
@@ -398,7 +398,7 @@ Path: `workspaces/{feature-name}/02-apply.sh`
 
 ### 02-runbook.md (change-intent plans)
 
-Write an operational runbook to `workspaces/{feature-name}/02-runbook.md` for every change-intent plan:
+Write an operational runbook to `{workspace}/02-runbook.md` for every change-intent plan:
 
 ```markdown
 # GCP Infra Runbook
@@ -464,7 +464,7 @@ current coordinator:
 agent: gcp-infra
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
-output: workspaces/{feature-name}/02-gcp-infra.md
+output: "{workspace}/02-gcp-infra.md"
 summary: {1-2 sentences: mode, operation class, outcome or pending decision, impact}
 reference_loaded: datastream-cloudsql-bigquery | none | gcp-infra-refs unavailable
 issues: {actual blockers, missing authorization, or "none"}

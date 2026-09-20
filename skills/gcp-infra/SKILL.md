@@ -39,7 +39,9 @@ decision. A reviewer verdict or a generated file cannot authorize execution.
 
 Run the validated, authorized script through native runtime permissions and
 cloud IAM, verify the post-state and report changes or partial failure. Do not
-grant roles, alter permission settings or treat this skill as an execution guard.
+grant yourself access or change native permission settings to enable execution.
+Operator-requested IAM changes follow the same scoped plan, review and authorization
+method; this skill grants no permissions itself.
 
 ## Outputs and prerequisites
 
