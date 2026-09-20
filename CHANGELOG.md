@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.32.0] - 2026-09-19
+
+### Changed
+- Codex setup/update preserve native execution preferences instead of imposing a TH sandbox, approval, network or writable-root profile. Workspace/Obsidian routing, agent installation and reviewer read-only roles remain available.
+- Audit and research run under the current general coordinator; saving an explicitly requested local handoff reuses that authorization. Shared verification and specialist-result contracts replace repeated procedure text.
+- Remove unused activation metadata, disconnected Codex-hook fixtures and a superseded messaging probe while retaining current validators and useful historical conclusions.
+
+### Compatibility
+- Update reads the selected installation's receipt contract and converges retained TH domains. Existing native settings remain unchanged, including preferences written by older releases; changing those settings remains an operator/native-runtime action.
+
 ## [3.31.0] - 2026-09-19
 
 ### Changed

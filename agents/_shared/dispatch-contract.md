@@ -22,6 +22,6 @@ or replaces it before another writer begins.
 Specialists independently validate the lease, remain inside writable paths, and
 cannot write coordinator workspace projections. Native sandbox and permission
 policy remain an additional floor and are never weakened by a lease.
-Each specialist returns one result envelope through native terminal transport;
-Main validates and accepts it before projection. Design never pre-builds these
-leases or duplicates canonical OpenSpec acceptance in dispatch prose.
+Results follow `agents/_shared/output-template.md` in the selected TH installation.
+Design never pre-builds leases or duplicates canonical OpenSpec acceptance in
+dispatch prose.

@@ -1,24 +1,4 @@
-# codex-update-convergence Specification
-
-## Purpose
-Make Team Harness updates on Codex fast and predictable while preserving native plugin authority, operator-owned configuration and execution preferences, and recoverable convergence of TH-owned installation domains.
-
-## Requirements
-
-### Requirement: Native snapshot selection remains authoritative
-The update flow SHALL derive the running version from the loaded plugin manifest, refresh only the configured Team Harness marketplace, compare versions semantically, and use Codex's native plugin installation operation when a newer snapshot or an explicitly forced equal-version refresh is selected. It MUST NOT downgrade, remove the active plugin before replacement, or treat a marketplace listing as proof that the loaded snapshot changed.
-
-#### Scenario: Newer marketplace snapshot is available
-- **WHEN** the refreshed Team Harness marketplace exposes a version newer than the loaded plugin manifest
-- **THEN** the flow installs that snapshot through Codex's native plugin operation and binds all later work to the exact installed path returned by that operation
-
-#### Scenario: No installation is needed
-- **WHEN** the marketplace and loaded versions are equal and the operator did not request a forced refresh
-- **THEN** the flow skips plugin replacement and uses the validated loaded snapshot as the convergence source
-
-#### Scenario: Marketplace would downgrade the installation
-- **WHEN** the refreshed marketplace version is older than the loaded plugin version
-- **THEN** the flow stops before replacement and reports the stale marketplace without changing the active installation
+## MODIFIED Requirements
 
 ### Requirement: Post-install convergence uses one bounded pass
 After snapshot selection, the update flow SHALL reconcile and verify TH-owned snapshot bridging, workflow settings, feature prerequisites, bundled agents and expected MCP registrations in one bounded pass. Native execution preferences SHALL NOT be an installation domain or a reason to require another approval. The coordinator SHALL reuse the receipt instead of repeating successful installation checks.
@@ -91,3 +71,9 @@ Rerunning update after interruption, denial or partial convergence SHALL recompu
 #### Scenario: Approval follows a pending receipt
 - **WHEN** the operator continues after an older version's runtime-profile proposal
 - **THEN** the current updater recomputes only retained installation domains and does not use that old approval to modify native execution policy
+
+## REMOVED Requirements
+
+### Requirement: Persistent runtime changes require flexible live approval
+**Reason**: Native execution policy is no longer a TH update domain.
+**Migration**: Preserve all existing policy values and use the host's own configuration workflow for a separately requested change; do not delete formerly managed values or replay an old runtime-approval invocation.

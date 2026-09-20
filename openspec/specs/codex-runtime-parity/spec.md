@@ -6,18 +6,15 @@ Codex is a first-class runtime: sandbox failures diagnose to their real cause, d
 ## Requirements
 
 ### Requirement: Sandbox diagnosis distinguishes shadowing from stale sessions
-When a workspace write probe fails and the target root is declared in the operator-level config, preflight SHALL check whether the checked-out tree's project config declares `writable_roots`; if so it reports config shadowing with the concrete fix (update tree / regenerate config), and only otherwise advises a session restart.
+When an actual workspace access fails, TH SHALL identify the target and use available native configuration or host evidence to distinguish project configuration, permission refusal and stale activation. It SHALL NOT infer a required policy value or restart solely from missing evidence, a directory's absence or a different operator preference.
 
 #### Scenario: A pre-#601 tree shadows the global roots
-- **WHEN** the write probe fails and the project `.codex/config.toml` declares `writable_roots`
-- **THEN** the diagnosis names the shadowing and never enters a restart loop
+- **WHEN** available evidence shows project configuration shadows an intended workspace permission
+- **THEN** TH reports that concrete cause and a scoped native remedy without rewriting global policy or entering a restart loop
 
-### Requirement: Setup and update detect and repair sandbox drift
-`/th:setup` and `/th:update` (Codex runtime) SHALL warn when the checked-out tree declares project-level `writable_roots`, and SHALL offer — behind the existing confirmation gate — to write required vault roots into the operator-level config with a merge that preserves unrelated keys, followed by the restart instruction. Config migration SHALL preserve structured values (`obsidian_tasks` stays an object; a degraded value is repaired or reported, never silently kept).
-
-#### Scenario: Setup finds a shadowing project config
-- **WHEN** setup runs on a tree whose project config declares writable roots while the global config declares the vault
-- **THEN** the operator receives the drift warning and a gated offer to fix the operator-level config
+#### Scenario: Activation evidence is unavailable
+- **WHEN** the host cannot prove whether a changed setting is active
+- **THEN** TH reports activation as unverified and does not prescribe restart without a demonstrated need
 
 ### Requirement: Declared capability equals effective capability
 The canonical agent registry, generated TOMLs, and instruction adapters SHALL
@@ -137,3 +134,18 @@ SHALL compare the installed roster and bytes with the packaged agent artifacts.
 #### Scenario: All bundled roles are current
 - **WHEN** agent setup sync runs again
 - **THEN** it reports no changed roles and no restart requirement
+
+### Requirement: Setup preserves native policy and workspace preferences
+Ordinary Codex setup and generated project configuration SHALL leave global sandbox, approval, network and writable-root decisions to the operator and native runtime. TH SHALL retain skill discovery, complete agent installation, reviewer read-only role defaults, voice, language and workspace/Obsidian preferences. Workspace selection SHALL preserve structured settings and resolve through the existing workspace mechanism; writing there remains subject to native permissions.
+
+#### Scenario: Setup runs with custom native policy
+- **WHEN** setup installs TH roles and saves collaboration preferences
+- **THEN** it preserves native execution-policy values, including absent values, and does not add cache or vault roots to global permissions
+
+#### Scenario: Obsidian is selected
+- **WHEN** the operator configures an existing vault and a valid TH subfolder
+- **THEN** TH retains that destination and creates workflow artifacts there only through an authorized native write without requiring a global policy rewrite
+
+#### Scenario: Project projections are regenerated
+- **WHEN** the Codex generator emits the project's TH agent configuration
+- **THEN** it preserves the complete role roster and Main's model choice without emitting project execution-policy defaults

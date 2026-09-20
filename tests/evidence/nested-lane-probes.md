@@ -1,4 +1,12 @@
-# Evidence Artifact — Nested-Lane Probes M2/M3/M4 (Operator-Reviewable)
+# Archived Evidence — Nested-Lane Probes M2/M3/M4
+
+This entire document is a historical record of the original nested-lane
+experiment, including its proposed activation rules and unfilled confirmation
+form. It is not a current setup procedure. The M3 requirements, FATAL summary,
+operator-confirmation dependency and version-based re-confirmation rule quoted
+below are retired; they do not prevent current activation or require another
+operator response. Current activation follows the installed setup/reload
+workflow. No unverified observation is promoted to PASS by this archival notice.
 
 > **SUPERSEDED-CORRECTION (M3 only).** The M3 premise recorded below — the operator replying **in the orchestrator's own transcript** (direct subagent-panel messaging) and that subagent resuming as sole witness and recorder — was empirically found **unreachable in the real client** (herdr and other TUIs expose no in-session-subagent reply path; the paused subagent is reaped), which **deadlocked** the gate-blind design. The design pivoted to **leader-mediated** gates: the orchestrator returns `gate_pending`; `th:leader` presents the gate inline in the operator's main conversation and relays the operator's verbatim decision (tagged `leader-relayed-operator`) back to the orchestrator, which records the dual-record. Treat any M3 "gate-blind" conclusions below as **historical**; the current capability floor is the parent→child spawn-and-resume path (Claude Code ≥ v2.1.199), not direct subagent-panel messaging. The M2, M4, and marker byte-identity rows and all recorded results below are unchanged.
 
@@ -29,9 +37,12 @@ Full probe definition: `tests/probe_lane_hook_depth.md`.
 | `dev-guard` decision logic is target-aware (`-C {dir}`, `--repo`, refspec dest) | `dev-guard` | n/a (direct hook invocation) | 18/18 new deterministic cases pass; non-resolvable target never allows | CONFIRMED — deterministic test | `tests/test_dev_guard.sh` Suite 83e (Task-6) |
 | Hook payload cwd tracks the nested subagent's OWN shell cwd across a `-C {repoB}` redirection, at the specific leader→orchestrator→specialist depth-2 shape | `dev-guard`/`policy-block` | depth 2 (specialist under orchestrator) | not yet observed at this exact shape | **REQUIRES-LIVE-RUN** | none yet — see `tests/probe_lane_hook_depth.md` M2.4 |
 
-## M3 — Gate messaging round-trip (panel resume + dual-record)
+## Historical M3 — Retired gate messaging round-trip
 
-Full probe definition: `tests/probe_lane_gate_messaging.md`.
+The superseded M3 probe definition was retired with the disconnected workflow
+assets. Its original text remains in Git history before this change. The useful
+conclusion is that direct replies to a paused subagent panel were unavailable;
+this historical experiment does not define a current activation prerequisite.
 
 | Check | OBSERVED | Status | Source |
 |---|---|---|---|
@@ -39,7 +50,9 @@ Full probe definition: `tests/probe_lane_gate_messaging.md`.
 | Reply is witnessed by the SAME subagent that emitted the STOP (no top-level relay) | not yet observed | **REQUIRES-LIVE-RUN** | none |
 | Dual-record (`gateN_release` + `stage.gate.release`) written atomically by the witnessing subagent | not yet observed (live write); atomicity INVARIANT itself is separately deterministic-test-covered | **REQUIRES-LIVE-RUN** for the live write | `research/00-test-plan.md` WS-3 (deterministic, separate task) |
 
-**M3 is the FATAL-constraint probe.** Its result gates the capability floor harder than M2/M4: a FAIL here (reply consumed by the leader instead of the orchestrator subagent) directly falsifies the gate-blind design and must block the split from ever reporting `probe_result: PASS`.
+The original proposal treated M3 as a fatal constraint. That requirement was
+retired when its unavailable premise led to the leader-mediated design. M3 is
+excluded from any current overall result; its live checks remain unconfirmed.
 
 ## M4 — Concurrency (N≥2 lanes) + legit-spawn Bash-traversal
 
@@ -67,29 +80,33 @@ A dedicated deterministic script, `tests/test_lane_marker_identity.py`, asserts 
 | Injector (`agents/orchestrator.md`) carries the identical `TH-STATE-REF:` literal | specialist-dispatch controlled header stamps `TH-STATE-REF: {docs_root}/00-state.md` | CONFIRMED — deterministic (Suite 151, 6/6) |
 | Injector (`agents/leader.md`/`agents/ref-dispatch-machinery.md`) carries the identical `TH-LANE:` literal | orchestrator-spawn controlled header stamps `TH-LANE: {project}` (multi-project) | CONFIRMED — deterministic (Suite 151, 6/6) |
 
-## Summary — what still requires a live CC run / operator confirmation
+## Historical summary — unresolved observations at the time
 
 | Probe | Item | Blocking for capability floor? |
 |---|---|---|
 | M2 | Payload-cwd tracking at the exact depth-2 shape (`-C {repoB}` from a specialist under an orchestrator) | Yes — feeds `probe_result` |
-| M3 | Full round-trip: panel resume + witness identity + live dual-record write, for at least STAGE-GATE-1 (ideally all three gates) | **Yes — FATAL-constraint probe, hardest blocker** |
+| M3 | Panel resume + witness identity + live dual-record write | Retired — unavailable premise; not a current activation prerequisite |
 | M4 | Role-specific depth-1→depth-2 re-confirmation (low-cost, high prior confidence from M1) | Confirmatory, not blocking on its own |
 | M4 | N=2 live concurrent orchestrators, disjoint state-file attribution (E2E) | Confirmatory (hook-level guarantees already deterministic) |
 | M4 | Split-native spawn Bash-traversal (once Task-2 lands) | Not a live-run item — becomes ANSWERED by code inspection once Task-2/3 land in this branch |
 | AC-7.4 | Marker byte-identity, injector side | CONFIRMED — Task-2/3 landed; `tests/test_lane_marker_identity.py` (Suite 151) passes 6/6, no live run needed |
 
-## Operator confirmation
+## Historical operator confirmation (unfilled; not a current setup step)
 
 This section is intentionally left for the operator to complete, per `01-plan.md` AC-9.4 ("un paso gateado registra el `probe_result` SÓLO tras que el operador confirme el artefacto de evidencia... nunca auto-escrito por un agente"). No agent writes to this section.
 
-**Relationship between the fields below (read before filling).** `Overall probe_result: PASS` REQUIRES `M3 ... result: PASS` — M3 is the FATAL-constraint probe (the gate-messaging round-trip the whole gate-blind split rests on), so `Overall` can never be PASS while M3 is FAIL or not-run. The boot capability check (`agents/leader.md § Boot capability check`) gates specifically on M3 via this rule; M2 and M4 REQUIRES-LIVE-RUN items are confirmatory and do not, on their own, block `Overall` unless you decide otherwise.
+These unfilled fields preserve the original record without claiming an operator
+confirmation. M3 is excluded from `Overall probe_result`; no new overall result
+is asserted by this archive. The former dependency on a passing M3 is retired.
 
 - **Confirmed by:** _(operator name/handle)_
 - **Date:** _(YYYY-MM-DD)_
 - **CC version observed against:** _(e.g., 2.1.206 — must match the `version` pinned by the boot capability check, per AC-9.4/AC-10.3 version-invalidation)_
 - **M2 REQUIRES-LIVE-RUN item — result:** PASS / FAIL / not run
-- **M3 REQUIRES-LIVE-RUN items — result:** PASS / FAIL / not run
+- **M3 — disposition:** retired; original live checks not confirmed
 - **M4 REQUIRES-LIVE-RUN items — result:** PASS / FAIL / not run
 - **Overall `probe_result`:** PASS / FAIL
 
-**Re-confirmation trigger:** per AC-10.3, a mismatch between the CC `version` recorded here and the CC version actually running invalidates this confirmation and forces a hard-STOP + re-confirmation before the split path is used again.
+The original version-based hard stop and re-confirmation instruction is retired
+with this experiment. This archived record never requests another confirmation
+or restart.

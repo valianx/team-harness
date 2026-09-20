@@ -1,27 +1,22 @@
 
-Analyze the input: $ARGUMENTS
+# Research
 
----
-name: research
+Answer the operator's question with evidence that helps them choose an approach.
+The current general agent coordinates and synthesizes the work. Ask for the
+missing question or decision context only when the request does not establish it.
 
-## Mode 1 — Topic or question provided
+Identify the alternatives, constraints and uncertainty that matter to the decision.
+Use current primary sources for external technical claims and inspect the relevant
+code when the question depends on an existing implementation. Separate observed
+behavior, documented claims and inference; cite sources and disclose important gaps.
 
-1. Pass to the `orchestrator` agent:
-   ```
-   Direct Mode Task:
-   - Mode: research
-   - Topic: {user's input}
-   ```
+Delegate distinct questions to researchers when useful. Give them bounded scope
+and compare their evidence rather than treating agreement or a verdict as authority.
+An architect or research consolidator can help with a complex synthesis; a fixed
+agent count or extra consolidation stage is not required for every question.
 
-## Mode 2 — No input provided
-
-Ask the user: "What technology, library, or approach do you want to research? Example: 'zod vs yup for validation', 'monorepo strategies', 'server components with our stack'."
-
----
-name: research
-
-## Important
-
-- Always invoke the `orchestrator` agent — do NOT invoke agents directly
-- The orchestrator fans out to N parallel `researcher` (haiku) agents (default 3, cap 5), then dispatches `research-consolidator` to merge findings, then invokes `architect` in research mode to synthesize the consolidated evidence
-- Output: `workspaces/{topic-slug}/research/00-research.md`
+Follow the [research method](../../agents/ref-architect-modes.md#research-mode)
+for the report. Preserve configured workspace/Obsidian, language and voice;
+save useful evidence and recommendations as `research/00-research.md` there.
+Report the conclusion, tradeoffs and remaining uncertainty without activating
+a pipeline or implementing a recommendation unless the operator requests it.

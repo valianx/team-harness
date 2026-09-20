@@ -21,11 +21,11 @@ from types import ModuleType
 from typing import BinaryIO, Callable
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 PLUGIN_NAME = "team-harness"
 REQUIRED_FEATURES = ("multi_agent", "multi_agent_v2")
-DOMAIN_NAMES = ("bridge", "config", "runtime", "features", "agents", "mcp")
-OVERALL_STATUSES = {"current", "converged", "pending-approval", "partial-convergence"}
+DOMAIN_NAMES = ("bridge", "config", "features", "agents", "mcp")
+OVERALL_STATUSES = {"current", "converged", "partial-convergence"}
 RECOVERY_INVOCATION = "$team-harness:update"
 MAX_NATIVE_OUTPUT = 256 * 1024
 NATIVE_TIMEOUT_SECONDS = 30
@@ -42,7 +42,6 @@ NON_FATAL_ALIAS_WARNING = (
 HELPER_DIGESTS = {
     "skills/update/scripts/bridge_snapshot.py": "52da3ca0233c3d9f145a46a9f0b6648aa65f01bd867cd4d7b0870053b8f2f99d",
     "skills/setup/scripts/manage_config.py": "49175207918335c7323deeb0cb38a6253c78b6595cd724c6b15e1c5ae46f4d31",
-    "skills/setup/scripts/manage_runtime.py": "b96d3b25a82a039020954869e47b96001b6c957ae6578723f74f386c6a53f774",
     "skills/setup/scripts/manage_agents.py": "defb1ee1531bba5dee8a92756684f48f81b6c75a0a6938066779c5361b00b976",
 }
 
@@ -265,7 +264,6 @@ def load_helpers(plugin: Path) -> dict[str, ModuleType]:
     return {
         "bridge": load_module("th_update_bridge", update / "bridge_snapshot.py"),
         "config": load_module("th_update_config", setup / "manage_config.py"),
-        "runtime": load_module("th_update_runtime", setup / "manage_runtime.py"),
         "agents": load_module("th_update_agents", setup / "manage_agents.py"),
     }
 
@@ -441,75 +439,6 @@ def domain_error(exc: Exception) -> dict[str, object]:
     return {"status": "failed", "errorCode": code, "retryWithEscalation": retry, "restartRequired": False}
 
 
-def redacted_runtime_path(value: object) -> str:
-    if not isinstance(value, str):
-        raise ConvergenceError("RUNTIME_CLASSIFICATION_INVALID")
-    candidate = lexical_path(value)
-    roots = (
-        (codex_home_path(), "$CODEX_HOME"),
-        (lexical_path(str(Path.cwd())), "$PROJECT"),
-    )
-    for root, label in roots:
-        try:
-            relative = candidate.relative_to(root)
-            return label if not relative.parts else f"{label}/{'/'.join(relative.parts)}"
-        except ValueError:
-            continue
-    digest = hashlib.sha256(str(candidate).encode()).hexdigest()[:12]
-    return f"$EXTERNAL_ROOT/{digest}"
-
-
-def runtime_pending_decision(
-    runtime_state: dict[str, object],
-    new_version: str,
-    *,
-    old_plugin: Path,
-    new_plugin: Path,
-    snapshot_digest: str,
-) -> dict[str, object]:
-    mismatched = runtime_state.get("mismatchedSettings", [])
-    missing_roots = runtime_state.get("missingWritableRoots", [])
-    missing_directories = runtime_state.get("missingDirectories", [])
-    if (
-        not isinstance(mismatched, list)
-        or not isinstance(missing_roots, list)
-        or not isinstance(missing_directories, list)
-        or any(not isinstance(item, str) for item in [*mismatched, *missing_roots, *missing_directories])
-        or any(len(items) > MAX_LIST_ITEMS for items in (mismatched, missing_roots, missing_directories))
-    ):
-        raise ConvergenceError("RUNTIME_CLASSIFICATION_INVALID")
-    project_config = runtime_state.get("projectConfig")
-    project_shadowing = bool(runtime_state.get("projectConfigShadowing"))
-    project_path = None
-    if project_shadowing:
-        if not isinstance(project_config, dict):
-            raise ConvergenceError("RUNTIME_CLASSIFICATION_INVALID")
-        project_path = redacted_runtime_path(project_config.get("path"))
-    raw_identity = {
-        "version": new_version,
-        "oldPlugin": str(old_plugin),
-        "newPlugin": str(new_plugin),
-        "snapshotDigest": snapshot_digest,
-        "mismatchedSettings": sorted(mismatched),
-        "missingWritableRoots": sorted(missing_roots),
-        "missingDirectories": sorted(missing_directories),
-        "projectConfigShadowing": project_shadowing,
-        "projectConfigPath": project_config.get("path") if isinstance(project_config, dict) else None,
-    }
-    fingerprint = hashlib.sha256(
-        json.dumps(raw_identity, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
-    return {
-        "kind": "runtime-profile",
-        "mismatchedSettings": sorted(mismatched),
-        "missingWritableRoots": [redacted_runtime_path(item) for item in sorted(missing_roots)],
-        "missingDirectories": [redacted_runtime_path(item) for item in sorted(missing_directories)],
-        "projectConfigShadowing": project_shadowing,
-        "projectConfigPath": project_path,
-        "approvalFingerprint": fingerprint,
-    }
-
-
 def empty_receipt(old_plugin: Path, old_version: str, new_plugin: Path, new_version: str) -> dict[str, object]:
     return {
         "schemaVersion": SCHEMA_VERSION,
@@ -519,6 +448,9 @@ def empty_receipt(old_plugin: Path, old_version: str, new_plugin: Path, new_vers
         "domains": {name: {"status": "not-run", "restartRequired": False} for name in DOMAIN_NAMES},
         "changedDomains": [],
         "restartRequired": False,
+        # Keep the nullable field so callers that consumed schema v2 can safely
+        # inspect a v3 receipt, but runtime-policy decisions are no longer a
+        # convergence concern and this field is always null.
         "pendingDecision": None,
         "failedDomain": "preflight",
         "recoveryInvocation": RECOVERY_INVOCATION,
@@ -546,7 +478,6 @@ def validate_receipt(receipt: object) -> dict[str, object]:
     domain_keys = {
         "bridge": {"status", "bridgeStatus", "restartRequired"},
         "config": {"status", "added", "removedLegacySelectors", "restartRequired"},
-        "runtime": {"status", "restartRequired"},
         "features": {"status", "changed", "required", "restartRequired"},
         "agents": {"status", "scope", "changedCount", "customDefaultsPreserved", "restartRequired"},
         "mcp": {"status", "registeredCount", "missingExpected", "restartRequired"},
@@ -554,7 +485,6 @@ def validate_receipt(receipt: object) -> dict[str, object]:
     domain_statuses = {
         "bridge": {"not-run", "current", "changed", "preserved", "failed"},
         "config": {"not-run", "current", "changed", "failed"},
-        "runtime": {"not-run", "current", "changed", "pending", "failed"},
         "features": {"not-run", "current", "changed", "failed"},
         "agents": {"not-run", "current", "changed", "failed"},
         "mcp": {"not-run", "current", "preserved", "failed"},
@@ -564,7 +494,7 @@ def validate_receipt(receipt: object) -> dict[str, object]:
             raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
         if not isinstance(result.get("restartRequired"), bool):
             raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
-        if result["status"] in {"not-run", "pending"}:
+        if result["status"] == "not-run":
             expected_keys = {"status", "restartRequired"}
         elif result["status"] == "failed":
             expected_keys = {"status", "errorCode", "retryWithEscalation", "restartRequired"}
@@ -609,27 +539,7 @@ def validate_receipt(receipt: object) -> dict[str, object]:
         or receipt["recoveryInvocation"] != RECOVERY_INVOCATION
     ):
         raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
-    pending = receipt["pendingDecision"]
-    if pending is not None:
-        pending_keys = {
-            "kind", "mismatchedSettings", "missingWritableRoots", "missingDirectories",
-            "projectConfigShadowing", "projectConfigPath", "approvalFingerprint",
-        }
-        if not isinstance(pending, dict) or set(pending) != pending_keys or pending.get("kind") != "runtime-profile":
-            raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
-        if not isinstance(pending["projectConfigShadowing"], bool):
-            raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
-        if not re.fullmatch(r"[0-9a-f]{64}", str(pending["approvalFingerprint"])):
-            raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
-        for key in ("mismatchedSettings", "missingWritableRoots", "missingDirectories"):
-            values = pending[key]
-            if not isinstance(values, list) or len(values) > MAX_LIST_ITEMS or any(not isinstance(item, str) or len(item) > 256 for item in values):
-                raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
-        if pending["projectConfigPath"] is not None and not isinstance(pending["projectConfigPath"], str):
-            raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
-    if receipt["status"] == "pending-approval" and pending is None:
-        raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
-    if receipt["status"] in {"current", "converged"} and pending is not None:
+    if receipt["pendingDecision"] is not None:
         raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
     if receipt["status"] == "partial-convergence":
         if receipt["failedDomain"] not in {*DOMAIN_NAMES, "preflight"}:
@@ -648,13 +558,9 @@ def validate_receipt(receipt: object) -> dict[str, object]:
             raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
     elif failed:
         raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
-    if (domains["runtime"]["status"] == "pending") != (pending is not None):
+    if receipt["status"] == "current" and derived_changed:
         raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
-    if receipt["status"] == "pending-approval" and domains["runtime"]["status"] != "pending":
-        raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
-    if receipt["status"] == "current" and (derived_changed or pending is not None):
-        raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
-    if receipt["status"] == "converged" and (not derived_changed or pending is not None):
+    if receipt["status"] == "converged" and not derived_changed:
         raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
     if len(json.dumps(receipt, ensure_ascii=False).encode()) > MAX_RECEIPT_BYTES:
         raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
@@ -671,7 +577,6 @@ def run_convergence(
     receipt = empty_receipt(old_plugin, args.old_version, new_plugin, args.new_version)
     changed: list[str] = []
     restart_required = False
-    runtime_pending = False
 
     try:
         if SEMVER_RE.fullmatch(args.old_version) is None or SEMVER_RE.fullmatch(args.new_version) is None:
@@ -679,7 +584,7 @@ def run_convergence(
         codex_binary = validate_codex_binary(args.codex_bin)
         validate_manifest(new_plugin, args.new_version)
         verify_helper_integrity(new_plugin)
-        new_snapshot_digest = snapshot_identity(new_plugin)
+        snapshot_identity(new_plugin)
         helpers = load_helpers(new_plugin)
     except Exception as exc:
         receipt["domains"]["bridge"] = domain_error(exc)
@@ -742,46 +647,6 @@ def run_convergence(
     if not apply_domain("config", config_operation):
         return receipt
 
-    runtime_state: dict[str, object]
-    try:
-        runtime_state = helpers["runtime"].classify()
-        if runtime_state.get("status") == "current":
-            runtime_result = {"status": "current", "restartRequired": False}
-        elif runtime_state.get("status") != "stale":
-            raise ConvergenceError("RUNTIME_CLASSIFICATION_INVALID")
-        else:
-            pending = runtime_pending_decision(
-                runtime_state,
-                args.new_version,
-                old_plugin=old_plugin,
-                new_plugin=new_plugin,
-                snapshot_digest=new_snapshot_digest,
-            )
-        if runtime_state.get("status") == "stale" and args.runtime_approval is not None:
-            if args.escalation_domain is not None:
-                raise ConvergenceError("RUNTIME_APPROVAL_ESCALATION_MIXED")
-            if args.runtime_approval != pending["approvalFingerprint"]:
-                raise ConvergenceError("RUNTIME_APPROVAL_MISMATCH")
-            ensured = helpers["runtime"].ensure_result()
-            runtime_result = {
-                "status": "changed" if ensured["changed"] or ensured["createdDirectories"] else "current",
-                "restartRequired": bool(ensured["restartRequired"]),
-            }
-        elif runtime_state.get("status") == "stale":
-            runtime_pending = True
-            receipt["pendingDecision"] = pending
-            runtime_result = {"status": "pending", "restartRequired": False}
-        receipt["domains"]["runtime"] = runtime_result
-        if runtime_result["status"] == "changed":
-            changed.append("runtime")
-        restart_required = restart_required or bool(runtime_result["restartRequired"])
-        receipt["changedDomains"] = list(changed)
-        receipt["restartRequired"] = restart_required
-    except Exception as exc:
-        receipt["domains"]["runtime"] = domain_error(exc)
-        receipt["failedDomain"] = "runtime"
-        return receipt
-
     if not apply_domain("features", lambda: converge_features(runner, codex_bin, apply=may_mutate("features"))):
         return receipt
 
@@ -830,9 +695,7 @@ def run_convergence(
     receipt["changedDomains"] = changed
     receipt["restartRequired"] = restart_required
     receipt["failedDomain"] = None
-    if runtime_pending:
-        receipt["status"] = "pending-approval"
-    elif changed:
+    if changed:
         receipt["status"] = "converged"
     else:
         receipt["status"] = "current"
@@ -846,8 +709,11 @@ def parser() -> argparse.ArgumentParser:
     root.add_argument("--new-plugin", required=True)
     root.add_argument("--new-version", required=True)
     root.add_argument("--codex-bin", required=True)
+    # Accept the retired option so a follow-up command emitted by an older
+    # installed skill still converges retained domains. It is intentionally
+    # ignored and can never authorize a policy write.
     root.add_argument("--runtime-approval")
-    root.add_argument("--escalation-domain", choices=tuple(name for name in DOMAIN_NAMES if name != "runtime"))
+    root.add_argument("--escalation-domain", choices=DOMAIN_NAMES)
     root.add_argument("--expected-mcp", action="append", default=[])
     return root
 

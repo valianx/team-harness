@@ -122,6 +122,11 @@ for (const name of ["reviewer", "pr-review-qa", "pr-review-security", "pr-review
 }
 
 const projectConfig = first.files.get(join(root, ".codex/config.toml"));
+assert.doesNotMatch(projectConfig, /^sandbox_mode\s*=/m, "project config must preserve native sandbox policy");
+assert.doesNotMatch(projectConfig, /^approval_policy\s*=/m, "project config must preserve native approval policy");
+assert.doesNotMatch(projectConfig, /^approvals_reviewer\s*=/m, "project config must preserve native approval reviewer");
+assert.doesNotMatch(projectConfig, /^network_access\s*=/m, "project config must preserve native network policy");
+assert.doesNotMatch(projectConfig, /^writable_roots\s*=/m, "project config must preserve native writable roots");
 assert.doesNotMatch(projectConfig, /^model = /m, "project fallback must not override Main's model");
 assert.doesNotMatch(projectConfig, /^model_reasoning_effort = /m, "project fallback must not override Main's effort");
 assert.match(
@@ -129,14 +134,9 @@ assert.match(
   /^project_doc_fallback_filenames = \["CLAUDE\.md"\]$/m,
   "project config must load CLAUDE.md only when AGENTS.md is absent",
 );
-assert.match(projectConfig, /^sandbox_mode = "workspace-write"$/m);
-assert.match(projectConfig, /^approval_policy = "on-request"$/m);
 assert.match(projectConfig, /^\[features\]$/m);
 assert.match(projectConfig, /^multi_agent = true$/m);
 assert.match(projectConfig, /^multi_agent_v2 = true$/m);
-assert.match(projectConfig, /^\[sandbox_workspace_write\]$/m);
-assert.match(projectConfig, /^network_access = true$/m);
-assert.doesNotMatch(projectConfig, /^writable_roots\s*=/m, "global setup owns user-specific writable roots");
 assert.match(projectConfig, /^default_subagent_model = "gpt-5\.6-luna"$/m);
 assert.match(projectConfig, /^default_subagent_reasoning_effort = "max"$/m);
 assert.doesNotMatch(projectConfig, /gpt-5\.6-terra/, "project fallback retains Terra");
@@ -422,11 +422,12 @@ await expectRegistryFailure(registry => {
   reviewer.sandbox_mode = "workspace-write";
 }, /requires read-only sandbox mode/);
 await expectRegistryFailure(registry => {
-  registry.project_execution.sandbox_mode = "danger-full-access";
-}, /project_execution: unsupported sandbox mode/);
-await expectRegistryFailure(registry => {
-  registry.project_execution.approval_policy = "never";
-}, /approval_policy must be on-request/);
+  registry.project_execution = {
+    sandbox_mode: "workspace-write",
+    approval_policy: "on-request",
+    network_access: true,
+  };
+}, /project_execution is no longer supported/);
 await expectRegistryFailure(registry => {
   registry.agents[0].output_path = ".codex/agents/wrong.toml";
 }, /output_path must be/);

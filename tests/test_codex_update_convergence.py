@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from unittest import mock
 
@@ -103,21 +104,13 @@ class ConvergenceFixture(unittest.TestCase):
         )
 
     def converge(self, native: FakeCodex, *, authorize_runtime: bool = False) -> dict[str, object]:
-        approval = None
-        if authorize_runtime:
-            helpers = CONVERGE.load_helpers(self.plugin)
-            state = helpers["runtime"].classify()
-            approval = CONVERGE.runtime_pending_decision(
-                state,
-                PLUGIN_VERSION,
-                old_plugin=self.plugin,
-                new_plugin=self.plugin,
-                snapshot_digest=CONVERGE.snapshot_identity(self.plugin),
-            )["approvalFingerprint"]
+        # The parameter remains for old callers, but runtime approval is now a
+        # retired no-op and can never authorize a policy mutation.
+        approval = "legacy-approval" if authorize_runtime else None
         receipt = CONVERGE.run_convergence(self.args(runtime_approval=approval), native_runner=native)
         return CONVERGE.validate_receipt(receipt)
 
-    def test_pending_approval_then_authorized_pass_then_current_fast_path(self) -> None:
+    def test_retained_domains_converge_then_current_fast_path(self) -> None:
         native = FakeCodex(
             features={
                 "multi_agent": True,
@@ -125,17 +118,17 @@ class ConvergenceFixture(unittest.TestCase):
                 "guardianv2.thread_context": False,
             }
         )
-        pending = self.converge(native)
-        self.assertEqual(pending["status"], "pending-approval")
-        self.assertEqual(pending["domains"]["runtime"]["status"], "pending")
-        self.assertIn("config", pending["changedDomains"])
-        self.assertIn("agents", pending["changedDomains"])
-        self.assertIsInstance(pending["pendingDecision"], dict)
+        first = self.converge(native)
+        self.assertEqual(first["status"], "converged")
+        self.assertNotIn("runtime", first["domains"])
+        self.assertIn("config", first["changedDomains"])
+        self.assertIn("agents", first["changedDomains"])
+        self.assertIsNone(first["pendingDecision"])
 
         authorized = self.converge(native, authorize_runtime=True)
-        self.assertEqual(authorized["status"], "converged")
-        self.assertEqual(authorized["changedDomains"], ["runtime"])
-        self.assertTrue(authorized["restartRequired"])
+        self.assertEqual(authorized["status"], "current")
+        self.assertEqual(authorized["changedDomains"], [])
+        self.assertFalse(authorized["restartRequired"])
 
         native.calls.clear()
         current = self.converge(native)
@@ -147,12 +140,60 @@ class ConvergenceFixture(unittest.TestCase):
             [(CODEX_BIN, "features", "list"), (CODEX_BIN, "mcp", "list", "--json")],
         )
 
-    def test_declined_runtime_can_remain_pending_without_a_prescribed_command(self) -> None:
-        receipt = self.converge(FakeCodex())
-        self.assertEqual(receipt["status"], "pending-approval")
-        self.assertEqual(receipt["recoveryInvocation"], "$team-harness:update")
-        runtime_text = (self.codex_home / "config.toml").read_text(encoding="utf-8")
-        self.assertNotIn("sandbox_mode", runtime_text)
+    def test_native_execution_preferences_are_preserved_without_policy_classification(self) -> None:
+        config = self.codex_home / "config.toml"
+        config.parent.mkdir(parents=True, exist_ok=True)
+        config.write_text(
+            'sandbox_mode = "read-only"\n'
+            'approval_policy = "never"\n'
+            'approvals_reviewer = "manual"\n'
+            'custom_key = "preserve-me"\n'
+            '\n'
+            '[sandbox_workspace_write]\n'
+            'network_access = false\n'
+            'writable_roots = ["C:/operator/root"]\n',
+            encoding="utf-8",
+        )
+        before = tomllib.loads(config.read_text(encoding="utf-8"))
+        receipt = self.converge(FakeCodex(), authorize_runtime=True)
+        self.assertIn(receipt["status"], {"converged", "current"})
+        after = config.read_text(encoding="utf-8")
+        parsed = tomllib.loads(after)
+        self.assertEqual(parsed["sandbox_mode"], "read-only")
+        self.assertEqual(parsed["approval_policy"], "never")
+        self.assertEqual(parsed["approvals_reviewer"], "manual")
+        self.assertEqual(parsed["custom_key"], "preserve-me")
+        self.assertFalse(parsed["sandbox_workspace_write"]["network_access"])
+        self.assertEqual(parsed["sandbox_workspace_write"]["writable_roots"], ["C:/operator/root"])
+        self.assertEqual(before["sandbox_mode"], parsed["sandbox_mode"])
+        self.assertEqual(before["approval_policy"], parsed["approval_policy"])
+        self.assertEqual(before["approvals_reviewer"], parsed["approvals_reviewer"])
+        self.assertEqual(before["sandbox_workspace_write"], parsed["sandbox_workspace_write"])
+
+    def test_absent_native_policy_stays_absent_with_obsidian_workspace(self) -> None:
+        vault = self.base / "vault"
+        vault.mkdir()
+        preferences = {"logs-mode": "obsidian", "logs-path": str(vault), "logs-subfolder": "TH-notes"}
+        settings = self.codex_home / ".team-harness.json"
+        settings.write_text(json.dumps(preferences), encoding="utf-8")
+
+        for scope in ("global", "project"):
+            with self.subTest(scope=scope):
+                current = json.loads(settings.read_text(encoding="utf-8"))
+                current["agent-scope"] = scope
+                settings.write_text(json.dumps(current), encoding="utf-8")
+                receipt = self.converge(FakeCodex())
+                self.assertIsNone(receipt["failedDomain"])
+                config = (self.codex_home if scope == "global" else self.project / ".codex") / "config.toml"
+                parsed = tomllib.loads(config.read_text(encoding="utf-8"))
+                for key in ("sandbox_mode", "approval_policy", "approvals_reviewer", "network_access", "writable_roots", "sandbox_workspace_write"):
+                    self.assertNotIn(key, parsed)
+                self.assertIn("agents", parsed)
+                persisted = json.loads(settings.read_text(encoding="utf-8"))
+                for key, value in preferences.items():
+                    self.assertEqual(persisted[key], value)
+                self.assertFalse((vault / "TH-notes").exists())
+                self.assertFalse((self.codex_home / "tmp").exists())
 
     def test_missing_windows_symlink_privilege_preserves_bridge_and_checks_all_domains(self) -> None:
         self.converge(FakeCodex(), authorize_runtime=True)
@@ -311,7 +352,7 @@ class ConvergenceFixture(unittest.TestCase):
         self.assertEqual(partial["failedDomain"], "features")
         self.assertEqual(partial["domains"]["features"]["errorCode"], "NATIVE_COMMAND_FAILED")
         self.assertIn("config", partial["changedDomains"])
-        self.assertEqual(partial["domains"]["runtime"]["status"], "pending")
+        self.assertNotIn("runtime", partial["domains"])
 
         repaired = FakeCodex(features={"multi_agent": False, "multi_agent_v2": True})
         resumed = self.converge(repaired, authorize_runtime=True)
@@ -333,7 +374,12 @@ class ConvergenceFixture(unittest.TestCase):
         target = self.base / "unsafe-helper.py"
         target.write_text("{}", encoding="utf-8")
         helper.unlink()
-        helper.symlink_to(target)
+        try:
+            helper.symlink_to(target)
+        except OSError as error:
+            if getattr(error, "winerror", None) == 1314:
+                self.skipTest("symlink privilege unavailable")
+            raise
         unsafe = self.converge(FakeCodex())
         self.assertEqual(unsafe["failedDomain"], "preflight")
         self.assertEqual(unsafe["domains"]["bridge"]["errorCode"], "SNAPSHOT_COMPONENT_SYMLINK")
@@ -384,7 +430,12 @@ class ConvergenceFixture(unittest.TestCase):
         scripts = self.plugin / "skills/setup/scripts"
         real_scripts = self.plugin / "skills/setup/scripts-real"
         scripts.rename(real_scripts)
-        scripts.symlink_to(real_scripts, target_is_directory=True)
+        try:
+            scripts.symlink_to(real_scripts, target_is_directory=True)
+        except OSError as error:
+            if getattr(error, "winerror", None) == 1314:
+                self.skipTest("symlink privilege unavailable")
+            raise
         linked = self.converge(FakeCodex())
         self.assertEqual(linked["failedDomain"], "preflight")
         self.assertEqual(linked["domains"]["bridge"]["errorCode"], "SNAPSHOT_COMPONENT_SYMLINK")
@@ -410,14 +461,32 @@ class ConvergenceFixture(unittest.TestCase):
         self.assertEqual(config.read_bytes(), before)
         self.assertFalse((self.plugin / "hooks").exists())
 
-    def test_runtime_approval_is_bound_to_exact_pending_delta(self) -> None:
-        receipt = CONVERGE.run_convergence(
+    def test_legacy_runtime_approval_is_ignored_and_never_writes_policy(self) -> None:
+        config = self.codex_home / "config.toml"
+        config.parent.mkdir(parents=True, exist_ok=True)
+        config.write_text(
+            'sandbox_mode = "read-only"\n'
+            'approval_policy = "never"\n'
+            'approvals_reviewer = "manual"\n'
+            '\n'
+            '[sandbox_workspace_write]\n'
+            'network_access = false\n'
+            'writable_roots = ["C:/operator/root"]\n',
+            encoding="utf-8",
+        )
+        receipt = CONVERGE.validate_receipt(CONVERGE.run_convergence(
             self.args(runtime_approval="0" * 64),
             native_runner=FakeCodex(),
-        )
-        receipt = CONVERGE.validate_receipt(receipt)
-        self.assertEqual(receipt["failedDomain"], "runtime")
-        self.assertEqual(receipt["domains"]["runtime"]["errorCode"], "RUNTIME_APPROVAL_MISMATCH")
+        ))
+        self.assertIn(receipt["status"], {"converged", "current"})
+        self.assertIsNone(receipt["pendingDecision"])
+        self.assertNotIn("runtime", receipt["domains"])
+        parsed = tomllib.loads(config.read_text(encoding="utf-8"))
+        self.assertEqual(parsed["sandbox_mode"], "read-only")
+        self.assertEqual(parsed["approval_policy"], "never")
+        self.assertEqual(parsed["approvals_reviewer"], "manual")
+        self.assertFalse(parsed["sandbox_workspace_write"]["network_access"])
+        self.assertEqual(parsed["sandbox_workspace_write"]["writable_roots"], ["C:/operator/root"])
 
     def test_native_output_limit_is_enforced_while_streaming(self) -> None:
         with self.assertRaisesRegex(CONVERGE.ConvergenceError, "NATIVE_COMMAND_OUTPUT_TOO_LARGE"):
@@ -471,17 +540,11 @@ class ConvergenceFixture(unittest.TestCase):
         self.assertEqual(receipt["failedDomain"], "preflight")
         self.assertEqual(receipt["domains"]["bridge"]["errorCode"], "CODEX_BINARY_INVALID")
 
-    def test_runtime_approval_is_bound_to_snapshot_content(self) -> None:
-        pending = self.converge(FakeCodex())
-        approval = pending["pendingDecision"]["approvalFingerprint"]
-        converger = self.plugin / "skills/update/scripts/converge.py"
-        converger.write_text(converger.read_text(encoding="utf-8") + "\n", encoding="utf-8")
-        receipt = CONVERGE.validate_receipt(CONVERGE.run_convergence(
-            self.args(runtime_approval=approval),
-            native_runner=FakeCodex(),
-        ))
-        self.assertEqual(receipt["failedDomain"], "runtime")
-        self.assertEqual(receipt["domains"]["runtime"]["errorCode"], "RUNTIME_APPROVAL_MISMATCH")
+    def test_receipt_has_no_runtime_approval_fingerprint(self) -> None:
+        receipt = self.converge(FakeCodex())
+        self.assertIsNone(receipt["pendingDecision"])
+        self.assertNotIn("approvalFingerprint", json.dumps(receipt))
+        self.assertNotIn("runtime", receipt["domains"])
 
     def test_native_timeout_survives_early_pipe_close(self) -> None:
         previous = CONVERGE.NATIVE_TIMEOUT_SECONDS
@@ -534,7 +597,6 @@ class ConvergenceFixture(unittest.TestCase):
         scripts = self.plugin / "skills/setup/scripts"
         commands = [
             [sys.executable, str(scripts / "manage_config.py"), "ensure", "--version", PLUGIN_VERSION],
-            [sys.executable, str(scripts / "manage_runtime.py"), "inspect"],
             [sys.executable, str(scripts / "manage_agents.py"), "inspect", "--scope", "global"],
         ]
         for command in commands:

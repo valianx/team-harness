@@ -77,35 +77,15 @@ new effect.
    preparation checkpoint when PR delivery is agreed; otherwise apply the [shared
    lifecycle](references/lifecycle.md) directly. Prepare archive before committing the final
    review candidate, including the living specs and archived change with the implementation.
-5. **Classify and validate.** Before publication, build the anchored package for the committed
-   branch with `skills/verify/scripts/review-fan.mjs`; this deterministic step always classifies
-   the completed changed surface and binds the validated requirements as `written-intent`
-   criteria. Offer the optional [author review](references/author-review.md) using that classification.
-   For an archived change, select its exact `archive/YYYY-MM-DD-<change>` reference
-   with `--change`, so the package includes the archive and final specs.
-   When it reports `security_floor.applies`, stop for the live three-way choice in
-   § Escalation. Selecting the in-lane path makes the package's `security` and `adversary` lenses
-   mandatory and runs the one full-scope review without waiting for another request. When the
-   floor does not apply, run the review only on an explicit live operator request. Validation
-   confirms the change; it does not iterate. `review-fan.mjs gate` is the immutable historical
-   assessment of the reviewed revision and classifies every blocking finding; its output is never
-   rewritten after a repair:
-
-   - **covered** — a bound criterion anticipated it. Fix it, then close by executing that
-     criterion's scenario and the deterministic suites. No reviewer is dispatched, and nothing is
-     counted as a round.
-   - **uncovered, above the floor** — the authored change failed to anticipate it, which is a
-     defect in the change rather than a new finding. Explain the needed revision to the operator,
-     revise the bound change at its current source location, revalidate, and obtain only missing scope approval,
-     reusing live authorization already given. Never answer it with another review.
-   - **uncovered, below the floor** — record it as a pull-request concern.
-
-   Keep the original reviewed revision and bind any repaired head as a separate corrected revision.
-   An ordinary in-scope repair advancing that head does not make the original review stale. Inspect
-   the entire reviewed-to-corrected diff and hold publication if it contains unrelated changes;
-   only verified repairs and authorized spec amendments are eligible. A reviewed closure pass over
-   a fix runs only on an explicit live operator request, with the prior review anchor; the script
-   refuses a second full scope. The lane opens no other review.
+5. **Classify and validate.** Use [verify](../verify/SKILL.md) to build the committed
+   candidate package and bind the authored requirements, including the exact archived
+   change reference when applicable. Apply the live review choice and completion rules
+   in [author review](references/author-review.md); use § Escalation when the package
+   identifies a security dimension. Reuse the review decision already given for this
+   delivery rather than offering it again. Main evaluates findings, performs authorized
+   repairs and records their evidence-backed closure under that shared contract. Keep
+   the original reviewed revision and historical gate result distinct from a corrected
+   head; do not manufacture a pass or add another full review automatically.
 6. **Deliver.** Preserve the agreed delivery and repository conventions. If no PR
    is required, complete applicable validation and acceptance, record local delivery,
    and continue to close. For PR delivery, first satisfy the author-review decision and completion conditions in
