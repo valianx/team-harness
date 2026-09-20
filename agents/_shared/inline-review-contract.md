@@ -150,15 +150,14 @@ an exact SHA-256 byte digest match with the trusted packaged
 field-mismatched, or digest-mismatched definition fails closed as `untrusted`
 or `unavailable`; Main does not dispatch it.
 
-Disk hashes do not attest loaded bytes. Record `profile_session` (digest, scope,
-backend, activation basis) only when native read-only dispatch is available and
-the backend loaded the verified definition at startup or through verified
-reload/reconnect. No-op setup/sync and other-role changes preserve known-current
-activation. Changed selected bytes or scope invalidate it: use installed reload,
-preserving the conversation when reconnecting. Unverified activation or native
-read-only enforcement returns `unavailable`, naming the missing evidence.
-A new conversation is not required. Neither this marker nor hooks attest
-in-memory profile bytes.
+Use the host's native read-only reviewer role after verifying that installed
+definition. Disk hashes establish installed-file integrity, not loaded bytes.
+No `profile_session` marker or unavailable in-memory attestation is required.
+Report limited activation visibility without inventing evidence or requiring a
+new conversation. An unavailable native read-only role remains `unavailable`.
+Recheck the selected definition and scope before consolidation; a changed or
+untrusted definition requires diagnosis. Use supported reload for observed stale
+activation, and propose reconnect only for a demonstrated need.
 
 `review-pr` is a separate fenced flow. An intent to review a PR, a PR number,
 or a PR URL is classified to `review-pr` before this contract is considered.

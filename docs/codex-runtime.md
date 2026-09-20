@@ -181,13 +181,13 @@ transport, or evidence-manifest protocol.
 Before dispatch, Main validates the exact project-or-global agent definition
 selected by Codex against the trusted packaged `inline-reviewer.toml`: it must
 be a regular non-symlink with the packaged model, effort, read-only fields and raw-byte
-SHA-256 digest. That digest does not attest an already-loaded profile: Main
-requires activation evidence for that selected definition through startup or
-supported reload and records `profile_session` solely as that lifecycle marker,
-never as an in-memory byte attestation. Setup/update that leaves the definition
-and scope unchanged preserves valid activation evidence on the same backend.
-A changed definition or scope requires activation verification; missing evidence
-makes the lens unavailable without proving a restart is needed.
+SHA-256 digest. That digest establishes installed-file integrity, not bytes loaded
+in memory. Main uses the native read-only reviewer role and reports any activation
+visibility limit; no `profile_session` marker is required. An invalid installed
+definition or unavailable native read-only role still makes the lens unavailable.
+Main rechecks the selected definition and scope before consolidation and diagnoses
+changes. Supported reload addresses observed stale activation; missing loaded-byte
+attestation alone does not require a restart or prevent review.
 No hook layer is used to attest session start or loaded agent bytes. Main resolves
 each range endpoint separately with hardened globals
 and `rev-parse --verify --end-of-options <rev>^{commit}`, accepting one full

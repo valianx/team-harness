@@ -19,9 +19,13 @@ When a reasoning verifier (qa, adversary, security) forms any finding, it SHALL 
 ### Requirement: A persistent findings ledger is the correction loop's memory
 The workspace SHALL carry `reviews/findings-ledger.md` as a rebuildable view
 projected only by Main from accepted result events and live dispositions in the
-control log. It SHALL expose one row per finding ID with class, severity,
+control log. It SHALL expose one row per lens and finding ID pair — a finding ID two lenses
+report occupies two rows — with class, severity,
 disposition (`fixed | accepted-residual | open | rejected-with-rationale`),
-causal identity, and operator ruling. Verifiers read the view and never edit it.
+causal identity, operator ruling, and the originating lens, derived from the
+role of the lease under which the result was accepted and never from the
+envelope's own text. The decision ledger's `disposition` record SHALL carry the
+same `lens`. Verifiers read the view and never edit it.
 
 Every reasoning-lens result envelope SHALL carry stable structured finding ID,
 closed-vocabulary severity (`critical | high | medium | low | info`), class,
@@ -45,6 +49,10 @@ reviewer narrative.
 #### Scenario: A correction round is dispatched
 - **WHEN** the coordinator dispatches any re-review after a correction
 - **THEN** the dispatch context includes the ledger, and the verifier classifies every reported finding as `new_in_delta`, `pre_existing_missed`, or `reopened`
+
+#### Scenario: Two lenses report the same defect
+- **WHEN** `qa` and `security` each return a finding for one defect under separate leases
+- **THEN** the ledger shows each finding with its own lens, and an optional comparative measurement credits neither lens exclusively for that defect
 
 ### Requirement: Ratchet termination ends the loop on severity, not patience
 The ratchet SHALL govern the complete reasoning-lens finding set and require the

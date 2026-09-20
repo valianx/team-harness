@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.33.0] - 2026-09-19
+
+### Changed
+- GCP uses the current coordinator and clear authorization for the concrete plan, without nested orchestration or prescribed approval phrases. Validated scripts, independent review, impact analysis and native permissions remain.
+- Inline reviews use the verified installed definition and native read-only role without an extra session marker or unavailable loaded-profile proof. Immutable targets and honest coverage remain.
+- Pipeline measurements are optional; reusable fixtures and guidance remain, while execution results belong in the workspace. No live performance results are claimed.
+- Reconcile and archive nine older OpenSpec changes, explicitly retiring superseded hook and benchmark obligations; remove five release fragments already incorporated in this changelog.
+
 ## [3.32.0] - 2026-09-19
 
 ### Changed

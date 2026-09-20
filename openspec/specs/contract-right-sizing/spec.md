@@ -1,20 +1,9 @@
 # contract-right-sizing Specification
 
 ## Purpose
-TBD - created by archiving change right-size-pipeline-contracts. Update Purpose after archive.
+Keep specialist contracts concise and grounded in the artifacts needed for their assigned work, with optional comparative measurements that report their evidence and limits.
 
 ## Requirements
-
-### Requirement: A real-run baseline exists before contract rewrites
-The repository SHALL hold `docs/benchmarks/pipeline-baseline.md` recording, for a small-fix, a medium-feature, and a security-sensitive-fix fixture request run through the live pipeline against a named tree anchor: time to Gate 1, architect dispatches, acceptance-criteria count, specialist dispatches, tool calls, correction rounds, terminal state, and exclusive defects per lens. A change that alters dispatch, state, or recovery contracts SHALL compare its own measurement against this file. The deterministic contract benchmark is retained and is not a substitute.
-
-#### Scenario: A contract change reaches its benchmark task
-- **WHEN** a change that alters dispatch or recovery contracts records its measurement
-- **THEN** its report cites the baseline file's tree anchor and states each metric as before/after
-
-#### Scenario: The baseline is missing
-- **WHEN** such a change is validated and the baseline file is absent
-- **THEN** `tests/test_openspec_scope.py` fails naming the missing file
 
 ### Requirement: Reference and shared-contract files carry a shrink-only word ceiling
 `tests/fixtures/authoring-baseline.json` SHALL record a `ceiling` in words for every `agents/ref-*.md` and `agents/_shared/*.md` file above its class budget, and MAY record a `target`. The authoring-budget suite SHALL fail when a file exceeds its `ceiling` and SHALL fail when a recorded `ceiling` exceeds the file's current count by more than 2%. A `reason` field is reported, never used to pass.
@@ -37,3 +26,23 @@ An agent or skill contract SHALL name the helper that performs a deterministic c
 #### Scenario: An exempted file loses its phrases
 - **WHEN** an exempted file no longer contains any retired phrase
 - **THEN** the lint test fails until the exemption entry is removed
+
+### Requirement: Contract benchmarks are an optional measurement method
+Team Harness SHALL retain reusable fixture requests and guidance for optional
+comparative pipeline measurements. Contract changes SHALL NOT require three live
+pipeline runs or a tracked execution-result table to proceed. When measurement
+is selected, the coordinator SHALL record the compared tree anchors, conditions,
+metrics and limitations in the configured workspace, distinguish live measurements
+from deterministic helper-operation counts, and avoid claiming unexecuted runs.
+
+#### Scenario: A contract change reaches its benchmark task
+- **WHEN** the operator selects a comparative measurement for a contract change
+- **THEN** the workspace report names both tree anchors and comparable before/after metrics, or states why a comparison is inconclusive
+
+#### Scenario: The baseline is missing
+- **WHEN** no live baseline exists for an otherwise validated contract change
+- **THEN** delivery remains possible without creating placeholder results or starting pipelines solely to satisfy a process check
+
+#### Scenario: A run does not dispatch a lens
+- **WHEN** a selected measurement did not dispatch a validation lens
+- **THEN** that lens is reported as not dispatched, without inventing an exclusive-defect count

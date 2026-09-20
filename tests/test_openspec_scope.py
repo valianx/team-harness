@@ -19,7 +19,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CHANGES = ROOT / "openspec/changes"
 CONFIG = ROOT / "openspec/config.yaml"
-BASELINE = ROOT / "docs/benchmarks/pipeline-baseline.md"
 
 REQUIREMENT = re.compile(r"(?m)^### Requirement:")
 TASK_ITEM = re.compile(r"(?m)^\s*- \[[ xX]\]")
@@ -129,34 +128,10 @@ def archive_lag(change: Path) -> str | None:
     return None
 
 
-EXCLUSIVE_CELL = re.compile(r"^(?:\d+|`pending-runs`|`n/a — lens not dispatched`)$")
-
-
-def baseline_cell_problems(path: Path) -> list[str]:
-    """Exclusive-defect cells hold an integer, the placeholder, or the explicit n/a literal."""
-    problems: list[str] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.startswith("| Exclusive defects"):
-            continue
-        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-        for cell in cells[2:]:
-            if not EXCLUSIVE_CELL.match(cell):
-                problems.append(f"{path.relative_to(ROOT).as_posix()}: {cells[0]} holds `{cell}`, not an integer, `pending-runs`, or `n/a — lens not dispatched`")
-    return problems
-
-
 def main() -> int:
     limits = rules()
     failures: list[str] = []
     warnings: list[str] = []
-
-    if not BASELINE.is_file():
-        failures.append(
-            f"{BASELINE.relative_to(ROOT).as_posix()} is missing — a change that alters dispatch, "
-            f"state, or recovery contracts has nothing to compare against"
-        )
-    else:
-        failures.extend(baseline_cell_problems(BASELINE))
 
     changes = active_changes()
     for change in changes:
