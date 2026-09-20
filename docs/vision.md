@@ -2,6 +2,12 @@
 
 > Where team-harness is headed — a team of developers, each amplified by a trusted team of agents they direct, working together as one.
 
+Team Harness contributes the shared way of working: clear objectives, useful
+written intent, bounded collaboration, independent review, and delivery. Claude
+Code, Codex, and OpenCode provide the native harnesses. TH's direction is to use
+their execution, permission, sandbox, approval, and session capabilities rather
+than duplicate them or replace the general agent.
+
 This document describes the destination: what team-harness is building toward and what we want it to become. It is not a feature list and not a tutorial — for those, see [How it works](./how-it-works.md) and the [Pipelines reference](./pipelines.md). Some of what follows exists today; the rest is the direction we are deliberately building toward, and the text marks the difference plainly.
 
 ---
@@ -26,7 +32,7 @@ The foundation already exists. Team-harness is built around one idea — a devel
 - **The developer engages before the system commits.** The Discover phase is patient by default — it waits for an explicit advance signal rather than racing ahead and planning the wrong thing. The developer and the system think through the problem together first.
 - **The developer right-sizes their own work.** A short intake survey captures the meta-decisions — how heavy the pipeline should be, how much effort, the scope of the change — as attributable fields. The system does not silently guess how serious a change is; the developer is the classifier, because they are the one who knows.
 - **Spec co-authoring runs in both directions.** The developer can seed the intent, an approach, the gotchas they already know. The architect treats that as a strong prior, not a mandate — and when the seeded approach is deficient, it dissents explicitly, in writing. Neither party is assumed right by default. Disagreement is surfaced and resolved.
-- **Three human stage-gates hold the decisions that matter.** After the plan, after the implementation, and before delivery, the pipeline stops for the developer to approve, amend, or abort. These are not ceremony — they are the points where human judgment is required, and the system cannot proceed past them on its own.
+- **Decisions stay connected to the objective.** The coordinator uses the operator's existing scope and authorization, considers specialist recommendations, and brings unresolved decisions back when they matter. The explicitly selected pipeline has its own coordination checkpoints; they are not mandatory for every workflow.
 
 This is the trusted foundation. The destination is reached by deepening it — extending each developer's reach without moving them off-center, and letting that amplification compound across the team.
 
@@ -54,7 +60,13 @@ The collaboration today is real, but some of what makes it safe still lives as p
 
 ### Confidence to delegate
 
-Today some critical guarantees are written as rules the model must recall: do not commit a secret, do not let the pipeline's recorded state drift out of sync. The direction is to turn those guarantees into deterministic floors that run regardless of how the model behaves — a secret scanned out of the diff before any push, the pipeline's machine-readable state validated against its schema at the point it is written. These floors do not reduce the developer's control. They protect the collaboration from exactly the irreversible mistakes that hurt most, so the developer can delegate with less manual auditing — letting go of the wheel on the stretches where human judgment adds nothing, precisely because a guardrail, not memory, is holding the line. Distributed across the team, a deterministic floor also means every developer's pipeline upholds the same guarantee, rather than each relying on their own diligence.
+Confidence comes from clear objectives, appropriate verification, independent
+findings, and the native runtime's execution boundaries. TH should retain helpers
+that make its own workflow reliable, such as resolving the intended workspace or
+recovering an active run. Equivalent permission systems, execution guards, and
+session controls belong to the native harness. Repository tests and server-side
+checks continue to validate the delivered product. Simplification should preserve
+useful capabilities while removing duplicated mechanisms and unnecessary ceremony.
 
 ### A more capable agent team, and a shared language for improving it
 
