@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -84,6 +85,47 @@ func TestComputePlan_WritesNothing(t *testing.T) {
 	if fi, err := os.Stat(ledgerPath); err == nil {
 		if !fi.ModTime().Equal(ledgerMtimeBefore) {
 			t.Error("ComputePlan modified the ledger file — it must write nothing")
+		}
+	}
+}
+
+func TestComputePlan_RejectsLinkedNativeGuideHashMatch(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink setup requires platform privileges on Windows")
+	}
+	for _, linkedParent := range []bool{false, true} {
+		_, cleanup := ledgerTestEnv(t)
+		defer cleanup()
+		placer := newOpencodePlacerAt(t.TempDir())
+		modules, components, err := buildOpencodeManifests()
+		if err != nil {
+			t.Fatal(err)
+		}
+		initial, err := ComputePlan(modules, components, []string{opencodeGuideComponent}, placer, EmbeddedAssets(), opencodeRuntimeTransform)
+		if err != nil || len(initial.ToCreate) != 1 {
+			t.Fatalf("initial plan: %+v, %v", initial, err)
+		}
+		guide := initial.ToCreate[0]
+		externalDir := t.TempDir()
+		externalFile := filepath.Join(externalDir, "native-workflow-guide.md")
+		if err := os.WriteFile(externalFile, guide.SrcData, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		link, target := guide.ConcreteDst, externalFile
+		if linkedParent {
+			link, target = filepath.Dir(guide.ConcreteDst), externalDir
+		}
+		if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(target, link); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ComputePlan(modules, components, []string{opencodeGuideComponent}, placer, EmbeddedAssets(), opencodeRuntimeTransform); err == nil {
+			t.Fatal("hash-matching linked guide was accepted")
+		}
+		if _, err := os.Lstat(link); err != nil {
+			t.Fatal("planning changed the linked file")
 		}
 	}
 }

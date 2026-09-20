@@ -11,6 +11,7 @@ import (
 const opencodeDefaultAgent = "TH-orchestrator"
 const opencodeGuideRelativePath = "th-references/agents/_shared/native-workflow-guide.md"
 const opencodeGuideOwnershipKey = "instructions.team-harness"
+const opencodeGuideComponent = "reference-shared-native-workflow-guide-md"
 
 func opencodeGuidePath(docPath string) string {
 	return filepath.ToSlash(filepath.Join(filepath.Dir(docPath), filepath.FromSlash(opencodeGuideRelativePath)))
@@ -32,6 +33,26 @@ func opencodeInstructions(raw map[string]json.RawMessage) ([]string, error) {
 		}
 	}
 	return instructions, nil
+}
+
+func withOpencodeGuide(instructions []string, guide string) ([]string, bool) {
+	merged := make([]string, 0, len(instructions)+1)
+	found, changed := false, false
+	for _, instruction := range instructions {
+		if instruction == guide {
+			if found {
+				changed = true
+				continue
+			}
+			found = true
+		}
+		merged = append(merged, instruction)
+	}
+	if !found {
+		merged = append(merged, guide)
+		changed = true
+	}
+	return merged, changed
 }
 
 // MCPServerStatus describes what actually happened to one MCP server entry
@@ -131,12 +152,8 @@ func opencodeWorkflowGuideConfigured(path string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	for _, instruction := range instructions {
-		if instruction == opencodeGuidePath(path) {
-			return true, nil
-		}
-	}
-	return false, nil
+	_, changed := withOpencodeGuide(instructions, opencodeGuidePath(path))
+	return !changed, nil
 }
 
 func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, secrets opencodeMCPSecrets) (MCPRegisterOutcome, error) {
@@ -164,14 +181,7 @@ func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, se
 	if err != nil {
 		return outcome, err
 	}
-	guide := opencodeGuidePath(docPath)
-	guideChanged := true
-	for _, instruction := range instructions {
-		if instruction == guide {
-			guideChanged = false
-			break
-		}
-	}
+	instructions, guideChanged := withOpencodeGuide(instructions, opencodeGuidePath(docPath))
 
 	// Extract (or initialise) the mcp sub-object.
 	mcpRaw := map[string]json.RawMessage{}
@@ -241,7 +251,7 @@ func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, se
 		mcpRaw["context7"] = json.RawMessage(encoded)
 	}
 	if guideChanged {
-		raw["instructions"] = mustMarshalJSON(append(instructions, guide))
+		raw["instructions"] = mustMarshalJSON(instructions)
 	}
 
 	encodedMCP, _ := json.Marshal(mcpRaw)

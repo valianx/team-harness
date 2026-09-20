@@ -967,6 +967,40 @@ func TestRegisterOpencodeMCP_RejectsMalformedInstructionsBeforeWrite(t *testing.
 	}
 }
 
+func TestRegisterOpencodeMCP_DeduplicatesOnlyManagedGuide(t *testing.T) {
+	docPath := filepath.Join(t.TempDir(), "opencode.json")
+	guide := opencodeGuidePath(docPath)
+	seed := map[string]interface{}{"default_agent": "build", "instructions": []string{"company.md", guide, "company.md", guide}}
+	if err := os.WriteFile(docPath, mustMarshalJSON(seed), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if configured, err := opencodeWorkflowGuideConfigured(docPath); err != nil || configured {
+		t.Fatalf("duplicate association considered current: %t, %v", configured, err)
+	}
+	if _, err := registerOpencodeMCP("", "", docPath, tokenModeEnvRef, opencodeMCPSecrets{}); err != nil {
+		t.Fatal(err)
+	}
+	raw, first, err := readSettingsDoc(docPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instructions, err := opencodeInstructions(raw)
+	if err != nil || len(instructions) != 3 || instructions[0] != "company.md" || instructions[1] != guide || instructions[2] != "company.md" {
+		t.Fatalf("unexpected instructions: %v, %v", instructions, err)
+	}
+	if string(raw["default_agent"]) != `"build"` {
+		t.Fatal("operator agent changed")
+	}
+	assertOpencodeWorkflowGuide(t, docPath)
+	if _, err := registerOpencodeMCP("", "", docPath, tokenModeEnvRef, opencodeMCPSecrets{}); err != nil {
+		t.Fatal(err)
+	}
+	_, second, err := readSettingsDoc(docPath)
+	if err != nil || string(first) != string(second) {
+		t.Fatal("repeat registration changed config")
+	}
+}
+
 func TestRegisterOpencodeMCP_TightensExistingFileMode(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("POSIX permission bits are not enforced on Windows")

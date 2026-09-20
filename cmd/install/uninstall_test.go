@@ -382,6 +382,48 @@ func TestUninstall_NativeWorkflowConfiguration(t *testing.T) {
 	}
 }
 
+func TestUninstall_RejectsIncorrectGuideOwnership(t *testing.T) {
+	for name, tags := range map[string]OwnershipTags{
+		"extra key":      {Files: []string{"{config_root}/" + opencodeGuideRelativePath}, ConfigKeys: []string{opencodeGuideOwnershipKey, "mcp.memory"}},
+		"missing file":   {ConfigKeys: []string{opencodeGuideOwnershipKey}},
+		"colliding path": {Files: []string{"{config_root}/th-references/agents/shared/native-workflow-guide.md"}, ConfigKeys: []string{opencodeGuideOwnershipKey}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dataDir, cleanup := ledgerTestEnv(t)
+			defer cleanup()
+			placer := newOpencodePlacerAt(t.TempDir())
+			file := opencodeGuidePath(placer.SettingsDocPath())
+			if len(tags.Files) > 0 {
+				file = resolveTemplatedPath(tags.Files[0], placer)
+			}
+			if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(file, []byte("preserve"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			config := []byte(`{"mcp":{"memory":{"url":"https://operator.example"}},"instructions":["company.md"]}`)
+			if err := os.WriteFile(placer.SettingsDocPath(), config, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			entry := LedgerEntry{TS: "2026-09-20T00:00:00Z", Op: "install", Component: opencodeGuideComponent, Owns: tags, SchemaVersion: 1}
+			writeLedgerLines(t, dataDir, []string{string(mustMarshalJSON(entry))})
+			report, err := Uninstall(nil, placer)
+			if err != nil || report.LedgerIntegrityWarning == "" || len(report.Removed) != 0 {
+				t.Fatalf("incorrect ownership was accepted: %+v, %v", report, err)
+			}
+			actual, err := os.ReadFile(file)
+			if err != nil || string(actual) != "preserve" {
+				t.Fatal("unowned file changed")
+			}
+			actual, err = os.ReadFile(placer.SettingsDocPath())
+			if err != nil || string(actual) != string(config) {
+				t.Fatal("operator configuration changed")
+			}
+		})
+	}
+}
+
 func TestUninstall_RejectsSymlinkedParentBeforeDeletion(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink setup requires platform privileges on Windows")

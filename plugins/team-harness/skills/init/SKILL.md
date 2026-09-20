@@ -40,8 +40,7 @@ commit/range targets, not uncommitted review: it requires a clean index/worktree
 binds the canonical project root plus exact resolved commit/tree IDs, and sends
 each independent lens the same package with
 `mode: inline-review`, scope, intent/criteria provenance, `changed_surface`,
-`lens`, matching `expected_lens`, fresh `dispatch_id`, `security_floor`,
-`read_only: true`, and `target_id`. This path creates no workspace, pipeline
+`lens`, `security_floor`, and `read_only: true`. This path creates no workspace, pipeline
 state/events, gates, Stage Gate, branch, or delivery record.
 
 Before dispatch, determine the exact project-or-global `inline-reviewer`
@@ -67,10 +66,11 @@ or state, commit, branch, push, publish, use network/external state, or dispatch
 agents. Native project access is the only execution and evidence transport; if
 read-only enforcement is unavailable, return `lens_status: unavailable`. Each result
 returns terminal `lens_status: complete|incomplete|failed|unavailable|untrusted`,
-coverage limits, target identity, matching `dispatch_id`/`expected_lens`/lens,
-and a normalized verdict; global PASS is fail-closed on every required lens
-with both `lens_status: complete` and `verdict: pass`. Reject replayed,
-duplicate, substituted, or identity-mismatched returns as `untrusted`. There is
+coverage limits, immutable target, selected lens and a normalized verdict.
+Main associates returns with the dispatched target and lens without requiring
+extra correlation fields. Preserve duplicate returns and use the worse outcome;
+global PASS requires every required lens to be complete and pass. A substituted
+or mismatched target remains untrusted. There is
 no Freeze/Gate semantic in this mode. Main independently resolves each endpoint
 with hardened globals plus `rev-parse --verify --end-of-options <rev>^{commit}`;
 it accepts exactly one newline-terminated full 40/64-hex commit ID, rejects
