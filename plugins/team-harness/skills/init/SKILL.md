@@ -40,8 +40,7 @@ commit/range targets, not uncommitted review: it requires a clean index/worktree
 binds the canonical project root plus exact resolved commit/tree IDs, and sends
 each independent lens the same package with
 `mode: inline-review`, scope, intent/criteria provenance, `changed_surface`,
-`lens`, matching `expected_lens`, fresh `dispatch_id`, `security_floor`,
-`read_only: true`, and `target_id`. This path creates no workspace, pipeline
+`lens`, `security_floor`, and `read_only: true`. This path creates no workspace, pipeline
 state/events, gates, Stage Gate, branch, or delivery record.
 
 Before dispatch, determine the exact project-or-global `inline-reviewer`
@@ -51,16 +50,13 @@ file. Fail closed if it is not a regular non-symlink or if its
 `sandbox_mode = "read-only"`, or SHA-256 raw-byte digest differs from the
 trusted packaged `inline-reviewer.toml` provided by this loaded plugin. Record
 the selected scope/path and digest only in the in-memory review package. The
-digest does not attest an already-loaded profile: require evidence that the
-current backend loaded the verified selected definition through startup or
-supported reload, recording `profile_session` only as that lifecycle marker,
-never as an in-memory byte attestation. Preserve valid activation evidence when
-setup/update leaves that definition and scope unchanged. When either changes,
-use `reload` to assess activation; missing evidence yields
-`lens_status: unavailable`, not an automatic restart requirement.
-Shipped Codex hooks do not observe session start or
-loaded agent bytes, so no hook attestation is available. A mismatch is
-`untrusted` or `unavailable`, never a dispatch.
+digest establishes installed-definition integrity; it does not attest bytes
+already loaded by the host. Report that visibility limit when the runtime does
+not expose them, without inventing evidence, requiring a session marker, or
+requesting a new conversation. Use supported native refresh when the selected
+definition changes and the host needs it. An invalid or untrusted definition,
+or an unavailable native read-only dispatch, remains `untrusted` or
+`unavailable`, never a dispatch.
 
 Codex dispatches each requested lens as an independent runtime-native
 `inline-reviewer` from the project root. It may inspect the anchored project
@@ -70,10 +66,11 @@ or state, commit, branch, push, publish, use network/external state, or dispatch
 agents. Native project access is the only execution and evidence transport; if
 read-only enforcement is unavailable, return `lens_status: unavailable`. Each result
 returns terminal `lens_status: complete|incomplete|failed|unavailable|untrusted`,
-coverage limits, target identity, matching `dispatch_id`/`expected_lens`/lens,
-and a normalized verdict; global PASS is fail-closed on every required lens
-with both `lens_status: complete` and `verdict: pass`. Reject replayed,
-duplicate, substituted, or identity-mismatched returns as `untrusted`. There is
+coverage limits, immutable target, selected lens and a normalized verdict.
+Main associates returns with the dispatched target and lens without requiring
+extra correlation fields. Preserve duplicate returns and use the worse outcome;
+global PASS requires every required lens to be complete and pass. A substituted
+or mismatched target remains untrusted. There is
 no Freeze/Gate semantic in this mode. Main independently resolves each endpoint
 with hardened globals plus `rev-parse --verify --end-of-options <rev>^{commit}`;
 it accepts exactly one newline-terminated full 40/64-hex commit ID, rejects
@@ -96,9 +93,10 @@ confinement and remains an explicitly reported residual read-only exposure.
 Before consolidation, Main repeats the exact hardened clean/local-object
 preflight and re-resolves the project root and commit/range. A moved HEAD,
 missing object, or changed target is stale and must be recaptured. Findings,
-disagreements, and limits remain explicit; exact one-return keyed consolidation
-rejects missing, failed, blocking, replayed, duplicate, or substituted lens
-slots as non-pass rather than treating them as PASS.
+disagreements, and limits remain explicit. Consolidate by lens using the worse
+outcome described above, preserving every return. Duplicate passing returns alone
+do not prevent PASS; a missing required lens, non-pass outcome, blocker, or
+unresolved blocking disagreement does.
 
 An intent to review a PR, PR number, or PR URL is routed exclusively to
 `review-pr` before this mode is considered. Inline cannot intercept or rebuild

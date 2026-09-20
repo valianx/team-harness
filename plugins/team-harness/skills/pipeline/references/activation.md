@@ -29,11 +29,13 @@ and `Initiative Create-or-Join` after the live confirmation. These
 coordinator-owned intake decisions run without architect or validation-panel
 dispatch and must finish before OpenSpec/workspace identity is pinned.
 
-For a workspace outside the repository root, apply
-`docs/permission-provisioning.md` before the first write: perform its
-already-present check, show the exact bounded allow/deny/additional-directory
-delta, and require the documented live confirmation. Do not reproduce or widen
-the canonical read-only command allowlist here.
+Use the resolved workspace under Codex's native filesystem permissions,
+including an Obsidian destination outside the repository. Reuse applicable
+workspace access checks; if the native runtime denies access, report the exact
+destination and denial and use its supported approval path. Do not read or
+provision Claude settings, add TH permission policy, or treat an external
+workspace alone as a reason for another confirmation. Workspace containment,
+identity and write ownership still apply.
 
 If current state is v5, replay its valid prefix and rebuild projections. A
 workspace without `control/control.jsonl` is closed administratively and offered

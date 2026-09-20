@@ -6,9 +6,9 @@
 
 ## 1. Purpose & Boundaries
 
-**What this repo is.** `team-harness` distributes one orchestrated development system across Claude Code, Codex, and opencode. Runtime-specific projections preserve a shared set of semantic roles while using each host's plugin, agent, and hook contracts. The Memory MCP server is an external service; it is never bundled here.
+**What this repo is.** `team-harness` distributes a shared development workflow across Claude Code, Codex, and OpenCode. Skills help the current general agent clarify objectives, record intent with OpenSpec, coordinate bounded work, assess independent recommendations, verify changes, and prepare PRs. Runtime adapters use each host's native capabilities. Workspace/Obsidian continuity and voice/language preferences remain part of the workflow. The Memory MCP server is an external service; it is never bundled here.
 
-**What this repo is NOT.** Not an application, library, API, or service; not a runtime beyond the installer and the (post-install) MCP server; not a deployed, hosted application — see §3/§4 for its own build/test tooling; not a general-purpose framework — it encodes one opinionated workflow (orchestrator + specialized subagents + SDD pipeline).
+**Responsibility boundary.** TH contributes a way of working, not a replacement harness. Native runtimes own execution, permissions, sandboxing, approvals, and session controls. TH should reuse those mechanisms instead of adding equivalent controls. The current general agent coordinates; specialists provide evidence and recommendations, not independent authority over the objective. Use the current `spec`, `pipeline`, `review-pr`, or `create-pr` skill as appropriate; the full pipeline is optional. See §3/§4 for this repository's own build/test tooling.
 
 **External dependencies (required).** A **context7 API key** (get one at https://context7.com/, or set `CONTEXT7_API_KEY`) and a **Memory MCP URL** — the public URL of any MCP-compatible server (e.g., Railway/Render/Fly/Docker, or a local container). The installer prompts for it interactively or reads `MEMORY_MCP_URL` non-interactively. **No default URL** — empty input is rejected and a missing env var exits the installer with an explicit error (rationale: `docs/knowledge.md`). Example format only: `https://your-mcp.example.com/mcp`.
 

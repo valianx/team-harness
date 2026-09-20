@@ -1,6 +1,11 @@
 # How it works
 
-Team Harness starts as a lightweight direct assistant and offers an explicit Spec-Driven Development pipeline. Pipeline state lives in `workspaces/{feature}/`, so an activated run can resume cold.
+Team Harness contributes workflow guidance to the runtime's existing general
+agent. Its skills organize intent, implementation, independent review, and
+delivery. The native harness supplies execution, permissions, sandboxing,
+approvals, and session controls; TH's purpose is to use these capabilities
+without duplicating them. An explicitly selected pipeline can retain recovery
+state in the configured local or Obsidian workspace.
 
 When intake has already framed a task that needs the full pipeline, the
 operator starts it with a localized numeric choice instead of repeating a
@@ -172,27 +177,30 @@ Full bug-fix details remain in [`agents/ref-special-flows.md`](../agents/ref-spe
 
 ## Resume any time
 
-All state lives in files. `/recover {feature-name}` reads `00-state.md` and continues from `next_action`. Works across compactions, across sessions, across machines (as long as `workspaces/` travels with the repo).
+An active pipeline retains recovery state in its configured canonical workspace:
+repository-local in local mode, or directly in the selected vault in Obsidian
+mode. Use `/th:recover {feature-name}` in Claude Code, or the active runtime's
+recovery entry point, to resume that same workspace. Across sessions or machines,
+make its existing files accessible; do not create a repository-local copy of an
+Obsidian workspace. Recovery uses the current pipeline's persisted state and
+control log.
 
 Open `01-plan.md § Task Index` for task status. Follow one task path to see only that task's scope and AC checkboxes; no unrelated task must be read.
 
 ---
 
-## Why a harness
+## What the workflow contributes
 
-Chat-driven Claude Code, run unguided, has documented failure modes that compound over a feature's lifetime:
+| Contribution | Purpose |
+| --- | --- |
+| Written objectives, acceptance criteria, and tasks | Keep implementation tied to the requested outcome. |
+| Bounded delegation and independent review | Bring additional evidence to decisions the coordinator owns. |
+| Relevant verification and PR preparation | Deliver a change whose scope, behavior, and limitations can be reviewed. |
+| Workspace and Obsidian continuity | Retain useful decisions and handoffs outside tracked product files. |
+| Voice, language, and workflow discovery | Help the general agent use the operator's preferred working method. |
 
-| Without a harness | With this harness |
-|---|---|
-| Acceptance criteria drift silently mid-task | `[CONSTRAINT-DISCOVERED]` annotations + the implementation reconciliation checkpoint force keep/amend/drop to be a deliberate decision |
-| Plans accumulate iteration cruft (`v1 → v6`, "previously decided", parallel review files) | `architect` forbids version markers; `qa` cannot write sibling review files — analysis docs read as one polished pass |
-| Findings are hidden behind review panels | Gate 1 shows the minimum plan and finding headlines; final defects route to implementation, while structural contradictions require an explicit new Gate 1 |
-| Multi-PR splits leave the WHY in nobody's head | Base PRs carry `Cleanup PR:` with operational rationale; secondary PRs carry `Base PR:` back-reference |
-| "Did the AC pass?" requires reading the whole plan | `01-plan.md § Task Index` routes to one task shard; its AC checkboxes mirror PASS |
-| Agents silently disappear when their frontmatter has invalid YAML | A structural test parses every agent and fails on broken YAML |
-| Destructive operations need explicit scope and impact | TH workflows surface planned effects for review; configured native permissions govern execution |
-
-Each row is a real failure mode encountered and patched. See [`docs/knowledge.md`](./knowledge.md) for the canonical pattern / decision log.
+Review findings inform the coordinator's judgment. Native runtime permissions
+remain the execution boundary; workflow recommendations do not replace them.
 
 ---
 

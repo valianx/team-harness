@@ -837,7 +837,7 @@ func TestRegisterOpencodeMCP_IdempotentReRun_ReturnsAlreadyConfigured(t *testing
 
 // TestRegisterOpencodeMCP_GenuineAbsence_ReturnsSkipped verifies that when
 // both URLs are empty, registerOpencodeMCP returns MCPStatusSkipped for both
-// servers and still configures the Team Harness default agent.
+// servers and still registers native Team Harness instructions.
 func TestRegisterOpencodeMCP_GenuineAbsence_ReturnsSkipped(t *testing.T) {
 	dir := t.TempDir()
 	docPath := filepath.Join(dir, "opencode.json")
@@ -863,9 +863,10 @@ func TestRegisterOpencodeMCP_GenuineAbsence_ReturnsSkipped(t *testing.T) {
 	if err := json.Unmarshal(data, &config); err != nil {
 		t.Fatalf("parse opencode.json: %v", err)
 	}
-	if config["default_agent"] != opencodeDefaultAgent {
-		t.Errorf("default_agent = %v, want %q", config["default_agent"], opencodeDefaultAgent)
+	if _, exists := config["default_agent"]; exists {
+		t.Error("fresh installation selected a default agent")
 	}
+	assertOpencodeWorkflowGuide(t, docPath)
 }
 
 func TestRegisterOpencodeMCP_DefaultAgentPreservesOtherConfig(t *testing.T) {
@@ -887,11 +888,116 @@ func TestRegisterOpencodeMCP_DefaultAgentPreservesOtherConfig(t *testing.T) {
 	if err := json.Unmarshal(data, &config); err != nil {
 		t.Fatalf("parse opencode.json: %v", err)
 	}
-	if config["default_agent"] != opencodeDefaultAgent {
-		t.Errorf("default_agent = %v, want %q", config["default_agent"], opencodeDefaultAgent)
+	if config["default_agent"] != "build" {
+		t.Errorf("default_agent = %v, want build", config["default_agent"])
 	}
 	if config["model"] != "openai/example" || config["share"] != "disabled" {
 		t.Errorf("operator config was not preserved: %v", config)
+	}
+}
+
+func TestRegisterOpencodeMCP_GuidePreservesSelectionAndInstructions(t *testing.T) {
+	for _, selected := range []string{"", "build", "custom-general", opencodeDefaultAgent} {
+		t.Run(selected, func(t *testing.T) {
+			docPath := filepath.Join(t.TempDir(), "opencode.json")
+			seed := map[string]interface{}{"instructions": []string{"company.md", "https://example.com/team.md"}, "permission": map[string]string{"edit": "ask"}}
+			if selected != "" {
+				seed["default_agent"] = selected
+			}
+			if err := os.WriteFile(docPath, mustMarshalJSON(seed), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := registerOpencodeMCP("", "", docPath, tokenModeEnvRef, opencodeMCPSecrets{}); err != nil {
+				t.Fatal(err)
+			}
+			raw, first, err := readSettingsDoc(docPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var actual string
+			_ = json.Unmarshal(raw["default_agent"], &actual)
+			if actual != selected || (selected == "" && raw["default_agent"] != nil) {
+				t.Fatal("default selection changed")
+			}
+			instructions, err := opencodeInstructions(raw)
+			if err != nil || len(instructions) != 3 || instructions[0] != "company.md" || instructions[1] != "https://example.com/team.md" || instructions[2] != opencodeGuidePath(docPath) {
+				t.Fatalf("instructions changed unexpectedly: %v, %v", instructions, err)
+			}
+			var permission map[string]string
+			if json.Unmarshal(raw["permission"], &permission) != nil || permission["edit"] != "ask" || len(permission) != 1 {
+				t.Fatal("permission changed")
+			}
+			assertOpencodeWorkflowGuide(t, docPath)
+			backups, _ := filepath.Glob(docPath + ".bak-*")
+			if _, err := registerOpencodeMCP("", "", docPath, tokenModeEnvRef, opencodeMCPSecrets{}); err != nil {
+				t.Fatal(err)
+			}
+			_, second, err := readSettingsDoc(docPath)
+			if err != nil || string(first) != string(second) {
+				t.Fatal("repeated registration changed config")
+			}
+			afterBackups, _ := filepath.Glob(docPath + ".bak-*")
+			if len(backups) != len(afterBackups) {
+				t.Fatal("no-op registration created a backup")
+			}
+		})
+	}
+}
+
+func TestRegisterOpencodeMCP_RejectsMalformedInstructionsBeforeWrite(t *testing.T) {
+	for _, seed := range []string{`null`, `{"instructions":null}`, `{"instructions":"company.md"}`, `{"instructions":[1]}`, `{"instructions":["company.md",null]}`} {
+		docPath := filepath.Join(t.TempDir(), "opencode.json")
+		if err := os.WriteFile(docPath, []byte(seed), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if validateOpencodeJSONFile(docPath) == nil {
+			t.Fatalf("preflight accepted %s", seed)
+		}
+		if _, err := registerOpencodeMCP("", "", docPath, tokenModeEnvRef, opencodeMCPSecrets{}); err == nil {
+			t.Fatalf("registration accepted %s", seed)
+		}
+		after, err := os.ReadFile(docPath)
+		if err != nil || string(after) != seed {
+			t.Fatal("invalid config changed")
+		}
+		backups, _ := filepath.Glob(docPath + ".bak-*")
+		if len(backups) != 0 {
+			t.Fatal("invalid config created backup")
+		}
+	}
+}
+
+func TestRegisterOpencodeMCP_DeduplicatesOnlyManagedGuide(t *testing.T) {
+	docPath := filepath.Join(t.TempDir(), "opencode.json")
+	guide := opencodeGuidePath(docPath)
+	seed := map[string]interface{}{"default_agent": "build", "instructions": []string{"company.md", guide, "company.md", guide}}
+	if err := os.WriteFile(docPath, mustMarshalJSON(seed), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if configured, err := opencodeWorkflowGuideConfigured(docPath); err != nil || configured {
+		t.Fatalf("duplicate association considered current: %t, %v", configured, err)
+	}
+	if _, err := registerOpencodeMCP("", "", docPath, tokenModeEnvRef, opencodeMCPSecrets{}); err != nil {
+		t.Fatal(err)
+	}
+	raw, first, err := readSettingsDoc(docPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instructions, err := opencodeInstructions(raw)
+	if err != nil || len(instructions) != 3 || instructions[0] != "company.md" || instructions[1] != guide || instructions[2] != "company.md" {
+		t.Fatalf("unexpected instructions: %v, %v", instructions, err)
+	}
+	if string(raw["default_agent"]) != `"build"` {
+		t.Fatal("operator agent changed")
+	}
+	assertOpencodeWorkflowGuide(t, docPath)
+	if _, err := registerOpencodeMCP("", "", docPath, tokenModeEnvRef, opencodeMCPSecrets{}); err != nil {
+		t.Fatal(err)
+	}
+	_, second, err := readSettingsDoc(docPath)
+	if err != nil || string(first) != string(second) {
+		t.Fatal("repeat registration changed config")
 	}
 }
 

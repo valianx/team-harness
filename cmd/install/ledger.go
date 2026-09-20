@@ -205,9 +205,17 @@ func validateLedgerOwnership(entry LedgerEntry) error {
 	if err := validateOwnershipTags(entry.Owns); err != nil {
 		return err
 	}
+	if entry.Component == opencodeGuideComponent &&
+		(len(entry.Owns.Files) != 1 || entry.Owns.Files[0] != "{config_root}/"+opencodeGuideRelativePath ||
+			len(entry.Owns.ConfigKeys) != 1 || entry.Owns.ConfigKeys[0] != opencodeGuideOwnershipKey) {
+		return fmt.Errorf("native workflow guide ownership does not match its installed file and association")
+	}
 	for _, key := range entry.Owns.ConfigKeys {
+		if key == opencodeGuideOwnershipKey && entry.Component != opencodeGuideComponent {
+			return fmt.Errorf("native workflow instructions do not belong to component %q", entry.Component)
+		}
 		switch key {
-		case "default_agent", "logs-mode", "logs-path", "logs-subfolder", "language", "english_learning", "clickup.workspace_id", "mcp.memory", "mcp.context7":
+		case "default_agent", opencodeGuideOwnershipKey, "logs-mode", "logs-path", "logs-subfolder", "language", "english_learning", "clickup.workspace_id", "mcp.memory", "mcp.context7":
 		default:
 			return fmt.Errorf("ConfigKeys entry %q is not installer-managed", key)
 		}

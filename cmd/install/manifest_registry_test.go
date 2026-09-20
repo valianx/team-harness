@@ -81,6 +81,36 @@ func TestBuildOpencodeManifests_NoHookComponents(t *testing.T) {
 	}
 }
 
+func TestBuildOpencodeManifests_NativeWorkflowGuide(t *testing.T) {
+	_, components, err := buildOpencodeManifests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, component := range components {
+		if component.Component == "agent-orchestrator" && len(component.Emits.ConfigKeys) != 0 {
+			t.Fatal("agent still owns general-agent selection")
+		}
+		if component.Component == "reference-shared-native-workflow-guide-md" {
+			found = true
+			if len(component.Emits.Files) != 1 || component.Emits.Files[0] != "{config_root}/"+opencodeGuideRelativePath || len(component.Emits.ConfigKeys) != 1 || component.Emits.ConfigKeys[0] != opencodeGuideOwnershipKey {
+				t.Fatalf("incorrect guide ownership: %+v", component.Emits)
+			}
+			if err := validateLedgerOwnership(LedgerEntry{Component: component.Component, Owns: component.Emits}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("native workflow guide missing from distribution")
+	}
+	for _, key := range []string{"instructions", "instructions.company"} {
+		if validateOwnershipTags(OwnershipTags{ConfigKeys: []string{key}}) == nil {
+			t.Fatalf("operator instructions can be claimed: %s", key)
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // AC-2: runtime-specific skills use native opencode overrides
 // ---------------------------------------------------------------------------

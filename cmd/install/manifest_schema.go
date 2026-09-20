@@ -254,6 +254,12 @@ func validateComponentManifest(c ComponentManifest, moduleByName map[string]Modu
 //
 // This gate is symmetric with validateOwnershipTags in ledger.go.
 func validateConfigKeyNamespace(component, k string) error {
+	// Only the installed guide association is owned, never the whole native array.
+	if k == "instructions" || strings.HasPrefix(k, "instructions.") {
+		if k != opencodeGuideOwnershipKey {
+			return fmt.Errorf("component %q cannot own native instructions key %q", component, k)
+		}
+	}
 	// Forbid the legacy claude.json namespace unconditionally.
 	for _, ns := range reservedOperatorNamespaces {
 		if k == ns || strings.HasPrefix(k, ns+".") {

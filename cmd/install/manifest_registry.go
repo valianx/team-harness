@@ -324,10 +324,6 @@ func buildAgentComponents(embeddedFS fs.FS) ([]ComponentManifest, error) {
 
 		name := strings.TrimSuffix(e.Name(), ".md")
 		compID := "agent-" + name
-		configKeys := []string{}
-		if name == "orchestrator" {
-			configKeys = []string{"default_agent"}
-		}
 
 		components = append(components, ComponentManifest{
 			SchemaVersion:  1,
@@ -340,7 +336,7 @@ func buildAgentComponents(embeddedFS fs.FS) ([]ComponentManifest, error) {
 			DefaultInstall: true,
 			Emits: OwnershipTags{
 				Files:      []string{"{config_root}/agents/" + e.Name()},
-				ConfigKeys: configKeys,
+				ConfigKeys: []string{},
 			},
 		})
 	}
@@ -407,6 +403,10 @@ func buildReferenceComponents(embeddedFS fs.FS) ([]ComponentManifest, error) {
 			"_", "-",
 		).Replace(rel)
 		compIDBase = strings.Trim(compIDBase, "-")
+		configKeys := []string{}
+		if "th-references/agents/"+rel == opencodeGuideRelativePath {
+			configKeys = []string{opencodeGuideOwnershipKey}
+		}
 		components = append(components, ComponentManifest{
 			SchemaVersion:  1,
 			Component:      "reference-" + compIDBase,
@@ -418,7 +418,7 @@ func buildReferenceComponents(embeddedFS fs.FS) ([]ComponentManifest, error) {
 			DefaultInstall: true,
 			Emits: OwnershipTags{
 				Files:      []string{"{config_root}/th-references/agents/" + rel},
-				ConfigKeys: []string{},
+				ConfigKeys: configKeys,
 			},
 		})
 		return nil

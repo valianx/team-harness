@@ -143,7 +143,18 @@ func ComputePlan(
 				firstPlanned = &copy
 			}
 
-			dstHash, err := hashFile(dst)
+			var dstHash string
+			if compID == opencodeGuideComponent {
+				// A matching hash must not adopt a linked native instruction file.
+				err = lstatWalkForWrite(dst, placer.ConfigRoot())
+				if err == nil {
+					var data []byte
+					data, err = readLeafNoFollow(dst)
+					dstHash = hashBytes(data)
+				}
+			} else {
+				dstHash, err = hashFile(dst)
+			}
 			if os.IsNotExist(err) {
 				diff.ToCreate = append(diff.ToCreate, pf)
 				componentChanged = true

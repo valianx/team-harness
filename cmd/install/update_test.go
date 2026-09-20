@@ -440,7 +440,7 @@ func TestAlreadyCurrent_ZeroWrites_Decision(t *testing.T) {
 	if result["installed_version"] != version {
 		t.Errorf("installed_version = %v, want %v (managed key not bumped by applyUpdateDiff)", result["installed_version"], version)
 	}
-	assertOpencodeDefaultAgent(t, placer.SettingsDocPath())
+	assertOpencodeWorkflowGuide(t, placer.SettingsDocPath())
 }
 
 // ---------------------------------------------------------------------------
@@ -714,21 +714,17 @@ func TestApplyUpdateDiff_NonInteractive_BumpsConfigAndNoAssets(t *testing.T) {
 	if !bakFound {
 		t.Error("expected a timestamped backup (.team-harness.json.bak-*) but none found")
 	}
-	assertOpencodeDefaultAgent(t, placer.SettingsDocPath())
+	assertOpencodeWorkflowGuide(t, placer.SettingsDocPath())
 }
 
-func assertOpencodeDefaultAgent(t *testing.T, path string) {
+func assertOpencodeWorkflowGuide(t *testing.T, path string) {
 	t.Helper()
-	raw, err := os.ReadFile(path)
+	configured, err := opencodeWorkflowGuideConfigured(path)
 	if err != nil {
-		t.Fatalf("read opencode.json: %v", err)
+		t.Fatalf("inspect workflow instructions: %v", err)
 	}
-	var config map[string]interface{}
-	if err := json.Unmarshal(raw, &config); err != nil {
-		t.Fatalf("parse opencode.json: %v", err)
-	}
-	if config["default_agent"] != opencodeDefaultAgent {
-		t.Errorf("default_agent = %v, want %q", config["default_agent"], opencodeDefaultAgent)
+	if !configured {
+		t.Error("native TH workflow guide is not registered")
 	}
 }
 

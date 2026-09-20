@@ -1,17 +1,37 @@
-# Team Harness — Multi-runtime Agent Orchestration
+# Team Harness — Shared Development Workflows
 
-> Team Harness is a multi-runtime agent orchestration system for **Claude Code**, **Codex**, and **opencode**: the top-level thread frames each request and dispatches specialized architect, implementer, tester, QA, security, and delivery agents through a Spec-Driven Development (SDD) pipeline with mandatory human gates.
->
-> Every pipeline stage is captured as files on disk, so any session can resume from where the last one stopped.
+Team Harness contributes a shared way of working to **Claude Code**, **Codex**,
+and **OpenCode**: clarify the objective, record useful intent, implement, verify,
+review independently, and deliver a reviewable change.
+
+TH's role is workflow guidance. The native harness owns agent execution,
+permissions, sandboxing, approvals, and session controls. TH uses those
+capabilities; its purpose is not to replace the general agent or duplicate the
+native harness's safety mechanisms.
+
+The current general agent selects and reads the relevant skill:
+
+| Need | Workflow |
+| --- | --- |
+| Development with written intent and tasks | [`spec`](skills/spec/SKILL.md) |
+| Broader coordination and recoverable execution | [`pipeline`](skills/pipeline/SKILL.md) |
+| Review an existing pull request | [`review-pr`](skills/review-pr/SKILL.md) |
+| Prepare or publish a completed change | [`create-pr`](skills/create-pr/SKILL.md) |
+
+Independent specialists contribute findings and recommendations. The coordinator
+judges them against the objective and available evidence, verifies corrections,
+and continues the authorized work. Workspace and Obsidian support preserve
+useful context; voice and language guidance preserve the operator's preferences.
 
 [![Version](https://img.shields.io/github/v/release/valianx/team-harness?label=version&color=blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
 > Team Harness runs under **Claude Code**, **Codex** (POSIX-only beta), and **opencode**. See [`docs/lifecycle.md`](./docs/lifecycle.md) and the [Codex runtime guide](./docs/codex-runtime.md).
 
-New pipeline Designs use [OpenSpec as the canonical intent source](./docs/openspec-integration.md)
-inside the existing TH lifecycle. TH keeps specialist execution, evidence, both gates, and
-delivery; OpenSpec owns repository-local proposal/spec/design/task artifacts.
+[OpenSpec](./docs/openspec-integration.md) owns proposal, spec, design, and task
+artifacts for work that needs written intent. Completed changes are archived in
+the implementation PR. The broader pipeline is an explicitly selected workflow;
+its coordination state and gates are not prerequisites for every TH request.
 
 ---
 
@@ -98,12 +118,13 @@ by the gated `pipeline` workflow, `inline-reviewer` serves direct read-only
 reviews, and five agents are required by `review-pr`; lightweight `init` remains
 available with the plugin alone.
 
-4. Start another Codex thread so newly configured MCP servers and installed
-   agents are loaded.
+4. Use `reload` to refresh supported components and check activation in the
+   current conversation. Reconnect only when a specific remaining need is demonstrated.
 
-5. Try the two entry points in a clean `Main` thread:
+5. Select the workflow that fits the request in your current thread:
 ```text
 @Team-Harness init explain how this repository is structured
+@Team-Harness spec add an export-to-CSV feature to invoices
 @Team-Harness pipeline add an export-to-CSV feature to invoices
 ```
 
@@ -186,6 +207,11 @@ iwr https://valianx.github.io/team-harness/install-opencode.ps1 | iex
 Or to register only Memory MCP (context7 skipped), set only `MEMORY_MCP_URL` in the same way.
 
 To add or update MCP entries after install, re-run with the desired env vars set.
+
+Installation registers a concise TH guide through OpenCode's native `instructions`
+configuration. It preserves the selected general agent and unrelated instructions.
+An existing `TH-orchestrator` selection also remains unchanged; choose another
+general agent through OpenCode if desired. TH's skills remain available either way.
 
 **Environment variables:**
 
