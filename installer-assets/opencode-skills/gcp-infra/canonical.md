@@ -1,68 +1,51 @@
 
-Manage a GCP infrastructure change: $ARGUMENTS
+Use the current coordinator to handle the request: $ARGUMENTS. Delegate bounded
+infrastructure analysis or script preparation to `gcp-infra` when useful; keep
+operator decisions and consolidation here. Do not create another orchestrator.
 
-## Mode 1 — Read / Plan (default, SAFE)
+## Inspect or prepare a change
 
-Examples: `/th:gcp-infra "list compute instances in proj-x"`, `/th:gcp-infra --plan-only "show the IAM bindings on proj-x"`
+Resolve the requested resources and explicit project. `--project <id>` supplies
+the target; if only an ambient gcloud project is available, confirm that target
+before using it. `--plan-only` keeps the task read-only. With no clear change
+request, inspect and report without generating an apply script.
 
-Read-and-plan is the default. The agent inventories/describes the resources in scope and produces a plan report — no script is generated and no apply gate is presented.
+For a change request, prepare the plan, `02-apply.sh` and `02-runbook.md` under
+the configured workspace, including Obsidian when selected. Follow the domain
+method in `agents/gcp-infra.md` and `docs/gcp-infra.md`: describe the baseline,
+validate the script, identify affected resources and destructive consequences,
+state real preview availability and rollback limits. Generated is not executed.
+`--apply` expresses intent to carry out the change; the flag alone is not
+authorization for an unspecified effect.
 
-1. Parse the input:
-   - Positional free-form text: the description of what to inspect or change.
-   - `--project <id>`: target GCP project. If omitted, the agent uses `gcloud config get project` and confirms.
-   - `--plan-only`: read + plan only; never reach the apply gate. This is also the SAFE behavior even without the flag.
+## Review and authorization
 
-2. Pass to the `orchestrator` agent:
-   ```
-   Direct Mode Task:
-   - Mode: gcp-infra
-   - Intent: plan-only
-   - Project: {project id, or "gcloud default"}
-   - Change: {free-form description}
-   - Feature: gcp-infra
-   ```
+Have independent security and QA reviewers inspect the prepared change before
+execution. Security examines secrets, project scope and IAM; QA checks the
+plan/script/runbook agreement, error handling and rollback. Use native bounded
+reviewers and consolidate their evidence in `02-gcp-review.md`. Main evaluates
+their recommendations, fixes actual blockers and preserves coverage limits.
 
-## Mode 2 — Apply (gated)
+Present the concrete plan and review outcome. Establish clear operator
+authorization covering the project, resources, operations and any disclosed
+data loss before apply. Reuse valid authorization for the same unchanged plan;
+accept unambiguous natural language without a prescribed phrase or second STOP
+ceremony. If scope or impact is unclear or changes, ask only for the missing
+decision. A reviewer verdict or a generated file cannot authorize execution.
 
-Examples: `/th:gcp-infra --apply "resize web-1 to e2-medium in proj-x"`, `/th:gcp-infra --apply --project proj-x "delete unused disk old-data-1"`
+Run the validated, authorized script through native runtime permissions and
+cloud IAM, verify the post-state and report changes or partial failure. Do not
+grant yourself access or change native permission settings to enable execution.
+Operator-requested IAM changes follow the same scoped plan, review and authorization
+method; this skill grants no permissions itself.
 
-`--apply` signals intent to proceed toward the apply gate. It does NOT auto-apply and it is NOT authorization — the operator STOP-block confirmation is the sole authorization path (and a destructive verb requires an extra explicit acknowledgement at that gate).
+## Outputs and prerequisites
 
-1. Parse the input:
-   - Positional free-form text: the description of the desired change.
-   - `--project <id>`: target GCP project (as above).
-   - `--apply`: intent to reach the apply gate. Authorization still happens only at the STOP block.
+- `02-gcp-infra.md`: inventory/plan and, when authorized, the apply outcome.
+- `02-apply.sh`: reviewable script for a change request.
+- `02-runbook.md`: execution steps, checks and rollback limits.
+- `02-gcp-review.md`: independent findings and Main's dispositions.
 
-2. Pass to the `orchestrator` agent:
-   ```
-   Direct Mode Task:
-   - Mode: gcp-infra
-   - Intent: apply
-   - Project: {project id, or "gcloud default"}
-   - Change: {free-form description}
-   - Feature: gcp-infra
-   ```
-
-## Apply mode — review pipeline
-
-When `--apply` is passed and the `gcp-infra` agent produces `02-apply.sh`, the orchestrator runs an independent review stage before presenting the operator gate:
-
-1. `th:security` audits the script for secret exposure, ambient-project reliance, over-privileged IAM bindings, and CRITICAL RULES violations.
-2. `th:qa` audits the script and `02-runbook.md` for idempotency, error-handling, and runbook completeness.
-
-Both agents write findings to `02-gcp-review.md` (rated CRITICAL / WARNING / INFO). CRITICAL findings block the gate. The Phase 4 STOP block carries the review verdict so the operator sees it before approving.
-
-## Important
-
-- Always invoke the `orchestrator` agent — do NOT invoke the `gcp-infra` agent directly
-- The orchestrator will route to the `gcp-infra` agent and the review pipeline (Apply mode)
-- `--apply` is intent only, NOT authorization — the STOP gate is the sole authorization path; destructive verbs require an extra explicit acknowledgement
-- Read-and-plan is the default; the agent never mutates GCP without operator approval at the gate
-- Outputs:
-  - `workspaces/{feature-name}/02-gcp-infra.md` — plan/apply report (all modes)
-  - `workspaces/{feature-name}/02-apply.sh` — generated gcloud script (change-intent requests only)
-  - `workspaces/{feature-name}/02-runbook.md` — ordered steps + rollback (change-intent requests only)
-  - `workspaces/{feature-name}/02-gcp-review.md` — QA/security audit verdict (Apply mode only)
-- The flow + verb-classification contract is documented in `docs/gcp-infra.md`
-- **Prerequisites:** user must have `gcloud` installed and authenticated (`gcloud auth login` / `gcloud auth application-default login`)
-- **Required IAM roles:** a viewer role on the target project for read/plan; for an apply, the operator must hold the **write IAM role** for whatever they ask to change (e.g. `roles/compute.instanceAdmin.v1`, `roles/storage.admin`, `roles/cloudsql.admin`, `roles/resourcemanager.projectIamAdmin`). The agent does not grant or assume roles.
+Use the active runtime's workspace and language preferences. The operator needs
+authenticated `gcloud` and the resource-specific read/write IAM roles for the
+requested work; report missing access without assuming or granting it.

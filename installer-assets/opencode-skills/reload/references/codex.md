@@ -37,12 +37,13 @@ app, use its conversation history after restarting the affected backend.
 Do not ask the operator to trust, recreate or repair retired TH hooks. Any
 unrelated native hook trust remains outside this reload's scope.
 
-For local inline reviews, activation is specific to the selected reviewer
-profile and scope. Preserve its verified activation basis when setup made no
-change to that definition; installing another agent does not invalidate it.
-If it changed, attempt supported refresh and verify activation through this
-backend. A documented session-static setting can justify a reconnect proposal;
-an unavailable observation cannot. A new conversation ID is not an acceptance criterion.
+For local inline reviews, verify the selected installed reviewer definition and
+use the native read-only role. Report limited loaded-profile visibility without
+requiring a session marker or an in-memory byte attestation. Installing another
+agent does not invalidate this role. If stale activation is observed, attempt
+supported refresh. A documented session-static setting can justify a reconnect
+proposal; an unavailable observation cannot. A new conversation ID is not an
+acceptance criterion.
 
 Sources checked 2026-09-07:
 

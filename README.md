@@ -46,7 +46,7 @@ codex plugin marketplace add valianx/team-harness
 codex plugin add team-harness@team-harness
 ```
 
-3. Start a new Codex thread and configure the runtime:
+3. Once the host exposes the installed Team Harness skills, configure the runtime:
 
 ```text
 $team-harness:setup
@@ -60,10 +60,10 @@ Codex's native permission and hook-trust prompts. It can also import every
 missing setting from an existing Claude Code or opencode Team Harness config;
 opaque values are copied directly and never displayed.
 
-After setup, update, or an agent sync, continue in the current Codex thread
-when the host reports the components active. Start a new thread only when
-reload reports a changed profile that cannot be activated in place; no blanket
-restart is needed.
+After setup, update, or an agent sync, use `reload` to check activation and
+continue in the current Codex thread. Report unavailable observations as partial
+activation. Reconnect only for an identified component that cannot activate in
+place, preserving the current conversation; no blanket restart is needed.
 
 Codex uses its native permissions and approvals. Team Harness does not install
 a Codex policy-hook layer, so there is no hook manifest to trust for this
@@ -249,10 +249,14 @@ Or run the subcommand directly (headless / CI):
 install update --runtime opencode --scope global --non-interactive
 ```
 
-After the update completes, **restart opencode** to activate the refreshed agents, skills, and commands — the update is NOT live in any running opencode session until restart.
+After installation, use Team Harness `reload` to check the active host's agents,
+skills, commands and other components. Apply supported refreshes in the current
+session; report unverifiable components as partial. Propose a reconnect only
+when a specific component needs it and preserve the existing conversation.
+Installing new files alone proves neither live activation nor a need to restart.
 
 The updater reports one of three states:
-- **update available** — new files downloaded, diff applied, restart to activate.
+- **update available** — new files downloaded and diff applied; check activation with `reload`.
 - **already current** — no binary downloaded, no files written.
 - **installed ahead** — recorded version is newer than this binary; no downgrade performed.
 

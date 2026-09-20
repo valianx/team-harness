@@ -13,14 +13,16 @@ cloud IAM, and provider-side protections govern execution.
 A **generated** script is a plan artifact produced by the agent for review and audit. A **run** script is one that has been executed. The full package — essential artifacts + executable script(s) + `02-runbook.md` — is the standard deliverable of a change-intent request.
 
 - A change-intent plan (explicitly asks to provision/configure/apply) standardly produces: essential artifacts (resource/DB structures + env inventory + change-map) + `02-apply.sh` (executable script) + `02-runbook.md` (ordered steps, inter-step checks, success criteria, rollback).
-- These deliverables are GENERATED, VALIDATED (Phase 3), and REVIEWED (Phase 3.5) but NEVER RUN without the Phase 4 STOP gate.
+- These deliverables are generated, validated (Phase 3) and independently reviewed (Phase 3.5). Execution requires the scoped authorization described in Phase 4.
 - A purely read-only/inspection request still emits NO script.
 
 ---
 
 ## Flow: Create → Validate → Apply
 
-The `gcp-infra` agent always follows this sequence. No phase may be skipped.
+The current general agent coordinates this method and delegates bounded work
+when useful. It reuses completed preparation and valid authorization for the
+same unchanged plan; it does not spawn a second coordinator.
 
 ### Phase 0 — Pre-Flight Checklist
 
@@ -66,14 +68,14 @@ Required conventions for every generated script:
 
 - Explicit `--project="$PROJECT"` on every gcloud command — never rely on ambient default at apply time.
 - Quoted expansions throughout: `"$VARIABLE"`, not `$VARIABLE`.
-- No interactive prompts (`-q` / `--quiet` only after the operator gate confirms — never before).
+- Leave provider confirmation enabled in prepared scripts. After the concrete commands are authorized, add `-q` / `--quiet` for non-interactive execution and revalidate syntax, checking that the project, resources and effects still match the authorized plan. The flag never supplies authorization or requires a second approval for unchanged effects.
 - No embedded secrets: no SA `.json` key files, no bearer tokens, no `--impersonate-service-account` credential output.
 - Each mutating/destructive line is annotated with its class: `# MUTATING — review before apply` or `# DESTRUCTIVE — review before apply`.
 - Idempotency where feasible: prefer `--update-if-exists` or describe-before guards.
 
 ### Phase 3 — Validation
 
-Performed against `02-apply.sh` before the operator gate:
+Performed against `02-apply.sh` before execution:
 
 1. `bash -n 02-apply.sh` — shell syntax check (always available).
 2. `shellcheck 02-apply.sh` — quoting, injection-prone patterns, missing pipefail (best-effort; skip with explicit note if absent).
@@ -105,45 +107,43 @@ Never imply a safety that does not exist.
 
 Applies after Phase 3 validation completes. Skipped for read-only / inspection requests (no script generated).
 
-The orchestrator dispatches two subagents in sequence, writing results to `02-gcp-review.md`:
+The current coordinator obtains independent security and QA reviews. They may
+run in parallel when their reads are independent; the coordinator consolidates
+their returns in `02-gcp-review.md` rather than sharing a writable report:
 
 1. **`th:security`** — audits `02-apply.sh` for: injected secrets, ambient-project reliance, variable-interpolated verbs (contract violation), missing `--project` flags, dangerous patterns (`--recursive`/`--all` without explicit scope), over-privileged IAM bindings, and any deviation from CRITICAL RULES in `agents/gcp-infra.md`.
 
 2. **`th:qa`** — audits `02-apply.sh` and `02-runbook.md` for: idempotency violations, missing error-handling (missing `set -euo pipefail`, unguarded destructive commands), gap between plan blast-radius statement and actual script, steps in `02-runbook.md` that reference resources not in the script or vice-versa, and whether rollback steps are actionable.
 
-Both agents append their findings to `02-gcp-review.md` (a single shared audit file). Findings are rated: `CRITICAL` (blocks Phase 4), `WARNING` (surfaced in Phase 4 gate), `INFO` (informational only). At least one `CRITICAL` finding blocks the gate.
+Reviewers report evidence, severity and coverage limits. Main evaluates each
+finding, resolves actual blockers and records dispositions before apply. Preserve
+original findings and show remaining concerns; a severity label is not an
+operator decision, and a patch alone does not prove a defect is resolved.
 
-The Phase 4 STOP block carries the review verdict: `02-gcp-review.md — PASS (no CRITICAL findings)` or `02-gcp-review.md — BLOCKED (N CRITICAL findings; list)`.
+### Phase 4 — Scoped operator authorization
 
-### Phase 4 — Operator Gate (STOP Block)
+Present the concrete project, resources, validated script, intended changes,
+impact, preview limits, rollback and review outcome. Establish clear operator
+authorization for those effects before execution. For a destructive operation,
+the operator must understand and authorize the identified resource and disclosed
+irreversible consequences.
 
-```
-=== STAGE GATE — GCP INFRA APPLY ===
-Project: <project>           Scope: <resources>
-Operation class: READ-ONLY | MUTATING | DESTRUCTIVE
-Script: workspaces/.../02-apply.sh (validated: bash -n PASS, shellcheck <PASS|skipped>)
-QA/Security review: 02-gcp-review.md — PASS (no CRITICAL findings) | BLOCKED (N CRITICAL: <list>)
-Plan / diff (what WOULD change):
-  <describe-before → intended → describe-after, per resource>
-Blast radius:
-  <which resources change; reversibility per line; data-loss flags>
-Preview availability:
-  <per verb: --validate-only used | IAM simulator used | NO dry-run (irreversible)>
-Approval required:
-  MUTATING  → reply "apply" to proceed.
-  DESTRUCTIVE → reply "apply destructive: <resource>" to proceed (explicit ack).
-  BLOCKED    → review must be cleared before any approval is accepted.
-No apply happens until you reply. Default action is to STOP.
-```
+Reuse an existing authorization that already covers this unchanged plan.
+Unambiguous conversational replies are sufficient: there is no required phrase,
+duplicated STOP block or separate destructive password. If the project, scope or
+impact changes or remains ambiguous, prepare the reviewable result and ask only
+for the missing decision. Silence, a flag, a generated artifact or a reviewer
+recommendation does not authorize apply.
 
-- Apply ONLY on explicit operator approval.
-- Destructive operations require the distinct acknowledgement form: `"apply destructive: <resource>"`.
-- This review is a planning and authorization step in the agent conversation. Native runtime permissions and approvals remain authoritative when the command is executed; this document does not create an OS-level deny policy or remove a native approval path.
+Native runtime permissions, cloud IAM and provider protections govern execution.
+This workflow neither grants permissions nor intercepts commands.
 
-### Phase 5 — Gated Apply
+### Phase 5 — Apply and verify
 
 Execute `02-apply.sh`, capture output, verify post-state via `gcloud … describe` (after snapshot),
-and produce a completion report. Phase 5 is never reached without Phase 4 approval.
+and produce a completion report. Execute only the plan covered by Phase 4
+authorization. After a partial failure, inspect the actual state before choosing
+a safe retry; a changed effect needs its own scoped authorization.
 
 ---
 

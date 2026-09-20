@@ -1,50 +1,28 @@
-# Pipeline real-run baseline
+# Optional pipeline measurements
 
-Measurements from three fixture requests run through the **live** pipeline. This
-is the wall-clock and dispatch record that
-`tests/test_pipeline_simplification_benchmark.mjs` cannot produce: that suite
-compares normalized helper-operation counts against fixture data and never runs
-a pipeline. A change that alters dispatch, state, or recovery contracts records
-its own measurement and cites this file's tree anchor, stating each metric as
-before/after.
-
-The three runs are executed as separate operator-driven pipelines; every cell
-below reads `pending-runs` until each run completes and its numbers are
-recorded here.
-
-## Fixture requests
+Use these reusable requests when a live comparison would answer a specific
+question about pipeline cost or quality. They do not need to run before every
+contract change, and this guide is not a claim that any run has completed.
 
 | Fixture | Class | Request |
 |---|---|---|
 | `small-fix` | small fix | `tests/fixtures/pipeline-baseline/small-fix.md` |
-| `medium-feature` | medium feature, public surface | `tests/fixtures/pipeline-baseline/medium-feature.md` |
+| `medium-feature` | medium public feature | `tests/fixtures/pipeline-baseline/medium-feature.md` |
 | `security-sensitive` | security-sensitive fix | `tests/fixtures/pipeline-baseline/security-sensitive.md` |
 
-## Measurements
+For a selected comparison, record each revision/tree anchor, model/runtime,
+request and relevant conditions in the configured workspace. Measure time to
+Gate 1, architect and specialist dispatches, tool calls, acceptance-criteria
+count, correction rounds and terminal state where observable. State missing
+measurements explicitly and compare only equivalent runs.
 
-| Metric | Tree anchor | `small-fix` | `medium-feature` | `security-sensitive` |
-|---|---|---|---|---|
-| Tree anchor | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
-| Time to Gate 1 | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
-| Architect dispatches | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
-| Acceptance-criteria count | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
-| Specialist dispatches | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
-| Tool calls | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
-| Correction rounds | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
-| Terminal state | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
-| Exclusive defects — `qa` | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
-| Exclusive defects — `tester` | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
-| Exclusive defects — `cleaner` | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
-| Exclusive defects — `security` | `pending-runs` | `pending-runs` | `pending-runs` | `pending-runs` |
+For exclusive defects, use the originating `Lens` in
+`reviews/findings-ledger.md`. A defect shared by two lenses (same class and an
+overlapping evidence path) is exclusive to neither. A lens not dispatched is
+reported as such, without a fabricated count. Keep per-run reports, logs and
+raw measurements outside tracked product files.
 
-Exclusive-defect rows name the four lenses the v5 validation fan can dispatch. A
-cell counts findings whose `Lens` in `reviews/findings-ledger.md` is that lens
-and whose defect no other lens reported, where two findings are the same defect
-when they share `class` and at least one `evidence_paths` entry; a lens the run
-did not dispatch records `n/a — lens not dispatched`. A recorded run never
-leaves `pending-runs`, and `tests/test_openspec_scope.py` rejects any other
-cell value in these rows.
-
-The per-run tree anchor is the full `tree_anchor` value defined in
-`docs/verification-packet.md § 1a`, recorded for the tree the run executed
-against. Anchor equality is a plain string comparison of the full value.
+`tests/test_pipeline_simplification_benchmark.mjs` remains a separate
+deterministic check of helper-operation counts. Its fixture-based comparison
+does not demonstrate live wall-clock or token savings. The old three-run
+baseline was never recorded; no performance result is claimed by its retirement.
