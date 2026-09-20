@@ -7,5 +7,5 @@
 
 ## 2. Validate and deliver
 
-- [ ] 2.1 Run relevant installer, workspace, review, package and OpenSpec checks; resolve failures.
-- [ ] 2.2 Prepare the completed OpenSpec archive and PR candidate; track subsequent independent review and publication in the external operator plan.
+- [x] 2.1 Run relevant installer, workspace, review, package and OpenSpec checks; resolve failures.
+- [x] 2.2 Prepare the completed OpenSpec archive and PR candidate; track subsequent independent review and publication in the external operator plan.
