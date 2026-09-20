@@ -9,6 +9,30 @@ import (
 )
 
 const opencodeDefaultAgent = "TH-orchestrator"
+const opencodeGuideRelativePath = "th-references/agents/_shared/native-workflow-guide.md"
+const opencodeGuideOwnershipKey = "instructions.team-harness"
+
+func opencodeGuidePath(docPath string) string {
+	return filepath.ToSlash(filepath.Join(filepath.Dir(docPath), filepath.FromSlash(opencodeGuideRelativePath)))
+}
+
+func opencodeInstructions(raw map[string]json.RawMessage) ([]string, error) {
+	value, present := raw["instructions"]
+	if !present {
+		return []string{}, nil
+	}
+	var entries []json.RawMessage
+	if err := json.Unmarshal(value, &entries); err != nil || entries == nil {
+		return nil, fmt.Errorf("opencode.json instructions must be an array of strings")
+	}
+	instructions := make([]string, len(entries))
+	for i, entry := range entries {
+		if len(entry) == 0 || entry[0] != '"' || json.Unmarshal(entry, &instructions[i]) != nil {
+			return nil, fmt.Errorf("opencode.json instructions must be an array of strings")
+		}
+	}
+	return instructions, nil
+}
 
 // MCPServerStatus describes what actually happened to one MCP server entry
 // during a single registerOpencodeMCP call. The value is determined by
@@ -33,7 +57,7 @@ type MCPRegisterOutcome struct {
 	Context7 MCPServerStatus
 }
 
-// registerOpencodeMCP sets Team Harness as the default agent and merges
+// registerOpencodeMCP registers native TH workflow instructions and merges
 // mcp.memory and mcp.context7 into the opencode.json at docPath. The default
 // secret model writes {env:VAR} references (tokenModeEnvRef).
 // When called with tokenModeLiteral + a non-empty opencodeMCPSecrets, the literal
@@ -73,6 +97,12 @@ func validateOpencodeJSONFile(path string) error {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return fmt.Errorf("parse opencode.json %q: %w", path, err)
 	}
+	if raw == nil {
+		return fmt.Errorf("opencode.json must be an object")
+	}
+	if _, err := opencodeInstructions(raw); err != nil {
+		return err
+	}
 	if value, ok := raw["mcp"]; ok {
 		var mcp map[string]json.RawMessage
 		if err := json.Unmarshal(value, &mcp); err != nil {
@@ -85,7 +115,7 @@ func validateOpencodeJSONFile(path string) error {
 	return nil
 }
 
-func opencodeDefaultAgentConfigured(path string) (bool, error) {
+func opencodeWorkflowGuideConfigured(path string) (bool, error) {
 	data, err := readLeafNoFollow(path)
 	if os.IsNotExist(err) {
 		return false, nil
@@ -97,11 +127,16 @@ func opencodeDefaultAgentConfigured(path string) (bool, error) {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return false, err
 	}
-	var current string
-	if err := json.Unmarshal(raw["default_agent"], &current); err != nil && len(raw["default_agent"]) > 0 {
+	instructions, err := opencodeInstructions(raw)
+	if err != nil {
 		return false, err
 	}
-	return current == opencodeDefaultAgent, nil
+	for _, instruction := range instructions {
+		if instruction == opencodeGuidePath(path) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, secrets opencodeMCPSecrets) (MCPRegisterOutcome, error) {
@@ -122,9 +157,21 @@ func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, se
 		}
 	}
 
-	var currentDefault string
-	_ = json.Unmarshal(raw["default_agent"], &currentDefault)
-	defaultChanged := currentDefault != opencodeDefaultAgent
+	if raw == nil {
+		return outcome, fmt.Errorf("opencode.json must be an object")
+	}
+	instructions, err := opencodeInstructions(raw)
+	if err != nil {
+		return outcome, err
+	}
+	guide := opencodeGuidePath(docPath)
+	guideChanged := true
+	for _, instruction := range instructions {
+		if instruction == guide {
+			guideChanged = false
+			break
+		}
+	}
 
 	// Extract (or initialise) the mcp sub-object.
 	mcpRaw := map[string]json.RawMessage{}
@@ -170,7 +217,7 @@ func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, se
 		}
 	}
 
-	if !defaultChanged && !memChanged && !ctx7Changed {
+	if !guideChanged && !memChanged && !ctx7Changed {
 		return outcome, nil // nothing to do — already up-to-date
 	}
 
@@ -193,7 +240,9 @@ func registerOpencodeMCP(memURL, context7URL, docPath string, mode tokenMode, se
 		encoded, _ := json.Marshal(merged)
 		mcpRaw["context7"] = json.RawMessage(encoded)
 	}
-	raw["default_agent"] = mustMarshalJSON(opencodeDefaultAgent)
+	if guideChanged {
+		raw["instructions"] = mustMarshalJSON(append(instructions, guide))
+	}
 
 	encodedMCP, _ := json.Marshal(mcpRaw)
 	if len(mcpRaw) > 0 {

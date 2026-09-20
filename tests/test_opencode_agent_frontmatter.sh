@@ -57,6 +57,34 @@ HOME="${FAKE_HOME}" MEMORY_MCP_URL="https://smoke-test.example.com/mcp" CONTEXT7
     --non-interactive \
     2>&1 | tail -5
 
+python3 - "${OPENCODE_DIR}" <<'PY'
+import json, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+config_path = root / 'opencode.json'
+config = json.loads(config_path.read_text())
+guide = root / 'th-references/agents/_shared/native-workflow-guide.md'
+assert 'default_agent' not in config, 'fresh install replaced native general agent'
+assert config['instructions'].count(str(guide)) == 1 and guide.is_file()
+for skill in ('spec', 'pipeline', 'review-pr', 'create-pr'):
+    assert (root / 'skills' / skill / 'SKILL.md').is_file(), skill
+config['default_agent'] = 'custom-general'
+config['instructions'].append('company.md')
+config_path.write_text(json.dumps(config))
+PY
+
+HOME="${FAKE_HOME}" "${BINARY}" update --runtime opencode \
+  --opencode-dir "${OPENCODE_DIR}" --non-interactive >"${BIN_DIR}/update.log" 2>&1
+python3 - "${OPENCODE_DIR}" <<'PY'
+import json, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+config = json.loads((root / 'opencode.json').read_text())
+guide = root / 'th-references/agents/_shared/native-workflow-guide.md'
+assert config['default_agent'] == 'custom-general', 'update replaced selected agent'
+assert config['instructions'].count(str(guide)) == 1
+assert config['instructions'][-1] == 'company.md', 'update changed unrelated instructions'
+print('PASS: native workflow discovery and selected general agent survive update')
+PY
+
 # Find a representative placed agent file.
 AGENT_FILE="${OPENCODE_DIR}/agents/orchestrator.md"
 if [[ ! -f "${AGENT_FILE}" ]]; then

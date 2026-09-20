@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -307,6 +308,77 @@ func TestUninstall_RemovesRetiredComponentsAndDefaultAgent(t *testing.T) {
 	}
 	if _, exists := config["model"]; !exists {
 		t.Fatal("operator-owned config was removed")
+	}
+}
+
+func TestUninstall_NativeWorkflowConfiguration(t *testing.T) {
+	for _, legacy := range []bool{false, true} {
+		for _, selected := range []string{"", "build", "custom-general", opencodeDefaultAgent} {
+			t.Run(fmt.Sprintf("legacy=%t/agent=%s", legacy, selected), func(t *testing.T) {
+				dataDir, cleanup := ledgerTestEnv(t)
+				defer cleanup()
+				placer := newOpencodePlacerAt(t.TempDir())
+				agent := filepath.Join(placer.ConfigRoot(), "agents", "orchestrator.md")
+				guide := opencodeGuidePath(placer.SettingsDocPath())
+				for _, file := range []string{agent, guide} {
+					if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(file, []byte("managed"), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				seed := map[string]interface{}{"instructions": []string{"company.md", guide, "project.md"}, "model": "operator/model"}
+				if selected != "" {
+					seed["default_agent"] = selected
+				}
+				if err := os.WriteFile(placer.SettingsDocPath(), mustMarshalJSON(seed), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				agentKeys := []string{}
+				if legacy {
+					agentKeys = []string{"default_agent"}
+				}
+				entries := []LedgerEntry{
+					{TS: "2026-09-20T00:00:00Z", Op: "install", Component: "agent-orchestrator", Owns: OwnershipTags{Files: []string{"{config_root}/agents/orchestrator.md"}, ConfigKeys: agentKeys}, SchemaVersion: 1},
+					{TS: "2026-09-20T00:00:00Z", Op: "install", Component: "reference-shared-native-workflow-guide-md", Owns: OwnershipTags{Files: []string{"{config_root}/" + opencodeGuideRelativePath}, ConfigKeys: []string{opencodeGuideOwnershipKey}}, SchemaVersion: 1},
+				}
+				lines := []string{}
+				for _, entry := range entries {
+					lines = append(lines, string(mustMarshalJSON(entry)))
+				}
+				writeLedgerLines(t, dataDir, lines)
+				report, err := Uninstall(nil, placer)
+				if err != nil || report.LedgerIntegrityWarning != "" || len(report.IncompleteComponents) != 0 {
+					t.Fatalf("uninstall: %+v, %v", report, err)
+				}
+				raw, _, err := readSettingsDoc(placer.SettingsDocPath())
+				if err != nil {
+					t.Fatal(err)
+				}
+				var actual string
+				_ = json.Unmarshal(raw["default_agent"], &actual)
+				if selected == opencodeDefaultAgent || selected == "" {
+					if raw["default_agent"] != nil {
+						t.Fatal("dangling or invented default remains")
+					}
+				} else if actual != selected {
+					t.Fatal("operator default removed")
+				}
+				instructions, err := opencodeInstructions(raw)
+				if err != nil || len(instructions) != 2 || instructions[0] != "company.md" || instructions[1] != "project.md" {
+					t.Fatalf("unrelated instructions changed: %v", instructions)
+				}
+				if string(raw["model"]) != `"operator/model"` {
+					t.Fatal("operator model changed")
+				}
+				for _, file := range []string{agent, guide} {
+					if _, err := os.Stat(file); !os.IsNotExist(err) {
+						t.Fatal("owned file remains")
+					}
+				}
+			})
+		}
 	}
 }
 

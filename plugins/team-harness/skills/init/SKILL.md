@@ -51,16 +51,13 @@ file. Fail closed if it is not a regular non-symlink or if its
 `sandbox_mode = "read-only"`, or SHA-256 raw-byte digest differs from the
 trusted packaged `inline-reviewer.toml` provided by this loaded plugin. Record
 the selected scope/path and digest only in the in-memory review package. The
-digest does not attest an already-loaded profile: require evidence that the
-current backend loaded the verified selected definition through startup or
-supported reload, recording `profile_session` only as that lifecycle marker,
-never as an in-memory byte attestation. Preserve valid activation evidence when
-setup/update leaves that definition and scope unchanged. When either changes,
-use `reload` to assess activation; missing evidence yields
-`lens_status: unavailable`, not an automatic restart requirement.
-Shipped Codex hooks do not observe session start or
-loaded agent bytes, so no hook attestation is available. A mismatch is
-`untrusted` or `unavailable`, never a dispatch.
+digest establishes installed-definition integrity; it does not attest bytes
+already loaded by the host. Report that visibility limit when the runtime does
+not expose them, without inventing evidence, requiring a session marker, or
+requesting a new conversation. Use supported native refresh when the selected
+definition changes and the host needs it. An invalid or untrusted definition,
+or an unavailable native read-only dispatch, remains `untrusted` or
+`unavailable`, never a dispatch.
 
 Codex dispatches each requested lens as an independent runtime-native
 `inline-reviewer` from the project root. It may inspect the anchored project

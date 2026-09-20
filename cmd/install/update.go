@@ -52,7 +52,7 @@ func parseSemver(v string) [3]int {
 // path (SEC-04/05 enforced). Config key updates go through
 // refreshManagedConfigKeys (allowlisted, hardened write, backup before write —
 // SEC-OC-R4 / SEC-OC-R2 / SEC-01..08 reused). opencode.json is merge-updated
-// only to keep Team Harness selected as the default agent.
+// only to register native TH workflow instructions.
 func runUpdateCommand() {
 	if runtimeFlag != "opencode" && runtimeFlag != "codex" {
 		fmt.Fprintf(os.Stderr, "update: --runtime opencode or codex is required (got %q)\n", runtimeFlag)
@@ -105,12 +105,12 @@ func runUpdateCommand() {
 			fmt.Fprintf(os.Stderr, "update: preflight config: %v\n", err)
 			os.Exit(1)
 		}
-		defaultConfigured, err := opencodeDefaultAgentConfigured(opencodePlacer.SettingsDocPath())
+		guideConfigured, err := opencodeWorkflowGuideConfigured(opencodePlacer.SettingsDocPath())
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "update: inspect default agent: %v\n", err)
+			fmt.Fprintf(os.Stderr, "update: inspect workflow instructions: %v\n", err)
 			os.Exit(1)
 		}
-		hasChanges := len(diff.ToCreate)+len(diff.ToUpdate)+len(diff.ToRemove)+len(diff.ToRecord)+len(diff.LedgerErrors) > 0 || !defaultConfigured
+		hasChanges := len(diff.ToCreate)+len(diff.ToUpdate)+len(diff.ToRemove)+len(diff.ToRecord)+len(diff.LedgerErrors) > 0 || !guideConfigured
 		if !hasChanges {
 			printAlreadyCurrent(installedVersion)
 			return // AC-2: zero writes when already current
@@ -226,7 +226,7 @@ func applyUpdateDiff(diff PlanDiff, cfgPath string, placer *opencodePlacer) {
 		os.Exit(1)
 	}
 	if _, err := registerOpencodeMCP("", "", placer.SettingsDocPath(), tokenModeEnvRef, opencodeMCPSecrets{}); err != nil {
-		fmt.Fprintf(os.Stderr, "update: configure default agent: %v\n", err)
+		fmt.Fprintf(os.Stderr, "update: configure workflow instructions: %v\n", err)
 		os.Exit(1)
 	}
 

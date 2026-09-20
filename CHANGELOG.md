@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.33.1] - 2026-09-20
+
+### Fixed
+- OpenCode install/update preserve the selected general agent and register concise TH workflow guidance through native instructions. Uninstall preserves unrelated instructions and agent preferences, clearing a TH selection only when removing its owned agent.
+- Codex init uses installed-definition verification and native read-only review without an extra session marker. Pipeline workspaces use Codex permissions, including Obsidian, without provisioning Claude settings.
+
+### Changed
+- Describe TH as workflows for the native general agent, preserving skill discovery, independent recommendations, voice/language preferences and canonical workspaces.
+
 ## [3.33.0] - 2026-09-19
 
 ### Changed

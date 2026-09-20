@@ -83,9 +83,14 @@ func Uninstall(selected []string, placer Placer) (UninstallReport, error) {
 		if len(selected) > 0 && !selectedSet[compID] && !isRetirableLedgerComponent(compID, tags, placer) {
 			continue
 		}
-		if len(tags.ConfigKeys) > 0 {
+		if len(uninstallConfigKeys(compID, tags, placer)) > 0 {
 			if _, _, err := readSettingsDoc(settingsDocPathFor(placer)); err != nil {
 				return report, err
+			}
+			if placer.Runtime() == "opencode" {
+				if err := validateOpencodeJSONFile(placer.SettingsDocPath()); err != nil {
+					return report, err
+				}
 			}
 			break
 		}
@@ -116,8 +121,9 @@ func Uninstall(selected []string, placer Placer) (UninstallReport, error) {
 		}
 
 		// Step 2: rewrite settings doc — delete owned config keys (C-1).
-		if len(tags.ConfigKeys) > 0 {
-			rewriteErr := deleteConfigKeys(placer.SettingsDocPath(), tags.ConfigKeys, &removed)
+		keys := uninstallConfigKeys(compID, tags, placer)
+		if len(keys) > 0 {
+			rewriteErr := deleteConfigKeys(placer.SettingsDocPath(), keys, &removed)
 			if rewriteErr != nil {
 				report.IncompleteComponents = append(report.IncompleteComponents, IncompleteComponent{
 					Component: compID,
@@ -154,6 +160,26 @@ func Uninstall(selected []string, placer Placer) (UninstallReport, error) {
 	}
 
 	return report, nil
+}
+
+// Remove a dangling TH selection only with its owned agent. New installations
+// do not claim the operator's general-agent preference; legacy ledgers still load.
+func uninstallConfigKeys(component string, tags OwnershipTags, placer Placer) []string {
+	keys := make([]string, 0, len(tags.ConfigKeys)+1)
+	for _, key := range tags.ConfigKeys {
+		if key != "default_agent" {
+			keys = append(keys, key)
+		}
+	}
+	if placer.Runtime() == "opencode" && component == "agent-orchestrator" {
+		for _, file := range tags.Files {
+			if file == "{config_root}/agents/orchestrator.md" {
+				keys = append(keys, "default_agent")
+				break
+			}
+		}
+	}
+	return keys
 }
 
 // deleteConfigKey removes a single key (possibly dotted, e.g. "mcp.memory")
@@ -273,25 +299,51 @@ func deleteConfigKeys(settingsDocPath string, keys []string, r *RemovedComponent
 		return err
 	}
 
-	// Backup before write, with owner-only 0o600 to protect sensitive content.
-	if len(existing) > 0 {
-		ts := time.Now().UTC().Format("20060102-150405")
-		bakPath := settingsDocPath + ".bak-" + ts
-		if err := copyBackupHardened(settingsDocPath, bakPath, 0o600); err != nil {
-			return fmt.Errorf("create backup %q: %w", bakPath, err)
-		}
-	}
-
 	// Delete the owned keys. Keys may be dotted (e.g. "mcp.memory") requiring a
 	// nested lookup, or top-level (e.g. "logs-mode"). SEC-DR-2: leaf-exact delete
 	// — never remove a parent key (e.g. "mcp") unless all sibling leaves are gone.
 	removed := make([]string, 0, len(keys))
 	for _, k := range keys {
+		if k == opencodeGuideOwnershipKey {
+			instructions, err := opencodeInstructions(raw)
+			if err != nil {
+				return err
+			}
+			kept := make([]string, 0, len(instructions))
+			for _, instruction := range instructions {
+				if instruction != opencodeGuidePath(settingsDocPath) {
+					kept = append(kept, instruction)
+				}
+			}
+			if len(kept) != len(instructions) {
+				raw["instructions"] = mustMarshalJSON(kept)
+				removed = append(removed, k)
+			}
+			continue
+		}
+		if k == "default_agent" {
+			var selected string
+			if json.Unmarshal(raw[k], &selected) != nil || selected != opencodeDefaultAgent {
+				continue
+			}
+		}
 		if deleteConfigKey(raw, k) {
 			removed = append(removed, k)
 		}
 	}
 	r.KeysRemoved = removed
+	if len(removed) == 0 {
+		return nil
+	}
+
+	// Backup only when removing an owned association or key.
+	if len(existing) > 0 {
+		ts := time.Now().UTC().Format("20060102-150405.000000000")
+		bakPath := settingsDocPath + ".bak-" + ts
+		if err := copyBackupHardened(settingsDocPath, bakPath, 0o600); err != nil {
+			return fmt.Errorf("create backup %q: %w", bakPath, err)
+		}
+	}
 
 	// Write the updated doc back (whole-doc read-merge-write pattern).
 	out, err := json.MarshalIndent(raw, "", "  ")

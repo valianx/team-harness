@@ -244,7 +244,7 @@ func TestRegisterOpencodeMCPFromValues_NoSecretInOpencodeJSON(t *testing.T) {
 }
 
 // TestRegisterOpencodeMCPFromValues_SkipsWhenAbsent verifies that when no
-// Memory URL is set AND context7 is disabled, only the default agent is
+// Memory URL is set AND context7 is disabled, only workflow instructions are
 // configured and no MCP entry is introduced.
 func TestRegisterOpencodeMCPFromValues_SkipsWhenAbsent(t *testing.T) {
 	dir := t.TempDir()
@@ -268,9 +268,10 @@ func TestRegisterOpencodeMCPFromValues_SkipsWhenAbsent(t *testing.T) {
 	if err := json.Unmarshal(data, &config); err != nil {
 		t.Fatalf("parse opencode.json: %v", err)
 	}
-	if config["default_agent"] != opencodeDefaultAgent {
-		t.Errorf("default_agent = %v, want %q", config["default_agent"], opencodeDefaultAgent)
+	if _, exists := config["default_agent"]; exists {
+		t.Error("installation selected a default agent")
 	}
+	assertOpencodeWorkflowGuide(t, settingsPath)
 	if _, ok := config["mcp"]; ok {
 		t.Error("mcp config was written despite both servers being absent")
 	}

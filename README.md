@@ -208,6 +208,11 @@ Or to register only Memory MCP (context7 skipped), set only `MEMORY_MCP_URL` in 
 
 To add or update MCP entries after install, re-run with the desired env vars set.
 
+Installation registers a concise TH guide through OpenCode's native `instructions`
+configuration. It preserves the selected general agent and unrelated instructions.
+An existing `TH-orchestrator` selection also remains unchanged; choose another
+general agent through OpenCode if desired. TH's skills remain available either way.
+
 **Environment variables:**
 
 | Variable | Required | Purpose |
