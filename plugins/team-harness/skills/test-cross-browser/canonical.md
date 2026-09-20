@@ -26,6 +26,7 @@ matches, omit the field (absence is the signal — do not set it to false explic
    ```
    Direct Mode Task:
    - Mode: test
+   - workspaces path: {absolute-workspace-root}
    - Feature: {feature-name}
    - cross_browser: true        # always set by this skill — the distinguishing field
    - frontend_scope: true       # only when frontend markers detected; omit otherwise
@@ -79,5 +80,5 @@ elements (headers, field names, status-block keys) stay English.
 - **Never invokes the `tester` agent directly.** The full pipeline (architect determination of
   scope, tester phase-0 reference routing, qa verification) runs as normal — cross-browser is an
   axis, not a bypass of the pipeline.
-- Requires existing workspaces with implementation docs. If none exist, Mode 2 will tell the user
-  to implement first.
+- Requires existing workspaces with implementation docs. If none exist, Mode 2 will report the
+  checked location and ask for the intended feature; it will not create a fallback workspace.

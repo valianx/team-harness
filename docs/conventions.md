@@ -16,13 +16,18 @@ Beyond the root-tier docs (`00-state.md`, `01-plan.md`, `02-implementation.md`, 
 
 ## Document classification
 
-Every workspace doc is either **operator-facing** or **agentic**. The operator's own directive: the plan and the sketches are made for the operator; everything else can use an agentic, low-cost, or non-human-readable format.
+Workspace context notes use Markdown (`.md`) in local and Obsidian mode, following
+the shared workspace skill. Their audience may be **operator-facing** or **agentic**;
+this changes detail and language, not the common note format. No universal template
+or extra frontmatter is required solely by the workspace mode. Preserve metadata
+and anchors consumed by the active flow. Machine-consumed state, events, helper
+artifacts and deliverables retain their required formats; notes link to them.
 
 | Doc | Tier | Format contract | Writer |
 |-----|------|-----------------|--------|
 | `01-plan.md` | operator-facing | `sharded-v1` operator summary and manifest; no copied architecture or AC prose | architect (content); see `docs/plan-shards.md` |
 | `plan/architecture.md`, `plan/delivery.md`, `plan/invariants.md`, `plan/tasks/*.md` | agentic | Canonical plan shards; one fact in one owning artifact | architect; bounded post-gate writers per consolidation contract |
-| `sketches/*` | operator-facing | `docs/plan-sketches.md` manifest (unchanged) | architect |
+| `sketches/*` | operator-facing | Pipeline manifest or requested preview via `sketch` | architect in pipeline / Main on demand |
 | `01-root-cause.md` | operator-facing | Strict root-cause template (unchanged); the bug-fix equivalent of the plan, read at STAGE-GATE-1 | architect |
 | `overview.md` (initiative) | operator-facing | `agents/ref-dispatch-machinery.md § "overview.md — you are the sole writer"` (unchanged) | orchestrator (sole writer; derives completion-row coordinates after its own Phase-4 mechanics) |
 | `reviews/01-plan-review.md` | agentic | Fixed skeleton of anchored sections; no `## Review Summary`/`## Technical Detail` split; minimal prose, tables and labels | panel (single-writer-per-section) |
@@ -32,7 +37,10 @@ Every workspace doc is either **operator-facing** or **agentic**. The operator's
 | `research/00-research.md`, `research/00-audit.md`, `01-planning.md` | agentic | Each agent's current fixed structure; no two-tier obligation | architect |
 | Vault pages produced by `documenter`, `00-teaching-pack-*.md` | operator-deliverable | Own contracts (docs flow / mentor); outside the two-tier mandate | documenter / mentor |
 
-Consequence: the old universal mandate ("every workspace doc gets `## Review Summary` then `## Technical Detail`") is rescoped. Operator-facing docs keep their intrinsic templates (which already carry a `## Review Summary`-equivalent where it matters). Agentic docs use whatever compact, structured format their own agent already defines — no two-tier obligation. STOP blocks and the status-block return protocol are unaffected — they are already agentic/operator-facing by design.
+Context notes have no universal `## Review Summary` / `## Technical Detail` split.
+Keep sections useful to the task and any structure required by an existing consumer;
+agentic notes may use compact tables or structured blocks within Markdown. STOP
+blocks, machine records and status-block return protocols keep their own formats.
 
 All tiers also follow the enforceable workspace write and read budgets in
 `docs/output-contract-patterns.md § 6` and § 7. “Operator-facing” permits clear prose; it does

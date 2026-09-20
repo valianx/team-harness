@@ -22,8 +22,8 @@ If the operator only asks to preview a handoff, show it without saving. Native
 permissions govern the write; a refusal is reported as a write outcome, not an
 operator decline or permission to widen access.
 
-Use this compact structure, adding the workspace's Obsidian frontmatter when
-applicable:
+Use this compact Markdown structure. Preserve metadata used by existing readers;
+Obsidian mode alone does not require extra frontmatter:
 
 ```markdown
 # Session Handoff: {feature}

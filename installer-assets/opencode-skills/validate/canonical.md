@@ -57,6 +57,7 @@ name: validate
    ```
    Direct Mode Task:
    - Mode: validate
+   - workspaces path: {absolute-workspace-root}
    - Feature: {feature-name}
    ```
 

@@ -24,6 +24,7 @@ When ANY marker matches, include `frontend_scope: true` in the Direct Mode Task 
    ```
    Direct Mode Task:
    - Mode: test
+   - workspaces path: {absolute-workspace-root}
    - Feature: {feature-name}
    - frontend_scope: true   # detected from repo markers; activates the tester's browser-test routing
    ```

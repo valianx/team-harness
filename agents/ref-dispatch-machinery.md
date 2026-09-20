@@ -86,11 +86,12 @@ hold evidence but never a competing coordinator state or gate stream.
 
 ## overview.md — you are the sole writer
 
-No specialist ever writes this file. After your own Phase-4 mechanics create or update the
-PR, you already hold the branch, resolved version, PR number/URL, and delivery outcome; use
-those coordinates to write the row directly. Every write passes through your hand.
+Only Main writes this file. After Phase-4 mechanics create or update the PR, use
+the resulting branch, version, PR number/URL and delivery outcome to update its row.
 
 ### Template (obsidian shown; local omits the obsidian-only frontmatter keys)
+
+Keep reader-required metadata such as `initiative` in both modes.
 
 ```markdown
 ---

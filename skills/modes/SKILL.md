@@ -67,6 +67,7 @@ text. Keep mode names and invocations exact.
 | `save-session` | Save a concise handoff in the effort's workspace. | Claude Code + opencode + Codex |
 | `security` | Audit a target against OWASP, CWE, and ASVS. | Claude Code + opencode + Codex |
 | `setup` | Configure Team Harness integrations and operator preferences. | Claude Code + opencode + Codex |
+| `sketch` | Preview a proposed solution on demand in direct, spec or pipeline work. | Claude Code + opencode + Codex |
 | `spec` | Author and implement a short task through a coordinator-only OpenSpec lane. | Claude Code + opencode + Codex |
 | `spike` | Prototype quickly to test a technical hypothesis. | Claude Code + opencode + Codex |
 | `test` | Design and run tests for a feature or component. | Claude Code + opencode + Codex |

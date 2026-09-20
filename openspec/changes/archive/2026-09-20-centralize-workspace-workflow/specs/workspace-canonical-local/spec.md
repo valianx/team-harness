@@ -45,6 +45,10 @@ The workspace skill SHALL preserve the existing flow's artifact ownership and
 write scope. It SHALL retain only useful objective, decisions, source links,
 progress, evidence and next action in that flow's existing notes or handoff, without
 requiring a parallel index, schema, event log, remote memory or session service.
+Context notes SHALL use Markdown (`.md`) in local and Obsidian mode without a
+universal template or additional frontmatter solely because of the workspace mode.
+Existing reader-required fields and operational artifact formats SHALL remain
+compatible; code, tests and deliverables SHALL retain their own formats and homes.
 OpenSpec sources SHALL remain in their owning repository. Pipeline authority and
 identity SHALL remain with its existing helpers and contracts. Native permissions
 SHALL govern access, with no automatic migration or fallback copy on refusal.
@@ -56,3 +60,25 @@ SHALL govern access, with no automatic migration or fallback copy on refusal.
 #### Scenario: Context Harness is absent
 - **WHEN** a task selects and maintains its workspace without Context Harness or Memory MCP
 - **THEN** the workspace skill completes using native filesystem operations and existing context, without requesting remote installation or emitting telemetry
+
+#### Scenario: Different flows write context notes
+- **WHEN** development, research, review or handoff work retains contextual notes in either workspace mode
+- **THEN** it writes useful Markdown notes without requiring a universal template, links operational artifacts and deliverables in their original formats, and preserves fields read by existing consumers
+
+### Requirement: Sketches support requested design review across workflows
+TH SHALL expose an on-demand `sketch` skill in Claude Code, Codex and OpenCode.
+Direct and spec work SHALL support requested sketches in the effort's configured
+workspace before implementing the proposed change, without activating a pipeline,
+requiring its complete sketch set or adding an approval gate. Text sketches SHALL
+use Markdown; the existing self-contained HTML UI preview SHALL remain available.
+Spec SHALL link the sketches from its operator plan, reflect agreed intent changes
+in canonical OpenSpec and consult relevant agreed sketches during implementation
+and validation. Active pipeline sketch requirements SHALL remain unchanged.
+
+#### Scenario: The user requests a preview during spec work
+- **WHEN** the user asks to see the proposed interface, contract or interaction before implementation
+- **THEN** Main creates or reuses the relevant sketch in the same local or Obsidian workspace and presents it through the existing spec discussion, without a second gate or pipeline state
+
+#### Scenario: Direct work needs only a wireframe
+- **WHEN** the user requests a standalone UI sketch without a pipeline
+- **THEN** Main can provide a low-fidelity HTML wireframe linked from Markdown context without generating unrelated sketches or approving product implementation

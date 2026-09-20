@@ -4,7 +4,7 @@
 Give the effort one place for useful working context. Main uses this skill when
 starting or continuing substantive work, including research, implementation,
 reviews and artifact creation. Other flows delegate workspace decisions here;
-they retain their own output formats and authority. No explicit invocation is
+they retain their artifact ownership and authority. No explicit invocation is
 needed. Prefer reusing an existing workspace even for a small follow-up.
 
 Brief conversation needs no empty directory or note. Read-only status, preview
@@ -58,6 +58,15 @@ Neither that lookup nor pipeline discovery finds arbitrary unbound work across
 the filesystem. Report missing or ambiguous context honestly.
 
 ## Keep context useful
+
+Write context notes as Markdown (`.md`) in the selected workspace in both local
+and Obsidian mode: plans, research, decisions, review summaries and handoffs.
+Use headings and links that help the task; the common format requires no universal
+template, extra frontmatter or Obsidian-specific syntax. Preserve fields or anchors
+that an existing flow or reader needs. Machine-consumed state, event records and
+helper artifacts keep their required formats; code, tests and deliverables keep
+their own formats and locations. Link them from notes rather than renaming or
+duplicating them as Markdown.
 
 Create only artifacts the task needs. Record the workspace's absolute location,
 project/source association (Git common directory for repository work, established

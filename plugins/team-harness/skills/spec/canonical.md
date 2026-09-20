@@ -8,6 +8,11 @@ merits a durable written intent. The mode runs entirely in the coordinator.
 When PR preparation or publication is relevant, use [create-pr](../create-pr/SKILL.md)
 automatically; selecting it does not activate the pipeline.
 
+When the user wants to inspect the proposed result before implementation, use
+[sketch](../sketch/SKILL.md) in this lane. Link the requested sketches from the
+operator plan and use their feedback in the existing OpenSpec intent and approval.
+They add no pipeline activation, mandatory sketch set or separate gate.
+
 ## Routing predicate
 
 Plain inline handles mechanical, reversible work with no design decision worth recording. `/th:spec`

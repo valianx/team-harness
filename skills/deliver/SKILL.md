@@ -22,6 +22,7 @@ When a feature name is present, pass:
 ```text
 Direct Mode Task:
 - Mode: deliver
+- workspaces path: {absolute-workspace-root}
 - Feature: {feature-name}
 ```
 

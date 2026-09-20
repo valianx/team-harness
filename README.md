@@ -14,6 +14,7 @@ The current general agent selects and reads the relevant skill:
 | Need | Workflow |
 | --- | --- |
 | Development with written intent and tasks | [`spec`](skills/spec/SKILL.md) |
+| Inspect a proposed solution before implementation | [`sketch`](skills/sketch/SKILL.md), on demand in any flow |
 | Broader coordination and recoverable execution | [`pipeline`](skills/pipeline/SKILL.md) |
 | Review an existing pull request | [`review-pr`](skills/review-pr/SKILL.md) |
 | Prepare or publish a completed change | [`create-pr`](skills/create-pr/SKILL.md) |

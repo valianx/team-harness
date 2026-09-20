@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Sketch"
+  short_description: "Team Harness Sketch workflow"
+  default_prompt: "Use $team-harness:sketch for this request."

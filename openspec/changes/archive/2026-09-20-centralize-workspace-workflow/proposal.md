@@ -15,6 +15,10 @@ that ordinary work and specialized flows can use without Context Harness.
   that method, preserving existing pipeline identity and native permissions.
 - Keep product intent in repository OpenSpec and working context outside tracked
   product files; retain the original workspace across sessions and worktrees.
+- Use Markdown for context notes in every flow and workspace mode, without a
+  universal template or changing operational artifact and deliverable formats.
+- Expose sketches on demand in direct and spec work to review proposed results
+  before implementation, preserving existing pipeline and visual sketch formats.
 
 ## Capabilities
 

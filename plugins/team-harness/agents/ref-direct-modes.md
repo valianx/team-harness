@@ -168,16 +168,16 @@ for a missing destination. Keep research and continuity in the selected workspac
 
 Invoke `architect` in **research mode** via Task tool with:
 - The diagram request (what to visualize)
-- Feature name for workspaces
-- Instruction: "Analyze the codebase/system to extract the components, relationships, data flows, and boundaries needed to create a diagram. Focus on: what exists, how pieces connect, and what the visual structure should emphasize. Produce a structured analysis in `workspaces/{feature}/research/00-research.md` — do NOT produce a diagram."
+- Feature name; `workspaces path: {workspace}`
+- Instruction: "Analyze the codebase/system to extract the components, relationships, data flows, and boundaries needed to create a diagram. Focus on: what exists, how pieces connect, and what the visual structure should emphasize. Produce a structured analysis in `{workspace}/research/00-research.md` — do NOT produce a diagram."
 
 Gate: if `status: failed` → report to user and stop.
 
 ### Step 2 — Invoke diagrammer
 
 Invoke `diagrammer` via Task tool with:
-- Feature name
-- Path to architect's analysis: `workspaces/{feature}/research/00-research.md`
+- Feature name; `workspaces path: {workspace}`
+- Path to architect's analysis: `{workspace}/research/00-research.md`
 - Path to skill: `.claude/skills/excalidraw-diagram/`
 - Output path: `{resolved output path from Step 0}`
 - **Expected sections:** list the major sections from the architect's analysis
@@ -220,16 +220,16 @@ missing destination. Keep research and continuity in the selected workspace.
 
 Invoke `architect` in **research mode** via Task tool with:
 - The diagram request (what to visualize)
-- Feature name for workspaces
-- Instruction: "Analyze the codebase/system to extract the components, relationships, data flows, and boundaries needed to create a LikeC4 architecture diagram. Focus on: entry points, services, databases, queues, external dependencies, and actors. Produce a structured analysis in `workspaces/{feature}/research/00-research.md` — do NOT produce a diagram."
+- Feature name; `workspaces path: {workspace}`
+- Instruction: "Analyze the codebase/system to extract the components, relationships, data flows, and boundaries needed to create a LikeC4 architecture diagram. Focus on: entry points, services, databases, queues, external dependencies, and actors. Produce a structured analysis in `{workspace}/research/00-research.md` — do NOT produce a diagram."
 
 Gate: if `status: failed` → report to user and stop.
 
 ### Step 2 — Invoke likec4-diagrammer
 
 Invoke `likec4-diagrammer` via Task tool with:
-- Feature name
-- Path to architect's analysis: `workspaces/{feature}/research/00-research.md`
+- Feature name; `workspaces path: {workspace}`
+- Path to architect's analysis: `{workspace}/research/00-research.md`
 - Path to skill: `.claude/skills/likec4-diagram/`
 - Output path: `{resolved output path from Step 0}`
 
@@ -260,16 +260,16 @@ missing destination. Keep research and continuity in the selected workspace.
 
 Invoke `architect` in **research mode** via Task tool with:
 - The diagram request
-- Feature name for workspaces
-- Instruction: "Analyze the codebase/system to extract the components, relationships, data flows, and boundaries needed to create a D2 diagram. Produce a structured analysis in `workspaces/{feature}/research/00-research.md` — do NOT produce a diagram."
+- Feature name; `workspaces path: {workspace}`
+- Instruction: "Analyze the codebase/system to extract the components, relationships, data flows, and boundaries needed to create a D2 diagram. Produce a structured analysis in `{workspace}/research/00-research.md` — do NOT produce a diagram."
 
 Gate: if `status: failed` → report to user and stop.
 
 ### Step 2 — Invoke d2-diagrammer
 
 Invoke `d2-diagrammer` via Task tool with:
-- Feature name
-- Path to architect's analysis: `workspaces/{feature}/research/00-research.md`
+- Feature name; `workspaces path: {workspace}`
+- Path to architect's analysis: `{workspace}/research/00-research.md`
 - Path to skill: `.claude/skills/d2-diagram/`
 - Output path: `{resolved output path from Step 0}`
 
@@ -545,6 +545,7 @@ The skill handles user approval and publishing.
 When invoked with `Direct Mode Task: translate`:
 
 The `/translate` skill passes mode, submode, scope, and language configuration.
+Resolve `{workspace}` through `workspace` before selecting a submode.
 
 ### Submode: glossary-only
 
@@ -568,19 +569,19 @@ Step 6   Report to user
 ### Step 1 — Setup workspaces
 
 1. Resolve/create the effort's home through `workspace`; pass its absolute path to every translator.
-2. Write initial `00-state.md` with `phase: translate`, `status: in_progress`
-3. Initialize the events file (local mode: `00-execution-events.jsonl`; obsidian mode: `00-execution-events.md`) with the opening `pipeline.start` event so `/th:pipelines` and `/th:recover` see a trace alongside the state file
+2. Write `{workspace}/00-state.md` with `phase: translate`, `status: in_progress`
+3. Initialize `{workspace}/00-execution-events.jsonl` (local) or `{workspace}/00-execution-events.md` (Obsidian) with `pipeline.start` so `/th:pipelines` and `/th:recover` see the trace alongside state.
 
 ### Step 2 — Discovery + Glossary + i18n Setup (sequential)
 
 Invoke `translator` in **full mode** via Task tool with:
-- Feature name
+- Feature name; `workspaces path: {workspace}`
 - Scope: directory path or "full project"
 - Source language: `es` (Spanish)
 - Target language: `en` (English neutral)
-- Instruction: "Run Phase 0 (Discovery), Phase 1 (Glossary), and Phase 2 (i18n Setup) ONLY. Do NOT proceed to Phase 3 or Phase 4. Save the glossary to `docs/glossary.md`, write the string inventory to `workspaces/{feature}/00-translation.md`, and return. Include in your status block: `framework`, `i18n-library`, `locale-dir`, `key-convention`, `interpolation-syntax`, and `module-split` (proposed directory groupings with string counts)."
+- Instruction: "Run Phase 0 (Discovery), Phase 1 (Glossary), and Phase 2 (i18n Setup) ONLY. Do NOT proceed to Phase 3 or Phase 4. Save the glossary to `docs/glossary.md`, write the string inventory to `{workspace}/00-translation.md`, and return. Include in your status block: `framework`, `i18n-library`, `locale-dir`, `key-convention`, `interpolation-syntax`, and `module-split` (proposed directory groupings with string counts)."
 
-Gate: if `status: failed` → read `00-translation.md` to diagnose, report to user.
+Gate: if `status: failed` → read `{workspace}/00-translation.md` to diagnose, report to user.
 Gate: if `status: blocked` → relay the blocker.
 
 **Expected status block extras:**
@@ -616,6 +617,7 @@ For each module:
   Invoke translator with:
     mode: parallel-batch
     feature: {feature-name}
+    workspaces path: {workspace}
     glossary: docs/glossary.md
     i18n-config:
       framework: {from Step 2}
@@ -646,10 +648,10 @@ batch blocker and stop; do not imply that every batch eventually succeeded.
 After ALL parallel batches return `status: success`:
 
 Invoke `translator` in **merge mode** via Task tool with:
-- Feature name
+- Feature name; `workspaces path: {workspace}`
 - locale-dir: `{from Step 2}`
 - glossary: `docs/glossary.md`
-- Instruction: "Merge all locale fragment files (`{namespace}.en.json`, `{namespace}.es.json`) into final `en.json` and `es.json`. Delete fragments. Run the project build. Produce the final `00-translation.md` report with aggregated stats."
+- Instruction: "Merge all locale fragment files (`{namespace}.en.json`, `{namespace}.es.json`) into final `en.json` and `es.json`. Delete fragments. Run the project build. Produce `{workspace}/00-translation.md` with aggregated stats."
 
 Gate: if build fails, the translator diagnoses and changes the cause. Continue
 while a verifiable repair remains; otherwise report the exact build blocker.
@@ -657,9 +659,10 @@ while a verifiable repair remains; otherwise report the exact build blocker.
 ### Step 5b — Sequential fallback (small projects)
 
 If Step 3 decided to skip parallelism, invoke single `translator` in `translate-only` mode:
+- `workspaces path: {workspace}`
 - Reads existing glossary and i18n setup
 - Runs Phase 3 → Phase 4 → Phase 5 sequentially
-- Writes final `00-translation.md`
+- Writes `{workspace}/00-translation.md`
 
 Gate: if build fails, re-invoke with the exact error only when the next action
 is causally distinct; otherwise report the blocker.
@@ -671,7 +674,7 @@ Present:
 - Parallelism: N modules in parallel / sequential fallback
 - Glossary location: `docs/glossary.md`
 - Locale files location: `{locale-dir}/en.json`, `{locale-dir}/es.json`
-- Translation report: `workspaces/{feature-name}/00-translation.md`
+- Translation report: `{workspace}/00-translation.md`
 - Next steps: review translations, add language switcher, configure locale detection
 
 ---
