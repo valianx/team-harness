@@ -93,9 +93,10 @@ confinement and remains an explicitly reported residual read-only exposure.
 Before consolidation, Main repeats the exact hardened clean/local-object
 preflight and re-resolves the project root and commit/range. A moved HEAD,
 missing object, or changed target is stale and must be recaptured. Findings,
-disagreements, and limits remain explicit; exact one-return keyed consolidation
-rejects missing, failed, blocking, replayed, duplicate, or substituted lens
-slots as non-pass rather than treating them as PASS.
+disagreements, and limits remain explicit. Consolidate by lens using the worse
+outcome described above, preserving every return. Duplicate passing returns alone
+do not prevent PASS; a missing required lens, non-pass outcome, blocker, or
+unresolved blocking disagreement does.
 
 An intent to review a PR, PR number, or PR URL is routed exclusively to
 `review-pr` before this mode is considered. Inline cannot intercept or rebuild
