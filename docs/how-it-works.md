@@ -177,7 +177,13 @@ Full bug-fix details remain in [`agents/ref-special-flows.md`](../agents/ref-spe
 
 ## Resume any time
 
-All state lives in files. `/recover {feature-name}` reads `00-state.md` and continues from `next_action`. Works across compactions, across sessions, across machines (as long as `workspaces/` travels with the repo).
+An active pipeline retains recovery state in its configured canonical workspace:
+repository-local in local mode, or directly in the selected vault in Obsidian
+mode. Use `/th:recover {feature-name}` in Claude Code, or the active runtime's
+recovery entry point, to resume that same workspace. Across sessions or machines,
+make its existing files accessible; do not create a repository-local copy of an
+Obsidian workspace. Recovery uses the current pipeline's persisted state and
+control log.
 
 Open `01-plan.md § Task Index` for task status. Follow one task path to see only that task's scope and AC checkboxes; no unrelated task must be read.
 
