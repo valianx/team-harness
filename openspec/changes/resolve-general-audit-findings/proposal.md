@@ -11,7 +11,7 @@ all reported pending findings be corrected in the existing update PR.
 - Resolve workspace ancestors physically and route visual work through the shared workspace and active runtime.
 - Keep quality execution separate from package installation and report malformed reviewer data accurately.
 - Connect GCP cost analysis to the native coordinator, align security self-scan documentation/coverage, and retain OpenCode context through its supported native guide.
-- Correct Windows dependency guidance and remove verified orphan code and obsolete references without removing active capabilities.
+- Correct Windows dependency guidance and removal-record paths; remove verified orphan code and obsolete references without removing active capabilities.
 
 ## Capabilities
 
@@ -25,7 +25,7 @@ None.
 - `review-context-grounding`: inconsistent snapshot identity cannot reuse evidence.
 - `native-pr-review-orchestration`: portable owned regression probes.
 - `quality-runner-diagnostics`: repository identity, execution scope and malformed-result diagnostics.
-- `native-workflow-entry`: coherent cost-analysis/context entry points and OS-specific setup guidance.
+- `native-workflow-entry`: coherent cost-analysis/context entry points, OS-specific setup guidance and portable removal records.
 - `quality-diagnosis`: self-scan descriptions and role coverage match execution.
 
 ## Non-Goals

@@ -32,6 +32,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -391,6 +392,51 @@ func TestPythonCandidates_UseSupportedAliases(t *testing.T) {
 		if !seen[binary] {
 			t.Errorf("Unix Python candidate %q missing", binary)
 		}
+	}
+}
+
+func fakePythonCandidate(t *testing.T, version string, exitCode int) pythonCandidate {
+	t.Helper()
+	suffix := ""
+	if runtime.GOOS == "windows" {
+		suffix = ".cmd"
+	}
+	path := filepath.Join(t.TempDir(), "fake-python"+suffix)
+	var script string
+	if runtime.GOOS == "windows" {
+		script = fmt.Sprintf("@echo off\r\necho %s\r\nexit /b %d\r\n", version, exitCode)
+	} else {
+		script = fmt.Sprintf("#!/bin/sh\nprintf '%%s\\n' '%s'\nexit %d\n", version, exitCode)
+	}
+	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(path, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return pythonCandidate{binary: path, args: []string{"--version"}}
+}
+
+func TestHasPython3Version_UsesBoundedVersionProbe(t *testing.T) {
+	tests := []struct {
+		name     string
+		version  string
+		exitCode int
+		want     bool
+	}{
+		{name: "python3", version: "Python 3.13.1", want: true},
+		{name: "python2", version: "Python 2.7.18", want: false},
+		{name: "failed probe", version: "Python 3.13.1", exitCode: 1, want: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			candidate := fakePythonCandidate(t, test.version, test.exitCode)
+			if got := hasPython3Version(candidate); got != test.want {
+				t.Fatalf("hasPython3Version(%q) = %v, want %v", test.version, got, test.want)
+			}
+		})
 	}
 }
 

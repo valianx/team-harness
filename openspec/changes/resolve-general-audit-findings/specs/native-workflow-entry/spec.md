@@ -25,3 +25,12 @@ the active operating system and SHALL recognize supported executable alternative
 #### Scenario: Windows already exposes a supported Python executable
 - **WHEN** Python is available through a supported executable alternative
 - **THEN** the check reports availability instead of recommending a duplicate installation
+
+### Requirement: Installer removal records use portable paths
+Installer removal SHALL record owned file paths in the portable manifest format
+on every supported operating system so that a valid removal can close its ledger
+entry without a platform-separator error.
+
+#### Scenario: Windows removes an owned component
+- **WHEN** the removed component has Windows-native filesystem paths
+- **THEN** its removal record uses the portable configuration-root path and passes structural validation

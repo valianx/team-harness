@@ -233,7 +233,7 @@ Present output file path, view names, and how to render:
 - Preview: `npx likec4 start`
 - Export: `npx likec4 export png`
 
-In Obsidian mode, the agent appends one image embed per exported view to the resolved summary alongside the source. Link that summary from the workspace when an explicit deliverable target differs. Report the embed count and note that the diagrams display inline in Obsidian. If the CLI was absent (`render: skipped`), note that the source is available but images could not be rendered.
+In Obsidian mode, embed each exported view in the source's companion summary. Link that summary from the workspace when using another target. Report the embed count or explain `render: skipped`; the source remains available.
 
 ---
 
@@ -274,7 +274,7 @@ Present source file path, SVG output path, and re-render options:
 - Hand-drawn: `d2 --sketch diagram.d2 sketch.svg`
 - Better routing: `d2 --layout elk diagram.d2 elk.svg`
 
-In Obsidian mode, the agent appends the resolved SVG embed to the summary alongside the source. Link that summary from the workspace when an explicit deliverable target differs. Report the SVG path and note that the diagram displays inline in Obsidian. If the CLI was absent (`render: skipped`), note that the source is available but the image could not be rendered.
+In Obsidian mode, embed the resolved SVG in the source's companion summary. Link that summary from the workspace when using another target. Report the SVG path or explain `render: skipped`; the source remains available.
 
 ---
 

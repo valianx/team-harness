@@ -21,6 +21,8 @@ operator authorizes correcting them together in PR677.
   to workspace. Simplify gcp-costs routing to the current coordinator.
 - Remove orphan installer selectors/migration readers only after consumer
   searches; retain active projection rules, configuration builders and guides.
+- Normalize installer removal records to the existing manifest path format;
+  retain native filesystem paths for actual operations and existing ownership checks.
 
 ## Validation and risks
 

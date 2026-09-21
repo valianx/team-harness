@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Resolve physical workspace ancestors, keep quality checks bound to the selected repository and prepared dependencies, and report malformed reviewer data as an input error.
 - Route visual skills through the shared workspace and active skill resources; keep GCP cost analysis coordinated by the current agent and align the security self-scan with its actual checks.
 - Give Windows-specific dependency guidance and recognize supported Python launchers in OpenCode setup.
+- Serialize installer removal records with portable path separators on Windows.
 
 ### Removed
 - Disconnected OpenCode context hooks and orphan installer migration/selection code. OpenCode retains its registered native workflow guide, workspace discovery and language/voice preferences.
