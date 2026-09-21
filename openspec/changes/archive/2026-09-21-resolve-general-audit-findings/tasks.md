@@ -21,6 +21,6 @@
 
 ## 4. Validation and closure
 
-- [ ] 4.1 Run applicable Windows/Linux tests and generation checks; close all reported concrete findings with evidence.
-- [ ] 4.2 Execute installed TEA test-review/trace and Superpowers completion verification.
-- [ ] 4.3 Repair the Windows removal-record separator regression and verify applicable installer fixtures.
+- [x] 4.1 Run applicable Windows/Linux tests and generation checks; close all reported concrete findings with evidence.
+- [x] 4.2 Execute installed TEA test-review/trace and Superpowers completion verification.
+- [x] 4.3 Repair the Windows removal-record separator regression and verify applicable installer fixtures.
