@@ -7,10 +7,12 @@ Within task authorization and native permissions, it SHALL install missing
 providers or repair missing capabilities through their official installation
 owners for the active host. Healthy installations SHALL be reused without an
 automatic update or reinstall. Preparation SHALL NOT execute future workflow
-stages or configure inactive hosts unless requested.
+stages or configure inactive hosts unless requested. Selecting spec SHALL cover
+this declared preparation without separate approval per provider, while explicit
+read-only/no-install instructions and native permissions remain controlling.
 
 #### Scenario: New spec with missing tools
-- **WHEN** the operator starts spec with TEA or Superpowers absent and authorizes dependency preparation
+- **WHEN** the operator starts spec with TEA or Superpowers absent and has not restricted dependency preparation
 - **THEN** TH provisions the missing providers through BMAD or the official host plugin route before their stages are needed, verifies required entries and continues the same effort
 
 #### Scenario: Resume with working installations

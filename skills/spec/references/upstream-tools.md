@@ -14,6 +14,9 @@ The capability's algorithm, checklist, templates and scoring remain upstream.
 At spec entry or resumption, reuse [workspace](../../workspace/SKILL.md), read the
 [policy](../../pipeline/openspec-policy.json), and resolve OpenSpec, TEA and
 Superpowers for the active host, including each provider's required native skills.
+Selecting spec includes preparing these declared dependencies within that task;
+honor explicit read-only/no-install scope and native permission prompts. Ask only
+when an operation needs authority beyond that preparation, not for each provider.
 Reuse healthy installations without an automatic update or reinstall. If a
 declared capability is missing or incomplete, and the task is authorized with
 native permissions, use the existing [setup provider route](../../setup/SKILL.md)
