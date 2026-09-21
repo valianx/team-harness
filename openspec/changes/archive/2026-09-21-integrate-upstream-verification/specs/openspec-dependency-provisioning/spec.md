@@ -1,9 +1,9 @@
-# openspec-dependency-provisioning Specification
+## RENAMED Requirements
 
-## Purpose
-Defines a consistent and operator-controlled way for Team Harness to obtain and verify the OpenSpec CLI and upstream-generated runtime skills required by its Design phase.
+- FROM: `### Requirement: Provisioning requires explicit operator approval`
+- TO: `### Requirement: Provisioning reuses scoped authorization and native permissions`
 
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Design preflight verifies the complete OpenSpec toolchain
 Before OpenSpec-dependent work, TH SHALL check the supported Node.js/npm prerequisites, the resolved OpenSpec CLI version and the active runtime's upstream-generated capabilities. The required completion capabilities SHALL include implementation verification as well as planning/apply. Missing or stale generated instructions SHALL be refreshed by supported upstream initialization or update, preserving unrelated runtime targets and workflow selections.
@@ -28,39 +28,6 @@ Before OpenSpec-dependent work, TH SHALL check the supported Node.js/npm prerequ
 - **WHEN** the resolved executable is outside the declared compatibility policy
 - **THEN** TH reports the supported update path and preserves the current task for recovery instead of using an incompatible executable or requiring a new pipeline
 
-### Requirement: TH declares a reproducible compatibility policy
-TH releases that depend on OpenSpec SHALL identify a tested CLI version or bounded range, its prerequisites, supported runtime targets and required generated workflows. Updates SHALL follow upstream distribution and generation, recording the resolved version and checking capability compatibility. An upstream release SHALL NOT require copied templates to become usable; an untested version SHALL NOT be silently declared supported or resolved from an undeclared floating latest command.
-
-#### Scenario: A provisioning command is prepared
-- **WHEN** TH prepares to install or update OpenSpec
-- **THEN** it selects a declared supported version and the installation owner's upstream update route, then verifies the actual executable and required workflows
-
-#### Scenario: A newer upstream release is requested
-- **WHEN** an update request names a release outside the current tested policy
-- **THEN** TH identifies the compatibility checks needed before adoption and retains upstream ownership instead of freezing a private copy of its instructions
-
-#### Scenario: Verify is omitted by the selected profile
-- **WHEN** a supported CLI installation uses a profile without implementation verification
-- **THEN** TH adds that capability through the supported configuration and generation workflow, preserving other selected workflows and runtime integrations
-
-### Requirement: Provisioning outcome is verified and recoverable
-After provisioning, TH SHALL re-run the complete preflight, verify the CLI plus expected generated-skill ownership and metadata, and record non-sensitive evidence in the active workspace. A failed or partial installation or generation MUST leave the pipeline recoverable without requiring a new pipeline invocation.
-
-#### Scenario: Provisioning succeeds
-- **WHEN** installation and OpenSpec integration generation complete successfully
-- **THEN** TH records the verified versions and generated integration status and resumes the same workspace at the pending Design action
-
-#### Scenario: Provisioning fails
-- **WHEN** installation, version verification, or integration generation fails
-- **THEN** TH records the bounded failure and retry guidance, remains stopped before OpenSpec Design work, and does not claim the dependency is ready
-
-### Requirement: Preflight evidence excludes sensitive data
-Dependency checks and provisioning evidence SHALL contain only command identity, resolved non-secret paths, versions, outcome, and timestamps. TH MUST NOT persist registry credentials, environment secrets, or credential-store contents.
-
-#### Scenario: Provisioning needs package-manager authentication
-- **WHEN** the package manager uses credentials from the environment or credential store
-- **THEN** TH may execute the approved installation but records no credential values in repository or workspace artifacts
-
 ### Requirement: Provisioning reuses scoped authorization and native permissions
 TH SHALL install or update the OpenSpec CLI and generated integrations only within operator-authorized scope and native runtime permissions. An explicit request covering that operation SHALL be sufficient task authority; TH SHALL NOT require a fresh response to a fixed preflight prompt when authorization already exists. Unrelated dependencies and configuration SHALL remain outside that operation.
 
@@ -79,3 +46,18 @@ TH SHALL install or update the OpenSpec CLI and generated integrations only with
 #### Scenario: Operator declines provisioning
 - **WHEN** the operator declines the dependency operation
 - **THEN** TH makes no dependency changes and reports which OpenSpec work remains pending without discarding the shared workspace or completed independent work
+
+### Requirement: TH declares a reproducible compatibility policy
+TH releases that depend on OpenSpec SHALL identify a tested CLI version or bounded range, its prerequisites, supported runtime targets and required generated workflows. Updates SHALL follow upstream distribution and generation, recording the resolved version and checking capability compatibility. An upstream release SHALL NOT require copied templates to become usable; an untested version SHALL NOT be silently declared supported or resolved from an undeclared floating latest command.
+
+#### Scenario: A provisioning command is prepared
+- **WHEN** TH prepares to install or update OpenSpec
+- **THEN** it selects a declared supported version and the installation owner's upstream update route, then verifies the actual executable and required workflows
+
+#### Scenario: A newer upstream release is requested
+- **WHEN** an update request names a release outside the current tested policy
+- **THEN** TH identifies the compatibility checks needed before adoption and retains upstream ownership instead of freezing a private copy of its instructions
+
+#### Scenario: Verify is omitted by the selected profile
+- **WHEN** a supported CLI installation uses a profile without implementation verification
+- **THEN** TH adds that capability through the supported configuration and generation workflow, preserving other selected workflows and runtime integrations

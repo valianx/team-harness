@@ -5,6 +5,19 @@ description: Update Team Harness for opencode through the dedicated checksum-ver
 
 # Update Team Harness in opencode
 
+Route the explicit targets `openspec`, `superpowers`, and `tea` (also `bmad tea`)
+here before the TH update procedure. For a provider-only request, complete that
+route and return. Continue the TH-specific procedure below only when TH update
+was also requested; provider names are not flags for the TH updater.
+
+Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
+when the operator explicitly requests an OpenSpec, Superpowers, or TEA update. This flow
+updates Team Harness only; it never updates those providers as a side effect. For an
+explicit request, use the provider's official package, plugin, or BMAD module lifecycle
+under native permissions. Preserve provider-owned files and configuration, and report
+installed capability separately from active session; propose a reload/restart only for a
+documented host limitation or observed stale activation.
+
 Execute the same bounded updater used by `/th-update`:
 
 ```bash

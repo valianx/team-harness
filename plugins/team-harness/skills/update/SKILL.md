@@ -11,6 +11,21 @@ helper. Do not activate a pipeline, create workspace state, or spawn agents.
 Accept `--force` only to reinstall an equal-version development snapshot; it
 never authorizes a downgrade.
 
+## Upstream provider updates
+
+Route the explicit targets `openspec`, `superpowers`, and `tea` (also `bmad tea`)
+here before the TH update procedure. For a provider-only request, complete that
+route and return. Continue the TH-specific procedure below only when TH update
+was also requested; provider names are not flags for the TH updater.
+
+Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
+when the operator explicitly requests an OpenSpec, Superpowers, or TEA update. This
+flow updates Team Harness only and never updates those providers by side effect. For an
+explicit request, use the provider's official package, plugin, or BMAD module lifecycle
+under native permissions; preserve its files and configuration. Report installed
+capability separately from active session and propose reload/restart only for a documented
+host limitation or observed stale activation.
+
 ## Execution and sandbox contract
 
 Run each native marketplace or plugin mutation as its own tool call. Keep reads

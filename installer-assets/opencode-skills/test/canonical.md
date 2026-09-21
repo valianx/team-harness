@@ -5,6 +5,14 @@ Use [workspace](../workspace/SKILL.md) to select the existing effort in the
 configured local/Obsidian location. Pass its absolute root as `workspaces path:`
 in dispatch; output paths below refer to that root.
 
+Read [upstream tools](../spec/references/upstream-tools.md) when selecting TEA
+test-design, test-review or trace. In a spec effort, execute each as its stage is
+reached; elsewhere select the capability needed by the request. An existing
+tester can use the installed upstream skill as its method and share the result,
+without another equivalent TH review. Keep working reports in that workspace
+and maintained test code in the project. Neither a report nor a score proves
+that the project's executable tests ran.
+
 ---
 name: test
 

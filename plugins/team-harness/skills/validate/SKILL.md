@@ -18,6 +18,12 @@ requested. Preserve findings and missing coverage. Main judges recommendations,
 verifies corrections and reuses valid evidence when unaffected.
 This entry does not activate a pipeline or impose a security classifier floor.
 
+Use [upstream tools](../spec/references/upstream-tools.md) for selected testing
+analysis and completion evidence. In a spec effort, finish its pending TEA and
+Superpowers stages; reuse applicable results. For a relevant completed OpenSpec
+change, execute upstream implementation verify before archive under the shared
+[lifecycle](../spec/references/lifecycle.md). Reports stay in the selected workspace.
+
 Use Codex's native agent and task tools. Never require a Claude executable or
 configuration. In an active pipeline, read the matching phase reference under
 `../pipeline/references/` only as needed.

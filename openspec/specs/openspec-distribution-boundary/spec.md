@@ -28,7 +28,7 @@ Every TH distribution path SHALL select artifacts from an explicit set of TH-own
 - **THEN** package assembly still excludes those files unless they are explicitly declared as an external dependency rather than a TH-owned skill
 
 ### Requirement: Distribution boundaries are verified across runtimes
-TH SHALL have automated checks that enumerate shipped artifacts for every supported packaging path and fail when an undeclared project-local runtime file crosses the ownership boundary.
+TH SHALL have automated checks that enumerate shipped artifacts for every supported packaging path and fail when an undeclared project-local runtime file crosses the ownership boundary. Fixtures SHALL cover the native command and skill layouts produced by supported OpenSpec versions, including flat OpenCode commands.
 
 #### Scenario: Packaging tests inspect a clean fixture
 - **WHEN** the fixture contains OpenSpec-generated adapters for Claude, Codex, and OpenCode
@@ -37,6 +37,10 @@ TH SHALL have automated checks that enumerate shipped artifacts for every suppor
 #### Scenario: A packaging path accidentally sweeps the repository root
 - **WHEN** a distribution change would include an OpenSpec-generated adapter outside the declared TH roots
 - **THEN** the packaging test fails before release and identifies the unexpected artifact
+
+#### Scenario: OpenCode uses flat command files
+- **WHEN** the fixture includes upstream-generated `.opencode/commands/opsx-*.md` files as well as any supported nested layout
+- **THEN** TH packaging excludes both layouts without deleting or rewriting the repository's upstream integrations
 
 ### Requirement: Consumer repositories may retain OpenSpec integrations
 TH SHALL NOT require ordinary consumer repositories to delete or ignore OpenSpec-generated runtime adapters merely because Team Harness is also installed. Packaging isolation MUST NOT remove or mutate consumer-owned OpenSpec files.

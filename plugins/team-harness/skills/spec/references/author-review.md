@@ -79,10 +79,12 @@ covered by written intent, execute its scenario and relevant deterministic suite
 Before amending or reopening a spec, tell the operator which finding requires it, why a code-only
 fix is insufficient, and what intent, criteria or plan steps will change. Record that explanation
 and the revised status in the common plan; never silently reopen a spec.
-If the repair changes intended behavior, acceptance or authority, amend or reopen the appropriate
-repository's spec, validate it and obtain only any missing scope approval. Reuse a live instruction
-already authorizing that revision. Reopening an archived change uses the upstream OpenSpec flow
-and preserves history. Neither a reviewer finding nor the workspace report grants scope authority.
+If the repair changes intended behavior, acceptance or authority, author the appropriate
+bounded amendment through the upstream change workflow, validate it and obtain only
+missing scope approval. Reuse live authorization already covering that revision.
+For an archived code correction, follow the shared lifecycle's supported verification
+context and preserve history; no upstream reopen command is assumed. Neither a
+reviewer finding nor the workspace report grants scope authority.
 
 Repair dependencies first and then consumers, updating canonical tasks and the common plan.
 Preserve original lens verdicts and the helper summary as evidence: deterministic closure does
