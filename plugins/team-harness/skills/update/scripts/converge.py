@@ -41,7 +41,7 @@ NON_FATAL_ALIAS_WARNING = (
 )
 HELPER_DIGESTS = {
     "skills/update/scripts/bridge_snapshot.py": "52da3ca0233c3d9f145a46a9f0b6648aa65f01bd867cd4d7b0870053b8f2f99d",
-    "skills/setup/scripts/manage_config.py": "49175207918335c7323deeb0cb38a6253c78b6595cd724c6b15e1c5ae46f4d31",
+    "skills/setup/scripts/manage_config.py": "936a00fbe9977760b10014c980dc0a7db72d5164318fe433d57c5f50ea81b180",
     "skills/setup/scripts/manage_agents.py": "defb1ee1531bba5dee8a92756684f48f81b6c75a0a6938066779c5361b00b976",
 }
 
