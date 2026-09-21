@@ -10,7 +10,7 @@ Analyze the input: $ARGUMENTS
 ## Upstream provider route
 
 Route the explicit targets `openspec`, `superpowers`, `tea`, `semgrep`,
-`dependency-cruiser`, `knip`, `sentry`, `find-bugs`, `quality` and `quality-tools`
+`dependency-cruiser`, `knip`, `sentry`, `quality` and `quality-tools`
 (also `bmad tea`)
 here before inspecting or reconciling TH configuration. For a provider-only
 request, complete that route and return without creating TH settings. Continue
@@ -19,6 +19,12 @@ the TH-specific procedure only when TH setup was also requested.
 Match provider names as complete words in the requested target, never as
 substrings: `team` and `team-harness` do not select `tea`. TH-only options apply
 only to a separately requested TH operation.
+
+Before routing a bare `find-bugs` target, resolve the owner from the live task:
+TH project/module diagnosis or Sentry's upstream captured-change method. If it
+remains ambiguous, ask which owner is intended before installing or updating.
+An explicit `sentry find-bugs` or `getsentry/skills` selects the provider route;
+TH's OpenCode entry is `th-find-bugs`.
 
 Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
 when the operator names OpenSpec, Superpowers, TEA, or a quality capability. A full Team
@@ -79,7 +85,7 @@ fallback rather than guessing.
 
 | Target concern | Routes to | EN cues | ES cues |
 |----------------|-----------|---------|---------|
-| **upstream / quality provider** | § Upstream provider route; return before TH targeted setup | `openspec`, `superpowers`, `tea`, `bmad tea`, `quality`, `quality-tools`, `semgrep`, `dependency-cruiser`, `depcruise`, `knip`, `sentry find-bugs`, `find-bugs` | same provider names, `calidad`, `herramientas de calidad`, `buscar bugs` |
+| **upstream / quality provider** | § Upstream provider route; resolve owner before routing ambiguous diagnosis names | `openspec`, `superpowers`, `tea`, `bmad tea`, `quality`, `quality-tools`, `semgrep`, `dependency-cruiser`, `depcruise`, `knip`, `sentry find-bugs`, `getsentry/skills` | same provider names, `calidad`, `herramientas de calidad` |
 | **context7** | Step 2 — context7 block | `context7`, `context 7`, `docs`, `library docs`, `api key`, `c7` | `context7`, `clave api`, `documentación`, `docs de librerías` |
 | **workspace** | Step 3 — workspace output mode | `workspace`, `logs`, `logs mode`, `obsidian vault`, `vault`, `output location` | `espacio de trabajo`, `logs`, `modo de logs`, `bóveda`, `obsidian`, `ubicación de salida` |
 | **language** | Step 3.5 — default language | `language`, `lang`, `default language`, `locale` | `idioma`, `lenguaje`, `idioma por defecto` |

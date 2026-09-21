@@ -231,7 +231,7 @@
       "limits": [
         "the upstream method must receive captured evidence and must not resolve a live default branch",
         "provider recommendations do not grant operational authority or replace existing verification",
-        "the find-bugs basename may collide with TH's project/module skill; report and resolve the scoped native entry without overwriting either provider"
+        "TH project/module diagnosis uses th-find-bugs in OpenCode and namespaced plugin entries in Claude Code/Codex; resolve owner before setup/update and preserve Sentry's find-bugs entry"
       ]
     }
   },

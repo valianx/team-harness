@@ -21,7 +21,9 @@ Quality capabilities are selected per objective and stack, not installed univers
   configuration are available; they are not ordinary `review-pr` dependencies.
 - Sentry's upstream `find-bugs` skill is an optional captured-change method for the existing
   general reviewer. Its source/ref is resolved by owner, not by the basename alone, because TH
-  also has a project/module diagnostic skill with the same name.
+  also has a project/module diagnostic skill. TH uses `/th:find-bugs` in Claude Code,
+  `$team-harness:find-bugs` in Codex and `th-find-bugs` in OpenCode; Sentry keeps
+  `find-bugs`. Setup/update resolves the owner before changing an installation.
 - arc42 and ATAM are maintained references for architecture questions, not installable tools.
 
 The policy's `quality_providers` declarations record observed compatibility baselines and official

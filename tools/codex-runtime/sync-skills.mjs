@@ -158,11 +158,17 @@ function parseCanonicalSkill(bytes, expectedName) {
   };
 }
 
+function projectedSkillName(name, runtime) {
+  // OpenCode has a flat skill namespace; leave the upstream Sentry name intact.
+  return runtime === "opencode" && name === "find-bugs" ? "th-find-bugs" : name;
+}
+
 function renderAdapter(name, canonical, runtime) {
   const codex = runtime === "codex";
+  const nativeName = projectedSkillName(name, runtime);
   const mapping = (codex ? codexSpecialMappings : opencodeSpecialMappings).get(name)
     ?? `Execute the capability directly with ${codex ? "Codex" : "opencode"}-native tools and the current permission policy.`;
-  const invocation = codex ? `$team-harness:${name}` : name;
+  const invocation = codex ? `$team-harness:${name}` : nativeName;
   const example = codex
     ? `Examples written as \`/th:${name}\` name the same capability; do not try to execute them as shell commands.`
     : `Examples written as \`/th:${name}\` name the same capability; interpret them as examples rather than requiring Claude Code.`;
@@ -170,8 +176,8 @@ function renderAdapter(name, canonical, runtime) {
     ? "${CODEX_HOME:-$HOME/.codex}/.team-harness.json"
     : "${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}/.team-harness.json";
   const frontmatter = canonical.explicitOnly && !codex
-    ? `---\nname: ${name}\ndescription: ${yamlString(canonical.description)}\nmetadata:\n  opencode/autoinvoke: "false"\n---`
-    : `---\nname: ${name}\ndescription: ${yamlString(canonical.description)}\n---`;
+    ? `---\nname: ${nativeName}\ndescription: ${yamlString(canonical.description)}\nmetadata:\n  opencode/autoinvoke: "false"\n---`
+    : `---\nname: ${nativeName}\ndescription: ${yamlString(canonical.description)}\n---`;
   return `---
 ${frontmatter.slice(4)}
 
@@ -199,7 +205,7 @@ workflow:
 4. Resolve persistent settings from
    \`${configPath}\`. Never depend on a Claude
    Code installation, \`~/.claude\`, the \`claude\` binary, or Claude plugin
-   cache paths. Use packaged files relative to this skill directory.
+   cache paths. Use packaged files relative to this skill directory.${codex ? "" : " Canonical agent reference documents (`agents/ref-*.md` and documents in agent subdirectories, except README.md) resolve under `th-references/agents/...` in that config root, including links with relative prefixes. Invocable agent definitions remain under `agents/`."}
 5. Preserve every canonical safety boundary, read-only default, confirmation
    gate, secret rule, and outward-write approval. Native ${codex ? "Codex" : "opencode"} sandbox and
    permission policy remain authoritative.
@@ -307,7 +313,7 @@ async function syncProjection({ check, rootDir, names, runtime, targetRoot, over
   let stale = false;
   for (const name of names) {
     if (overrides.has(name)) continue;
-    const targetDir = join(targetRoot, name);
+    const targetDir = join(targetRoot, projectedSkillName(name, runtime));
     const expected = await expectedProjection(rootDir, name, runtime);
     if (await projectionMatches(targetDir, expected)) continue;
     stale = true;
@@ -332,8 +338,9 @@ async function syncProjection({ check, rootDir, names, runtime, targetRoot, over
   }
 
   const targetEntries = await readdir(targetRoot, { withFileTypes: true });
+  const projectedNames = new Set(names.map(name => projectedSkillName(name, runtime)));
   for (const entry of targetEntries) {
-    if (!entry.isDirectory() || names.includes(entry.name)) continue;
+    if (!entry.isDirectory() || projectedNames.has(entry.name)) continue;
     const targetDir = join(targetRoot, entry.name);
     if (!(await isGenerated(targetDir))) continue;
     stale = true;

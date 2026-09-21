@@ -18,3 +18,7 @@ At entry or resumption of audit, find-bugs or review-pr, TH SHALL resolve the an
 #### Scenario: Installation or activation cannot complete
 - **WHEN** a native permission, prerequisite or active-session limitation prevents a selected capability from being usable
 - **THEN** only dependent work remains pending with the missing prerequisite stated and no fabricated analysis, restart requirement or provider substitute
+
+#### Scenario: TH and Sentry skills coexist
+- **WHEN** preparation encounters the shared find-bugs label
+- **THEN** it resolves the requested owner before changing an installation, uses `th-find-bugs` for TH in OpenCode while preserving Sentry's `find-bugs`, and asks only when the live task leaves the owner ambiguous

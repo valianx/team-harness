@@ -18,7 +18,7 @@ settings, and whether a new opencode session is required for discovery.
 ## Upstream provider route
 
 Route the explicit targets `openspec`, `superpowers`, `tea`, `semgrep`,
-`dependency-cruiser`, `knip`, `sentry`, `find-bugs`, `quality` and `quality-tools`
+`dependency-cruiser`, `knip`, `sentry`, `quality` and `quality-tools`
 (also `bmad tea`)
 here before inspecting or reconciling TH configuration. For a provider-only
 request, complete that route and return without creating TH settings. Continue
@@ -27,6 +27,12 @@ the TH-specific procedure only when TH setup was also requested.
 Match provider names as complete words in the requested target, never as
 substrings: `team` and `team-harness` do not select `tea`. TH-only options apply
 only to a separately requested TH operation.
+
+Before routing a bare `find-bugs` target, resolve the owner from the live task:
+TH project/module diagnosis or Sentry's upstream captured-change method. If it
+remains ambiguous, ask which owner is intended before installing or updating.
+An explicit `sentry find-bugs` or `getsentry/skills` selects the provider route;
+TH's OpenCode entry is `th-find-bugs`.
 
 Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
 when the operator names OpenSpec, Superpowers, TEA, or a quality capability. Full setup may
@@ -50,9 +56,9 @@ the [shared upstream-tool reference](../spec/references/upstream-tools.md), then
 3. Verify the resolved version, prerequisites, invocation and workspace output before handing the
    capability to audit, find-bugs or review-pr. Do not install inactive-host capabilities or
    change project manifests unless that product change is separately authorized.
-4. Report any pending native activation and its recovery. The basename `find-bugs` may refer to
-   TH's project/module skill or Sentry's captured-branch method; resolve by owner/source and
-   objective, never by basename alone.
+4. Report any pending native activation and its recovery. TH's project/module skill uses
+   `th-find-bugs`; Sentry's captured-branch method keeps `find-bugs`. Verify the destination
+   belongs to the selected provider before installation; do not overwrite another owner's files.
 
 ## GitHub identity routes
 

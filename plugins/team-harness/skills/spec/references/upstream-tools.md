@@ -47,7 +47,11 @@ authority.
 
 ### Official routes and compatibility checks
 
-Use a project-managed executable first when the selected project already owns the tool. A tool-only
+For diagnostic audit/find-bugs, use a project-managed executable first when the selected project
+already owns the tool. For ordinary `review-pr`, resolve an official host/tool-cache executable
+outside the reviewed project and snapshot; never execute a project-provided binary, dependency
+or executable configuration. Follow [captured PR evidence](../../review-pr/references/external-evidence.md)
+for that route. A tool-only
 installation may use the official package manager into the approved task/tool cache, outside the
 repository and workspace evidence. Adding a development dependency or analysis configuration to a
 project is a separate product change and requires that scope; do not modify manifests merely to
@@ -74,10 +78,12 @@ before use.
   --global --yes`; never run a bare all-skills update for this selection. Verify the source/ref and
   native discovery. Symlink is the CLI's preferred install mode where supported; use its documented
   copy fallback only when the native host cannot use symlinks. The provider remains outside TH
-  packaging. The basename `find-bugs` can also name TH's project/module diagnostic skill; resolve
-  by owner/source and objective (`getsentry/skills` for captured branch review, TH's canonical
-  skill for a project without a PR). If both are discoverable on a host, verify the scoped native
-  entry before invocation and report a collision rather than overwriting either installation.
+  packaging. Resolve by owner/source and objective before installation or update: `getsentry/skills`
+  is the captured-branch method; TH's project/module diagnosis uses `/th:find-bugs` in Claude Code,
+  `$team-harness:find-bugs` in Codex and `th-find-bugs` in OpenCode. Sentry retains the native
+  `find-bugs` name. If a bare setup/update target remains ambiguous, ask which owner the operator
+  intends before changing either installation. Verify the destination and active native entry;
+  report any remaining collision without overwriting another owner's files.
 
 Setup/update should report `installed`, `discoverable` and `usable` separately. A provider update
 does not imply that an interactive session needs a restart: report active versus pending state and

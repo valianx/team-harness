@@ -33,9 +33,15 @@ for (const relative of [
   "plugins/team-harness/skills/pipeline/SKILL.md",
   "skills/find-bugs/SKILL.md",
   "plugins/team-harness/skills/find-bugs/SKILL.md",
-  "installer-assets/opencode-skills/find-bugs/SKILL.md",
+  "installer-assets/opencode-skills/th-find-bugs/SKILL.md",
   "plugins/team-harness/hooks/run-ts-hook.sh",
 ]) assert.ok((await readFile(path.join(root, relative))).length > 0, `missing curated Claude asset: ${relative}`);
+
+const opencodeBugSkill = await readFile(path.join(root, "installer-assets/opencode-skills/th-find-bugs/SKILL.md"), "utf8");
+assert.match(opencodeBugSkill, /^---\r?\nname: th-find-bugs\r?\n/,
+  "OpenCode skill name must match its distinct native directory");
+await assert.rejects(readFile(path.join(root, "installer-assets/opencode-skills/find-bugs/SKILL.md")), { code: "ENOENT" },
+  "TH must not ship into the upstream OpenCode find-bugs namespace");
 
 const forbidden = [
   /^skills\/openspec-[^/]+\//,

@@ -12,7 +12,7 @@ Analyze the input: $ARGUMENTS
 ## Upstream provider updates
 
 Route the explicit targets `openspec`, `superpowers`, `tea`, `semgrep`,
-`dependency-cruiser`, `knip`, `sentry`, `find-bugs`, `quality` and `quality-tools`
+`dependency-cruiser`, `knip`, `sentry`, `quality` and `quality-tools`
 (also `bmad tea`)
 here before the TH update procedure. For a provider-only request, complete that
 route and return. Continue the TH-specific procedure below only when TH update
@@ -21,6 +21,12 @@ was also requested; provider names are not flags for the TH updater.
 Match provider names as complete words in the requested target, never as
 substrings: `team` and `team-harness` do not select `tea`. TH-only options apply
 only to a separately requested TH operation.
+
+Before routing a bare `find-bugs` target, resolve the owner from the live task:
+TH project/module diagnosis or Sentry's upstream captured-change method. If it
+remains ambiguous, ask which owner is intended before installing or updating.
+An explicit `sentry find-bugs` or `getsentry/skills` selects the provider route;
+TH's OpenCode entry is `th-find-bugs`.
 
 Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
 when the operator explicitly requests an OpenSpec, Superpowers, TEA, or quality-provider

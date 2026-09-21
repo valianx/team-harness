@@ -12,7 +12,8 @@ text. Keep mode names and invocations exact.
 - In Claude Code, show each applicable mode as `/th:<name>`.
 - In opencode, show each applicable native skill by its exact skill ID. Show
   `/th-modes` for this catalog, `/th-update` for the updater, and `/th-reload`
-  for session activation.
+  for session activation. TH's `find-bugs` workflow uses native ID `th-find-bugs`;
+  unprefixed `find-bugs` belongs to the optional upstream Sentry method.
 - If the runtime is unclear, retain the Availability column instead of
   guessing an invocation.
 

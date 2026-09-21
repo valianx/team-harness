@@ -12,7 +12,7 @@
 
 ## 3. Evidence and delivery
 
-- [ ] 3.1 Verify generation, reference resolution, package boundaries and relevant snapshot/executable invariants with existing suites, adding behavioral fixtures only where changed executable behavior needs them.
-- [ ] 3.2 Execute a bounded pilot on fixed historical cases and small representative analyzer fixtures, then run audit and find-bugs on completed TH and check integration of components added in recent commits; retain cases, detection, misses, false positives, costs and limits in the workspace outside the PR.
-- [ ] 3.3 Execute OpenSpec implementation verification, applicable Superpowers verification and TEA test-review/trace; obtain independent advice, disposition findings and verify justified corrections against the final candidate.
-- [ ] 3.4 Synchronize living specifications and archive the completed change with implementation, inspect PR contents for transient work files and prepare the single implementation PR through create-pr.
+- [x] 3.1 Verify generation, reference resolution, package boundaries and relevant snapshot/executable invariants with existing suites, adding behavioral fixtures only where changed executable behavior needs them.
+- [x] 3.2 Execute a bounded pilot on fixed historical cases and small representative analyzer fixtures, then run audit and find-bugs on completed TH and check integration of components added in recent commits; retain cases, detection, misses, false positives, costs and limits in the workspace outside the PR.
+- [x] 3.3 Execute OpenSpec implementation verification, applicable Superpowers verification and TEA test-review/trace; obtain independent advice, disposition findings and verify justified corrections against the final candidate.
+- [x] 3.4 Synchronize living specifications and archive the completed change with implementation, inspect PR contents for transient work files and prepare the single implementation PR through create-pr.

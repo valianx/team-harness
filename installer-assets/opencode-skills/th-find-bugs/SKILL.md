@@ -1,5 +1,5 @@
 ---
-name: find-bugs
+name: th-find-bugs
 description: "Investigate concrete functional defects in a project or module with Semgrep evidence and contextual verification, without requiring a pull-request diff."
 ---
 
@@ -16,7 +16,7 @@ supporting resources it routes to.
 These rules override contradictory runtime-specific wording in the canonical
 workflow:
 
-1. Treat the live operator request for `find-bugs` as the canonical
+1. Treat the live operator request for `th-find-bugs` as the canonical
    `$ARGUMENTS` value. Examples written as `/th:find-bugs` name the same capability; interpret them as examples rather than requiring Claude Code.
 2. Keep the current primary thread as coordinator. A canonical instruction to
    invoke `th:orchestrator` means execute that routing decision in the current
@@ -27,7 +27,7 @@ workflow:
 4. Resolve persistent settings from
    `${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}/.team-harness.json`. Never depend on a Claude
    Code installation, `~/.claude`, the `claude` binary, or Claude plugin
-   cache paths. Use packaged files relative to this skill directory.
+   cache paths. Use packaged files relative to this skill directory. Canonical agent reference documents (`agents/ref-*.md` and documents in agent subdirectories, except README.md) resolve under `th-references/agents/...` in that config root, including links with relative prefixes. Invocable agent definitions remain under `agents/`.
 5. Preserve every canonical safety boundary, read-only default, confirmation
    gate, secret rule, and outward-write approval. Native opencode sandbox and
    permission policy remain authoritative.
