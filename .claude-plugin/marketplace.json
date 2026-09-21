@@ -11,7 +11,7 @@
       "displayName": "Team Harness",
       "source": {"source": "github", "repo": "valianx/team-harness"},
       "description": "Shared skills and development workflows for the native agents of Claude Code, Codex, and OpenCode",
-      "version": "3.36.0",
+      "version": "3.37.0",
       "category": "development",
       "tags": ["orchestration", "agents", "workflow", "diagrams", "gcp"],
       "author": {

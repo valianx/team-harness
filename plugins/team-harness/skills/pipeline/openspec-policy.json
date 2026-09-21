@@ -11,6 +11,37 @@
     "version": "1.9.0",
     "required_workflows": ["propose", "apply", "verify", "archive"]
   },
+  "providers": {
+    "tea": {
+      "id": "bmad-method-test-architecture-enterprise",
+      "owner": "bmad-code-org/bmad-method-test-architecture-enterprise",
+      "owner_url": "https://github.com/bmad-code-org/bmad-method-test-architecture-enterprise",
+      "baseline": {
+        "tea": "1.27.2",
+        "bmad": "6.12.0"
+      },
+      "prerequisites": {
+        "node": ">=22.20.0",
+        "uv": "available on PATH for BMAD scripts"
+      },
+      "required_native_skills": {
+        "claude": ["bmad-testarch-test-design", "bmad-testarch-test-review", "bmad-testarch-trace"],
+        "codex": ["bmad-testarch-test-design", "bmad-testarch-test-review", "bmad-testarch-trace"]
+      },
+      "required_command_pointers": {
+        "opencode": ["bmad-testarch-test-design", "bmad-testarch-test-review", "bmad-testarch-trace"]
+      },
+      "runtime_targets": ["claude", "codex", "opencode"]
+    },
+    "superpowers": {
+      "id": "superpowers",
+      "owner": "obra/superpowers",
+      "owner_url": "https://github.com/obra/superpowers",
+      "baseline": "6.4.1",
+      "required_native_skills": ["verification-before-completion"],
+      "runtime_targets": ["claude", "codex", "opencode"]
+    }
+  },
   "runtime_targets": [
     "claude",
     "codex",

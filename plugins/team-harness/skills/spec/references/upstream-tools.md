@@ -9,6 +9,41 @@ TEA supply their own maintained methods. TH selects an installed capability,
 passes the relevant context, follows its current instructions and uses its result.
 The capability's algorithm, checklist, templates and scoring remain upstream.
 
+## Spec dependency preparation
+
+At spec entry or resumption, reuse [workspace](../../workspace/SKILL.md), read the
+[policy](../../pipeline/openspec-policy.json), and resolve OpenSpec, TEA and
+Superpowers for the active host, including each provider's declared native skills
+or command pointers for that host. TEA requires native skills for Claude/Codex and
+command pointers for OpenCode; verify the selected entry kind without requiring
+another host's integration.
+Selecting spec includes preparing these declared dependencies within that task;
+honor explicit read-only/no-install scope and native permission prompts. Ask only
+when an operation needs authority beyond that preparation, not for each provider.
+Reuse healthy installations without an automatic update or reinstall. If a
+declared capability is missing or incomplete, and the task is authorized with
+native permissions, use the existing [setup provider route](../../setup/SKILL.md)
+and the provider's official owner to install or repair it. Preparation only makes
+dependencies available; it does not run future stages or configure inactive hosts.
+
+Pass the selected local or Obsidian workspace through supported provider settings,
+and report installed, discoverable and active states separately. Check a resolved
+version against the policy baseline and its prerequisites; validate compatibility
+for another version instead of forcing a downgrade or pinning an unavailable
+marketplace release. A failed action or pending activation gets a concrete recovery,
+not a generic restart. Updating TH does not reinstall these providers.
+
+TEA preparation uses BMAD's official module installer (`npx bmad-method install`),
+which generates project-local native entries and uses `uv` for shared scripts.
+Its optional CLI runners invoke a supported coding agent. Check each configured
+report destination, including derived paths, against the selected workspace.
+With BMAD 6.12 on Windows, use project-relative settings resolving to that same
+absolute workspace. Inspect remembered configuration before install/update:
+directory creation reads it before `--set` overrides and mishandles absolute
+Windows paths. Correct only affected local path settings, then verify outputs.
+Superpowers is installed as the official plugin for the active
+host, then the required verification skill is selected from that installation.
+
 ## When each capability is used
 
 | Tool / capability | When TH selects it | How it is applied and what it contributes |
@@ -110,7 +145,7 @@ inputs or restricts them to the project root, use native execution of the instal
 skill with those paths; do not mirror an Obsidian workspace into the repository.
 
 Pass output locations through supported provider configuration or flags. Resolve
-the existing workspace once and give every provider the same absolute destination:
+the existing workspace once and give every provider the same resolved destination:
 the configured local workspace in local mode, or the existing effort folder in
 the configured vault in Obsidian mode. Obsidian mode creates no local mirror.
 

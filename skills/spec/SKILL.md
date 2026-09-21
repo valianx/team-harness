@@ -42,10 +42,12 @@ evidence in the selected workspace without adding pipeline control records.
 
 ## Flow
 
-At entry, resumption, and before changing requirements, apply
-[the shared OpenSpec lifecycle](references/lifecycle.md) to the relevant active changes.
-Read [upstream tools](references/upstream-tools.md) for provider discovery and
-shared outputs. Spec executes TEA test-design, test-review and trace, Superpowers
+At entry or resumption, first verify and prepare the declared OpenSpec, TEA and
+Superpowers capabilities for the active host using [the shared dependency preparation
+guidance](references/upstream-tools.md#spec-dependency-preparation). At entry,
+resumption, and before changing requirements, apply the [shared OpenSpec
+lifecycle](references/lifecycle.md) to the relevant active changes.
+Spec executes TEA test-design, test-review and trace, Superpowers
 verification-before-completion, and OpenSpec implementation verification at the
 stages below. Use their current installed instructions, not TH copies of their
 methods. A missing provider leaves its stage pending while independent work continues.
@@ -86,7 +88,7 @@ new effect.
    when it adds useful proof without a new runner or mandatory review.
    After implementation and relevant tests, execute installed TEA test-review
    and trace, then Superpowers verification-before-completion with their shared
-   evidence. Apply the upstream-tool reference for outputs and reuse, and resolve
+   evidence. Apply the shared upstream-tool reference for outputs and reuse, and resolve
    actual completion defects. Execute upstream OpenSpec implementation verify
    before archive; structural validate and optional TH review do not replace it.
    Once these stages are complete, use [create-pr](../create-pr/SKILL.md)'s
