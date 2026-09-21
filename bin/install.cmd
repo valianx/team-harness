@@ -13,8 +13,8 @@ REM --runtime codex apply.
 set "FORWARD_ARGS=%*"
 
 :inspect_args
-if "%~1"=="" goto :native_notice
 set "CURRENT_ARG=%~1"
+if not defined CURRENT_ARG set "CURRENT_ARG=__no_argument__"
 if /i "%~1"=="plan" goto :download
 if /i "%~1"=="apply" goto :download
 if /i "%~1"=="update" goto :download
