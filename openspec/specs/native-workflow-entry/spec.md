@@ -6,7 +6,7 @@ Let the native general agent discover and use Team Harness workflows while retai
 ## Requirements
 
 ### Requirement: Workflow discovery without role replacement
-Team Harness startup context and managed guidance SHALL describe available workflows without replacing the native general agent or activating a pipeline implicitly. Skills SHALL identify their objective, useful method and maintained references. The current general agent SHALL coordinate selected audit, research and GCP workflows and delegate bounded work when useful rather than invoking a nested orchestrator merely to route the request. Spec, pipeline, review-pr and create-pr SHALL remain discoverable. Supported installations SHALL make this guidance available through native instruction discovery without requiring a TH default-agent selection.
+Team Harness startup context and managed guidance SHALL describe available workflows without replacing the native general agent or activating a pipeline implicitly. Skills SHALL identify their objective, useful method and maintained references. The current general agent SHALL coordinate selected audit, find-bugs, research and GCP workflows and delegate bounded work when useful rather than invoking a nested orchestrator merely to route the request. Spec, pipeline, review-pr, create-pr and find-bugs SHALL remain discoverable. Supported installations SHALL make this guidance available through native instruction discovery without requiring a TH default-agent selection.
 
 #### Scenario: Ordinary session starts
 - **WHEN** a supported runtime starts with Team Harness available
@@ -22,7 +22,11 @@ Team Harness startup context and managed guidance SHALL describe available workf
 
 #### Scenario: OpenCode uses its native general agent
 - **WHEN** Team Harness is installed while OpenCode retains its native or operator-selected general agent
-- **THEN** the agent can discover the four main TH workflows and the configured collaboration guidance without selecting TH-orchestrator
+- **THEN** the agent can discover the main TH workflows and configured collaboration guidance without selecting TH-orchestrator
+
+#### Scenario: Functional diagnosis is requested without a PR
+- **WHEN** the operator asks for concrete defects in a project or module
+- **THEN** the general agent can select find-bugs and distinguish it from architectural audit and review of an existing PR in Codex, Claude Code and OpenCode
 
 ### Requirement: Preserve useful collaboration context
 Team Harness SHALL preserve voice guidance, language and English-learning preferences, workspace/Obsidian configuration, specialist coordination and recoverable workflow methods. Session discovery, traces, notifications and precompact context SHALL remain available independently of retired execution guards. Native runtime permissions SHALL govern execution; TH SHALL NOT weaken or replace the operator's configured policy. A workflow requiring an external workspace SHALL use the active runtime's access mechanism without provisioning settings belonging to another runtime.

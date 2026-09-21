@@ -572,6 +572,146 @@ func TestOpencodeApply_Idempotent(t *testing.T) {
 	}
 }
 
+// TestOpencodeApply_PreservesUpstreamFindBugsSkill verifies that the Team
+// Harness project-diagnostic skill can coexist with the upstream Sentry
+// find-bugs skill in OpenCode. The two skills intentionally have different
+// native names and destinations: TH owns skills/th-find-bugs while the
+// upstream skill owns skills/find-bugs.
+//
+// This exercises the real production manifests and placer. It installs only
+// the TH alias components, updates a drifted TH file, then reapplies the same
+// selection. At every stage the pre-existing upstream file must remain byte
+// for byte unchanged, and the on-disk frontmatter names must remain distinct.
+func TestOpencodeApply_PreservesUpstreamFindBugsSkill(t *testing.T) {
+	_, cleanup := ledgerTestEnv(t)
+	defer cleanup()
+
+	configRoot := t.TempDir()
+	placer := newOpencodePlacerAt(configRoot)
+
+	const upstreamPath = "{config_root}/skills/find-bugs/SKILL.md"
+	upstreamContent := []byte("---\nname: find-bugs\ndescription: upstream Sentry method\n---\nupstream implementation\n")
+	upstreamConcrete := filepath.Join(configRoot, "skills", "find-bugs", "SKILL.md")
+	if err := os.MkdirAll(filepath.Dir(upstreamConcrete), 0o700); err != nil {
+		t.Fatalf("create upstream skill directory: %v", err)
+	}
+	if err := os.WriteFile(upstreamConcrete, upstreamContent, 0o600); err != nil {
+		t.Fatalf("seed upstream skill: %v", err)
+	}
+
+	modules, components, err := buildOpencodeManifests()
+	if err != nil {
+		t.Fatalf("buildOpencodeManifests: %v", err)
+	}
+
+	// Select only TH alias components from the real manifest set and reject any
+	// production component that still claims the upstream basename.
+	const thSkillPrefix = "{config_root}/skills/th-find-bugs/"
+	const upstreamSkillPrefix = "{config_root}/skills/find-bugs/"
+	var selected []string
+	for _, component := range components {
+		matches := false
+		for _, emitted := range component.Emits.Files {
+			if strings.HasPrefix(emitted, upstreamSkillPrefix) {
+				t.Fatalf("component %q still claims upstream path %q", component.Component, emitted)
+			}
+			if strings.HasPrefix(emitted, thSkillPrefix) {
+				matches = true
+			}
+		}
+		if matches {
+			selected = append(selected, component.Component)
+		}
+	}
+	if len(selected) == 0 {
+		t.Fatal("production manifests do not expose TH find-bugs components at skills/th-find-bugs")
+	}
+
+	thConcrete := filepath.Join(configRoot, "skills", "th-find-bugs", "SKILL.md")
+	assertFrontmatterName := func(stage, path, want string) {
+		t.Helper()
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			t.Fatalf("%s read %s: %v", stage, path, readErr)
+		}
+		frontmatter, _, parseErr := parseFrontmatterYAML(data)
+		if parseErr != nil {
+			t.Fatalf("%s parse frontmatter %s: %v", stage, path, parseErr)
+		}
+		got, ok := frontmatter["name"].(string)
+		if !ok || got != want {
+			t.Fatalf("%s frontmatter name at %s = %q, want %q", stage, path, got, want)
+		}
+	}
+	assertSkills := func(stage string) {
+		t.Helper()
+		assertFrontmatterName(stage+" upstream", upstreamConcrete, "find-bugs")
+		assertFrontmatterName(stage+" TH", thConcrete, "th-find-bugs")
+		got, readErr := os.ReadFile(upstreamConcrete)
+		if readErr != nil {
+			t.Fatalf("%s read upstream skill: %v", stage, readErr)
+		}
+		if !bytes.Equal(got, upstreamContent) {
+			t.Fatalf("%s changed upstream skill:\n got %q\nwant %q", stage, got, upstreamContent)
+		}
+	}
+
+	assertNoUpstreamPlan := func(stage string, diff PlanDiff) {
+		t.Helper()
+		for _, planned := range append(append(append([]PlannedFile{}, diff.ToCreate...), diff.ToUpdate...), diff.ToSkipHashMatch...) {
+			if planned.TemplatedDst == upstreamPath || planned.ConcreteDst == upstreamConcrete {
+				t.Fatalf("%s plan targets upstream Sentry skill: %+v", stage, planned)
+			}
+		}
+	}
+
+	first, err := ComputePlan(modules, components, selected, placer, EmbeddedAssets(), opencodeRuntimeTransform)
+	if err != nil {
+		t.Fatalf("initial ComputePlan: %v", err)
+	}
+	assertNoUpstreamPlan("initial", first)
+	if len(first.ToCreate) == 0 {
+		t.Fatal("initial plan has no TH find-bugs files to create")
+	}
+	if err := ApplyPlan(first, placer); err != nil {
+		t.Fatalf("initial ApplyPlan: %v", err)
+	}
+	assertSkills("initial")
+
+	// Simulate a stale local TH projection. The next update must repair only
+	// TH's namespace and leave the operator-installed upstream skill alone.
+	staleTH := []byte("---\nname: stale-th-skill\n---\nstale local projection\n")
+	if err := os.WriteFile(thConcrete, staleTH, 0o600); err != nil {
+		t.Fatalf("write stale TH projection: %v", err)
+	}
+	second, err := ComputePlan(modules, components, selected, placer, EmbeddedAssets(), opencodeRuntimeTransform)
+	if err != nil {
+		t.Fatalf("update ComputePlan: %v", err)
+	}
+	assertNoUpstreamPlan("update", second)
+	if len(second.ToUpdate) == 0 {
+		t.Fatal("update plan did not detect stale TH find-bugs projection")
+	}
+	if err := ApplyPlan(second, placer); err != nil {
+		t.Fatalf("update ApplyPlan: %v", err)
+	}
+	assertSkills("updated")
+
+	// A clean reinstall must be a no-op and preserve the upstream owner.
+	third, err := ComputePlan(modules, components, selected, placer, EmbeddedAssets(), opencodeRuntimeTransform)
+	if err != nil {
+		t.Fatalf("reinstall ComputePlan: %v", err)
+	}
+	assertNoUpstreamPlan("reinstall", third)
+	if len(third.ToCreate) != 0 || len(third.ToUpdate) != 0 {
+		t.Fatalf("reinstall is not idempotent: ToCreate=%d ToUpdate=%d", len(third.ToCreate), len(third.ToUpdate))
+	}
+	if err := ApplyPlan(third, placer); err != nil {
+		t.Fatalf("reinstall ApplyPlan: %v", err)
+	}
+	assertSkills("reinstalled")
+}
+
 // ---------------------------------------------------------------------------
 // AC-8: runApplyCommand stdout includes the update-later line
 // ---------------------------------------------------------------------------

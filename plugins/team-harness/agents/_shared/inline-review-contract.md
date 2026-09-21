@@ -216,19 +216,16 @@ Verdict-supporting tracked-file bytes—including ordinary, deleted, renamed,
 and historical files—must come only from the recorded bound blob IDs via
 `cat-file blob`, never the mutable worktree.
 
-`Main` preserves one terminal status per required lens, all findings, coverage
+`Main` preserves one terminal status per selected lens, all findings, coverage
 limits, and disagreements. Main groups common causes without erasing distinct
-findings. `review-fan.mjs gate` groups returns by `lens`, chooses the worst
-terminal status deterministically, and carries every finding from every return.
-A required lens with no
-return is never a pass; `failed`, `incomplete`, `unavailable`, and `untrusted`
-are terminal non-pass outcomes, as is a return carrying a blocker or a non-`pass`
-verdict. A return naming a lens outside `required_lenses` is reported as
-unrequested rather than absorbed. Global PASS requires every `required_lenses`
-entry to have a `lens_status: complete` return with `verdict: pass`, no blocker, and no
-unresolved blocking disagreement. Which severities hold the ship is the
-coordinator's policy, applied to what a lens reported; a lens reports a finding's
-severity and its grounds, and never needs to know the threshold.
+findings. `review-fan.mjs summary` (with `gate` as a compatibility alias) groups
+returns by `lens`, chooses the worst terminal status deterministically, and carries
+every finding from every return. Missing selected returns, failed or incomplete
+evidence, blockers, non-pass verdicts, and disagreements remain factual observations
+for Main. `unknown_coverage` stays visible; no unmatched criterion becomes a spec
+defect. The summary has no `ready` or publication result: Main and the operator
+decide closure and publication from the complete evidence. A return naming a lens
+outside the selected set is reported as `unrequested` rather than absorbed.
 
 An inline review never creates a Team Harness workspace, `00-state.md`, events,
 gates, a Stage Gate, branch, delivery record, commit, push, or publication. It

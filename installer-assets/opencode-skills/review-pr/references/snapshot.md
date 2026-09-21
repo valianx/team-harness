@@ -65,8 +65,8 @@ created. Main never recreates these mechanics with `mktemp`, shell promotion cha
 the mergeability values from `$CONTEXT`.
 
 Write data once and pass paths to agents, never artifact bodies. Every later artifact write uses
-the helper's leaf-safe write and atomic promotion. Do not execute the PR's code or install
-dependencies; existing CI results are evidence. If the PR body links an issue with `Closes`,
+the helper's leaf-safe write and atomic promotion. Do not execute the PR's code or install the
+reviewed project's dependencies; existing CI results are evidence. If the PR body links an issue with `Closes`,
 `Fixes`, or `Resolves`, fetch its number, title, body, and labels once into
 `$ARTIFACTS/pr-review-issue.json`; treat failure as `linked issue: unavailable`.
 
@@ -79,10 +79,40 @@ end after a bounded tool yield while reviewers still need the files. `$ARTIFACTS
 verification read, and post-dispatch integrity comparison regardless of how many tool yields occur
 or whether any one yield exceeds 30 seconds.
 
-Capture `git status --untracked-files=all` and `git diff HEAD` for the frozen worktree, and
-separately the regular review-artifact leaves under `$ARTIFACTS` (excluding `$SNAPSHOT_GIT` and
-`$WORKTREE`). Repeat both after all agents finish; the surfaces must be byte-identical before any
-returned draft is trusted or persisted to the fixed `$ARTIFACTS/pr-review-*` paths.
+Immediately after any workspace capture and before a selected external scan, capture the core
+snapshot baseline: `git status --untracked-files=all` and `git diff HEAD` for the frozen worktree,
+plus the hashes of all existing review-artifact input leaves under `$ARTIFACTS` (excluding
+`$SNAPSHOT_GIT` and `$WORKTREE`), together with any explicitly read policy leaf outside that
+directory. This baseline covers the captured context, conversation, diff, changed-files, checks,
+policy and captured workspace inputs. A later external report is an intentional new evidence leaf
+and is not silently folded into this initial baseline.
+
+External capture must run against its disposable copy. Before Main promotes its report or note,
+repeat the core status, diff and input-leaf hashes. Any mismatch invalidates the capture and
+follows the existing drift path; Main does not accept a moving core input by replacing the
+baseline. When the core baseline still matches, Main writes the selected evidence leaves through
+the existing safe helper, records their hashes, and creates the dispatch baseline from the core
+baseline plus those exact evidence leaves. Recheck that complete dispatch baseline immediately
+before dispatch. Repeat the core surfaces and dispatch evidence leaves after all agents finish;
+they must be byte-identical before any returned draft is trusted or persisted to the fixed
+`$ARTIFACTS/pr-review-*` paths.
+
+### Selected external evidence
+
+When Main selects Semgrep CE or an installed upstream review method, read
+[external-evidence.md](external-evidence.md). Main prepares the external tool outside the frozen
+snapshot, captures the result only after the core snapshot baseline, and binds it to the captured
+head, base and technical/context identity. Before promoting the result, Main rechecks the core
+baseline; a changed worktree or input leaf invalidates the result. A Semgrep scan uses a
+disposable copy of the captured head and keeps caches and output outside `$WORKTREE`; it never
+installs project dependencies, executes project code or executable project configuration, or
+resolves a moving ref. The raw report and coordinator note are retained as flat artifact leaves
+through the existing safe artifact helpers and become part of the dispatch baseline.
+
+Semgrep candidates stay with Main until every initial specialist has returned and its identity is
+validated. Main then reconciles them with the existing ledger and passes normalized evidence to the
+existing verifier. The installed Sentry method, when selected, runs inside the existing general
+reviewer pass and does not create another reviewer or review round.
 
 Run `cleanup-run` explicitly from the coordinator only after every dispatched reviewer has
 reached a terminal result and every check that consumes the snapshot has completed. Never remove

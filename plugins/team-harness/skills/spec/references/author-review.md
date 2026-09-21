@@ -20,8 +20,8 @@ Use `../../verify/SKILL.md` and its canonical inline-review contract to package 
 base/head and prerequisite references. Reuse an accepted review for the same candidate; multiple lenses form one review. Dispatch one native read-only `inline-reviewer` per explicitly selected lens. Main may add a focused lens when a concrete risk warrants it, but a risk signal never adds a mandatory lens. Preserve profile, immutable-target and currentness checks. An unavailable or failed lens is not a pass; report the precise limitation. If the package
 proves the whole surface checker-verified, report that evidence without dispatching empty work.
 
-Collect all returns and run `review-fan.mjs gate`. Main consolidates duplicate findings and checks their supporting evidence against the anchored candidate before changing code. Preserve unresolved
-disagreements and coverage limits. Reviewers do not edit files or publish anything. Main writes
+Collect all returns and run `review-fan.mjs summary` (`gate` remains a compatibility alias). Main consolidates duplicate findings and checks their supporting evidence against the anchored candidate before changing code. Preserve unresolved
+disagreements and coverage limits. The summary is factual evidence; it does not decide closure or publication. Reviewers do not edit files or publish anything. Main writes
 `reviews/pre-pr-review.md` in the existing common workspace and links it from `01-plan.md`; in Obsidian mode both remain there, without a repository-local duplicate.
 
 An accepted review with dispatched lenses requires complete, trusted, correctly anchored returns

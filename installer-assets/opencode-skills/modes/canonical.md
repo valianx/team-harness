@@ -8,7 +8,8 @@ text. Keep mode names and invocations exact.
 - In Claude Code, show each applicable mode as `/th:<name>`.
 - In opencode, show each applicable native skill by its exact skill ID. Show
   `/th-modes` for this catalog, `/th-update` for the updater, and `/th-reload`
-  for session activation.
+  for session activation. TH's `find-bugs` workflow uses native ID `th-find-bugs`;
+  unprefixed `find-bugs` belongs to the optional upstream Sentry method.
 - If the runtime is unclear, retain the Availability column instead of
   guessing an invocation.
 
@@ -30,6 +31,7 @@ text. Keep mode names and invocations exact.
 | `docs` | Generate Obsidian documentation through the documentation pipeline. | Claude Code + opencode + Codex |
 | `eval` | Evaluate and score agent or pipeline performance. | Claude Code + opencode + Codex |
 | `excalidraw-diagram` | Create Excalidraw JSON diagrams that make visual arguments. | Claude Code + opencode + Codex |
+| `find-bugs` | Investigate functional defects in a project or module with contextual evidence. | Claude Code + opencode + Codex |
 | `gcp-costs` | Analyze GCP costs and optimization opportunities. | Claude Code + opencode + Codex |
 | `gcp-infra` | Inspect, plan and carry out authorized GCP changes. | Claude Code + opencode + Codex |
 | `hookify` | Report candidate deterministic hooks from observed session friction. | Claude Code + opencode + Codex |

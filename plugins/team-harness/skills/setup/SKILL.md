@@ -17,7 +17,9 @@ untouched unless the operator explicitly configures Context7.
 
 ## Upstream provider route
 
-Route the explicit targets `openspec`, `superpowers`, and `tea` (also `bmad tea`)
+Route the explicit targets `openspec`, `superpowers`, `tea`, `semgrep`,
+`dependency-cruiser`, `knip`, `sentry`, `quality` and `quality-tools`
+(also `bmad tea`)
 here before inspecting or reconciling TH configuration. For a provider-only
 request, complete that route and return without creating TH settings. Continue
 the TH-specific procedure only when TH setup was also requested.
@@ -26,14 +28,43 @@ Match provider names as complete words in the requested target, never as
 substrings: `team` and `team-harness` do not select `tea`. TH-only options apply
 only to a separately requested TH operation.
 
+Before routing a bare `find-bugs` target, resolve the owner from the live task:
+TH project/module diagnosis or Sentry's upstream captured-change method. If it
+remains ambiguous, ask which owner is intended before installing or updating.
+An explicit `sentry find-bugs` or `getsentry/skills` selects the provider route;
+TH's OpenCode entry is `th-find-bugs`.
+
 Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
-when the operator names OpenSpec, Superpowers, or TEA. Full setup may report provider
-availability without installing anything implicitly. For an explicit provider request,
-use its official mechanism under native permissions: OpenSpec's package manager and
-project `init`/`update`, Superpowers' host-plugin lifecycle, or the official BMAD TEA
-module and upstream test-design, test-review, trace, or runner entry. Preserve provider
-files and configuration, and distinguish installed capability from active session; only
-propose reload/restart for a documented host limitation or observed stale activation.
+when the operator names OpenSpec, Superpowers, TEA, or a quality capability. Full setup may
+report provider availability without installing anything implicitly. For an explicit provider
+request, use its official mechanism under native permissions: OpenSpec's package manager and
+project `init`/`update`, Superpowers' host-plugin lifecycle, the official BMAD TEA module and
+upstream entries, or the selected quality provider's route in `quality_providers`. Preserve
+provider files and configuration, and distinguish installed, discoverable and usable capability
+from active session; only propose reload/restart for a documented host limitation or observed
+stale activation.
+
+### Quality capability route
+
+`quality`/`quality-tools` lists Semgrep CE, dependency-cruiser, Knip and Sentry `find-bugs` and
+asks for a concrete objective/stack; it never installs all quality providers. For an explicit
+quality target, read the policy and shared reference, reuse a healthy project/tool-cache
+executable or native skill, and prepare only the selected active-host capability when authorized:
+
+- Semgrep CE: official Brew/Python/uv/pipx route; verify `semgrep`, Python `>=3.10`, explicit
+  rules/config and local JSON/SARIF output.
+- dependency-cruiser: official npm project/tool-cache route; verify Node `^22 || ^24 || >=26`,
+  `depcruise` and project entry-point/resolution configuration. Audit JS/TS only.
+- Knip: official npm project/tool-cache route with TypeScript peer dependencies when needed;
+  verify Node `^20.19.0 || >=22.12.0`, `knip` and entry-point/framework configuration. Audit
+  JS/TS only.
+- Sentry `find-bugs`: official `npx --yes skills@1.7.0 add getsentry/skills --skill find-bugs
+  --agent codex --global --yes`; resolve the duplicate basename by owner/source and objective,
+  and do not overwrite TH's project/module skill.
+
+Report `installed`, `discoverable` and `usable` separately, pass the existing local/Obsidian
+workspace to the selected flow, and report a concrete recovery for pending activation. Do not
+modify project manifests without separate product scope or install inactive-host capabilities.
 
 Resolve all helpers relative to this skill and use them for every managed
 write:
@@ -49,7 +80,7 @@ write:
 
 With no targeted intent, run the complete flow. For a targeted request, change
 only that concern and still ensure the native settings document exists.
-Provider targets `openspec`, `superpowers`, and `tea` use the route above and do
+Provider targets `openspec`, `superpowers`, `tea`, and explicit quality capabilities use the route above and do
 not enter this settings flow. TH settings targets are `workspace`, `language`, `english-learning`, `context7`,
 `agents`, `features`, `github-accounts`, `clickup`, and `obsidian-tasks`.
 

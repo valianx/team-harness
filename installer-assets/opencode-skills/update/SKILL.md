@@ -5,7 +5,9 @@ description: Update Team Harness for opencode through the dedicated checksum-ver
 
 # Update Team Harness in opencode
 
-Route the explicit targets `openspec`, `superpowers`, and `tea` (also `bmad tea`)
+Route the explicit targets `openspec`, `superpowers`, `tea`, `semgrep`,
+`dependency-cruiser`, `knip`, `sentry`, `quality` and `quality-tools`
+(also `bmad tea`)
 here before the TH update procedure. For a provider-only request, complete that
 route and return. Continue the TH-specific procedure below only when TH update
 was also requested; provider names are not flags for the TH updater.
@@ -14,13 +16,32 @@ Match provider names as complete words in the requested target, never as
 substrings: `team` and `team-harness` do not select `tea`. TH-only options apply
 only to a separately requested TH operation.
 
+Before routing a bare `find-bugs` target, resolve the owner from the live task:
+TH project/module diagnosis or Sentry's upstream captured-change method. If it
+remains ambiguous, ask which owner is intended before installing or updating.
+An explicit `sentry find-bugs` or `getsentry/skills` selects the provider route;
+TH's OpenCode entry is `th-find-bugs`.
+
 Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
-when the operator explicitly requests an OpenSpec, Superpowers, or TEA update. This flow
-updates Team Harness only; it never updates those providers as a side effect. For an
-explicit request, use the provider's official package, plugin, or BMAD module lifecycle
-under native permissions. Preserve provider-owned files and configuration, and report
-installed capability separately from active session; propose a reload/restart only for a
-documented host limitation or observed stale activation.
+when the operator explicitly requests an OpenSpec, Superpowers, TEA, or quality-provider
+update. This flow updates Team Harness only; it never updates those providers as a side
+effect. For an explicit request, use the provider's official package, plugin, Skills CLI or
+BMAD module lifecycle under native permissions. Preserve provider-owned files and
+configuration, and report installed, discoverable and usable capability separately from
+active session; propose a reload/restart only for a documented host limitation or observed
+stale activation.
+
+For `quality`/`quality-tools` without a concrete provider, list Semgrep CE,
+dependency-cruiser, Knip and Sentry `find-bugs`, then ask which objective/stack to update.
+Do not update every quality provider. Update the selected owner-managed installation only:
+
+- Semgrep CE through the owning Brew, uv, pipx or Python/pip route.
+- dependency-cruiser or Knip through npm in the existing project/tool cache, preserving
+  project manifests unless their change is separately authorized.
+- Sentry `find-bugs` with
+  `npx --yes skills@1.7.0 update find-bugs --global --yes`, verifying the source/ref and
+  active OpenCode skill. TH's separate project/module workflow is `th-find-bugs`;
+  preserve both installations and resolve the owner before updating.
 
 Execute the same bounded updater used by `/th-update`:
 

@@ -27,7 +27,7 @@ workflow:
 4. Resolve persistent settings from
    `${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}/.team-harness.json`. Never depend on a Claude
    Code installation, `~/.claude`, the `claude` binary, or Claude plugin
-   cache paths. Use packaged files relative to this skill directory.
+   cache paths. Use packaged files relative to this skill directory. Canonical agent reference documents (`agents/ref-*.md` and documents in agent subdirectories, except README.md) resolve under `th-references/agents/...` in that config root, including links with relative prefixes. Invocable agent definitions remain under `agents/`.
 5. Preserve every canonical safety boundary, read-only default, confirmation
    gate, secret rule, and outward-write approval. Native opencode sandbox and
    permission policy remain authoritative.

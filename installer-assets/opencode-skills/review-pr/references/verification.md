@@ -1,3 +1,23 @@
+## External evidence
+
+When Main has selected Semgrep CE, read [external-evidence.md](external-evidence.md) before
+Verify. Main validates the raw report and coordinator note against the captured `head_oid`,
+relevant `base_oid`, `technical_hash`, `context_hash`, rules/configuration and scope, then records
+their paths and hashes in the existing finding ledger. A stale head, base, scope or tool result is
+renewed under the existing drift path; it is never reused for another candidate.
+
+Use the existing `Reproduction Evidence` coordinate in the verifier packet for validated external
+evidence paths and digests. The verifier receives the normalized finding in the existing inline
+representation and may inspect only the exact allowlisted leaves. It does not consume raw SARIF or
+JSON as a second finding schema, add scanner findings, or decide severity. Main preserves the raw
+report and applies the returned assessment through the existing `apply-verification` helper.
+
+If Semgrep finds no candidates while reporting skipped, unsupported or errored files, record the
+completed scope and limitation in the ledger/coverage line. Exit zero alone does not establish a
+clean review. If the installed Sentry `find-bugs` method was selected, its output is the existing
+general reviewer's advisory return; verify its ordinary findings once and do not dispatch a second
+Sentry or scanner pass.
+
 ## Optional regression investigation
 
 When selected by the operator, Main investigates concrete hypotheses from the canonical findings

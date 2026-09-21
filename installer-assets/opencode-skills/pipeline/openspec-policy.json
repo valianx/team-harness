@@ -42,6 +42,199 @@
       "runtime_targets": ["claude", "codex", "opencode"]
     }
   },
+  "quality_references": {
+    "arc42": {
+      "owner": "arc42",
+      "owner_url": "https://arc42.org/overview/",
+      "purpose": "architecture perspectives used to choose audit questions",
+      "installable": false
+    },
+    "atam": {
+      "owner": "Software Engineering Institute",
+      "owner_url": "https://www.sei.cmu.edu/library/architecture-tradeoff-analysis-method-collection/",
+      "purpose": "scenario and trade-off reference for scoped architecture diagnosis",
+      "installable": false
+    }
+  },
+  "quality_providers": {
+    "semgrep-ce": {
+      "id": "semgrep-ce",
+      "owner": "semgrep/semgrep",
+      "owner_url": "https://github.com/semgrep/semgrep",
+      "documentation_url": "https://docs.semgrep.dev/getting-started/cli",
+      "purpose": "local rule-based candidates for concrete bug diagnosis and applicable PR review",
+      "applicability": {
+        "objectives": ["find-bugs", "review-pr"],
+        "stacks": "source languages supported by the selected Semgrep rules",
+        "selection": "explicit rules and captured scope; never an implicit all-provider scan",
+        "login_or_upload": "not required for Community Edition local scans"
+      },
+      "official_lifecycle": {
+        "package": "semgrep",
+        "registry": "PyPI",
+        "install": {
+          "macos": "brew install semgrep",
+          "windows_linux": "python3 -m pip install semgrep",
+          "isolated_tool": "uv tool install semgrep or pipx install semgrep"
+        },
+        "update": {
+          "brew": "brew upgrade semgrep",
+          "uv": "uv tool upgrade semgrep",
+          "pipx": "pipx upgrade semgrep",
+          "pip": "python3 -m pip install --upgrade semgrep"
+        }
+      },
+      "observed_baseline": {
+        "version": "1.177.0",
+        "observed_on": "2026-09-21",
+        "python": ">=3.10",
+        "source": "https://pypi.org/project/semgrep/1.177.0/"
+      },
+      "required_capabilities": ["semgrep executable", "explicit rule/config selection", "json or sarif output"],
+      "entry": {
+        "kind": "executable",
+        "command": "semgrep",
+        "runtime_targets": ["claude", "codex", "opencode"]
+      },
+      "outputs": {
+        "formats": ["json", "sarif"],
+        "workspace": "research/quality-tools/semgrep",
+        "metadata": ["version", "invocation", "configuration", "scope", "skipped_files", "errors", "head", "base"]
+      },
+      "limits": [
+        "exit zero or no matches does not establish clean or exhaustive correctness",
+        "Semgrep CE local analysis does not imply account-backed rules, SCA or cross-file platform analysis"
+      ]
+    },
+    "dependency-cruiser": {
+      "id": "dependency-cruiser",
+      "owner": "sverweij/dependency-cruiser",
+      "owner_url": "https://github.com/sverweij/dependency-cruiser",
+      "documentation_url": "https://github.com/sverweij/dependency-cruiser#readme",
+      "purpose": "dependency-relationship and architecture candidates for applicable JavaScript/TypeScript audits",
+      "applicability": {
+        "objectives": ["audit"],
+        "stacks": ["javascript", "typescript", "coffee-script"],
+        "selection": "only when project entry points and resolution configuration are available",
+        "review_pr": false
+      },
+      "official_lifecycle": {
+        "package": "dependency-cruiser",
+        "registry": "npm",
+        "project_install": "npm install --save-dev dependency-cruiser",
+        "tool_only_install": "npm install --prefix <approved-tool-cache> dependency-cruiser@18.4.0",
+        "update": "npm install --prefix <approved-tool-cache> dependency-cruiser@<selected-version>"
+      },
+      "observed_baseline": {
+        "version": "18.4.0",
+        "observed_on": "2026-09-21",
+        "node": "^22 || ^24 || >=26",
+        "source": "https://www.npmjs.com/package/dependency-cruiser/18.4.0"
+      },
+      "required_capabilities": ["depcruise executable", "entry points", "tsconfig/alias/framework resolution", "json or text output"],
+      "entry": {
+        "kind": "project_executable",
+        "commands": ["dependency-cruiser", "depcruise"],
+        "runtime_targets": ["claude", "codex", "opencode"]
+      },
+      "outputs": {
+        "formats": ["json", "text", "err-html"],
+        "workspace": "research/quality-tools/dependency-cruiser",
+        "metadata": ["version", "configuration", "entry_points", "resolution", "scope", "omissions", "errors"]
+      },
+      "limits": [
+        "dynamic or external consumers require contextual investigation",
+        "a dependency candidate is not a removal authorization"
+      ]
+    },
+    "knip": {
+      "id": "knip",
+      "owner": "webpro-nl/knip",
+      "owner_url": "https://github.com/webpro-nl/knip",
+      "documentation_url": "https://knip.dev/overview/getting-started",
+      "purpose": "unused files, exports and dependency candidates for applicable JavaScript/TypeScript audits",
+      "applicability": {
+        "objectives": ["audit"],
+        "stacks": ["javascript", "typescript"],
+        "selection": "only when package entry points, framework configuration and external consumers can be inspected",
+        "review_pr": false
+      },
+      "official_lifecycle": {
+        "package": "knip",
+        "registry": "npm",
+        "project_install": "npm install --save-dev knip typescript @types/node",
+        "tool_only_install": "npm install --prefix <approved-tool-cache> knip@6.37.0 typescript @types/node",
+        "update": "npm install --prefix <approved-tool-cache> knip@<selected-version> typescript @types/node"
+      },
+      "observed_baseline": {
+        "version": "6.37.0",
+        "observed_on": "2026-09-21",
+        "node": "^20.19.0 || >=22.12.0",
+        "source": "https://www.npmjs.com/package/knip/6.37.0"
+      },
+      "required_capabilities": ["knip executable", "project entry points", "typescript and @types/node when required", "json output"],
+      "entry": {
+        "kind": "project_executable",
+        "command": "knip",
+        "runtime_targets": ["claude", "codex", "opencode"]
+      },
+      "outputs": {
+        "formats": ["json", "text"],
+        "workspace": "research/quality-tools/knip",
+        "metadata": ["version", "configuration", "entry_points", "scope", "external_consumer_checks", "errors"]
+      },
+      "limits": [
+        "unused output is a candidate until generated, dynamic and external consumers are checked",
+        "this provider is not selected for ordinary review-pr static scans"
+      ]
+    },
+    "sentry-find-bugs": {
+      "id": "sentry-find-bugs",
+      "owner": "getsentry/skills",
+      "owner_url": "https://github.com/getsentry/skills",
+      "documentation_url": "https://github.com/getsentry/skills/blob/main/skills/find-bugs/SKILL.md",
+      "purpose": "optional upstream contextual review method for captured branch changes",
+      "applicability": {
+        "objectives": ["review-pr"],
+        "stacks": "repository changes supported by the installed skill",
+        "selection": "explicit request or scoped contextual bug investigation",
+        "review_pr": "selected method of the existing general reviewer; not a second TH review"
+      },
+      "official_lifecycle": {
+        "distribution": "Vercel Skills CLI",
+        "package": "skills",
+        "cli_baseline": "1.7.0",
+        "node": ">=22.20.0",
+        "install": "npx --yes skills@1.7.0 add getsentry/skills --skill find-bugs --agent <active-agent> --global --yes",
+        "update": "npx --yes skills@1.7.0 update find-bugs --global --yes",
+        "source_ref": "getsentry/skills@main",
+        "version_policy": "record the resolved upstream commit; TH does not pin or vendor the skill"
+      },
+      "observed_baseline": {
+        "skill": "find-bugs",
+        "source_ref": "main",
+        "observed_on": "2026-09-21",
+        "source": "https://raw.githubusercontent.com/getsentry/skills/main/skills/find-bugs/SKILL.md"
+      },
+      "required_capabilities": ["native find-bugs skill", "captured base/head context", "read-only review tools"],
+      "entry": {
+        "kind": "native_skill",
+        "skill": "find-bugs",
+        "runtime_targets": ["claude", "codex", "opencode"],
+        "resolution": "owner/source plus objective; do not resolve by basename alone"
+      },
+      "outputs": {
+        "formats": ["markdown assessment", "native upstream evidence"],
+        "workspace": "existing PR review artifact destination ($ARTIFACTS), linked from the finding ledger and verifier evidence",
+        "metadata": ["source_ref", "candidate identity", "scope", "files reviewed", "limitations"]
+      },
+      "limits": [
+        "the upstream method must receive captured evidence and must not resolve a live default branch",
+        "provider recommendations do not grant operational authority or replace existing verification",
+        "TH project/module diagnosis uses th-find-bugs in OpenCode and namespaced plugin entries in Claude Code/Codex; resolve owner before setup/update and preserve Sentry's find-bugs entry"
+      ]
+    }
+  },
   "runtime_targets": [
     "claude",
     "codex",

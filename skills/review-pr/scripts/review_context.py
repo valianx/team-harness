@@ -1060,6 +1060,11 @@ def git_snapshot(
             ["git", "init", "--bare", "--quiet", "--template=", str(snapshot_dir)]
         )
 
+    if os.name == "nt":
+        # The isolated review prefix can push ordinary repository paths past
+        # Windows' legacy limit. Keep this setting in the owned snapshot only.
+        run_text(["git", "--git-dir", str(snapshot_dir), "config", "core.longpaths", "true"])
+
     fetch_source = run_text(
         ["git", "remote", "get-url", remote],
         cwd=source_repo,

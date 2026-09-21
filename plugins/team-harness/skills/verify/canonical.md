@@ -29,9 +29,11 @@ or unavailable native activation is a limitation, never an inferred pass.
 
 ## Decide and report
 
-Collect the original returns and run `review-fan.mjs gate`. Report the findings,
-coverage limits and historical decision against the reviewed revision. Preserve
-the result after repairs; a subsequent spec-author publication follows
+Collect the original returns and run `review-fan.mjs summary` (`gate` remains a
+compatibility alias). Report findings, coverage limits and factual observations
+against the reviewed revision. The summary is evidence for Main and the operator;
+it does not grant or deny publication. Preserve the result after repairs; a
+subsequent spec-author publication follows
 [author-review closure](../spec/references/author-review.md) with a separately
 identified corrected head and evidence for each disposition.
 

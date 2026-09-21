@@ -38,11 +38,15 @@ boundaries. A new role ABI manifest SHALL NOT be required.
 - **THEN** parity validation fails before release
 
 ### Requirement: Review artifacts stay inside the workspace
-The frozen review worktree SHALL live under the git-ignored `workspaces/` tree (not a predictable shared `/tmp` path) and SHALL be pruned at flow close.
+The frozen review worktree SHALL live under the git-ignored `workspaces/` tree and SHALL be pruned at flow close. Snapshot creation on Windows SHALL support nested paths beyond the legacy 260-character limit without changing the operator's Git configuration.
 
 #### Scenario: A review flow completes
 - **WHEN** review publication or abort finishes
 - **THEN** no prunable review worktrees remain outside the workspace tree
+
+#### Scenario: A nested snapshot exceeds the Windows legacy path limit
+- **WHEN** supported repository paths become longer than 260 characters under the isolated review root
+- **THEN** capture materializes them successfully using snapshot-local Git configuration and preserves the operator checkout
 
 ### Requirement: Critical Codex roles use Astra and bounded roles use Luna
 The standard Team Harness Codex profile SHALL assign `gpt-6-astra` with `xhigh` reasoning to Opus source projections, including the installed architect, QA, security, and PR review verifier. Sonnet and Haiku source projections SHALL use `gpt-5.6-luna` with `max` reasoning. The standard pipeline dispatch matrix SHALL therefore use Luna/max for implementer, tester, cleaner, and delivery, and Astra/xhigh for architect, QA, and security. The project configuration SHALL preserve Main's selected chat model.
@@ -172,3 +176,18 @@ validation. Neither outcome SHALL bypass immutable written-intent binding.
 #### Scenario: Node provides npx as a Windows batch shim
 - **WHEN** review packaging validates an authored OpenSpec change
 - **THEN** it invokes the npm JavaScript entrypoint with Node and does not attempt execFile on npx.cmd
+
+### Requirement: Shared setup asset checks respect native filesystem modes
+Skill synchronization SHALL compare shared setup asset content on every supported platform. It SHALL check the executable mode on POSIX filesystems and SHALL NOT report stale assets solely because native Windows does not expose that POSIX mode.
+
+#### Scenario: Matching content on Windows
+- **WHEN** the distributed setup asset has the expected bytes on native Windows
+- **THEN** the check succeeds without requiring POSIX executable bits
+
+#### Scenario: Changed content
+- **WHEN** a distributed setup asset differs from its canonical bytes
+- **THEN** the check reports drift on both Windows and POSIX
+
+#### Scenario: Wrong executable mode on POSIX
+- **WHEN** a matching distributed setup asset loses its expected executable mode on POSIX
+- **THEN** the check reports mode drift

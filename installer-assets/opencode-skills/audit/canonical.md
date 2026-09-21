@@ -17,10 +17,19 @@ explain what capability survives and where. File size or age alone is not eviden
 that a component is unnecessary.
 
 Use the [architect's audit method](../../agents/ref-architect-modes.md#audit-mode)
-for a diagnostic report with concrete file references, impact, recommendations
-and coverage limits. Preserve the configured workspace/Obsidian destination,
-language and voice. Save the report as `research/00-audit.md` in that workspace
-and present the findings that affect the operator's next decision.
+and the [coverage method](references/coverage-method.md) for a diagnostic report
+with concrete file references, impact, recommendations and coverage limits.
+Trace applicable components, relationships and success, change and failure
+scenarios. Distinguish evidence observed directly from reasoning inferred from
+code or documentation, and name material interactions that remain unverified.
+Preserve the configured workspace/Obsidian destination, language and voice. Save
+the report as `research/00-audit.md` in that workspace and present the findings
+that affect the operator's next decision.
+
+When an upstream analyzer is useful, read the [shared upstream-tool integration
+reference](../spec/references/upstream-tools.md) and use its official entry and
+preparation rules. Do not copy provider methods, add a local scanner or turn a
+diagnostic result into implementation authority.
 
 Audit is diagnostic. It does not authorize implementation or activate a pipeline.
 Use [security](../security/SKILL.md) when the request is specifically a security

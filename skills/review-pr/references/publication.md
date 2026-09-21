@@ -67,6 +67,11 @@ findings and checks: the blocking count and consequence for `REQUEST_CHANGES`, t
 supported blockers for `APPROVE`, and the reason the draft is informational for `COMMENT` (an
 absent lens, an absent verifier, or no supported blocker). Never add findings here.
 
+When selected external evidence exists, the same preview includes its tool/scope status, skipped or
+error limitations, captured identity and raw-artifact digest through the existing Main ledger entry.
+Do not turn a scanner result into a new verdict, publication event or public finding channel; only
+the normalized finding and its existing disposition are publishable.
+
 Show one menu: the recommended event first, marked `**(recommended)**`, then the two other
 events in the order `Comment only`, `Request changes`, `Approve` minus the recommended one, then
 `4 — Defer` and `5 — Cancel`:
