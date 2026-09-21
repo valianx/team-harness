@@ -3,6 +3,12 @@
 TH integrates OpenSpec, Superpowers and BMAD TEA into the existing workflow.
 Their methods and updates remain upstream-owned.
 
+Every tool, agent and workflow contributes evidence and recommendations. The
+coordinator and operator decide which findings warrant action and how to proceed.
+A provider verdict does not invalidate completed work, mandate corrections or
+create an automatic delivery block. Reports retain the original result, the
+coordinator's disposition and any unverified scope.
+
 The shared [external-tool reference](../skills/spec/references/upstream-tools.md)
 documents when each capability runs, native invocation, shared workspace outputs,
 installation/update ownership and compatibility limits. It ships with the spec

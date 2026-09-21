@@ -9,6 +9,13 @@ TEA supply their own maintained methods. TH selects an installed capability,
 passes the relevant context, follows its current instructions and uses its result.
 The capability's algorithm, checklist, templates and scoring remain upstream.
 
+Tools, agents and workflows contribute evidence and recommendations. Main and
+the operator decide how to proceed: a finding, score or verdict does not invalidate
+completed work, order a correction or create an automatic delivery block. Main
+may accept, reject or defer a recommendation with its reason. Preserve original
+results and disclose missing evidence; proceeding does not turn an unrun check
+into a pass. Native permissions and the operator's scope still govern execution.
+
 ## Quality capability preparation
 
 Quality providers are selected by the consuming objective, project stack, active host and

@@ -18,7 +18,11 @@ TH SHALL consume Superpowers, BMAD TEA and selected quality tools or skills from
 ## ADDED Requirements
 
 ### Requirement: Quality capabilities contribute distinct evidence
-TH SHALL distinguish deterministic analysis, contextual upstream skill review and coordinator interpretation. It SHALL select structural and unused-code analysis for applicable architecture questions, rule-based analysis for concrete bug candidates, and an installed change-review method for captured changes. Each selected capability SHALL receive the actual scope and relevant evidence and contribute its result to the existing workflow. A specialist applying an upstream method SHALL fulfill that selected analysis without a second equivalent TH pass. Provider scores or verdicts SHALL NOT grant or revoke operational authority.
+TH SHALL distinguish deterministic analysis, contextual upstream skill review and coordinator interpretation. It SHALL select structural and unused-code analysis for applicable architecture questions, rule-based analysis for concrete bug candidates, and an installed change-review method for captured changes. Each selected capability SHALL receive the actual scope and relevant evidence and contribute its result to the existing workflow. A specialist applying an upstream method SHALL fulfill that selected analysis without a second equivalent TH pass. Tools, agents and workflows SHALL supply evidence and recommendations; Main and the operator SHALL decide how to proceed. Their scores, findings or verdicts SHALL NOT grant or revoke operational authority, invalidate completed work, mandate corrections or create an automatic delivery block. Main SHALL preserve original results, explain material dispositions and disclose missing evidence without claiming unexecuted checks passed.
+
+#### Scenario: A provider recommends corrections or reports concerns
+- **WHEN** a tool, agent or workflow returns a finding, failing score or recommended correction
+- **THEN** Main assesses its evidence and scope with the operator's direction, records acceptance, rejection or deferral, and decides the next action without treating that result as an order or invalidation of completed work
 
 #### Scenario: Architecture diagnosis concerns a JavaScript or TypeScript project
 - **WHEN** its question requires dependency relationships or apparently unused code
