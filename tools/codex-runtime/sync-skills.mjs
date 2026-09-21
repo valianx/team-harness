@@ -352,7 +352,7 @@ async function syncProjection({ check, rootDir, names, runtime, targetRoot, over
   return names.filter(name => !overrides.has(name));
 }
 
-async function syncSharedSetupAssets({ check, rootDir }) {
+export async function syncSharedSetupAssets({ check, rootDir }) {
   const source = join(rootDir, "skills/setup/scripts/manage_github_identities.py");
   const bytes = await readFile(source);
   const targets = [
@@ -374,7 +374,10 @@ async function syncSharedSetupAssets({ check, rootDir }) {
       if (error?.code !== "ENOENT") throw error;
     }
     const bytesMatch = current?.equals(bytes) ?? false;
-    const modeMatches = currentMode === 0o755;
+    // Windows does not expose Git's executable bit through Node's POSIX mode
+    // field. Keep the mode assertion on POSIX hosts, while still checking
+    // bytes on every platform.
+    const modeMatches = process.platform === "win32" || currentMode === 0o755;
     if (bytesMatch && modeMatches) continue;
     stale = true;
     if (check) {

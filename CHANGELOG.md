@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Architecture audit records component interactions, quality scenarios, evidence and unverified coverage using arc42 and ATAM guidance.
 - PR review can reconcile captured Semgrep evidence and use Sentry's installed method within the existing reviewers, finding ledger and verifier.
+- Inline review reports factual evidence through `summary`; `gate` remains an alias and no longer computes publication readiness.
+
+### Fixed
+- Preserve reviewer locations expressed as `path`/`line` or structured evidence without inventing criterion coverage.
+- Avoid false executable-mode drift on native Windows and support long paths in isolated PR snapshots without changing global Git settings.
 
 ## [3.37.0] - 2026-09-21
 

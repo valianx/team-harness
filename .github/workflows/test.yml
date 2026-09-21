@@ -25,6 +25,7 @@ jobs:
       - name: Verify native hook registration and Windows filesystem
         run: node tests/test_hook_registration.mjs
       - run: node tests/test_openspec_launcher.mjs
+      - run: node tests/test_sync_skills_platform.mjs
       - run: node tests/test_th_update_windows.mjs
       - run: python tests/test_install_bootstrap_windows.py
       - run: python tests/test_windows_artifact_fs.py

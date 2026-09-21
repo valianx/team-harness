@@ -567,7 +567,7 @@ class ReviewContextTests(unittest.TestCase):
             source = root / "source"
             producer = root / "producer"
             snapshot = root / "artifacts" / "pr-review-snapshot.git"
-            worktree = root / "review-worktree"
+            worktree = root / "review-worktree" / ("nested-review-" * 8)
             snapshot.parent.mkdir()
 
             def git(*args, cwd=None):
@@ -594,6 +594,10 @@ class ReviewContextTests(unittest.TestCase):
             git("config", "user.name", "Review Test", cwd=producer)
             git("config", "user.email", "review@example.test", cwd=producer)
             (producer / "file.txt").write_text("head\n", encoding="utf-8")
+            nested_file = Path("specs") / ("long-spec-name-" * 7) / "spec.md"
+            (producer / nested_file).parent.mkdir(parents=True)
+            (producer / nested_file).write_text("nested evidence\n", encoding="utf-8")
+            git("add", str(nested_file), cwd=producer)
             git("commit", "--quiet", "-am", "head", cwd=producer)
             head_oid = git("rev-parse", "HEAD", cwd=producer)
             git("push", "--quiet", "origin", "HEAD:refs/pull/1/head", cwd=producer)
@@ -647,7 +651,15 @@ class ReviewContextTests(unittest.TestCase):
                 str(worktree),
                 head_oid,
             )
-            self.assertEqual(git("rev-parse", "HEAD", cwd=worktree), head_oid)
+            try:
+                self.assertEqual(git("rev-parse", "HEAD", cwd=worktree), head_oid)
+                self.assertGreater(len(str(worktree / nested_file)), 260)
+                native_file = worktree / nested_file
+                if os.name == "nt":
+                    native_file = Path("\\\\?\\" + str(native_file))
+                self.assertEqual(native_file.read_text(encoding="utf-8"), "nested evidence\n")
+            finally:
+                git("--git-dir", str(snapshot), "worktree", "remove", str(worktree))
 
     def test_invalid_snapshot_parent_is_a_context_error(self):
         with tempfile.TemporaryDirectory() as directory:

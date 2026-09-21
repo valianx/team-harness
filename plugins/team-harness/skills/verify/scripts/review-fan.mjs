@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Build the anchored inline review package from repository state, and decide its ship join. */
+/** Build the anchored inline review package from repository state, and summarize review evidence. */
 
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
@@ -578,7 +578,7 @@ function locationPath(location) {
 /**
  * Findings name repository locations, not paths from the reviewer's machine. Keep the
  * check independent of the host OS so a Windows absolute path cannot be mistaken for an
- * out-of-scope repository file when the gate runs on Unix (or the reverse).
+ * out-of-scope repository file when the helper runs on Unix (or the reverse).
  */
 function isCanonicalRepoRelativePath(file) {
   if (typeof file !== "string" || file.length === 0) return false;
@@ -586,12 +586,43 @@ function isCanonicalRepoRelativePath(file) {
   return file.split("/").every((segment) => segment.length > 0 && segment !== "." && segment !== "..");
 }
 
+function validLocationLine(line) {
+  return (typeof line === "number" && Number.isInteger(line) && line > 0)
+    || (typeof line === "string" && /^[1-9]\d*$/.test(line));
+}
+
+/** Normalize the location shapes used by the shared contract and older returns. */
+function normalizeFindingLocation(value, line) {
+  if (object(value)) {
+    const file = value.path ?? value.file;
+    return normalizeFindingLocation(file, value.line);
+  }
+  if (typeof value !== "string") return value;
+  if (line === undefined || line === null) return value;
+  // Keep an invalid line as an object so findingLocationIssues reports it instead of
+  // mistaking a malformed return for a repository path containing a literal colon.
+  return validLocationLine(line) ? `${value}:${line}` : { path: value, line };
+}
+
 function rawFindingLocations(entry) {
   const legacy = Array.isArray(entry?.files)
     ? entry.files
     : entry?.file === undefined ? [] : [entry.file];
   const locations = Array.isArray(entry?.locations) ? entry.locations : [];
-  return [...legacy, ...locations];
+  const path = entry?.path === undefined ? [] : [entry.path];
+  const evidence = Array.isArray(entry?.evidence)
+    // `evidence` may contain free explanatory text. Only an object that explicitly names a
+    // path/file contributes a location; free evidence must not be demoted as an out-of-scope path.
+    ? entry.evidence
+      .filter((item) => object(item) && (Object.hasOwn(item, "path") || Object.hasOwn(item, "file")))
+      .map((item) => normalizeFindingLocation(item))
+    : [];
+  return [
+    ...legacy.map((location) => normalizeFindingLocation(location, entry?.line)),
+    ...locations.map((location) => normalizeFindingLocation(location)),
+    ...path.map((location) => normalizeFindingLocation(location, entry?.line)),
+    ...evidence,
+  ];
 }
 
 /** Return locations that cannot be interpreted as canonical repository-relative paths. */
@@ -602,7 +633,7 @@ export function findingLocationIssues(entry) {
   });
 }
 
-/** Read both the current locations format and older file/files returns. */
+/** Read the current locations format and older file/files/path/evidence returns. */
 export function findingFiles(entry) {
   return rawFindingLocations(entry)
     .map(locationPath)
@@ -610,9 +641,9 @@ export function findingFiles(entry) {
 }
 
 /**
- * The floor over the shared contract's severity vocabulary. `blocker` and `high` hold the ship;
- * the rest ride as concerns. An absent or unrecognized severity holds the ship, so a malformed
- * return cannot demote itself below the floor.
+ * The floor over the shared contract's severity vocabulary. `blocker` and `high` are blockers;
+ * the rest ride as concerns. An absent or unrecognized severity remains a blocker, so a
+ * malformed return cannot demote itself below the floor.
  */
 const BLOCKING_SEVERITIES = new Set(["blocker", "high"]);
 const SUB_FLOOR_SEVERITIES = new Set(["medium", "low", "info"]);
@@ -643,9 +674,9 @@ export function partitionFindings(pkg, findings) {
  */
 export function classifyCoverage(pkg, finding) {
   const criteria = Array.isArray(pkg.criteria) ? pkg.criteria : [];
-  const declared = typeof finding?.criterion === "string" ? finding.criterion.toLowerCase() : null;
-  if (declared === null) return { coverage: "unknown", criterion: null, source: null };
-  const texts = criteria.map((entry) => ({ entry, text: String(entry?.text ?? "").toLowerCase() })).filter((item) => item.text.length > 0);
+  const declared = typeof finding?.criterion === "string" ? finding.criterion.trim().toLowerCase() : null;
+  if (declared === null || declared.length === 0) return { coverage: "unknown", criterion: null, source: null };
+  const texts = criteria.map((entry) => ({ entry, text: String(entry?.text ?? "").trim().toLowerCase() })).filter((item) => item.text.length > 0);
   const exact = texts.filter((item) => item.text === declared);
   // Containment is a fallback, and only when it picks out exactly one criterion: binding a
   // finding to the first criterion that happens to share a substring names the wrong requirement.
@@ -716,13 +747,31 @@ function aggregateLensReturns(entries) {
   };
 }
 
-/** Fail-closed join: an absent required return is never a pass. */
-export function gateDecision(pkg, returns) {
-  const reasons = [];
+/**
+ * Return the lenses selected by the package while accepting both current and historical fields.
+ * Selection is context for Main; it never gives a lens authority over closure or publication.
+ */
+function selectedLenses(pkg) {
+  return [...new Set([
+    ...(Array.isArray(pkg.required_lenses) ? pkg.required_lenses : []),
+    ...(Array.isArray(pkg.requested_lenses) ? pkg.requested_lenses : []),
+    ...(Array.isArray(pkg.recommended_lenses) ? pkg.recommended_lenses : []),
+  ])].sort();
+}
+
+/**
+ * Summarize lens evidence without deciding whether the work is ready to publish.
+ *
+ * Every return remains in a lens group and every finding is retained. Missing, incomplete,
+ * failed or disputed evidence is an observation for Main to judge; it is not a closure rule.
+ */
+export function reviewSummary(pkg, returns) {
+  const observations = [];
   const byLens = new Map();
   const extra = [];
+  const selected = new Set(selectedLenses(pkg));
   for (const entry of returns) {
-    if (!pkg.required_lenses.includes(entry.lens)) { extra.push(entry); continue; }
+    if (!selected.has(entry.lens)) extra.push(entry);
     const group = byLens.get(entry.lens) ?? [];
     group.push(entry);
     byLens.set(entry.lens, group);
@@ -731,13 +780,8 @@ export function gateDecision(pkg, returns) {
   const concerns = [];
   const covered = [];
   const unknownCoverage = [];
-  const specDefects = [];
-  for (const lens of pkg.required_lenses) {
-    const entries = byLens.get(lens);
-    if (entries === undefined) {
-      reasons.push(`required lens ${lens} returned nothing`);
-      continue;
-    }
+  const lensResults = [];
+  for (const [lens, entries] of byLens) {
     const entry = aggregateLensReturns(entries);
     const split = partitionFindings(pkg, entry.findings ?? []);
     concerns.push(...split.concerns);
@@ -745,31 +789,36 @@ export function gateDecision(pkg, returns) {
       const classified = { ...classifyCoverage(pkg, blocker), lens, finding: blocker };
       (classified.coverage === "covered" ? covered : unknownCoverage).push(classified);
     }
-    // A lens that did not finish says so, and an unfinished pass is not a pass. That is the
-    // lens's own knowledge about its work, not a correlation field. An absent status is
-    // treated as unfinished, because a missing answer is not a completed one.
-    if (entry.lens_status !== "complete") {
-      reasons.push(`required lens ${lens} did not finish (${entry.lens_status ?? "no lens_status"})`);
+    lensResults.push({ lens, outcome: entry, returns: entries });
+    for (const original of entries) {
+      // These observations describe evidence for Main; they do not hold publication by
+      // themselves. An absent status is still recorded as an incomplete response.
+      if (original.lens_status !== "complete") {
+        observations.push(`lens ${lens} did not finish (${original.lens_status ?? "no lens_status"})`);
+      }
+      const disputed = blockingDisagreements(original);
+      if (disputed.length > 0) {
+        observations.push(`lens ${lens} left ${disputed.length} blocking disagreement(s) unresolved`);
+      }
+      if (original.verdict !== "pass") observations.push(`lens ${lens} returned ${original.verdict}`);
     }
-    const disputed = blockingDisagreements(entry);
-    if (disputed.length > 0) {
-      reasons.push(`required lens ${lens} left ${disputed.length} blocking disagreement(s) unresolved`);
-    }
-    if (entry.verdict !== "pass") reasons.push(`required lens ${lens} returned ${entry.verdict}`);
-    if (split.blockers.length > 0) reasons.push(`required lens ${lens} returned ${split.blockers.length} blocker(s)`);
+    if (split.blockers.length > 0) observations.push(`lens ${lens} returned ${split.blockers.length} blocker(s)`);
   }
+  const missing = selectedLenses(pkg).filter((lens) => !byLens.has(lens));
+  for (const lens of missing) observations.push(`selected lens ${lens} returned nothing`);
   return {
-    ready: reasons.length === 0,
-    reasons,
-    concerns,
-    covered,
-    unknown_coverage: unknownCoverage,
-    // Retain the field for consumers that read historical gate output. New
-    // decisions never infer a spec defect from an unmatched criterion.
-    spec_defects: specDefects,
+    lens_results: lensResults.sort((left, right) => left.lens.localeCompare(right.lens)),
+    missing,
+    observations: observations.sort(),
+    concerns: concerns.sort((left, right) => stableSerialize(left).localeCompare(stableSerialize(right))),
+    covered: covered.sort((left, right) => stableSerialize(left).localeCompare(stableSerialize(right))),
+    unknown_coverage: unknownCoverage.sort((left, right) => stableSerialize(left).localeCompare(stableSerialize(right))),
     unrequested: extra.slice().sort((left, right) => stableSerialize(left).localeCompare(stableSerialize(right))),
   };
 }
+
+// Source-compatible function alias. The returned object is a factual summary, never a gate.
+export const gateDecision = reviewSummary;
 
 async function readJson(target, code) {
   try {
@@ -779,12 +828,22 @@ async function readJson(target, code) {
   }
 }
 
-async function runGate(input) {
+async function runSummary(input) {
   const pkg = await readJson(input.package, "PACKAGE_INVALID");
-  if (!object(pkg) || !Array.isArray(pkg.required_lenses) || !object(pkg.scope)) fail("PACKAGE_INVALID");
+  const lensFields = ["required_lenses", "requested_lenses", "recommended_lenses"];
+  const validPaths = (value) => Array.isArray(value)
+    && value.every((entry) => typeof entry === "string" && entry.length > 0);
+  const validScope = object(pkg?.scope)
+    && ["full", "delta"].includes(pkg.scope.kind)
+    && validPaths(pkg.scope.paths)
+    && (pkg.scope.range_paths === undefined || validPaths(pkg.scope.range_paths));
+  if (!object(pkg) || !object(pkg.scope)
+    || !lensFields.some((field) => Array.isArray(pkg[field]))
+    || !validScope
+    || selectedLenses(pkg).some((lens) => !LENSES.includes(lens))) fail("PACKAGE_INVALID");
   const returns = await readJson(input.returns, "RETURNS_INVALID");
   if (!Array.isArray(returns) || returns.length > MAX_RETURNS || !returns.every(validReturn)) fail("RETURNS_INVALID");
-  return { decision: gateDecision(pkg, returns) };
+  return { summary: reviewSummary(pkg, returns) };
 }
 
 function result(kind, payload, error = null) {
@@ -803,13 +862,15 @@ export async function runReviewFan(input) {
     if (subcommand === "package") {
       return result("team_harness_inline_review_package", { package: await buildPackage(input) });
     }
-    if (subcommand === "gate") {
-      return result("team_harness_inline_review_gate", await runGate(input));
+    if (subcommand === "gate" || subcommand === "summary") {
+      return result("team_harness_inline_review_summary", await runSummary(input));
     }
     return fail("ARGUMENT_INVALID");
   } catch (error) {
     const code = ERROR_CODES.has(error?.message) ? error.message : "INTERNAL_ERROR";
-    const kind = subcommand === "gate" ? "team_harness_inline_review_gate" : "team_harness_inline_review_package";
+    const kind = subcommand === "gate" || subcommand === "summary"
+      ? "team_harness_inline_review_summary"
+      : "team_harness_inline_review_package";
     return result(kind, {}, code);
   }
 }
@@ -827,7 +888,7 @@ const KEYS = {
 
 function parseCli(argv) {
   const [subcommand, ...rest] = argv;
-  if (!["package", "gate"].includes(subcommand) || rest.length % 2 !== 0) return null;
+  if (!["package", "gate", "summary"].includes(subcommand) || rest.length % 2 !== 0) return null;
   const parsed = { subcommand };
   for (let index = 0; index < rest.length; index += 2) {
     const key = KEYS[rest[index]];
@@ -841,5 +902,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const parsed = parseCli(process.argv.slice(2));
   const output = await runReviewFan(parsed ?? {});
   process.stdout.write(`${JSON.stringify(output)}\n`);
-  if (output.verdict !== "pass" || output.decision?.ready === false) process.exitCode = 1;
+  if (output.verdict !== "pass") process.exitCode = 1;
 }
