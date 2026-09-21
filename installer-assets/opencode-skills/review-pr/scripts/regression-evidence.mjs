@@ -79,7 +79,7 @@ async function inputs(requestPath) {
 }
 
 async function git(snapshot, args, maxBuffer = 4 * 1024 * 1024) {
-  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.toUpperCase().startsWith("GIT_")));
   Object.assign(env, {
     GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: gitGlobalConfigNull, GIT_CONFIG_COUNT: "0",
     GIT_NO_REPLACE_OBJECTS: "1", GIT_TERMINAL_PROMPT: "0", GIT_NO_LAZY_FETCH: "1",

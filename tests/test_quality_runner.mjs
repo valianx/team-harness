@@ -18,7 +18,7 @@ import {
   runQualityChecks,
   validateQualityManifest,
 } from "../plugins/team-harness/skills/pipeline/scripts/quality-runner.mjs";
-import { createGitRunners, resolveGitTimeoutMs } from "../plugins/team-harness/skills/pipeline/scripts/quality-lib.mjs";
+import { createGitRunners, repositoryGitEnv, resolveGitTimeoutMs } from "../plugins/team-harness/skills/pipeline/scripts/quality-lib.mjs";
 
 const failures = [];
 const node = process.execPath;
@@ -187,6 +187,17 @@ await check("Git helpers ignore a parent's unrelated repository selection", asyn
     const unrelated = path.join(workspace, "unrelated");
     await mkdir(unrelated);
     git(unrelated, "init", "-q");
+    const mixedCase = repositoryGitEnv({
+      ...process.env,
+      git_dir: path.join(unrelated, ".git"),
+      Git_Work_Tree: unrelated,
+      Git_Common_Dir: path.join(unrelated, ".git"),
+      git_index_file: path.join(unrelated, ".git", "index"),
+      Git_Object_Directory: path.join(unrelated, ".git", "objects"),
+    });
+    assert.equal(execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: repo, env: mixedCase, encoding: "utf8", windowsHide: true,
+    }).trim(), candidate);
     const keys = ["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY"];
     const prior = Object.fromEntries(keys.map(key => [key, process.env[key]]));
     try {

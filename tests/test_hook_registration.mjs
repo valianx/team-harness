@@ -46,8 +46,16 @@ for (const path of [
   "plugins/team-harness/hooks/hooks.json",
   "plugins/team-harness/hooks/run-codex-hook.sh",
   "tools/codex-runtime/sync-hooks.mjs",
-  "hooks/ts/opencode-plugin.ts",
+  "hooks/adapters/notify-stage.opencode.yaml",
+  "hooks/ts/entry/notify-stage.opencode.ts",
   "hooks/ts/entry/session-enforcement.opencode.ts",
+  "hooks/ts/opencode-plugin.ts",
+  "hooks/ts/shim/opencode-config.ts",
+  "plugins/team-harness/hooks/adapters/notify-stage.opencode.yaml",
+  "plugins/team-harness/hooks/ts/entry/notify-stage.opencode.ts",
+  "plugins/team-harness/hooks/ts/entry/session-enforcement.opencode.ts",
+  "plugins/team-harness/hooks/ts/opencode-plugin.ts",
+  "plugins/team-harness/hooks/ts/shim/opencode-config.ts",
 ]) {
   await assert.rejects(access(join(root, path)), { code: "ENOENT" }, `${path} still exists`);
 }

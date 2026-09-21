@@ -40,10 +40,39 @@ try {
   await assert.rejects(access(leftover), { code: "ENOENT" });
   await syncClaudePackageAssets({ rootDir, check: true });
 
+  await rm(join(rootDir, "hooks", shipped[1]));
+  const removedCanonicalMirror = join(rootDir, "plugins/team-harness/hooks", shipped[1]);
+  assert.equal(await readFile(removedCanonicalMirror, "utf8"), `fixture:${shipped[1]}\n`);
+  await assert.rejects(syncClaudePackageAssets({ rootDir, check: true }), /assets are stale/);
+  assert.equal(
+    await readFile(removedCanonicalMirror, "utf8"),
+    `fixture:${shipped[1]}\n`,
+    "check mode must not remove a mirror whose canonical source was removed",
+  );
+  await syncClaudePackageAssets({ rootDir, check: false });
+  await assert.rejects(access(removedCanonicalMirror), { code: "ENOENT" });
+  assert.equal(
+    await readFile(join(rootDir, "plugins/team-harness/hooks", shipped[0]), "utf8"),
+    `fixture:${shipped[0]}\n`,
+    "active canonical hooks must remain packaged",
+  );
+
   await writeFile(join(rootDir, "hooks", shipped[0]), "changed distributed hook\n");
   await assert.rejects(syncClaudePackageAssets({ rootDir, check: true }), /assets are stale/);
   await syncClaudePackageAssets({ rootDir, check: false });
   await syncClaudePackageAssets({ rootDir, check: true });
+
+  const nestedUnrelated = join(rootDir, "nested-unrelated");
+  const nestedTarget = join(rootDir, "plugins/team-harness/hooks/ts/dist");
+  const nestedSentinel = join(nestedUnrelated, "session-start.cjs");
+  await mkdir(nestedUnrelated, { recursive: true });
+  await writeFile(nestedSentinel, "preserve nested unrelated file\n");
+  await rm(nestedTarget, { recursive: true });
+  await symlink(nestedUnrelated, nestedTarget, process.platform === "win32" ? "junction" : "dir");
+  for (const check of [true, false]) {
+    await assert.rejects(syncClaudePackageAssets({ rootDir, check }), /symbolic link/);
+    assert.equal(await readFile(nestedSentinel, "utf8"), "preserve nested unrelated file\n");
+  }
 
   const unrelated = join(rootDir, "unrelated");
   const sentinel = join(unrelated, "ts/dist/opencode-plugin.cjs");
