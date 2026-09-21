@@ -1,6 +1,11 @@
 # operator-response-normalization Specification
 
 ## Purpose
+This retained specification describes legacy v5 helper behavior and historical
+records. Current workflow coordination is defined by `pipeline-control-plane`
+and `specialist-coordination-protocol`; new tasks do not require these old
+gates, leases, journals or administrative transitions.
+
 Make operator decisions concise and conversational while binding every interpreted response to the current live prompt and preserving consequential authority boundaries.
 
 ## Requirements

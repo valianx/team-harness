@@ -1,6 +1,11 @@
 # contract-right-sizing Specification
 
 ## Purpose
+This retained specification describes legacy v5 helper behavior and historical
+records. Current workflow coordination is defined by `pipeline-control-plane`
+and `specialist-coordination-protocol`; new tasks do not require these old
+gates, leases, journals or administrative transitions.
+
 Keep specialist contracts concise and grounded in the artifacts needed for their assigned work, with optional comparative measurements that report their evidence and limits.
 
 ## Requirements

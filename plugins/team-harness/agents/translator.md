@@ -142,7 +142,7 @@ Merge locale fragments from parallel batches into final locale files, verify bui
 1. Read `README.md`, `package.json` (or equivalent), and route/page structure
 2. Identify the **product domain** — what does this app do? (e.g., billing platform, project management, e-commerce)
 3. Note key **domain concepts** — the nouns and verbs that define the product (e.g., "Factura", "Cliente", "Pago", "Enviar cotización")
-4. Read `00-knowledge-context.md` if it exists for prior insights
+4. Read relevant existing workspace notes for prior terminology decisions
 
 ### 0.2 — Framework Detection
 

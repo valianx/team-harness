@@ -12,11 +12,13 @@ behavior, documented claims and inference; cite sources and disclose important g
 
 Delegate distinct questions to researchers when useful. Give them bounded scope
 and compare their evidence rather than treating agreement or a verdict as authority.
-An architect or research consolidator can help with a complex synthesis; a fixed
-agent count or extra consolidation stage is not required for every question.
+Use the host's native task or session dispatch when parallel work helps; otherwise
+research directly. An architect or research consolidator can help with a complex
+synthesis, but a fixed agent count or extra consolidation stage is not required.
 
 Follow the [research method](../../agents/ref-architect-modes.md#research-mode)
-for the report. Preserve configured workspace/Obsidian, language and voice;
-save useful evidence and recommendations as `research/00-research.md` there.
+for the report. The caller supplies the absolute workspace path; preserve its
+local or Obsidian destination, language and voice. Save useful evidence and
+recommendations as `research/00-research.md` there.
 Report the conclusion, tradeoffs and remaining uncertainty without activating
 a pipeline or implementing a recommendation unless the operator requests it.

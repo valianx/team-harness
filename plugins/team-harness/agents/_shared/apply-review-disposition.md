@@ -1,23 +1,19 @@
 # Apply-Review Disposition
 <!-- Single source of truth for the author-side conservative disposition
      governing how reviewer comments are evaluated during comment incorporation.
-     Consumed by: agents/orchestrator.md (automatic, lifecycle-bound injection).
-     Edit here; the orchestrator references this file by section and never
-     restates it inline. -->
+     Consumed by: Main's direct apply-review mode and any explicitly selected
+     coordinator path that incorporates PR comments. Edit here; entry points
+     reference this file rather than restating the disposition inline. -->
 
 ## Untrusted content
 
 See `agents/_shared/untrusted-content.md`.
 
-## Mandatory adherence
+## Applying the guidance
 
-When a PR carries reviewer comments (inline or body), Steps 1–5 of this
-disposition are ALWAYS executed for every comment — no ad-hoc path. There is
-no shortcut: evaluating a comment without the two-axis classification, the
-mandatory verification filter, the deletion discipline check, and the
-per-comment output template is a process violation. The disposition runs in
-full or not at all. See also `orchestrator.md § PR Comment Incorporation —
-Apply-Review Disposition` and `ref-direct-modes.md § Apply-Review Mode`.
+For each comment, use Steps 1–5 to assess its intent, severity, evidence and
+appropriate disposition. Main owns the decision and records enough reasoning
+to explain it. Use `skills/apply-review/SKILL.md` for the active workflow.
 
 ## Default bias: CONSERVATIVE
 
@@ -150,6 +146,12 @@ Options:
 - Defer to a tracked follow-up when the finding is valid but out of this PR's
   scope (Decision = DEFERRED; a follow-up reference is required).
 
+The decision describes whether the reviewer's underlying concern is resolved, not
+whether every word of the proposed remedy was followed. An alternative that
+fully resolves the concern is `APPLIED`, with the alternative recorded in the
+evidence. `PARTIAL` means a residual concern remains; keep the thread open until
+that residue is addressed or explicitly deferred.
+
 ## Step 5 — Per-comment output
 
 For each comment processed, emit:
@@ -177,7 +179,14 @@ Note: {one line}
 Thread action: {reply + resolve | reply, left open}
 ```
 
-**Decision-ledger append.** Immediately after emitting the per-comment output above, the orchestrator appends one `disposition` line to `00-decision-ledger.*` for that comment, with `phase: "4.5-review"`, `subject` set to the comment's one-line summary, and `rationale` set to the Evidence/Note text. The `Decision` value above maps deterministically to the ledger's `accept | watch | reject` vocabulary: `APPLIED → accept`, `PARTIAL → watch`, `DEFERRED → watch`, `REJECTED → reject`, `NEEDS-CLARIFICATION → reject`. See `docs/observability.md § "Decision Ledger"` for write mechanics and mapping. This telemetry is never mirrored into `00-execution-events` and grants no pipeline authority; control actions follow `agents/_shared/orchestrator-state.md`.
+**Decision-ledger append.** When the active workflow retains a decision ledger, Main records one
+`disposition` line for that comment after emitting the per-comment output, with `phase: "4.5-review"`,
+`subject` set to the comment's one-line summary, and `rationale` set to the Evidence/Note text.
+The `Decision` value above maps deterministically to the ledger's `accept | watch | reject`
+vocabulary: `APPLIED → accept`, `PARTIAL → watch`, `DEFERRED → watch`, `REJECTED → reject`,
+`NEEDS-CLARIFICATION → reject`. See `docs/observability.md § "Decision Ledger"` for write mechanics
+and mapping. This telemetry grants no pipeline or publication authority; the active workflow makes
+those decisions from the disposition and its evidence.
 
 ## Step 6 — Reply and resolve on the thread
 
@@ -191,13 +200,13 @@ distinct actions on two distinct axes. Never confuse them.
 | Decision | Reply to thread? | Resolve thread? | Thread left | Rationale |
 |----------|------------------|-----------------|-------------|-----------|
 | `APPLIED` | yes (states what was applied) | **yes** (`resolveReviewThread`) | resolved | the concern is fully addressed in code |
-| `PARTIAL` | yes (states applied part + residual) | only if the applied part FULLY resolves the thread's concern; else **no** | resolved only when no residual remains; otherwise open | partial work must not hide a residual concern |
+| `PARTIAL` | yes (states applied part + residual) | **no** | open | partial work leaves a residual concern visible |
 | `DEFERRED` | yes (states the finding is acknowledged + the follow-up reference) | **no** | open | legitimate finding postponed to a tracked follow-up — must stay visible |
 | `REJECTED` | yes (states the evidence-backed rationale) | **no** | open | disagreement; the reviewer must see the argument and decide |
 | `NEEDS-CLARIFICATION` | yes (asks the question) | **no** | open | the concern cannot be evaluated yet |
 
 **Invariants — pinned, non-negotiable:**
-- Never mass-resolve. Resolve threads one at a time, gated strictly on Decision = APPLIED.
+- Never mass-resolve. Resolve threads one at a time, strictly on Decision = APPLIED.
 - Never resolve a thread with unfinished work. A residual concern must stay visible.
 - Resolving a thread does NOT dismiss a `CHANGES_REQUESTED` review (resolve ≠
   dismiss) — a CHANGES_REQUESTED review persists until the reviewer submits a
@@ -215,14 +224,12 @@ thread, do not issue one `gh api graphql` call per thread. Compose the whole
 pass's replies and resolves into one aliased request per
 `agents/_shared/gh-fallback.md` § "Tier B — batched review disposition
 (aliased mutation)": build the ledger from the per-comment Decisions above
-(Step 5) and this table's thread-action mapping, preview the full composed
-payload to the operator in chat, then issue the single gated call. This
-collapses what would otherwise be one `ask` per thread into exactly one `ask`
-for the whole pass, without changing which threads get resolved (the
-Decision→thread-action mapping above is unchanged — batching only changes
-how many `gh api graphql` calls carry it out). The single-thread sections
-remain the fallback whenever `gh` is unavailable, no token is set, or the
-batched call itself fails to reach the API.
+(Step 5) and this table's thread-action mapping, then issue the single request
+when the operator has already authorized this external comment pass. Batching
+does not grant authorization or change which threads get resolved; it only
+changes how many `gh api graphql` calls carry out the existing decisions. The
+single-thread sections remain the fallback whenever `gh` is unavailable, no
+token is set, or the batched call itself fails to reach the API.
 
 **Issue-level comments** (general PR discussion, not line-anchored review
 threads) receive a reply but are NOT resolvable — they have no `isResolved`

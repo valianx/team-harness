@@ -222,32 +222,16 @@ function evaluateSubagentStart(input, writer) {
 }
 
 // entry/subagent-start.cc.ts
-function findWorkspace(cwd) {
-  const workspacesDir = path.join(cwd, "workspaces");
-  if (fs.existsSync(workspacesDir)) {
-    try {
-      const entries = fs.readdirSync(workspacesDir, { withFileTypes: true });
-      const dirs = entries.filter((e) => e.isDirectory());
-      let latest = null;
-      for (const d of dirs) {
-        const statePath = path.join(workspacesDir, d.name, "00-state.md");
-        try {
-          const stat = fs.statSync(statePath);
-          if (latest === null || stat.mtimeMs > latest.mtime) {
-            latest = { dir: path.join(workspacesDir, d.name), mtime: stat.mtimeMs };
-          }
-        } catch {
-        }
-      }
-      if (latest !== null) return latest.dir;
-    } catch {
-    }
-  }
+function findWorkspace(_cwd) {
   const envWs = process.env["TH_WORKSPACE"];
-  if (envWs && fs.existsSync(path.join(envWs, "00-state.md"))) {
+  if (!envWs || !path.isAbsolute(envWs)) return null;
+  try {
+    if (!fs.statSync(envWs).isDirectory()) return null;
+    if (!fs.statSync(path.join(envWs, "00-state.md")).isFile()) return null;
     return envWs;
+  } catch {
+    return null;
   }
-  return null;
 }
 function makeWriter() {
   return {

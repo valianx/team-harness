@@ -1,6 +1,6 @@
 ---
 name: pipeline
-description: "Explicitly start the gated Team Harness pipeline for a task."
+description: "Start the operator-selected coordinated Team Harness workflow."
 metadata:
   opencode/autoinvoke: "false"
 ---

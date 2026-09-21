@@ -1,5 +1,10 @@
 # Discover Phase — Intake Disposition Contract
 
+> Legacy v5 reference retained for historical records and compatibility helpers.
+> Current workflows use native coordination from `agents/ref-pipeline.md` and
+> the selected skill. They do not require the leases, gate events, state schemas
+> or administrative closure described below.
+
 **Current v5 scope.** This document supplies conversational intake guidance and optional context
 for the canonical pipeline. The authoritative entry, lifecycle, recovery, dispatch, lease, and
 projection rules are `plugins/team-harness/skills/pipeline/SKILL.md` and

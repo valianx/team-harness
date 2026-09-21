@@ -1,44 +1,19 @@
 ---
 name: deliver
-description: Resume an already-validated workspace at its release gate and publish it after explicit operator approval.
+description: Prepare and carry out the authorized delivery of completed work.
 ---
 
-Analyze the input: $ARGUMENTS
+# Deliver
 
-Use [workspace](../workspace/SKILL.md) to resolve the effort in the configured
-local/Obsidian location. Pass its absolute root as `workspaces path:` in dispatch.
+Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
+its configured local or Obsidian mode. Main coordinates with native tools and
+permissions. Reuse authorization for unchanged work and ask only for a missing
+decision. Specialists provide evidence and recommendations; Main judges them.
 
-Use [create-pr](../create-pr/SKILL.md) for relevant PR preparation and publication. Its
-selection is automatic by relevance and does not activate the pipeline. Publication preserves
-existing authority; only active pipeline publication requires the accepted Freeze identity.
-
-## Route
-
-Always route through the top-level `orchestrator`; never invoke `delivery`
-directly.
-
-When a feature name is present, pass:
-
-```text
-Direct Mode Task:
-- Mode: deliver
-- workspaces path: {absolute-workspace-root}
-- Feature: {feature-name}
-```
-
-When no feature name is present:
-
-1. inspect existing `00-state.md` files in the configured workspace location;
-2. select the sole workspace with completed verification and an unresolved
-   release gate;
-3. when several qualify, ask the operator which feature to deliver; and
-4. when none qualify, report that no validated workspace is ready.
-
-## Boundary
-
-- This skill does not run sketch checks, tests, CI, or publication commands.
-- The orchestrator re-presents any unresolved STAGE-GATE-3 before publishing.
-- After `ship`, Phase 4 invokes `delivery` once for changelog, acceptance matrix,
-  and PR-body prose, then the orchestrator executes the deterministic mechanics.
-- Completion reports the PR URL and current merge state. CI is reported as the
-  current snapshot; the flow never waits for CI to finish.
+Inspect the candidate, existing validation and unresolved findings. Resolve a
+specific effort through the workspace skill; ask only if the target is ambiguous.
+Use [create-pr](../create-pr/SKILL.md) for PR preparation and publication, including
+OpenSpec archive and transient-file hygiene. A delivery specialist may draft
+release material; Main performs authorized outward actions with native tools.
+Report the PR URL and observed CI/merge state. Continue waiting or merging only
+when that belongs to the user's request. No separate TH ship token is required.

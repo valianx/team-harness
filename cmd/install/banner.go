@@ -286,7 +286,7 @@ func colorWarn(s string) string {
 // the binary or running it from a shell). In non-interactive mode (CI / script
 // / piped input) it returns immediately so automation is never blocked.
 //
-// Call this at the end of a successful install path, after printSummary.
+// Call this at the end of a successful install path.
 func pressEnterToExit() {
 	if !isTerminal() {
 		return

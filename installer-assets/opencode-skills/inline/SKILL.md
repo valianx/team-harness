@@ -1,6 +1,6 @@
 ---
 name: inline
-description: "Declare, exit, or query the inline working posture (operator-only session toggle)."
+description: "Select, leave or inspect the direct working preference for this session."
 metadata:
   opencode/autoinvoke: "false"
 ---

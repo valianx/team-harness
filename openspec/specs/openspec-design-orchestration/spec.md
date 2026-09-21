@@ -1,6 +1,11 @@
 # openspec-design-orchestration Specification
 
 ## Purpose
+This retained specification describes legacy v5 helper behavior and historical
+records. Current workflow coordination is defined by `pipeline-control-plane`
+and `specialist-coordination-protocol`; new tasks do not require these old
+gates, leases, journals or administrative transitions.
+
 Defines how Team Harness treats OpenSpec as the canonical Design source while adding only its execution overlay, specialist governance, evidence, and gate controls.
 
 ## Requirements

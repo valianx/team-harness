@@ -13,44 +13,22 @@ import { inboundCC, ShimRejectError } from "../shim/shim.js";
 import { evaluateSubagentStart, type SubagentStartWriter } from "../bodies/subagent-start.js";
 
 // ---------------------------------------------------------------------------
-// Workspace locator: walks up from cwd looking for workspaces/ dir.
-// Falls back to looking for 00-state.md in common locations.
-// Mirrors hooks/ts/entry/subagent-trace.cc.ts (the stop-side twin).
+// Workspace binding: only an explicit absolute TH_WORKSPACE is eligible.
+// Never infer a workspace from cwd or file modification time; a missing or
+// invalid binding makes this observational hook a silent no-op.
 // ---------------------------------------------------------------------------
 
-function findWorkspace(cwd: string): string | null {
-  // Strategy 1: look for workspaces/<anything>/00-state.md under cwd.
-  const workspacesDir = path.join(cwd, "workspaces");
-  if (fs.existsSync(workspacesDir)) {
-    try {
-      const entries = fs.readdirSync(workspacesDir, { withFileTypes: true });
-      const dirs = entries.filter((e) => e.isDirectory());
-      // Return most recently modified workspace with a 00-state.md.
-      let latest: { dir: string; mtime: number } | null = null;
-      for (const d of dirs) {
-        const statePath = path.join(workspacesDir, d.name, "00-state.md");
-        try {
-          const stat = fs.statSync(statePath);
-          if (latest === null || stat.mtimeMs > latest.mtime) {
-            latest = { dir: path.join(workspacesDir, d.name), mtime: stat.mtimeMs };
-          }
-        } catch {
-          // Not found — skip.
-        }
-      }
-      if (latest !== null) return latest.dir;
-    } catch {
-      // Cannot read directory — continue.
-    }
-  }
-
-  // Strategy 2: environment variable TH_WORKSPACE.
+function findWorkspace(_cwd: string): string | null {
   const envWs = process.env["TH_WORKSPACE"];
-  if (envWs && fs.existsSync(path.join(envWs, "00-state.md"))) {
-    return envWs;
-  }
+  if (!envWs || !path.isAbsolute(envWs)) return null;
 
-  return null;
+  try {
+    if (!fs.statSync(envWs).isDirectory()) return null;
+    if (!fs.statSync(path.join(envWs, "00-state.md")).isFile()) return null;
+    return envWs;
+  } catch {
+    return null;
+  }
 }
 
 function makeWriter(): SubagentStartWriter {

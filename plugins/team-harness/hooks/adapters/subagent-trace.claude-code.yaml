@@ -15,9 +15,11 @@ capabilities:
 # Matcher: th:.* (only th: agents)
 # Timeout: 5s
 # Output: NONE (writes 00-subagent-trace.jsonl; never emits stdout)
-# Fail mode: FAIL-OPEN. Profile gate: pipeline-observability class.
-# IMPORTS hook-profile (observability body — allowed).
+# Fail mode: FAIL-OPEN. This breadcrumb is not profile-gated.
+# Workspace binding: writes only when TH_WORKSPACE is absolute and valid.
 notes: >
   SubagentStop breadcrumb writer. NEVER blocks. NEVER emits stdout.
-  Profile gate: suppressed under TH_HOOK_PROFILE=minimal.
+  The breadcrumb remains enabled under every TH_HOOK_PROFILE value.
+  It writes only when the explicit absolute TH_WORKSPACE binding contains
+  00-state.md; without that binding the hook skips silently.
   Scope guard: agent_type must start with "th:" — others skipped silently.

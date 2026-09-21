@@ -1,6 +1,11 @@
 # design-single-pass Specification
 
 ## Purpose
+This retained specification describes legacy v5 helper behavior and historical
+records. Current workflow coordination is defined by `pipeline-control-plane`
+and `specialist-coordination-protocol`; new tasks do not require these old
+gates, leases, journals or administrative transitions.
+
 Collapse the two-architect OpenSpec Design transaction to one dispatch. The overlay pass was transcription policed by deterministic validators, not judgment; a script derives the mechanical content and the planning architect supplies the judgment content in its single pass.
 
 ## Requirements

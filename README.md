@@ -38,7 +38,7 @@ for brief conversations and read-only status requests.
 [OpenSpec](./docs/openspec-integration.md) owns proposal, spec, design, and task
 artifacts for work that needs written intent. Completed changes are archived in
 the implementation PR. The broader pipeline is an explicitly selected workflow;
-its coordination state and gates are not prerequisites for every TH request.
+it uses native tasks and permissions without its own gate tokens or control journal.
 
 ---
 
@@ -81,7 +81,7 @@ $team-harness:setup
 
 The setup skill configures native Team Harness settings, optional MCP servers,
 workspace/language preferences, optional workspace-to-GitHub identity routes,
-and thirteen specialist agents: seven for the gated
+and thirteen specialist agents: seven for the coordinated
 pipeline, one direct read-only inline reviewer, and five for immutable PR review. It preserves
 Codex's native permission and hook-trust prompts. It can also import every
 missing setting from an existing Claude Code or opencode Team Harness config;
@@ -146,25 +146,12 @@ The same canonical capability catalog is shipped to Claude Code, Codex, and
 opencode. Runtime adapters translate native paths, tools, permissions, and
 delegation without maintaining separate feature lists.
 
-`init` performs lightweight intake and direct bounded work without pipeline
-state or agent preflight. A current live request for tester, QA, security, or
-adversary may dispatch the native `inline-reviewer` over the local project.
-Each requested lens reads the anchored repository root and immutable commit or
-range through a native `read-only` sandbox; no workspace, state, events, gates,
-branch, delivery record, or publication is created. The adversary lens is added
-only when the security floor applies (changed auth, permissions, identity,
-secrets, cryptography, untrusted input, uploads, data export, executable code,
-or security policy/audit controls; ambiguity is sensitive) or the operator
-requests it. Each lens attempt has a fresh identity and a selected-agent
-preflight; replayed or substituted returns are untrusted. A missing or stale
-target, unsupported lens, or unavailable read-only boundary is explicit and
-cannot produce PASS; global PASS requires every required lens to complete with
-`verdict: pass`. Reviewers must stay in the project root, although the
-read-only boundary prevents mutation rather than enforcing filesystem
-confinement. PR text, numbers, and URLs always route exclusively to
-`review-pr`; generic inline review never intercepts that snapshot/publication
-flow. `pipeline` explicitly starts the full gated workflow in `Main`; it does
-not create a seventh coordinator or require `/agent`.
+The native general agent selects the current skill. `init` helps frame the task;
+`spec` retains written intent and tasks; `pipeline` supplies broader coordination.
+Independent reviewers inspect an anchored candidate through native read-only
+capabilities. Main preserves findings and limits, judges recommendations and
+verifies corrections. A PR reference identifies the target; the requested action
+selects review, comment application, publication or merge.
 
 Use `review-pr --regressions` to investigate concrete suspected defects with the
 same bounded assertion against the captured base and PR head. The existing
@@ -232,8 +219,7 @@ The installer writes only the Memory URL literally to `opencode.json`. Both secr
 
 **Security note:** The downloaded binary is verified against the published `SHA256SUMS` before it runs. The checksum file is served over HTTPS from the GitHub release origin but is not cryptographically signed — verification protects against corruption and tampering of the binary relative to the checksum, not against a compromise of the release origin (TOFU over HTTPS).
 
-`/th:setup` configures the two required MCP servers (Memory and context7), the
-**logs mode**, and optional workspace-to-GitHub identity routes. The identity
+`/th:setup` configures workspace preferences, optional integrations, and optional workspace-to-GitHub identity routes. The identity
 routes use the same token-free schema in Claude Code, Codex, and opencode; see
 [GitHub identity routing](./docs/github-identities.md).
 
@@ -302,7 +288,7 @@ Alternatively, type `/th-update` inside opencode. The command instructs the agen
 After install, work with your runtime's native general agent. It discovers Team Harness skills and coordinates the workflow you select without replacing its native identity. The entry points in Claude Code are:
 
 - `/th:spec <request>` — develop from written intent, tasks, and independent review
-- `/th:pipeline <request>` — activate the gated multi-agent pipeline
+- `/th:pipeline <request>` — activate the coordinated multi-agent workflow
 - `/th:review-pr <PR>` — review an existing pull request
 - `/th:create-pr` — prepare and publish completed work using existing authorization
 - `/th:setup` — configure logs-mode, vault path, and verify MCP connectivity
@@ -338,8 +324,7 @@ Full contract: docs/dev-mode.md.
 
 **Required:**
 - [Claude Code](https://docs.claude.com/en/docs/claude-code) — the primary runtime team-harness depends on. opencode is also supported through projected agents, skills, and rules plus its native permission model. See [`docs/lifecycle.md`](./docs/lifecycle.md) for the stage-by-stage maturity of each runtime and the [migration guide](./docs/opencode-migration-guide.md)
-- [context7](https://context7.com/) API key — for library docs retrieval
-- A reachable [Memory MCP](https://github.com/valianx/context-harness-mcp) URL — there is no default URL; `/th:setup` requires an explicit value
+- The selected native host and the tools needed by the chosen workflow. Context7 and a personal knowledge service are optional.
 
 **Recommended:**
 - [`gh`](https://cli.github.com/) CLI — for GitHub integration (`/th:issue`, `/th:deliver`, `/th:review-pr`). When absent, skills fall back to `curl` or operator-paste paths.
@@ -360,7 +345,7 @@ Full contract: docs/dev-mode.md.
 | [Agent tree](./docs/agent-tree.md) | How `th:orchestrator` and the leaf specialists relate at runtime |
 | [Configuration reference](./CLAUDE.md) | Architectural conventions, working agreements, subagent routing |
 | [Knowledge base](./docs/knowledge.md) | Decisions, patterns, stack notes, and constraints accumulated across features |
-| [Integration guide](./docs/integration.md) | context-harness-mcp setup, mcpServers config, 16-tool contract, troubleshooting |
+| [Integration guide](./docs/integration.md) | Optional knowledge integrations; workspace context has no remote dependency |
 | [Troubleshooting](./docs/troubleshooting.md) | SSH/HTTPS errors, duplicate agents, missing dispatch rule |
 | [Changelog](./CHANGELOG.md) | Release history |
 
@@ -370,7 +355,7 @@ Full contract: docs/dev-mode.md.
 
 A test in this repository asserts a **property of executable code or of a
 machine-readable artifact, evaluated by running it**. Hooks, the Go installer,
-the shell bootstrap scripts, the TypeScript gate bodies, and the JSON/YAML
+the shell bootstrap scripts, the TypeScript observational hook bodies, and the JSON/YAML
 manifests all qualify: they have inputs, outputs, and exit codes, so a failure
 names a real defect.
 

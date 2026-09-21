@@ -1,5 +1,10 @@
 # Spec Co-Authoring — Design Input Contract
 
+> Legacy v5 reference retained for historical records and compatibility helpers.
+> Current workflows use native coordination from `agents/ref-pipeline.md` and
+> the selected skill. They do not require the leases, gate events, state schemas
+> or administrative closure described below.
+
 This document defines the optional spec seed collected during Design, before OpenSpec planning continues. It complements the
 canonical v5 machine in `agents/ref-pipeline.md`; it does not add a state, a gate, or a review
 loop. OpenSpec remains the only semantic planning source. Main is the sole writer of the

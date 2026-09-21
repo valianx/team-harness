@@ -1,11 +1,9 @@
-# Coordinator liveness facts (v5)
+# Coordinator liveness facts
 
-Liveness reports only delivery, acknowledgement, terminality, declared progress,
-and interruption cause for an identity-bound lease/session. Main collects those
-facts from the native status query and the control log; liveness never chooses a
-wait, interruption, continuation, replacement, correction, or terminal route.
+Use native task status to observe delivery, progress, terminality and interruption.
+Timeouts and missing messages alone do not prove work failed. Preserve completed
+results and use a bounded status query when needed.
 
-Wait timeouts and project SLAs are operator-visible telemetry. Main may use a
-bounded native status query to collect facts, but elapsed time and observation
-counts do not grant authority. Every non-success goes to the causal recovery
-contract after safe ownership and preserved progress are established.
+Before replacing a writer, confirm it stopped and preserve its changes. Diagnose
+the concrete cause through the recovery guidance. TH requires no liveness lease,
+control event or separate authorization handshake.

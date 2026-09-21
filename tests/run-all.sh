@@ -469,16 +469,6 @@ else
     fi
 fi
 
-echo
-echo "############################################################"
-echo "# Suite 127: flow-event-schema-sync (AC-2.7 cross-repo guard)"
-echo "############################################################"
-if python3 "$TESTS_DIR/test_flow_event_schema_sync.py"; then
-    echo "flow-event-schema-sync: PASS"
-else
-    echo "flow-event-schema-sync: FAIL"
-    FAILED=$((FAILED + 1))
-fi
 
 echo
 echo "############################################################"
@@ -507,6 +497,13 @@ else
         FAILED=$((FAILED + 1))
     fi
 fi
+
+echo
+echo "############################################################"
+echo "# Suite 24b: hooks/ts explicit workspace binding"
+echo "# Requires: node. Skipped when absent."
+echo "############################################################"
+run_node_suite "workspace-bound-hooks" "test_workspace_bound_hooks.mjs" "node not found — install Node.js to run this suite"
 
 echo
 echo "############################################################"

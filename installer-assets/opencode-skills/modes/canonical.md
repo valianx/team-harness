@@ -24,20 +24,20 @@ text. Keep mode names and invocations exact.
 | `cross-repo` | Analyze dependencies and changes across repositories. | Claude Code + opencode + Codex |
 | `d2-diagram` | Create technical diagrams with the D2 language. | Claude Code + opencode + Codex |
 | `define-ac` | Define acceptance criteria for a feature or task. | Claude Code + opencode + Codex |
-| `deliver` | Resume validated work at its release gate and publish only after approval. | Claude Code + opencode + Codex |
+| `deliver` | Prepare requested delivery from validated work using native authorization. | Claude Code + opencode + Codex |
 | `design` | Design the architecture and work plan for a task. | Claude Code + opencode + Codex |
 | `diagram` | Create an Excalidraw diagram for a concept or workflow. | Claude Code + opencode + Codex |
 | `docs` | Generate Obsidian documentation through the documentation pipeline. | Claude Code + opencode + Codex |
 | `eval` | Evaluate and score agent or pipeline performance. | Claude Code + opencode + Codex |
 | `excalidraw-diagram` | Create Excalidraw JSON diagrams that make visual arguments. | Claude Code + opencode + Codex |
 | `gcp-costs` | Analyze GCP costs and optimization opportunities. | Claude Code + opencode + Codex |
-| `gcp-infra` | Manage GCP infrastructure through a gated plan and apply flow. | Claude Code + opencode + Codex |
+| `gcp-infra` | Inspect, plan and carry out authorized GCP changes. | Claude Code + opencode + Codex |
 | `hookify` | Report candidate deterministic hooks from observed session friction. | Claude Code + opencode + Codex |
 | `implement` | Implement directly or continue an explicitly active pipeline after design approval. | Claude Code + opencode + Codex |
-| `init` | Load lightweight intake and bounded direct help without activating the gated pipeline. | Claude Code + opencode + Codex |
+| `init` | Load lightweight intake and bounded direct help without activating pipeline coordination. | Claude Code + opencode + Codex |
 | `inline` | Declare, exit, or query the operator-controlled inline posture. | Claude Code + opencode + Codex |
 | `interactive-presentation` | Build interactive web presentations with animated visual flows. | Claude Code + opencode + Codex |
-| `issue` | Fetch a GitHub issue and explicitly activate the gated pipeline. | Claude Code + opencode + Codex |
+| `issue` | Fetch a GitHub issue and route its requested work. | Claude Code + opencode + Codex |
 | `json-canvas` | Create and edit Obsidian JSON Canvas files. | Claude Code + opencode + Codex |
 | `kg` | Search, inspect, and manage the Knowledge Graph. | Claude Code + opencode + Codex |
 | `learn` | Ask the mentor to explain code or a technical concept. | Claude Code + opencode + Codex |
@@ -49,7 +49,7 @@ text. Keep mode names and invocations exact.
 | `obsidian-bases` | Create and edit Obsidian Bases views, filters, and formulas. | Claude Code + opencode + Codex |
 | `obsidian-cli` | Interact with a running Obsidian instance through its CLI. | Claude Code + opencode + Codex |
 | `obsidian-markdown` | Create and edit Obsidian-flavored Markdown. | Claude Code + opencode + Codex |
-| `pipeline` | Explicitly start the full gated Team Harness pipeline. | Claude Code + opencode + Codex |
+| `pipeline` | Coordinate design, implementation, validation and delivery in Main. | Claude Code + opencode + Codex |
 | `pipelines` | Show the current state of all durable pipelines. | Claude Code + opencode + Codex |
 | `plan` | Break broad scope into labeled implementation tasks. | Claude Code + opencode + Codex |
 | `plan-review` | Audit a Stage 1 plan against its shape and substance rules. | Claude Code + opencode + Codex |
@@ -59,12 +59,12 @@ text. Keep mode names and invocations exact.
 | `research` | Investigate a technology, migration, or approach. | Claude Code + opencode + Codex |
 | `research-code` | Investigate a codebase with parallel, file-grounded evidence. | Claude Code + opencode + Codex |
 | `resume-session` | Read and summarize a saved session handoff without modifying state. | Claude Code + opencode + Codex |
-| `review-pr` | Review a PR against a fixed snapshot and publish only after approval. | Claude Code + opencode + Codex |
+| `review-pr` | Review a PR against a fixed snapshot and return advisory findings. | Claude Code + opencode + Codex |
 | `save-session` | Save a concise handoff in the effort's workspace. | Claude Code + opencode + Codex |
 | `security` | Audit a target against OWASP, CWE, and ASVS. | Claude Code + opencode + Codex |
 | `setup` | Configure Team Harness integrations and operator preferences. | Claude Code + opencode + Codex |
 | `sketch` | Preview a proposed solution on demand in direct, spec or pipeline work. | Claude Code + opencode + Codex |
-| `spec` | Author and implement a short task through a coordinator-only OpenSpec lane. | Claude Code + opencode + Codex |
+| `spec` | Author and implement bounded work through OpenSpec with optional review. | Claude Code + opencode + Codex |
 | `spike` | Prototype quickly to test a technical hypothesis. | Claude Code + opencode + Codex |
 | `test` | Design and run tests for a feature or component. | Claude Code + opencode + Codex |
 | `test-cross-browser` | Run a suite across browser engines and branded channels. | Claude Code + opencode + Codex |
@@ -74,7 +74,7 @@ text. Keep mode names and invocations exact.
 | `trace` | Show pipeline observability for one feature. | Claude Code + opencode + Codex |
 | `translate` | Discover, extract, and translate UI strings for i18n. | Claude Code + opencode + Codex |
 | `update` | Update the installed Team Harness runtime. | Claude Code + opencode + Codex |
-| `validate` | Validate an implementation against its acceptance criteria. | Claude Code + opencode + Codex |
+| `validate` | Validate an implementation against criteria and relevant checks. | Claude Code + opencode + Codex |
 | `verify` | Run the inline verification fan over a committed range and decide its ship join. | Claude Code + opencode + Codex |
 | `workspace` | Select, reuse and maintain a local or Obsidian workspace across workflows. | Claude Code + opencode + Codex |
 

@@ -36,8 +36,8 @@ merely because this skill was selected.
 For an existing type's skeleton, read only its portion of the installed
 `agents/ref-architect-design.md` section **Sketches — triggers and skeletons**.
 From this skill, Claude Code and Codex use `../../agents/ref-architect-design.md`;
-OpenCode uses `../../th-references/agents/ref-architect-design.md`. Its classification
-table and required set belong to active pipeline Design, not standalone selection.
+OpenCode uses `../../th-references/agents/ref-architect-design.md`. Its skeletons
+are examples; select the views useful for the current objective.
 
 ## Review and continue
 
@@ -52,6 +52,6 @@ behavior. OpenSpec remains the canonical intent. Reuse the flow's existing appro
 the sketch adds no second approval step. Implementation and validation consult the
 relevant agreed sketches alongside that intent; reconcile stale sketches visibly.
 
-In an active pipeline, keep its existing sketch selection, artifact formats,
-review and state ownership. Outside it, keep sketches as workspace decision aids
-without pipeline state, classification records or a sketch-guard invocation.
+In every flow, keep sketches as workspace decision aids with their useful formats
+and assigned ownership. They require no fixed set, classification record or
+sketch-guard invocation.

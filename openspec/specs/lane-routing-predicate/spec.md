@@ -18,8 +18,13 @@ Predicate consistency across carriers and the resolvability of every cited secti
 - **THEN** the deterministic check fails and names the citing file and the unresolved anchor
 
 ### Requirement: The spec lane is offered whenever its predicate passes
+TH SHALL offer spec when written intent and tasks help the user's bounded
+objective. Multiple specialists, security-sensitive paths or file counts MUST
+NOT automatically disqualify it.
 
-Live posture guidance SHALL offer the spec lane as an option whenever its routing predicate passes, rather than leaving the offer to coordinator discretion. When the predicate does not pass, the guidance MUST render only the postures that remain available.
+#### Scenario: Bounded specialist work
+- **WHEN** the selected spec objective benefits from two independent writers
+- **THEN** Main may delegate with explicit ownership without forcing a pipeline.
 
 #### Scenario: A request satisfies the spec-lane predicate
 - **WHEN** posture guidance is rendered for a single-repository request that merits written intent and breaks no public contract
@@ -27,11 +32,16 @@ Live posture guidance SHALL offer the spec lane as an option whenever its routin
 
 #### Scenario: A request fails the spec-lane predicate
 - **WHEN** the request is multi-repository, multi-specialist, irreversible, multi-task, or operator-absent
-- **THEN** the guidance renders without the spec-lane option and names the condition that removed it
+- **THEN** guidance reflects actual coordination needs and native permissions without automatically removing spec because of repository, writer or task counts.
 
 ### Requirement: Every carrier of the routing predicate states it consistently
+Workflow guides and native adapters SHALL select direct, spec or pipeline work
+from user intent and actual coordination needs. Old routing markers MUST NOT
+override current authorization.
 
-The routing predicate and the hard-router list SHALL read consistently across every file that carries them, and a change to the predicate MUST update all carriers in the same change, including the managed block distributed to operator configuration.
+#### Scenario: Explicit spec request
+- **WHEN** the user selects spec for approved scoped work
+- **THEN** each runtime follows that flow rather than imposing a separate lane menu.
 
 #### Scenario: The predicate is changed
 - **WHEN** the routing predicate or hard-router list is edited
@@ -42,12 +52,17 @@ The routing predicate and the hard-router list SHALL read consistently across ev
 - **THEN** the inlined copy is reconciled to that source or replaced by a reference to it
 
 ### Requirement: The sensitivity authority resolves to a real section
+Any retained classification reference SHALL resolve to the advisory risk guidance
+in the current workflow documentation. It MUST NOT claim authority over execution,
+required reviewers or publication.
 
-Every reference that resolves security sensitivity SHALL point at an existing section that defines the sensitive categories and the fail-closed default, and no routing rule MAY depend on an anchor that does not resolve.
+#### Scenario: Unknown sensitivity
+- **WHEN** classification is unresolved
+- **THEN** Main receives a limitation to consider rather than an automatic denial.
 
 #### Scenario: A routing rule resolves sensitivity
 - **WHEN** a coordinator or reference file resolves whether a scope is sensitive
-- **THEN** the cited section exists, lists the sensitive categories, and states that an ambiguous classification is sensitive
+- **THEN** the cited advisory categories exist and unresolved classification is reported as unknown rather than permission to stop work.
 
 #### Scenario: The section is relocated
 - **WHEN** the sensitivity section moves

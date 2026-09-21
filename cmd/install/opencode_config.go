@@ -138,8 +138,8 @@ func validateTeamHarnessConfigFile(path string) error {
 //
 // Contract:
 //   - Load existing JSON at path (empty map if absent or unreadable).
-//   - Overlay ONLY the keys in allowlistedOpencodeKeys that cfg sets (skip
-//     absent optional values such as an empty Language or ClickUpWorkspaceID).
+//   - Overlay only installer-owned keys that cfg sets. Existing workspace and
+//     native preference values remain operator-owned and are preserved.
 //   - ALWAYS set installer-managed keys (format_version, installed_version,
 //     updated_at) from the installer itself — never from the existing file
 //     (SEC-OC-R4 mass-assignment defense).
@@ -169,11 +169,16 @@ func writeOpencodeTeamHarnessConfig(path string, cfg opencodeSetupValues, placer
 		delete(raw, k)
 	}
 
-	// Apply logs-mode — always "local" after the trim (work-logs group removed).
-	// Clear any pre-existing obsidian-specific keys when present in the file.
-	raw["logs-mode"] = mustMarshalJSON("local")
-	delete(raw, "logs-path")
-	delete(raw, "logs-subfolder")
+	// Apply a local default only for a fresh config. An existing workspace mode
+	// and its path/subfolder are operator-owned preferences and must survive a
+	// native OpenCode re-apply even though the setup form no longer offers them.
+	if _, exists := raw["logs-mode"]; !exists {
+		mode := cfg.LogsMode
+		if mode == "" {
+			mode = "local"
+		}
+		raw["logs-mode"] = mustMarshalJSON(mode)
+	}
 
 	// Apply the per-provider cost-tiering selection (#424). cfg.CostTierProvider
 	// already reflects the resolved precedence (flag > persisted > absent) —

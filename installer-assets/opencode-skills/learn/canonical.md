@@ -31,6 +31,8 @@ Ask the operator: "What would you like to learn? You can ask about a concept, a 
 ## Important
 
 - Always invoke the `orchestrator` agent — do NOT invoke agents directly.
-- The orchestrator will classify `learn` as a read-only direct mode and dispatch the `mentor` agent only for the optional teaching-pack or deep background research.
-- Output: the answer in chat with a short inline diagram. For codebase questions where the repo is open, the first answer SHOWS the real code by default (snippets quoted verbatim with `file:line`, walked in execution order, named entry points) and the inline diagram is a code-grounded data-flow pipeline of the real symbols. The teaching-pack file (`workspaces/{topic-slug}/00-teaching-pack-{topic-slug}.md`) is an optional end-of-session artifact — not the default deliverable.
+- The orchestrator will classify `learn` as a read-only direct mode. It may
+  dispatch the `mentor` only for an optional teaching-pack or deep background
+  research; the ordinary answer stays inline in the current conversation.
+- Output: the answer in chat with a short inline diagram. For codebase questions where the repo is open, the first answer SHOWS the real code by default (snippets quoted verbatim with `file:line`, walked in execution order, named entry points) and the inline diagram is a code-grounded data-flow pipeline of the real symbols. The teaching-pack file (`{workspace}/00-teaching-pack-{topic-slug}.md`) is an optional end-of-session artifact — not the default deliverable.
 - The `--resume` flag resumes an existing teaching pack without re-covering already-taught layers.

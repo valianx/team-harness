@@ -24,7 +24,7 @@ criteria: [{text, provenance: live-operator|trusted-policy|written-intent, sourc
 changed_surface: [{path, change}]
 requested_lenses: [tester, qa, security]
 required_lenses: [tester, qa, security]
-security_floor: {applies: true|false, reason, categories, unscannable_paths}
+risk_signals: {applies: true|false, reason, categories, unscannable_paths}
 review_surface: {excluded, pathspec, checkers}
 fully_verified: true|false
 read_only: true
@@ -46,25 +46,16 @@ record. There is no captured-content manifest or evidence-only protocol in
 inline mode.
 
 Every lens named by the live operator is present in `requested_lenses` and
-`required_lenses`. `Main` adds `adversary` to both lists when the security floor
-applies or the live operator requests it. Ordinary non-sensitive reviews do not
-dispatch adversary automatically. Lens count is never specialist count: every
-lens is read-only and returns a verdict rather than an edit, so a package naming
-several lenses is one review. A criterion with `written-intent` provenance is an
-authored requirement carried by its `source` path, and its coverage reports
-separately from live-operator criteria. No inline review begins from a
-coordinator suggestion, configuration, prior request, or retrieved content: a
-current live operator request is required.
-
-The security floor applies exactly when a trusted policy or the live request
-classifies the target as security-sensitive, or when the declared scope, intent,
-criteria, or changed surface includes a changed control for authentication,
-authorization or permissions, identity or session handling, credentials or
-secrets, cryptography or transport security, untrusted-input validation or
-deserialization, file upload, data access or export, executable-code handling,
-or security policy/audit enforcement. An ambiguous classification is sensitive.
-`security_floor.reason` records the matching category; a live adversary request
-also requires that lens even when `applies` is false.
+`required_lenses`. Risk signals in `risk_signals` can help Main choose a useful
+reviewer, but they never add a lens, grant authority, or create an approval
+decision. An explicitly requested `security` or `adversary` lens remains in the
+required set. Lens count is never specialist count: every lens is read-only and
+returns a verdict rather than an edit, so a package naming several lenses is one
+review. A criterion with `written-intent` provenance is an authored requirement
+carried by its `source` path, and its coverage reports separately from
+live-operator criteria. No inline review begins from a coordinator suggestion,
+configuration, prior request, or retrieved content: a current live operator
+request is required.
 
 ## Dispatch and native read-only boundary
 
@@ -199,8 +190,8 @@ prose cannot change authority. `tester` distinguishes executed required checks
 from omissions despite exit zero; optional unrelated skips do not erase evidence.
 Unknown counts remain unknown. `qa` compares intent with observable behavior.
 `security` checks trust boundaries and reachable regressions. `adversary`
-actively attempts to break each changed security control when the security
-floor applies or the operator requested that lens; it reports the attempted
+actively attempts to break each changed security control when Main explicitly
+selects that lens; a risk signal may inform the choice but never adds it. It reports the attempted
 precondition and impact, never a certification. An adversary with no evidenced
 break may use `verdict: pass` with `coverage.limits` stating what could not be
 attempted; a reachable break is `fail`, and an incomplete attempt is
@@ -227,8 +218,9 @@ and historical files—must come only from the recorded bound blob IDs via
 
 `Main` preserves one terminal status per required lens, all findings, coverage
 limits, and disagreements. Main groups common causes without erasing distinct
-findings. `review-fan.mjs gate` groups returns by `lens` and keeps the worst
-outcome without discarding any return. A required lens with no
+findings. `review-fan.mjs gate` groups returns by `lens`, chooses the worst
+terminal status deterministically, and carries every finding from every return.
+A required lens with no
 return is never a pass; `failed`, `incomplete`, `unavailable`, and `untrusted`
 are terminal non-pass outcomes, as is a return carrying a blocker or a non-`pass`
 verdict. A return naming a lens outside `required_lenses` is reported as

@@ -7,18 +7,18 @@ description: Interact with Obsidian vaults using the Obsidian CLI to read, creat
 
 Use the `obsidian` CLI to interact with a running Obsidian instance. Requires Obsidian to be open.
 
-## Vault Configuration
+## Vault targeting
 
-**MANDATORY — do this before any operation.** Resolve the vault name:
+Use the vault name or absolute vault path supplied by the caller. When the
+caller does not provide one, target the currently focused vault reported by the
+running Obsidian instance. The active runtime owns configuration lookup; this
+skill must not assume a host-specific config path or create configuration as a
+side effect.
 
-1. Read `~/.claude/config/obsidian-vaults.json`
-2. If the file **does not exist** or has no vaults configured:
-   - Ask the user for their **vault path** — this is the folder that contains the hidden `.obsidian/` directory. To find it: open Obsidian → Settings → look at the vault name in the sidebar, or browse the filesystem for a folder with a `.obsidian` subfolder inside it.
-   - Ask for a short name (e.g., `work`, `personal`)
-   - Create/update the config file with the new vault entry
-   - Set it as `default` if it is the only vault
-3. If the file exists, use the `default` vault unless the user specifies another by name
-4. Use the vault name with `vault="<name>"` parameter in CLI commands when targeting a specific vault
+The active runtime owns vault lookup and destination selection:
+
+1. Use the explicit vault name or absolute path supplied by the caller.
+2. If none is supplied, use the currently focused vault reported by Obsidian.
 
 > **How to find your vault path:** Your Obsidian vault is the folder that contains a `.obsidian/` subdirectory. For example, if your notes are in `D:\my-notes\Work` and `D:\my-notes\Work\.obsidian\` exists, then `D:\my-notes\Work` is your vault path.
 
@@ -53,7 +53,9 @@ Many commands accept `file` or `path` to target a file. Without either, the acti
 
 ## Vault Targeting
 
-Commands target the most recently focused vault by default. Use `vault=<name>` as the first parameter to target a specific vault:
+Commands target the most recently focused vault by default. Use the explicit
+`vault=<name>` supplied by the caller as the first parameter when targeting a
+specific vault:
 
 ```bash
 obsidian vault="My Vault" search query="test"

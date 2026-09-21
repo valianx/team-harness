@@ -1,5 +1,10 @@
 # Verification Packet — Canonical Contract
 
+This reference describes the optional legacy packet format. Current reviewers
+can use the supplied candidate, OpenSpec and relevant workspace sources directly;
+they do not require a packet, Freeze ceremony or a TH authorization record.
+Retained historical packets and their source artifacts remain readable.
+
 This document is the **single source of truth** for `00-verify-packet.md`, a pipeline-only,
 shared build-once-read-many artifact that validation roles (`qa`, conditional
 `security`, risk-required `tester`, and applicable `ux-reviewer`) read first

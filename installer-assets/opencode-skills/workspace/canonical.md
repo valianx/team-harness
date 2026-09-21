@@ -4,7 +4,7 @@
 Give the effort one place for useful working context. Main uses this skill when
 starting or continuing substantive work, including research, implementation,
 reviews and artifact creation. Other flows delegate workspace decisions here;
-they retain their artifact ownership and authority. No explicit invocation is
+they retain their artifact ownership and native coordination. No explicit invocation is
 needed. Prefer reusing an existing workspace even for a small follow-up.
 
 Brief conversation needs no empty directory or note. Read-only status, preview
@@ -46,7 +46,7 @@ Use the existing read-only [workspace identity helper](../pipeline/scripts/works
 for repository-backed layouts. It is an imported library, not a command that
 discovers settings or repository identity for you. Supply verified project
 bindings and preferences; reuse a persisted pipeline identity unchanged. Keep
-existing pipeline discovery, service bindings and authority in that flow.
+existing pipeline discovery, service bindings and useful task context in that flow.
 Direct/spec work may reuse its path calculation without writing pipeline state.
 For projectless work, use `<working-directory>/workspaces/<date>_<task>` locally
 or `<logs-path>/<logs-subfolder>/<project-name>/<date>_<task>` in Obsidian; derive

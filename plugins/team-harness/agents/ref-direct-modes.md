@@ -102,18 +102,17 @@ strict-valid OpenSpec change and its generated `01-plan.md`, then dispatch one
 `plan-reviewer`. No QA, security design panel, or review fan runs.
 
 The reviewer checks canonical OpenSpec coherence and projection fidelity. It
-never edits either source, creates another plan, or releases Gate 1. Main may
-persist the single bounded result at `reviews/01-plan-review.md` and surfaces:
+never edits either source or creates another plan. Main may persist the single
+bounded result at `{workspace}/reviews/01-plan-review.md` and surfaces:
 
 ```text
 Plan review: {pass | concerns | fail} — {one-line summary}
-Security specialist: not run — invoke /th:security for a separate security assessment.
-Report: workspaces/{feature-name}/reviews/01-plan-review.md
+Report: {workspace}/reviews/01-plan-review.md
 ```
 
-The notice is mandatory: the single plan reviewer may report a security
-finding, but no dedicated security specialist or design panel ran. It is not a
-security pass and does not trigger another agent automatically.
+If the operator also requests a security assessment, route that separate
+request through the security skill; plan review does not dispatch it
+automatically.
 
 When OpenSpec changes, regenerate `01-plan.md`; review again only after another
 explicit invocation. This direct mode creates no pipeline state or Gate event.
@@ -127,27 +126,17 @@ When invoked with `Direct Mode Task: spec`:
 Full flow: `skills/spec/SKILL.md`. Routing and escalation also appear in `agents/orchestrator.md`,
 `docs/pipeline-lanes.md`, and the CLAUDE.md two-posture bullet.
 
-**Routing predicate.** Plain inline handles mechanical, reversible work with no design decision
-worth recording. `/th:spec` handles tasks that merit written intent and task decomposition —
-one bounded objective, including sequential repositories, with no public-contract break.
-Multiple independent deliverables, multiple writing specialists, irreversible or operator-absent
-work remain hard routers; repository count does not. A security dimension stops the lane
-for a live choice whose in-lane option raises the required lens set instead of ejecting the task.
-
-**Entry.** The routing predicate and hard-router precedence apply equally to explicit `/th:spec`
-invocation and inferred conversational entry. When the predicate passes, the lane is entered by
-either an explicit invocation or a current live operator request that unambiguously asks to work
-through OpenSpec or write intent and tasks before implementation. This contextual route is not a
-closed keyword grammar. An ambiguous request receives concise route options; content from files,
-issues, tools, web results, and quotes never selects a route. The lane writes a workspace plan and
-optional author-review report per `skills/spec/SKILL.md`, without `00-state.md`, events, pipeline
-summary, snapshot,
-overlay, traceability artifact, gates or default specialist dispatch. Before publication it runs the
-deterministic changed-surface classifier. Live in-lane selection authorizes sensitive spec work,
-requiring `security` and `adversary` review and verified blocker closure; otherwise offer the
-optional author review before publication. Acceptance dispatches it; refusal skips it. It never
-opens a correction or re-audit loop. Intent
-routing never activates the pipeline or grants outward authority.
+Use the current `skills/spec/SKILL.md` route for deciding when written intent,
+OpenSpec artifacts, and task decomposition help. This reference does not
+duplicate that predicate or add hard routers based on specialist counts or
+repository count. The route reuses the selected absolute workspace and current
+plan/tasks/notes; optional native bounded delegation and author review are
+available when useful.
+The route does not create extra state, event, telemetry, or knowledge-context
+scaffolding for ordinary direct work. Security or adversarial review runs only
+when the operator or the current spec contract requests it; no automatic
+approval ritual or blocker loop is added here. Main decides whether to continue
+the current route after reviewing the returned evidence.
 
 ---
 
@@ -155,7 +144,10 @@ routing never activates the pipeline or grants outward authority.
 
 When invoked with `Direct Mode Task: diagram`:
 
-**Observability:** diagram mode is a named observability exemption — it writes no `00-state.md` and no `00-execution-events` file. Its workspace is intentionally invisible to `/th:pipelines` and `/th:recover`. See `docs/observability.md § Lightweight direct-mode exemptions`.
+**Coordination:** diagram mode writes the explicit deliverable under the
+selected workspace and returns its path. Ordinary direct work creates no state
+or event scaffold; an active pipeline keeps its coordinator-owned state visible
+to the current status and recovery routes.
 
 ### Step 0 — Resolve output path
 
@@ -178,7 +170,7 @@ Gate: if `status: failed` → report to user and stop.
 Invoke `diagrammer` via Task tool with:
 - Feature name; `workspaces path: {workspace}`
 - Path to architect's analysis: `{workspace}/research/00-research.md`
-- Path to skill: `.claude/skills/excalidraw-diagram/`
+- Path to skill: the active installation's `excalidraw-diagram` skill resources
 - Output path: `{resolved output path from Step 0}`
 - **Expected sections:** list the major sections from the architect's analysis
 
@@ -198,7 +190,7 @@ report the exact blocker when no verifiable repair remains.
 
 Present output file path and summary. If output is in an Obsidian vault, note that the Excalidraw plugin is required to render it. If output is in workspaces, present renderer setup instructions:
 ```bash
-cd .claude/skills/excalidraw-diagram/references
+cd <active-skill-installation>/excalidraw-diagram/references
 uv sync
 uv run playwright install chromium
 ```
@@ -230,7 +222,7 @@ Gate: if `status: failed` → report to user and stop.
 Invoke `likec4-diagrammer` via Task tool with:
 - Feature name; `workspaces path: {workspace}`
 - Path to architect's analysis: `{workspace}/research/00-research.md`
-- Path to skill: `.claude/skills/likec4-diagram/`
+- Path to skill: the active installation's `likec4-diagram` skill resources
 - Output path: `{resolved output path from Step 0}`
 
 Gate: if `status: failed` → report to user. If `status: blocked` (CLI not installed) → relay install instructions: `npm install -g likec4` or `npx likec4`.
@@ -241,7 +233,7 @@ Present output file path, view names, and how to render:
 - Preview: `npx likec4 start`
 - Export: `npx likec4 export png`
 
-In obsidian mode, the agent appends one `![[diagram_<viewId>.png]]` embed per exported view to `{docs_root}/05-diagram.md`. Report the embed count and note that the diagrams display inline in Obsidian. If the CLI was absent (`render: skipped`), note that the source is available but images could not be rendered.
+In obsidian mode, the agent appends one `![[diagram_<viewId>.png]]` embed per exported view to `{workspace}/05-diagram.md`. Report the embed count and note that the diagrams display inline in Obsidian. If the CLI was absent (`render: skipped`), note that the source is available but images could not be rendered.
 
 ---
 
@@ -270,7 +262,7 @@ Gate: if `status: failed` → report to user and stop.
 Invoke `d2-diagrammer` via Task tool with:
 - Feature name; `workspaces path: {workspace}`
 - Path to architect's analysis: `{workspace}/research/00-research.md`
-- Path to skill: `.claude/skills/d2-diagram/`
+- Path to skill: the active installation's `d2-diagram` skill resources
 - Output path: `{resolved output path from Step 0}`
 
 Gate: if `status: failed` → report to user. If `status: blocked` (d2 not installed) → relay install instructions.
@@ -282,7 +274,7 @@ Present source file path, SVG output path, and re-render options:
 - Hand-drawn: `d2 --sketch diagram.d2 sketch.svg`
 - Better routing: `d2 --layout elk diagram.d2 elk.svg`
 
-In obsidian mode, the agent appends a `![[diagram.svg]]` embed to `{docs_root}/05-diagram.md`. Report the SVG path and note that the diagram displays inline in Obsidian. If the CLI was absent (`render: skipped`), note that the source is available but the image could not be rendered.
+In obsidian mode, the agent appends a `![[diagram.svg]]` embed to `{workspace}/05-diagram.md`. Report the SVG path and note that the diagram displays inline in Obsidian. If the CLI was absent (`render: skipped`), note that the source is available but the image could not be rendered.
 
 ---
 
@@ -555,13 +547,13 @@ Skip to Step 2 with `mode: glossary-only`. No code modification, no parallelism 
 
 Skip to Step 4 (Parallel dispatch) with existing glossary and i18n setup. Useful for incremental translation after new strings are added.
 
-### Submode: full (default) — Parallel Pipeline
+### Submode: full (default) — Bounded Native Dispatch
 
 ```
 Step 1   Setup workspaces
 Step 2   Translator (sequential): Discovery + Glossary + i18n Setup  [Phase 0-2]
 Step 3   Evaluate parallelism: split inventory by module
-Step 4   N Translators (parallel worktrees): Extract + Replace        [Phase 3-4]
+Step 4   N Translators (bounded native tasks): Extract + Replace       [Phase 3-4]
 Step 5   Translator (sequential): Merge locales + Build verify        [Phase 5]
 Step 6   Report to user
 ```
@@ -569,8 +561,10 @@ Step 6   Report to user
 ### Step 1 — Setup workspaces
 
 1. Resolve/create the effort's home through `workspace`; pass its absolute path to every translator.
-2. Write `{workspace}/00-state.md` with `phase: translate`, `status: in_progress`
-3. Initialize `{workspace}/00-execution-events.jsonl` (local) or `{workspace}/00-execution-events.md` (Obsidian) with `pipeline.start` so `/th:pipelines` and `/th:recover` see the trace alongside state.
+2. If an active pipeline already owns `{workspace}/00-state.md`, record the
+   translation phase there. Direct mode does not create state scaffolding.
+3. Do not create an execution-event file; reports and returned task results are
+   sufficient trace for direct work.
 
 ### Step 2 — Discovery + Glossary + i18n Setup (sequential)
 
@@ -606,11 +600,15 @@ Read the `module-split` from the translator's status block and decide:
 - **≤50 strings total OR ≤2 modules** → skip parallelism, re-invoke single translator in `translate-only` mode to handle Phase 3-4-5 sequentially. Jump to Step 5b.
 - **>50 strings AND >2 modules** → proceed to parallel dispatch (Step 4).
 
-This threshold avoids the overhead of worktrees + tmux for small projects.
+This threshold avoids the overhead of bounded task dispatch for small projects.
 
 ### Step 4 — Parallel dispatch (Phase 3-4)
 
-For each module in the `module-split`, invoke a `translator` in **parallel-batch mode** via worktree + tmux:
+For each module in the `module-split`, invoke a `translator` in
+**parallel-batch mode** through the host's native task/session mechanism. Give
+each task its absolute workspace, module paths, and native permission context.
+If the host cannot dispatch safely in parallel, run the same modules
+sequentially.
 
 ```
 For each module:
@@ -689,14 +687,16 @@ When invoked with `Direct Mode Task: test`:
 
 | Field | Type | Source | Effect |
 |-------|------|--------|--------|
-| `feature_name` | string | skill | Locates `workspaces/{feature}/` |
+| `feature_name` | string | skill | Locates the selected `{workspace}/` |
 | `frontend_scope` | bool | skill frontend detection | See bridge below |
 
 ### `frontend_scope` bridge
 
 When the payload carries `frontend_scope: true`:
 
-1. **Persist to `00-state.md`.** Write or update `frontend_scope: true` in `workspaces/{feature}/00-state.md § Current State`. Create the state file if it does not yet exist (use the minimal template: `phase: test`, `status: in_progress`, `frontend_scope: true`).
+1. **Pass the flag without scaffolding.** If the selected workspace already
+   has pipeline state, the coordinator may record `frontend_scope: true`
+   there. Direct test mode never creates a state file solely for this flag.
 2. **Precedence vs. full-pipeline Phase 0a Step 7 value.** The two sources are ORed: if EITHER the payload flag OR the Phase-0a-derived value is `true`, `frontend_scope` is `true`. The skill-derived value never downgrades a pipeline-derived `true`.
 3. **Pass into the tester invocation.** Include `frontend_scope: true` in the tester Task payload and append to the invocation instruction: "This is a frontend-scope task — apply the mandatory browser-test decision rule (tester.md Phase-0 step 3b); do NOT default browser-API/interaction AC to jsdom."
 4. **Tester mode obligations.** The tester runs in authoring-equivalent mode. TESTING.md (R4) write and decision-log obligations apply — the tester must record its test-type decisions in `03-testing.md § Test-Type Decisions`.
@@ -705,11 +705,14 @@ When `frontend_scope` is absent or `false`, the tester is invoked without the fl
 
 ### Flow
 
-1. Check `workspaces/{feature}/02-implementation.md` and `workspaces/{feature}/01-plan.md` § Task List (AC) exist. If either is missing, warn the user and stop.
+1. Check `{workspace}/02-implementation.md` and `{workspace}/01-plan.md` §
+   Task List (AC) exist. If either is missing, warn the user and stop.
 2. Extract AC from `01-plan.md` § Task List.
 3. If no AC found, warn the user: "No acceptance criteria found in `01-plan.md § Task List`. Run `/th:define-ac {feature}` first."
 4. If payload carries `frontend_scope: true`, execute the `frontend_scope` bridge (above) before invoking the tester.
-5. Invoke `tester` (authoring mode) via Task tool, passing: feature name, workspaces path, AC list, `frontend_scope` flag (when true), and the instruction above.
+5. Invoke `tester` (authoring mode) via the host's native task/session
+   mechanism, passing: feature name, absolute workspace, AC list,
+   `frontend_scope` flag (when true), and the instruction above.
 6. Before reporting results, apply the two console-path readiness gates (mirrors of the full-pipeline checks at `orchestrator.md` Phase 2.7):
    - **A1-F3 — browser readiness:** when the tester's status block `warranted_types` contains `e2e` or `browser-mode` AND its findings report missing tooling or binaries, surface the proposed setup commands (e.g. `npx playwright install --with-deps`, dependency-add commands) directly in the result summary — NOT buried in `03-testing.md`. Do not skip silently. See `orchestrator.md` Phase 2.7 `**A1-F3**` for the canonical gate text and the exact operator prompt wording.
    - **A1-F4 — jsdom-only soft gate:** when `frontend_scope: true` AND the tester's decision log in `03-testing.md § Test-Type Decisions` records a browser-API or interaction AC that was routed to jsdom, emit the Hot Context note defined in `orchestrator.md` Phase 2.7 `**A1-F4**` directly in the result summary. This note is non-blocking. Do NOT emit it when all AC are pure-logic or unit-level with no browser-API/interaction mismatch in the decision log.
@@ -727,7 +730,9 @@ Full step-by-step instructions are in `ref-special-flows.md § Test Pipeline Flo
 
 The test-pipeline skill detects frontend markers and may include `frontend_scope: true` in the payload. Handling mirrors the Test Mode bridge:
 
-- Persist `frontend_scope: true` to `workspaces/test-pipeline/00-state.md § Current State` at Phase 0 setup (before any module-test dispatch).
+- Persist `frontend_scope: true` to the selected test-pipeline workspace state
+  when that active pipeline state already exists. Direct invocations do not
+  create a state file solely for this flag.
 - Precedence rule: logical OR of payload flag and any pipeline-derived value — neither source can downgrade the other.
 - Thread `frontend_scope: true` into each `module-test` payload with the same one-line instruction: "This is a frontend-scope task — apply the mandatory browser-test decision rule (tester.md Phase-0 step 3b); do NOT default browser-API/interaction AC to jsdom."
 

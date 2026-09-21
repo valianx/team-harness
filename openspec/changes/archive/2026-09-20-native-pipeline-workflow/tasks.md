@@ -1,0 +1,3 @@
+- [x] Simplify coordinator, phase skills and shared contracts while preserving design, implementation, validation and delivery.
+- [x] Align native role adapters, workspace status and legacy recovery guidance.
+- [x] Validate generated distributions and compatibility suites.

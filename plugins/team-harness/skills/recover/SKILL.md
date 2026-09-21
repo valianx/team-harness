@@ -1,13 +1,22 @@
 ---
 name: recover
-description: Resume an explicitly activated Team Harness pipeline from durable workspace state without replaying completed phases. Use only for pipeline recovery; ordinary Codex work remains direct when no active state exists.
+description: Resume retained work from its actual plan, tasks and evidence.
 ---
 
 # Recover
 
-Read `../pipeline/references/state-and-gates.md` and
-`../pipeline/references/recovery.md`. The primary thread performs recovery and
-remains the sole coordination-state writer and gate presenter. If no explicit
-pipeline state exists, report that there is nothing to recover; do not create a
-pipeline implicitly. `complete` and `aborted` are terminal outcomes, not
-recoverable states.
+Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
+its configured local or Obsidian mode. Main coordinates with native tools and
+permissions. Reuse authorization for unchanged work and ask only for a missing
+decision. Specialists provide evidence and recommendations; Main judges them.
+
+Resolve the exact workspace without guessing from modification time. Read its
+plan, tasks, handoff and actual Git state. Inspect old state/logs only when they
+help explain progress; missing legacy control files do not force closure.
+Confirm prior writers stopped before taking overlapping ownership. Continue
+authorized work from verified evidence, reporting real unknowns and repairing
+operational blockers where possible. Do not create a pipeline unless selected.
+
+Use Codex's native agent and task tools. Never require a Claude executable or
+configuration. In an active pipeline, read the matching phase reference under
+`../pipeline/references/` only as needed.

@@ -16,8 +16,9 @@ codex plugin add team-harness@team-harness
 Then invoke `$team-harness:setup`. The marketplace only distributes code;
 setup converges the operational installation. It writes native settings to
 `${CODEX_HOME:-$HOME/.codex}/.team-harness.json`, configures workspace and
-language preferences and optional GitHub identity routes, offers Memory/context7
-MCP registration, preserves native execution preferences, and places twenty bundled specialist
+language preferences and optional GitHub identity routes, leaves personal MCP
+configuration and credentials untouched, preserves native execution preferences,
+and places twenty bundled specialist
 agents in project or global scope: seven standard logical roles, seven
 spawn-overridable `pipeline-*` identities, one direct read-only inline reviewer,
 and five for immutable PR review.
@@ -112,9 +113,9 @@ pipeline contracts remain hand-authored for Codex; the remaining skills use gene
 runtime adapters that package the canonical workflow, references, scripts, and
 assets while translating invocation, configuration paths, tools, delegation,
 and permission boundaries. This includes the diagram family and both GCP
-skills. The twenty generated specialist definitions used by bounded skills,
-the gated pipeline, direct inline review, and PR review remain a separate
-setup/update concern.
+skills. The twenty generated specialist definitions are optional native role
+adapters used when a workflow benefits from bounded delegation, inline review,
+or PR review; they are not a second permission system or a pipeline preflight.
 Consumers do not need the Go installer.
 Run `$team-harness:modes` for an alphabetical catalog with concise descriptions,
 or use `/skills` and `$team-harness` completion in the Codex composer.
@@ -134,35 +135,29 @@ CI and the prepublish guard require these sites to be changed together when a
 distributed runtime input changes. Repositories that predate the Codex plugin
 or installer path retain optional-site compatibility until that path exists.
 
-The seven spawn-overridable pipeline identities are a mandatory prerequisite for the gated `pipeline` skill,
-but not for lightweight `init` intake:
-the primary thread must find a complete set of `pipeline-architect.toml`,
-`pipeline-implementer.toml`, `pipeline-tester.toml`, `pipeline-cleaner.toml`,
-`pipeline-qa.toml`, `pipeline-security.toml`, and `pipeline-delivery.toml` in either the project `.codex/agents/` or global
-`$CODEX_HOME/agents/` scope before it delegates. Setup/update install them from
-the marketplace snapshot. The direct read-only `inline-reviewer` is the only specialist used
-by workspace-free inline review; it receives exactly one of the `tester`, `qa`, `security`,
-or conditional `adversary` lenses. The four read-only PR review agents (`reviewer`,
-`pr-review-qa`, `pr-review-security`, and `reviewer-consolidator`) are the corresponding
-prerequisite for `review-pr`. A new Codex thread is needed only when Codex must discover changed declarations;
-the updater's compatibility bridge keeps existing paths live. Shared direct skills remain
-available without either specialist set and execute through Main unless their adapter names a
-bounded native delegation.
+The seven spawn-overridable `pipeline-*` identities are optional packaged roles
+for bounded native delegation. A coordinated workflow can use whichever assigned
+role is available; setup/update install the complete set for predictable coverage,
+but their presence is not a preflight, permission or startup requirement. The
+direct read-only `inline-reviewer` receives one explicitly selected `tester`,
+`qa`, `security`, or `adversary` lens. The read-only PR review agents
+(`reviewer`, `pr-review-qa`, `pr-review-security`, `pr-review-verifier`, and
+`reviewer-consolidator`) provide optional evidence for `review-pr`. If a role is
+unavailable, Main reports that limit and decides whether to continue directly or
+with another native assignment. A new Codex thread is needed only when the host
+reports that changed declarations cannot activate in the current conversation.
 
 ## Roles and model projection
 
-`Main` stays in ordinary direct mode until the live operator mentions the
-plugin. `@Team-Harness init <task>` loads only the lightweight orchestrator
-kernel: it begins conversational intake and handles simple bounded work directly
-without workspace state, gates, or agent preflight. A live request for tester,
-QA, or security is also supported as a workspace-free inline review; it does not
-activate the pipeline or require a seven-agent preflight.
-
-Only that explicit pipeline invocation (or explicit approval after intake)
-loads the phase contracts. `Main` then owns pipeline state and delegates the
-logical `architect`, `implementer`, `tester`, `cleaner`, `qa`, `security`, and
-`delivery` roles through the corresponding `pipeline-*` identities. It does not spawn a persistent orchestrator and returns
-to direct behavior when the workflow completes or is explicitly aborted.
+`Main` remains the native general agent. `@Team-Harness init <task>` loads
+lightweight intake and helps with a bounded request; `@Team-Harness pipeline
+<task>` loads the coordinated workflow for design, implementation, validation and
+delivery. Both use the selected workspace and native permissions. Main may
+delegate the logical `architect`, `implementer`, `tester`, `cleaner`, `qa`,
+`security`, and `delivery` roles through the corresponding `pipeline-*` adapters
+when that improves the work. There is no persistent replacement orchestrator,
+TH permission ledger, lease, nonce or control journal. Main returns to ordinary
+native behavior when the selected workflow completes.
 
 ### Workspace-free inline review
 
@@ -207,25 +202,19 @@ exact hardened clean/local-object preflight and commit/tree binding before
 consolidation; dirty, missing-object, or concurrently changed targets are stale
 and recaptured rather than certified.
 
-The four lenses are `tester`, `qa`, `security`, and conditional `adversary`.
-The adversary lens is required when the security floor applies or the operator
-requests it and is not added to ordinary reviews. The floor applies to changed
-authentication, authorization/permissions, identity/session, credentials/secrets,
-cryptography/transport, untrusted-input, file-upload, data-access/export,
-executable-code, or security-policy/audit controls; ambiguity is sensitive. A
-lens reports its status,
-verdict, findings, coverage, limits, and disagreements. Main verifies the root
-and commit/range before dispatch and again before consolidation; a moved target
-is stale and cannot produce PASS. Consolidation groups returns by lens and keeps
-the worse outcome where a lens returns more than once: missing, failed,
-blocking, unavailable, and untrusted remain explicit non-pass outcomes; a stale
-target binding is rejected or recaptured by Main before consolidation, so it prevents
-consolidation rather than arriving as a lens outcome.
-Global PASS requires every required
-lens to be complete with `verdict: pass`, no blocker, and no unresolved blocking
-disagreement. Any PR intent, number, or URL has exclusive `review-pr`
-precedence and retains that flow's snapshot, lens selection, consolidation,
-preview, and publication gate.
+The four lenses are `tester`, `qa`, `security`, and `adversary`. Main selects
+the lenses that fit the changed surface or the operator's request; risk signals
+may inform that choice but never add a mandatory lens or grant execution
+authority. A lens reports its status, verdict, findings, coverage, limits, and
+disagreements as advisory evidence. Main verifies the root and commit/range
+before dispatch and again before consolidation; a moved target is stale and is
+recaptured or reported as unavailable. Consolidation preserves every finding and
+does not let one result hide another. Reviewers remain read-only and cannot
+approve, publish, alter the candidate, or override native permissions. A review
+is complete when the selected lenses return evidence or explicit limits; Main
+decides whether findings require changes and whether an authorized outward action
+may proceed. Any PR intent, number, or URL routes to `review-pr` for its snapshot
+and review procedure.
 
 Skill activation cannot itself change Main's selected model, reasoning effort,
 sandbox, or approval policy. The projection below applies to the thirteen
@@ -238,14 +227,14 @@ standard installed specialists:
 | `sonnet` + `medium` | `gpt-5.6-luna` | `max` |
 | `haiku` | `gpt-5.6-luna` | `max` |
 
-For the active pipeline only, an unambiguous live request such as “pipeline en
-Luna max” selects one ephemeral model/effort pair. Main asks the operator to use
-the native `/model` selector when the current chat is not already confirmed on
-that pair, then passes the pair explicitly to every `pipeline-*` spawn. No exact
-flag syntax is required. The choice is never written to Codex or Team Harness
-configuration, pipeline state, events, reports, or handoffs, and expires when
-the live Main thread ends. Without an override, explicit dispatch recreates the
-standard per-role projection in the table above.
+For a coordinated workflow, an unambiguous live request such as “pipeline en
+Luna max” selects one ephemeral model/effort pair for native role assignments.
+Main asks the operator to use the native `/model` selector when the current chat
+is not already confirmed on that pair, then passes the pair to the assignments
+that use it. No exact flag syntax is required. The choice is never written to
+Codex or Team Harness configuration, workspace state, events, reports, or
+handoffs, and expires when the live Main thread ends. Without an override,
+assigned roles use the standard projection above.
 
 The role table is independent from the generic fallback. Global setup and
 update install a missing fallback and atomically migrate the exact formerly

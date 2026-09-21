@@ -1,97 +1,41 @@
 ---
 name: ref-dispatch-machinery
-description: Reference file for th:orchestrator — initiative mechanics read on demand (path composition, repo-identity verification, the overview.md template and its sole-writer invariant, and multi-project sequencing). Not a standalone agent, never a dispatch target.
+description: Shared initiative overview and dependency-aware multi-project coordination.
 model: opus
 color: cyan
 ---
 
-# orchestrator — Initiative Machinery Reference
+# Initiative coordination
 
-Read on demand by `th:orchestrator`. Not part of its system prompt, never dispatched via `Task`. Direct routing and safety stay in `agents/orchestrator.md`; active-pipeline gates, Intake, Specify, recovery, and output contracts live in `agents/ref-pipeline.md`.
-
-Everything in this file applies only when `initiative != null`. On the single-project path — the overwhelming majority of runs — none of it is read.
-
----
-
-## Contents
-
-- [Initiative path composition](#initiative-path-composition)
-- [Repo-identity verification](#repo-identity-verification)
-- [Multi-project sequencing](#multi-project-sequencing)
-- [overview.md — you are the sole writer](#overviewmd--you-are-the-sole-writer)
-- [What left this file, and where it went](#what-left-this-file-and-where-it-went)
-
-Locate the needed section by heading; do not read this file in full.
+Main coordinates related projects without spawning another orchestrator.
+Use these sections only for an initiative.
 
 ## Initiative path composition
 
-Relocated here from the boot sequence: it is infrequent and does not belong on the hot path.
-
-| Mode | `initiative == null` | `initiative` set |
-|---|---|---|
-| Local | `{repo-root}/workspaces/{YYYY-MM-DD}_{feature}` | `{common-repository-parent}/{YYYY-MM-DD}_{initiative}` |
-| Obsidian | `{logs-path}/{logs-subfolder}/{repo-name}/{YYYY-MM-DD}_{feature}` | `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}` |
-
-Resolve both rows with `skills/pipeline/scripts/workspace-identity.mjs`, then persist
-the returned identity in coordinator state. Never recompute a historical identity
-from the current date or configuration. An initiative has exactly one coordinator
-root and one `00-state.md`; service artifacts live at `{workspace}/{service}/`.
-In Obsidian mode no local `workspaces/` counterpart is created. `events_file` is
-`00-execution-events.md` in Obsidian and `.jsonl` locally, at the coordinator root.
-
----
+Use the installed workspace skill and its identity helper. Reuse the existing
+absolute local/Obsidian home rather than recomputing a dated path. Each service
+may keep notes below that shared home; no duplicate local workspace is needed.
 
 ## Repo-identity verification
 
-Before treating two paths as separate projects, verify they are not one repository under two names:
-
-```bash
-git -C {p} rev-parse --git-common-dir
-git -C {p} remote get-url origin
-```
-
-Projects are separate only when both signals are **pairwise-distinct** across all candidates. Same `git-common-dir` or same `origin` URL means the SAME repo — it is one project with several tasks, not an initiative.
-
----
+Use Git common-directory and remote identity to distinguish projects from
+worktrees or aliases of the same repository. Do not treat a second checkout as
+another service solely because its path differs.
 
 ## Multi-project sequencing
 
-**One coordinator, one Design join, serial execution.** The coordinator gathers
-Design evidence for every writable service before Gate 1, then executes approved
-service work in dependency order. You never spawn a copy of yourself to run a lane.
-
-**Eligibility.** Read `overview.md § Projects` for status and `§ Big-Picture Plan` for A-blocks-B sequencing and shared-contract-in-flux exclusions. Exclude `deferred`, `blocked`, `delivered`. Never proceed across an in-flux shared contract.
-
-**Order confirm.** With ≥2 eligible projects, show the operator the project list, the exclusions with their reason, and the order you propose. Wait for confirmation. This is a sequencing decision, not a gate release — it carries no nonce.
-
-**Gate 1 is consolidated.** Writable services own separate OpenSpec changes in
-their own repositories. Main records their repository identities, dependency
-order, content identities, and evidence-only dispositions as immutable inputs
-of one presentation. One Gate-1 nonce binds that ordered set. A service child never presents another Gate 1. After
-approval, execution is serial in the recorded order. Gate 3 and all publication
-safety remain fail-closed against the resulting immutable candidates.
-
-Evidence-only repositories are readable inputs, never OpenSpec owners, writable
-scope, acceptance coordinates, or implicit execution targets. Promoting one to
-writable changes aggregate identity and invalidates an unconsumed presentation.
-
-**Safety floors.** Security runs exactly as configured within each project — initiative mode never waives, batches, or weakens a security gate. With `initiative: null` the pipeline is byte-identical to the single-project path.
-
-**Observability.** The coordinator root owns the lifecycle stream with
-`initiative.start` / `service.start` / `service.end` / `initiative.converge`.
-Service-scoped events carry the service binding explicitly; service folders may
-hold evidence but never a competing coordinator state or gate stream.
-
----
+Record each repository, objective and dependency in the overview. Keep dependent
+changes sequential, especially while a shared contract is changing. Independent
+bounded tasks may be delegated with explicit ownership. Use separate branches
+and PRs where repository boundaries require them; honor the requested delivery
+grouping. Reuse the approved sequence and ask only for an unresolved decision.
 
 ## overview.md — you are the sole writer
 
-Only Main writes this file. After Phase-4 mechanics create or update the PR, use
-the resulting branch, version, PR number/URL and delivery outcome to update its row.
+Main keeps the initiative overview coherent and updates one row per project
+after meaningful progress. Reuse the same file rather than versioned siblings.
 
 ### Template (obsidian shown; local omits the obsidian-only frontmatter keys)
-
-Keep reader-required metadata such as `initiative` in both modes.
 
 ```markdown
 ---
@@ -99,58 +43,37 @@ type: initiative-overview
 initiative: {initiative-slug}
 created: {YYYY-MM-DD}
 updated: {YYYY-MM-DD}
-projects: [{project-slug}, ...]
+projects: [{project-slug}]
 ---
 
 # Initiative: {initiative-slug}
 
 ## Review Summary
-> One-paragraph statement of the initiative's goal — the cross-project big picture
-> that no single 01-plan.md owns.
+The common outcome and current state.
 
 ## Functional Description
-Cross-project behavioural view: what this initiative does from the user's
-perspective across all participating projects. Reconciled in place whenever a
-project completes Design / STAGE-GATE-1 — re-read that project's `01-plan.md`
-(a public artifact, never its dual-record fields) and refresh this section.
+Behavior across participating projects.
 
 ## Projects
 | Project | Branch | Version | PR | Status |
-|---------|--------|---------|----|--------|
-| {project-slug} | {branch or —} | {version or —} | {#N / URL or —} | {planning\|in-progress\|delivered} |
+| --- | --- | --- | --- | --- |
+| {project} | {branch or —} | {version or —} | {URL or —} | {observed status} |
 
 ## Big-Picture Plan
-Cross-project narrative: sequencing, cross-project dependencies, shared
-contracts, initiative-level decisions.
+Dependencies, sequence and material decisions.
 ```
 
 ### Section-ownership map
 
-Transcribed verbatim from the previous revision of this file rather than re-derived — the map's content did not change with the fusion; only its writer's identity did.
-
-| Section | Sole writer | When |
-|---------|-------------|------|
-| Frontmatter (`updated`, `projects`) | you (create/join) | intake; append project slug if absent |
-| `## Review Summary` | you | at creation; editable on operator request |
-| `## Functional Description` | you | at creation; reconciled after every project's Design/STAGE-GATE-1 (you learn of this from your own per-project tracking, then re-read that project's `01-plan.md` — a public artifact, never a dual-record field) |
-| `## Projects` table rows | you (all rows) | at intake (initial row); again after your Phase-4 mechanics resolve branch/version/PR/status |
-| `## Big-Picture Plan` | you | intake; reconciled after every project's Design/STAGE-GATE-1 |
-
-**Row schema.** Each `## Projects` row is `{project-slug} | {branch or —} | {version or —} | {#N / URL or —} | {planning|in-progress|delivered}` — one row per project, keyed by `project-slug`, never a second row for the same project.
+Main reconciles the shared overview; specialists own explicitly assigned service
+artifacts. Serialize shared-file updates and preserve existing useful context.
 
 ### No-fork / consolidation invariant
 
-`overview.md` is a **snapshot**, not a log. Each project has exactly one row, overwritten in place. Never create `overview-v2.md` or `00-overview-*.md` siblings. Concurrency-safe write rules: `## Projects` rows are one-per-project (safe under concurrency); `## Functional Description`/`## Big-Picture Plan` are reconcile-in-place, last-writer-wins on a true race, and you serialize your own read-modify-write of the whole document (never overlapping two reconciles) — you process project completions in arrival order.
-
-**Marker: multi-project-initiative-overview**
-
----
+One overview and one row per project keep continuity. Native task transport
+carries results; no leader roster, lane state or gate stream is required.
 
 ## What left this file, and where it went
 
-| Removed | Why |
-|---|---|
-| `00-leader-roster.md` schema and write discipline | the roster tracked coordinator instances; there is one coordinator, running each project in its own turn, so there is nothing to track across instances |
-| The coordinator spawn-payload contract | there is no spawn — Intake writes the board directly, in this same agent |
-| Multi-Task fan-out and its consolidator contract | measured at 0.6% of runs, and those were operator overrides. Two independent tasks run as two sessions on two worktrees, consolidated by the operator |
-| `functional_clarity_confirmed` propagation | it was a payload field carried from one coordinator to another; it is now a `checkpoint.confirmed` event this same agent reads from its own events file (`agents/ref-pipeline.md § Gates`) |
+Legacy multi-coordinator and gate bookkeeping remains in Git history. Current
+coordination uses native tasks, shared workspace notes and canonical OpenSpec.

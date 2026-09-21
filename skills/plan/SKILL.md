@@ -11,12 +11,13 @@ name: plan
 
 ## Step 0 — Detect intent
 
-Before processing the input, determine if the user wants **plan only** or **plan + execute**:
-
-- **`plan-and-execute`** — if the input contains keywords like: "implementar", "ejecutar", "implement", "execute", "build", "develop", "y ejecutar", "and implement", "full pipeline", "plan and build", "plan e implementar", "planificar y ejecutar"
-- **`plan`** (default) — if none of the above keywords are present
-
-Use the detected mode in the payload below. When in doubt, ask the user: "Do you want to just create the task breakdown (plan), or also implement each task (plan-and-execute)?"
+Before processing the input, determine whether the operator wants **plan only**
+or **plan + execute**. Treat an explicit planning-only phrase as decisive,
+including `plan only`, `do not implement`, `don't implement`, `solo plan`, and
+`sin implementar`, even when the same request contains words such as
+"implement" or "build". Use `plan-and-execute` only when implementation is
+affirmatively requested and no planning-only phrase negates it. Otherwise use
+`plan` and ask only when the intent remains genuinely ambiguous.
 
 For `plan-and-execute` only, prepend:
 
@@ -94,4 +95,6 @@ name: plan
 - Always invoke the `orchestrator` agent — do NOT execute any pipeline yourself
 - **Mode `plan`**: orchestrator runs SPECIFY → DESIGN (planning mode) → create tasks → stop
 - **Mode `plan-and-execute`**: orchestrator runs SPECIFY → DESIGN (planning mode) → create tasks → then executes each task through the full pipeline
-- **No GitHub? No problem.** The orchestrator will auto-detect `gh` availability. If unavailable, tasks are written as markdown files in `workspaces/{feature-name}/tasks/` instead of GitHub issues.
+- **No GitHub? No problem.** The orchestrator will auto-detect `gh`
+  availability. If unavailable, tasks are written as markdown files in the
+  selected `{workspace}/tasks/` instead of GitHub issues.

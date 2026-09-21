@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Team Harness v5 capability, result, control-log, and projection primitives. */
+/** Legacy v5 record and helper compatibility; not a current workflow permission layer. */
 
 import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";

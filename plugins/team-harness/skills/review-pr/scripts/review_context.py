@@ -212,13 +212,65 @@ def promote_artifact(root: Path, temporary_name: str, final_name: str) -> None:
         os.close(directory_fd)
 
 
+def _git_local_exclude_path(repo_root: Path) -> Path:
+    """Resolve Git's local exclude without trusting a repository file path."""
+    env = command_environment({
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_COUNT": "0",
+        "GIT_OPTIONAL_LOCKS": "0",
+        "GIT_NO_LAZY_FETCH": "1",
+        "GIT_ALLOW_PROTOCOL": "",
+    })
+    # Resolve metadata from the explicitly requested repository.  Git honors
+    # these inherited overrides even when -C points at another worktree,
+    # which could otherwise redirect the local exclude write to another repo.
+    env.pop("GIT_DIR", None)
+    env.pop("GIT_COMMON_DIR", None)
+    try:
+        git_dir_result = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--git-common-dir"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=COMMAND_TIMEOUT_SECONDS,
+            env=env,
+        )
+        exclude_result = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--git-path", "info/exclude"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=COMMAND_TIMEOUT_SECONDS,
+            env=env,
+        )
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        raise ContextError("cannot resolve Git local exclude") from error
+    git_dir = Path(git_dir_result.stdout.strip())
+    if not git_dir.is_absolute():
+        git_dir = repo_root / git_dir
+    exclude = Path(exclude_result.stdout.strip())
+    if not exclude.is_absolute():
+        exclude = repo_root / exclude
+    try:
+        git_dir = git_dir.resolve(strict=True)
+        exclude_parent = exclude.parent.resolve(strict=True)
+    except OSError as error:
+        raise ContextError("cannot resolve Git local exclude") from error
+    if exclude_parent != git_dir / "info":
+        raise ContextError("Git local exclude is outside the repository metadata")
+    return exclude_parent / exclude.name
+
+
 def ensure_workspaces_ignored(repo_root: Path) -> None:
-    resolved, directory_fd = _open_directory(repo_root)
+    """Keep review artifacts ignored through Git's untracked local exclude."""
+    exclude = _git_local_exclude_path(repo_root)
+    resolved, directory_fd = _open_directory(exclude.parent)
     del resolved
-    name = ".gitignore"
+    name = _safe_leaf(exclude.name)
     try:
         try:
-            current = safe_read_leaf(repo_root, name, limit=1_000_000)
+            current = safe_read_leaf(exclude.parent, name, limit=1_000_000)
             mode = _regular_stat_at(directory_fd, name).st_mode & 0o777
         except ContextError:
             try:
@@ -228,19 +280,19 @@ def ensure_workspaces_ignored(repo_root: Path) -> None:
                 mode = 0o644
             else:
                 if not stat.S_ISREG(existing.st_mode):
-                    raise ContextError(".gitignore is not a regular non-symlink file")
+                    raise ContextError("Git local exclude is not a regular non-symlink file")
                 raise
         try:
             text = current.decode("utf-8")
         except UnicodeDecodeError as error:
-            raise ContextError(".gitignore is not UTF-8 text") from error
+            raise ContextError("Git local exclude is not UTF-8 text") from error
         if any(line in {"/workspaces", "/workspaces/"} for line in text.splitlines()):
             return
         updated = current
         if updated and not updated.endswith(b"\n"):
             updated += b"\n"
         updated += b"/workspaces/\n"
-        temporary = f".gitignore.team-harness-{secrets.token_hex(8)}"
+        temporary = f"exclude.team-harness-{secrets.token_hex(8)}"
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW
         temporary_fd = artifact_fs.open(temporary, flags, mode, dir_fd=directory_fd)
         try:
@@ -1755,17 +1807,19 @@ def command_same_author(args: argparse.Namespace) -> int:
     return 0
 
 
-REASONS_REQUIRING_SECURITY = {"known-sensitive", "unmatched-executable"}
-REASONS_WAIVING_SECURITY = {"known-non-executable", "indeterminate"}
-def resolve_security_required(reason: str, triggers: list[str]) -> bool:
-    """Pure function of the resolved reason and trigger list.
+REASONS_RECOMMENDING_SECURITY = {"known-sensitive", "unmatched-executable"}
+REASONS_WITHOUT_SECURITY_SIGNAL = {"known-non-executable", "indeterminate"}
 
-    Explicit/tier triggers and concrete sensitive or executable changes require the lens.
-    Indeterminate classification alone is not a trigger or a claim of safety.
+
+def resolve_security_required(reason: str, triggers: list[str]) -> bool:
+    """Compatibility helper: only an explicit operator request selects security.
+
+    Risk classification is advisory. Keep this name for callers of older helper
+    versions, but do not let a path/content category become a mandatory lens.
     """
-    if reason not in REASONS_REQUIRING_SECURITY | REASONS_WAIVING_SECURITY:
+    if reason not in REASONS_RECOMMENDING_SECURITY | REASONS_WITHOUT_SECURITY_SIGNAL:
         raise ContextError("unknown security classification")
-    return bool(triggers) or reason in REASONS_REQUIRING_SECURITY
+    return "explicit" in triggers
 
 
 def command_select_security(args: argparse.Namespace) -> int:
@@ -1784,9 +1838,14 @@ def command_select_security(args: argparse.Namespace) -> int:
         triggers.append("explicit")
     if args.tier == 4:
         triggers.append("tier-4")
+    explicit = resolve_security_required(reason, triggers)
     print(json.dumps({
         "reason": reason,
-        "security_required": resolve_security_required(reason, triggers),
+        "security_recommended": reason in REASONS_RECOMMENDING_SECURITY or bool(triggers),
+        "security_selected": explicit,
+        # Backward-compatible field; it now means explicitly selected, never
+        # automatically required by classification.
+        "security_required": explicit,
         "triggers": triggers,
     }))
     return 0
@@ -2076,9 +2135,17 @@ def preflight(repo_root: Path, runtime: str, agents_dir: Path | None,
         gh_status = "unavailable"
     if gh_status != "authenticated":
         blockers.append(f"gh {gh_status}")
-    gitignore = repo_root / ".gitignore"
-    ignored_before = gitignore.is_file() and any(
-        line.strip() in {"/workspaces", "/workspaces/"} for line in gitignore.read_text(encoding="utf-8", errors="replace").splitlines()
+    exclude = _git_local_exclude_path(repo_root)
+    if _is_link(exclude):
+        raise ContextError("Git local exclude must not be a symlink")
+    try:
+        exclude_text = safe_read_leaf(exclude.parent, exclude.name, limit=1_000_000).decode(
+            "utf-8", errors="replace"
+        )
+    except ContextError:
+        exclude_text = ""
+    ignored_before = any(
+        line.strip() in {"/workspaces", "/workspaces/"} for line in exclude_text.splitlines()
     )
     ensure_workspaces_ignored(repo_root)
     codex_agents: dict[str, Any] | None = None
@@ -2089,7 +2156,7 @@ def preflight(repo_root: Path, runtime: str, agents_dir: Path | None,
     return {
         "ok": not blockers,
         "gh": gh_status,
-        "workspaces_ignore": "present" if ignored_before else "added",
+        "workspaces_ignore": "present" if ignored_before else "local-exclude-added",
         "codex_agents": codex_agents,
         "review_agents": list(selected),
         "agent_check": "not-run" if prerequisites_only else "native-check-required",

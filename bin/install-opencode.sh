@@ -108,12 +108,10 @@ echo "Checksum verified."
 # Run the verified binary.
 #
 # Interactive setup: when a terminal (/dev/tty) is present, the binary
-# presents the trimmed .team-harness.json setup surface as a sequence of
-# skippable, explanatory prompts. Only two settings are configurable:
-#   - Memory MCP URL (paste or JSON snippet; bearer token stays in your shell)
-#   - context7 (enable/skip; API key stays in your shell)
-# All other settings use silent defaults (work-logs → local; no language,
-# no english-learning, no ClickUp, no Obsidian tasks).
+# presents the native .team-harness.json setup surface. Context7 remains an
+# independent optional choice. Existing MCP entries are preserved; a
+# knowledge-graph URL is registered only when supplied explicitly through
+# MEMORY_MCP_URL, --memory-url, or existing user-owned configuration.
 #
 # Non-interactive (headless/CI): when /dev/tty is absent, the binary
 # installs all assets and resolves configuration from env vars + defaults only
@@ -122,7 +120,7 @@ echo "Checksum verified."
 #
 # MEMORY_MCP_URL and CONTEXT7_API_KEY are OPTIONAL. When MEMORY_MCP_URL is
 # set, it is passed via --memory-url argv (not env, to avoid shell history).
-# To configure MCP servers later, re-run with the env vars set:
+# To configure an optional MCP later, re-run with the env vars set:
 #   MEMORY_MCP_URL=https://your-mcp.example.com/mcp \
 #     CONTEXT7_API_KEY=your-key \
 #     curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash
@@ -130,9 +128,8 @@ echo "Checksum verified."
 # Redirect stdin from /dev/tty when present — same rationale as install.sh:
 # when invoked via 'curl | bash', bash holds the pipe as stdin; the binary
 # must read from the operator's terminal, not the remaining pipe bytes. The
-# binary also wires /dev/tty explicitly into the huh form as the bubbletea
-# input source so that pasting a bare Memory MCP URL is reliably delivered
-# as a single paste event (not dropped or split under curl | bash).
+# binary also wires /dev/tty explicitly into any native form so terminal input
+# remains reliable under curl | bash.
 # Forward "$@" so the operator can pass --scope, --opencode-dir, or
 # --non-interactive / --yes to the binary.
 # ---------------------------------------------------------------------------
@@ -156,6 +153,6 @@ else
 fi
 INSTALL_EXIT=$?
 
-# The binary (dispatch.go::registerOpencodeMCPIfConfigured) emits any
+# The binary (dispatch.go::registerOpencodeMCPFromValues) emits any
 # MCP-related notes authoritatively. The script does not duplicate them.
 exit $INSTALL_EXIT

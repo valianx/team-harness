@@ -1,147 +1,103 @@
 # Parallel Batch Implementation
 
-**Status:** Proven in PR #338 (the Tier 3+4 batch — suites 101–105 implemented concurrently across isolated worktrees, consolidated into one PR). This document codifies that procedure as the normative contract.
-
-Plain reference URL: https://github.com/valianx/team-harness/pull/338
-
----
+This reference describes bounded native parallel work for independent tasks in
+one repository. The coordinator keeps dependency planning, workspace ownership,
+result consolidation, and publication in one build and one PR.
 
 ## When this applies
 
-This contract applies when ALL of the following conditions hold:
+Use this flow when:
 
-1. **Operator-authorized** — the operator approved the batch and its scope. Same authority gate as the batches in #336 and #338.
-2. **Single repo** — every item in the batch lands in the same repository.
-3. **ADDITIVE** — every item adds new files or makes pure insertions into existing shared files. No item rewrites or deletes lines owned by another item.
-4. **Independent** — no item depends on another item's output at implementation time. Items with a dependency must be serialized.
-5. **Pre-reserved suite block numbers** — each item was given its suite block number(s) at plan time. This reservation happens before implementation starts, not during, so concurrent implementers never race to claim the next free number.
+1. the operator requested the batch and its scope;
+2. the tasks share a repository and a selected absolute workspace;
+3. the plan identifies independent tasks with explicit file ownership; and
+4. dependent tasks can be ordered from the plan before dispatch.
 
-If any condition is not met, fall back to the default serial implementation (today's behavior). This contract is opt-in; it never fires automatically.
+If ownership overlaps or a dependency is unresolved, run that portion
+sequentially. The batch route is a coordination choice, not a prerequisite for
+ordinary direct work.
 
----
+## Plan and workspace
 
-## Intra-task lane fan-out — a third, distinct parallelism mechanism
+The coordinator records the task list and dependency graph in the existing
+plan. Each task names its objective, assigned files, worktree or repository
+root, focused checks, and expected result location. Every destination is an
+absolute path supplied by the workspace method.
 
-This document covers ONE parallelism mechanism: an operator-authorized batch of independent ITEMS across isolated worktrees, consolidated into one PR. Team-harness has two other, structurally distinct parallelism mechanisms — naming all three prevents "parallel" from being read as one undifferentiated concept:
+Milestone builds keep one plan, one workspace, dependency annotations, and one
+build-level PR. Independent milestones may use the same bounded native dispatch;
+dependent milestones wait for their prerequisites. Do not create per-milestone
+workspace copies, retired lane protocols, or a second coordinator.
 
-| Mechanism | Axis | Unit of fan-out | Gate | Canonical source |
-|---|---|---|---|---|
-| Inter-task DAG scheduler | tasks within one plan | the base dispatch carries every non-decomposed task, in `Depends on:` order | none | `agents/ref-pipeline.md` |
-| ~~Parallel Multi-Project Dispatch~~ — **RETIRED** | projects within one initiative | — | — | Retired with the coordinator fusion: fanning out per-project lanes required the coordinator to dispatch a copy of itself. Successor: serial, `agents/ref-dispatch-machinery.md § "Multi-project sequencing"` |
-| Batch Implementation (this document) | independent items across an operator-authorized batch | one implementer per item, own worktree | operator authorization + the 5 preconditions in `## When this applies` | this document |
-| **Intra-task lane decomposition** | **files WITHIN one already-approved task** | **one implementer lane per architect-declared, file-disjoint seam** | **`Lane-decomposable: yes` in `01-plan.md` AND `Files:` count ≥ `LANE_DECOMPOSE_MIN_FILES` (8) AND ≥2 disjoint seams** | `agents/ref-pipeline.md § Phase 2 — Implementation → Intra-task execution-lane decomposition` |
+The plan, tasks, and notes are the durable context. Direct batches do not create
+knowledge-context, telemetry, event, or session scaffolding.
 
-**Intra-task execution-lane decomposition, in brief.** A task's architect-declared `seams:` (disjoint file subsets) and `frozen-contracts:` (shared files/symbols no seam may modify) let the orchestrator fan out ONE task's implementation into up to `LANE_CAP` (5) fresh-context implementer lanes at dispatch time, capped globally at `GLOBAL_ROUND_CONCURRENCY_CAP` (6) concurrent implementer subagents per round (summing inter-task DAG parallelism and intra-task lanes). A lane that discovers it must modify a frozen-contract returns `status: blocked, reason: seam-not-disjoint`; the orchestrator aborts the fan-out and re-dispatches the whole task monolithically — never a silent stop. The DELIVERABLE (plan, commit set, PR) is never divided; only EXECUTION may fan out into bounded lanes — the reader downstream of Phase 2 sees one task, one `02-implementation.md`, one commit set, exactly as the 1:1 path. Full gate mechanics, trace events, and the `00-state.md` schema live at `agents/ref-pipeline.md § Phase 2 — Implementation → Intra-task execution-lane decomposition`.
+## Native bounded dispatch
 
-**Why this is not the same as this document's batch mechanism.** This document's batch mechanism fans out independent ITEMS — each with its own worktree, its own branch, its own full Stage-1-through-verify pipeline run, consolidated at the END via sequential `git merge`. Intra-task lane decomposition fans out FILES within a SINGLE task that already cleared Stage 1 — lanes share the SAME worktree and branch (deliverable cohesion, not execution cohesion), write disjoint files, and consolidate via a compact status-block report, never a merge. Do not apply this document's worktree-isolation or edit-class-split machinery to lane decomposition; it operates at a different, finer grain.
+The coordinator dispatches independent tasks through the active host's native
+task or session mechanism. Use the configured concurrency cap (default five)
+with eager slot filling when useful. If native parallel dispatch is unavailable,
+run the same tasks sequentially.
 
----
+Each task receives:
+
+- the objective and acceptance scope;
+- the absolute repository and workspace paths;
+- its dependency status and assigned files;
+- the requested deliverable path;
+- native permission context; and
+- focused checks to run.
+
+Do not require a shell multiplexer, a particular coding host, a permission
+bypass, or a fixed environment variable. A failed task is reported with its
+diagnostic and does not erase completed task evidence.
 
 ## Worktree isolation
 
-Each item runs in its own `git worktree`. Follow `docs/worktree-discipline.md` rules:
+Parallel tasks that would share Git metadata use distinct host-managed
+worktrees or checkouts. The coordinator records each returned absolute path and
+base revision before dispatch. Tasks in one worktree run sequentially.
 
-- **Rule 1 (fresh base):** `git fetch origin main` first, then `git worktree add -b <item-branch> <item-path> origin/main`. Verify HEAD is on the fresh `origin/main` base before starting.
-- **Rule 2 (no-silent-reuse):** check that neither the branch name nor the worktree path already exists before creating. Stop and report if either conflicts.
-- **Rule 5 (plan records the worktree):** record the worktree path, branch name, and base commit in the item's `00-state.md` / `01-plan.md` before the implementer starts. Delivery uses this record for teardown.
+Never assume a path under a particular host's configuration directory, and
+never discover a worktree by date, mtime, or newest-directory ordering. A
+missing, conflicting, or outside path blocks that task before edits.
 
-Concurrent implementers never contend on the same working tree because each holds its own isolated directory under `.claude/worktrees/<item-branch>/` (or another non-root path).
+## Shared files and result ownership
 
----
+The task list declares file ownership. A task edits only its assigned files and
+returns changed paths, checks, findings, and its explicit output path. Shared
+plan, index, manifest, or publication files remain coordinator-owned and are
+updated serially after task results arrive.
 
-## Concurrent implementer fan-out
-
-Dispatch N implementers in parallel via concurrent `Task` calls in the parent
-orchestrator session. The same transport may fan out the fresh QA verifier and
-impact-required security over the immutable frozen candidate.
-
-Cap the concurrency at `batch_concurrency` (default 5) using an eager slot-fill wave model: fill all available slots immediately, and as each item finishes open the slot to the next queued item. This mirrors the Stage-1 planning fan-out (N architects + N plan-reviewers) on the implementation side.
-
-**Commit ownership per item (`agents/implementer.md § Commit Contract`).** An item's implementer commits and reports `commit: {sha}` for any item-LOCAL diff — before the item's in-worktree verify runs. This is the standard 1:1 case, never `lane-deferred`: `lane-deferred` is reserved for intra-task execution-lane decomposition, where multiple lanes share ONE worktree and branch (see the mechanism-comparison table above). Each item in this batch holds its own isolated worktree and its own branch, so no lane index-race exists here — the item's own committed sha is what `git merge <item-branch>` (below) merges into the integration branch at consolidation. An item whose entire contribution is **shared-serial only** (see "Edit-class split" below) — nothing item-local to commit — has no item-worktree diff to commit: it reports `commit: none — no source change` instead of a fabricated sha. Reserved shared-serial content must never be written inside an item's own worktree to manufacture a commit; it is spliced centrally by the orchestrator at consolidation, per the Edit-class split below.
-
----
-
-## Edit-class split
-
-Every file an item touches MUST be declared in that item's `01-plan.md` with its edit class. There are two classes:
-
-| Class | Examples | Where edited | Reconciliation |
-|-------|----------|--------------|----------------|
-| **item-local** | new skill/agent/script/doc file; the item's own new test file; the item's own new `docs/` file | inside the item's worktree — no other item touches the same file | wholesale `git checkout <item-branch> -- <item-local-paths>` into the consolidation tree |
-| **shared-serial** | any test file two items both touch; `docs/testing.md` rows; `README.md` / `skills/README.md` listings; `.claude-plugin/plugin.json` + `marketplace.json`; `CHANGELOG.md` / `changelog.d/` entries | NEVER edited inside the worktree — the item declares its reserved insertion block in its plan and does not touch the file | orchestrator extracts each item's added block and splices all blocks centrally in reserved order at consolidation |
-
-**The invariant:** a shared-serial file is never edited in an item's worktree. An item that needs to contribute to a shared-serial file declares its reserved insertion block in the plan (`01-plan.md` § Files, with class: `shared-serial`, content: `<the exact insertion>`). The orchestrator performs the splice centrally.
-
-Items that touch only item-local files can be fully autonomous in their worktree (no coordination needed at file-write time). Items that touch shared-serial files are autonomous in their worktree too — they just do not write those files; the orchestrator handles the write at consolidation.
-
----
+When two results touch the same file, the coordinator reconciles the complete
+set of changes in dependency order, preserving every compatible contribution.
+An unresolved semantic conflict is reported for an operator decision; it is
+never silently dropped or resolved by choosing the first result.
 
 ## Consolidation
 
-Consolidation reuses the discipline of merging several PRs one at a time — applied to the item branches so the batch ships as ONE PR instead of N. It runs after all N implementers have finished and each item has passed its in-worktree verify. A SINGLE consolidator (a dedicated consolidator orchestrator) creates the integration branch (the eventual PR head) from the fresh base, then merges each item branch into it one at a time.
+After independent tasks complete, the coordinator:
 
-### Sequential merge, validate after each
+1. verifies each result against its assigned scope;
+2. applies or merges task changes serially in dependency order;
+3. runs the appropriate focused checks after each material merge;
+4. records the consolidated changed-file map and evidence; and
+5. runs the repository-level checks appropriate to the final candidate once.
 
-```bash
-git switch -c <integration-branch> <base>      # base = origin/main (fresh)
-# then, per item, in reserved order (lowest reserved suite number first):
-git merge <item-branch>                         # resolve conflicts (below)
-bash tests/run-all.sh                           # validate; continue only when green
-```
+The resulting branch carries one plan, one implementation result set, one
+validation record, and one PR by default. Version and publication work remain
+with the current delivery route after the candidate is accepted.
 
-Validate after EVERY merge, not only at the end. Incremental validation localizes any failure to the item just merged (or its interaction with what is already integrated), and catches a contaminated or mislabeled item commit at the merge that introduces it — a single end-of-batch run cannot.
+## Verification and cleanup
 
-### Conflict resolution
+Task checks are necessary evidence for their own scope. The consolidated check
+covers interactions between tasks and is the final implementation signal. A
+missing or failed task result stays visible in the consolidated report.
 
-git auto-merges disjoint edits (e.g., two items editing different regions of the same agent file). The expected conflicts are the shared-serial append points — two items each adding a suite block before the same `# Summary` anchor, or a row to the same `docs/testing.md` registry. Resolve by KEEPING ALL blocks in reserved order; never drop one and never pick a "winner". These are additive conflicts, not competing edits.
+Remove only run-owned host-managed worktrees and scratch directories after the
+coordinator confirms their evidence is retained. Keep failed worktrees when
+their inspection is needed. Never delete a generic `/tmp` path, another run's
+files, or a workspace destination supplied by the operator.
 
-Item-local files (those only one item touches) ride along in that item's merge automatically — the edit-class split guarantees no two items touch the same item-local file, so they never conflict.
-
-### Version + CHANGELOG
-
-Done ONCE, after all items are merged and the full suite is green, by the coordinator's publication mechanics. Items do not bump the version individually. Open the PR only when every item branch is merged and `run-all.sh` is green on the integration branch.
-
-### Evolution from the splice method
-
-The first batch (PR #338) consolidated by hand-splicing each item's added lines into the shared files. A later batch hit cross-contamination (two worktrees' copies of the shared test file cross-mixed) and a global-guard collision (a new suite embedding literal agent-tokens that the whole-file guard scans for) — both caught only by the final run, not localized. Sequential `git merge` + validate-after-each replaces the splice: git surfaces real conflicts (resolved by keeping all blocks), and per-merge validation localizes failures. This is the hardened method.
-
----
-
-## Verify
-
-### Per-item (in the worktree)
-
-```bash
-bash tests/run-all.sh
-```
-
-Run this directly in the item's worktree. Do NOT run `bash tests/run-all.sh` concurrently across items. The reason: `run-all.sh` chains `checkpoint-guard.sh` on stdin; concurrent invocations contend on stdin and orphan bash process trees on Windows, leaving zombie processes and incomplete test output (confirmed platform constraint on Windows 11).
-
-The per-item run is **necessary but not sufficient**. It confirms the item's own suite block passes and no preexisting suite regressed. It cannot detect cross-item interactions (e.g., two items that each pass alone but conflict when their shared-serial contributions are concatenated).
-
-### Consolidated (once)
-
-After consolidation, on the consolidated tree:
-
-```bash
-bash tests/run-all.sh
-```
-
-Run the full suite exactly once. This is the mandatory safety net. It covers:
-
-- The full verification suite (`bash tests/run-all.sh`).
-- `policy-block.sh` secret-scan of all new content.
-- Agent frontmatter validation across all modified agents.
-
-The consolidated full-suite run is the gate that separates the parallel implementation phase from delivery.
-
-## Consolidator role and directives
-
-Consolidation is owned by a SINGLE designated consolidator — a dedicated consolidator orchestrator, never a worker subagent and never split across actors. The consolidator is the only writer of shared-serial files; parallel implementers never reconcile each other's work. The single-owner rule exists because concurrent implementers can contaminate even a notionally-isolated shared file — observed live, two worktrees' copies of the same test file cross-contaminated, each commit carrying the other item's block.
-
-Four directives:
-
-1. **Re-derive, do not trust.** Treat every worktree's copy of a shared-serial file as untrusted. Rebuild each shared-serial file from `base + each item's reserved block` (extract each item's block via `git diff <base>..<item-branch>`); never adopt a worktree's mutated shared file wholesale.
-2. **All new suites must pass together.** Run `bash tests/run-all.sh` exactly once on the consolidated tree; every separately-authored suite must pass in that single together-run. A per-item in-worktree pass is necessary but never sufficient — the together-run is the gate, and consolidation is not done until it is green.
-3. **No new suite may break a global guard.** A new suite's non-comment source must not embed the literal agent-invocation tokens that the whole-file free-suite guard scans for; phrase no-agent-call descriptions generically and assemble the tokens in variables (`"Age" + "nt("`), as the sibling suites do. Observed live: a new suite's check description embedded the literal tokens and tripped the whole-file guard — caught only by the together-run.
-4. **One actor, one sequence.** The consolidator performs item-local checkouts, shared-serial re-derivation, the single version bump, and CHANGELOG assembly as one serial sequence in the parent session — never concurrently.
+The coordinator returns the task map, absolute workspace, changed files,
+verification results, unresolved conflicts, and the final deliverable path.

@@ -5,59 +5,8 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
-
-// printSummary prints the post-install report to stdout.
-func printSummary(claudeJSONBackup string, mem MemoryMCPChoice, context7Preserved bool, mode InstallMode) {
-	osLabel := map[string]string{
-		"windows": "windows",
-		"darwin":  "macos",
-		"linux":   "linux",
-	}[runtime.GOOS]
-	if osLabel == "" {
-		osLabel = runtime.GOOS
-	}
-
-	sectionHeader("Summary")
-	fmt.Printf("  installed: %s\n", colorValue(fmt.Sprintf("%d", len(stats.Installed))))
-	fmt.Printf("  updated:   %s\n", colorValue(fmt.Sprintf("%d", len(stats.Updated))))
-	fmt.Printf("  unchanged: %s\n", colorValue(fmt.Sprintf("%d", len(stats.Unchanged))))
-
-	printModeSummary(mode)
-	printLogsSummary()
-
-	fmt.Println()
-	fmt.Println("MCP servers in ~/.claude.json:")
-	fmt.Printf("  %s\n", formatMemorySummary(mem))
-	c7Status := "updated"
-	if context7Preserved {
-		c7Status = "preserved"
-	}
-	fmt.Printf("  - context7 (library docs): %s\n", c7Status)
-	if claudeJSONBackup != "" {
-		fmt.Printf("  backup: %s\n", claudeJSONBackup)
-	} else {
-		fmt.Println("  (no backup needed — file was not modified)")
-	}
-
-	fmt.Println()
-	fmt.Printf("Manifest: %s\n", filepath.Join(claudeDir, manifestFilename))
-
-	fmt.Println()
-	fmt.Println("Next steps:")
-	fmt.Println("  1. Restart Claude Code so it picks up the new MCP servers and hooks.")
-
-	agentCount, skillCount, hookCount := countInstalledAssets()
-	fmt.Println()
-	fmt.Printf("Installation completed successfully. %s agents, %s skills, %s hooks installed.\n",
-		colorValue(fmt.Sprintf("%d", agentCount)),
-		colorValue(fmt.Sprintf("%d", skillCount)),
-		colorValue(fmt.Sprintf("%d", hookCount)))
-	fmt.Println()
-	fmt.Println(colorWarn("Restart Claude Code to load them."))
-}
 
 // countInstalledAssets counts the number of agent files (installed under an
 // "agents" path segment), skill files (installed under a "skills" or "commands"

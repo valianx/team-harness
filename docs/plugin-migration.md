@@ -1,6 +1,8 @@
 # Plugin Migration Guide
 
-This guide covers migration from the Go installer to the Claude Code plugin distribution.
+This guide covers migration from the retired Claude Code binary path to the
+native Claude Code plugin distribution. The Go installer remains available for
+explicit OpenCode and Codex subcommands.
 
 ---
 
@@ -28,7 +30,7 @@ The namespace prefix `th:` is mandatory in plugin mode. The coordinator (`@th:or
 | `~/.claude/commands/*.md` | `${CLAUDE_PLUGIN_ROOT}/skills/<name>/SKILL.md` |
 | `~/.claude/agents/*.md` | `${CLAUDE_PLUGIN_ROOT}/agents/*.md` |
 | Retired Team Harness policy hooks | No plugin replacement; native permissions and approvals remain the action boundary |
-| `~/.claude.json` mcpServers block | Managed by `/th:setup` via `.team-harness.json` |
+| Existing `~/.claude.json` mcpServers block | Preserved as user-owned native configuration; `/th:setup` does not copy or replace it |
 
 ### Skill file format
 
@@ -42,7 +44,7 @@ Skills now use the directory format. Each skill lives at `skills/<name>/SKILL.md
 - **Pipeline behavior** — all pipelines (feature, fix, hotfix, research, docs, review) run identically.
 - **orchestrator as entry point** — `@th:orchestrator` in chat still routes to the same coordinator.
 - **Workspaces** — pipeline workspaces (local `./workspaces/` or Obsidian vault) work identically.
-- **Low-cost mode** — only available via the legacy Go installer; the plugin cannot transform frontmatter on install. See [`docs/install.md` § Legacy installer](./install.md#legacy-installer-contributors--offline--ci).
+- **Low-cost mode** — available only where the selected native engine supports the installer transform; Claude Code uses the plugin's native model settings.
 - **`.team-harness.json` manifest** — config file location and format unchanged.
 
 ---
@@ -87,11 +89,11 @@ In Claude Code:
 /th:setup
 ```
 
-`/th:setup` replaces the interactive prompts the Go installer used to provide. It:
+`/th:setup` configures the native plugin installation. It:
 - Reads or creates `.team-harness.json`
 - Lets you choose logs-mode (local or Obsidian vault)
-- Verifies Memory MCP and context7 connectivity
-- Shows a summary of detected agents, active skills, and MCP status
+- Preserves existing MCP registrations and credentials
+- Configures Context7 only when explicitly selected, then shows a summary of detected agents and active skills
 
 ### 4. Verify
 
@@ -99,7 +101,7 @@ In Claude Code:
 /th:orchestrator give me the work plan for this task: <any test task>
 ```
 
-The pipeline should start normally. If agents are missing, run `/plugin reload th`.
+The pipeline should start normally. If agents are missing, run `/reload-plugins` and follow the host's activation guidance.
 
 ---
 
@@ -107,26 +109,25 @@ The pipeline should start normally. If agents are missing, run `/plugin reload t
 
 ### Duplicate skills appearing (`/design` AND `/th:design`)
 
-Old installer files and plugin files coexist. Run step 1 above to remove the installer files, then reload Claude Code.
+Old installer files and plugin files coexist. Run step 1 above to remove the installer files, then activate the plugin through the host's reload command.
 
 ### MCP not connecting after migration
 
-The installer wrote MCP config directly to `~/.claude.json`. After migration, run `/th:setup` to re-verify and reconfigure. The `~/.claude.json` `mcpServers` block written by the installer stays active; `/th:setup` will detect it.
+Existing MCP configuration remains in the native runtime. Inspect it with the
+runtime's MCP command and repair only the selected integration. `/th:setup`
+does not provision Memory or Context Harness and does not copy credentials;
+Context7 is an independent, explicit option.
 
 ### `/th:setup` not found after install
 
-Run `/plugin reload th` or restart Claude Code. Plugin skills require a reload after first install.
+Run `/reload-plugins`. Reconnect only when the host reports that reload cannot activate the plugin.
 
 ### Orphan cleanup for old flat skill files
 
 If the Go installer left behind flat `.md` files under `~/.claude/commands/` that have no plugin equivalent, run `/th:update` which includes a legacy orphan cleanup step for directory-format migrations.
 
-### Low-cost mode (legacy Go installer only)
+### Low-cost mode
 
-The plugin does not transform frontmatter on install. To use low-cost mode (all agents on `sonnet` / `medium` effort), use the legacy Go installer:
-
-```bash
-INSTALL_MODE=low-cost curl -fsSL https://valianx.github.io/team-harness/install.sh | bash
-```
-
-The Go installer is the legacy install path as of v2.33.0 — it remains functional for this use case. The installer writes to `~/.claude/` and the plugin writes to the plugin root; they can coexist. See [`docs/install.md` § Legacy installer](./install.md#legacy-installer-contributors--offline--ci) for full details.
+Use the selected native runtime's model configuration. The compatibility
+bootstrap scripts do not install Claude Code files; with no subcommand they
+only print the native marketplace path.

@@ -10,14 +10,15 @@ package main
 //
 //   No secret value at rest (AC-6 / SEC-OC-R1):
 //     - The opencodeMCPValues struct carries no bearer/key literal fields;
-//       only MemoryURL (literal, validated), MemoryRequiresAuth (bool UI signal),
+//       only the optional MemoryURL (literal, validated), MemoryRequiresAuth (bool UI signal),
 //       and Context7Enabled (bool UI signal) are present.
 //     - registerOpencodeMCPFromValues writes only {env:VAR} refs, never a
 //       literal secret to opencode.json.
 //
 //   Trimmed surface assertions (AC-1, AC-2, AC-4):
 //     - buildOpencodeSetupValues always returns LogsMode == "local" (AC-1).
-//     - buildOpencodeSetupGroups produces only Memory MCP and context7 groups (AC-2).
+//     - buildOpencodeSetupGroups produces only the independent context7 group
+//       (AC-2); Memory/KG is explicit-only.
 //     - Import short-circuit: on "Import", the main form is not run (AC-4).
 //
 //   Dependency detect/guide (AC-9):
@@ -89,28 +90,17 @@ func TestBuildOpencodeSetupValues_Context7EnabledWhenFlagSet(t *testing.T) {
 // Suite — AC-2: trimmed group composition
 // ---------------------------------------------------------------------------
 
-// TestBuildOpencodeSetupGroups_GroupCountIsInRange verifies that
-// buildOpencodeSetupGroups produces 5 groups or fewer — Memory MCP (confirm +
-// URL + auth + bearer note) and context7. The removed groups (Agent Output
-// Location, Language, English-Learning, ClickUp, Obsidian Tasks, final Confirm)
-// are not present (AC-2).
-//
-// With all MCP sub-groups visible (4: confirm, URL, auth, bearer) + 1 context7 = 5.
-// The bearer note group has a WithHideFunc so at runtime some groups are hidden,
-// but buildOpencodeSetupGroups always returns the full slice — count checks the
-// maximum: at most 5 groups exist in the trimmed form.
+// TestBuildOpencodeSetupGroups_GroupCountIsInRange verifies that the normal
+// setup form contains only the independent context7 choice. Memory/KG MCP is
+// available through an explicit flag or environment value and is not offered
+// by the normal setup flow (AC-2/F30).
 func TestBuildOpencodeSetupGroups_GroupCountIsInRange(t *testing.T) {
 	data := freshFormData()
 	groups := buildOpencodeSetupGroups(data)
 
-	// Trimmed form: at most 5 groups (MCP confirm + URL + auth + bearer note + context7).
-	// The previous form had up to 16 groups.
-	const maxExpected = 5
-	if len(groups) > maxExpected {
-		t.Errorf("buildOpencodeSetupGroups returned %d groups, want at most %d (AC-2: removed groups must be absent)", len(groups), maxExpected)
-	}
-	if len(groups) == 0 {
-		t.Error("buildOpencodeSetupGroups returned 0 groups, want at least 2 (Memory MCP + context7)")
+	const want = 1
+	if len(groups) != want {
+		t.Errorf("buildOpencodeSetupGroups returned %d groups, want %d (context7 only)", len(groups), want)
 	}
 }
 
@@ -612,9 +602,9 @@ func TestBuildOpencodeSetupGroups_RemovedGroupTitlesAbsent(t *testing.T) {
 	}
 }
 
-// TestBuildOpencodeSetupGroups_RetainsMemoryMCPAndContext7Titles verifies
-// that the two surviving top-level group title strings — "Memory MCP" and
-// "context7" — are present in the function body after the trim (AC-2).
+// TestBuildOpencodeSetupGroups_RetainsContext7AndOmitsMemory verifies that the
+// independent context7 group remains while Memory/KG is not offered by the
+// normal setup form (AC-2/F30).
 func TestBuildOpencodeSetupGroups_RetainsMemoryMCPAndContext7Titles(t *testing.T) {
 	src, err := os.ReadFile(filepath.Join(sourceDir(t), "opencode_tui.go"))
 	if err != nil {
@@ -628,10 +618,11 @@ func TestBuildOpencodeSetupGroups_RetainsMemoryMCPAndContext7Titles(t *testing.T
 	}
 	funcBody := extractFuncBody(content[start:])
 
-	for _, expected := range []string{"Memory MCP", "context7"} {
-		if !strings.Contains(funcBody, expected) {
-			t.Errorf("expected surviving group title %q not found in buildOpencodeSetupGroups (AC-2 regressed)", expected)
-		}
+	if strings.Contains(funcBody, "Memory MCP") || strings.Contains(funcBody, "memory") {
+		t.Error("Memory/KG setup offer found in buildOpencodeSetupGroups (F30 violated)")
+	}
+	if !strings.Contains(funcBody, "context7") {
+		t.Error("context7 group missing from buildOpencodeSetupGroups")
 	}
 }
 

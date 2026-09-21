@@ -1,17 +1,18 @@
 package main
 
-// opencodeMCPMigration carries the CC MCP config values extracted from
-// ~/.claude.json mcpServers. Only memory and context7 are ever read —
-// no other servers are inspected (AC-4).
+// opencodeMCPMigration carries values for the explicit, legacy migration
+// helper. The current install flow does not call this reader: cross-runtime
+// MCP credentials stay in their source runtime and existing native entries
+// are preserved. Keeping the helper makes the migration engine available to
+// an explicit migration command or compatibility test without making it part
+// of normal setup.
 //
 // All three fields are non-secret FROM THE PERSPECTIVE of the reader
 // (MemoryURL is a URL, not a secret). MemoryBearer and Context7Key are
 // literal token strings extracted from the CC config; they are treated
 // as potentially sensitive and are NEVER persisted to any config file or
-// log. They flow through a transient opencodeMCPSecrets struct only when
-// the operator's own ~/.claude.json carried literal tokens
-// (ccMigration.hasLiteralTokens()) — copied unconditionally on the
-// CC→opencode migration path (no interactive confirm required).
+// log. They flow through a transient opencodeMCPSecrets struct only when an
+// explicit migration caller requests it.
 type opencodeMCPMigration struct {
 	// MemoryURL is the http URL from mcpServers.memory (non-secret).
 	// Empty when the entry is absent or is a stdio-type entry.

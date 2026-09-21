@@ -220,7 +220,7 @@ name: kg
 ## Error Handling
 
 - If Knowledge Graph MCP is not available → "Knowledge Graph MCP server is not running. Check your Claude Code MCP configuration."
-- If `read_graph` returns empty → "Knowledge Graph is empty. Entities are created automatically by the orchestrator after successful pipelines."
+- If `read_graph` returns empty → "Knowledge Graph is empty. Add entries explicitly with the KG utility when reusable knowledge is worth preserving."
 - If `mark_superseded` fails → report the error, do not retry
 
 ---

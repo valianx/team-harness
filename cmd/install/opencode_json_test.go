@@ -27,17 +27,13 @@ import (
 // AC-1: No work-logs jargon in TITLE strings
 // ---------------------------------------------------------------------------
 
-// TestBuildOpencodeSetupGroups_GroupCount verifies that buildOpencodeSetupGroups
-// returns exactly 5 groups after the trim: Memory MCP (confirm + URL + auth +
-// bearer note) and context7 (AC-2). The previous count was 15 groups.
+// TestBuildOpencodeSetupGroups_GroupCount verifies that the normal setup form
+// contains only the independent context7 choice. Memory/KG registration is
+// explicit-only (AC-2/F30).
 func TestBuildOpencodeSetupGroups_GroupCount(t *testing.T) {
 	data := freshFormData()
 	groups := buildOpencodeSetupGroups(data)
-	// Trimmed form: Memory MCP confirm(1) + URL(1) + auth(1) + bearer note(1) +
-	// context7(1) = 5 groups. The removed groups are: agent output (2), language (2),
-	// english-learning (2), ClickUp (2), Obsidian tasks (1), final confirm (1) = 10
-	// groups removed. Final count: 15 - 10 = 5.
-	const want = 5
+	const want = 1
 	if len(groups) != want {
 		t.Errorf("buildOpencodeSetupGroups returned %d groups, want %d (AC-2: trimmed form)", len(groups), want)
 	}

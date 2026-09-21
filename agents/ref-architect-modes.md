@@ -8,7 +8,7 @@ color: yellow
 # Architect secondary modes
 
 Process detail and output templates for the architect's non-design modes.
-Loaded on demand by `agents/architect.md` when the dispatch names the mode;
+Loaded by `agents/architect.md` when the dispatch names the mode;
 never a dispatch target. Locate the needed section by heading; do not read
 this file in full.
 
@@ -24,22 +24,23 @@ this file in full.
 
 Produces a neutral, evidence-based report with options and a recommendation —
 never an architecture proposal. Output:
-`workspaces/{feature-name}/research/00-research.md`.
+`{workspace}/research/00-research.md`, where Main supplies the absolute
+workspace path. Direct research does not require a state, event, or knowledge
+context file.
 
 1. **Define the research question** — technology migration, library
    comparison, approach evaluation, or feasibility study.
 2. **Gather evidence.** When the coordinator provides a consolidated findings
    file (written by `research-consolidator`), read it as the primary evidence
-   base; spot-fetch with `WebFetch` only for gaps flagged under
-   `## Coverage gaps` — do not re-run broad `WebSearch` over covered angles.
+   base; spot-fetch with WebFetch only for specific gaps named in the
+   supplied findings — do not re-run broad WebSearch over covered angles.
    With no consolidated findings, use context7, WebSearch, codebase analysis,
    and a compatibility check against the existing stack directly.
 3. **Analyze per option:** concrete pros/cons, migration effort, risk and
    reversibility, team impact, stack compatibility.
-4. **Write the report.** In follow-up rounds, amend the SAME
-   `research/00-research.md` in place — never a `-v2` sibling. Re-synthesize
-   `## Recommendation` and `## Next Steps`, reconcile `## Coverage gaps`, and
-   write or overwrite `## Residual Gaps`.
+4. **Write the report.** If the operator names a follow-up, amend the same
+   report in place. Re-synthesize Recommendation and Next Steps; do not
+   create an automatic research round or state/event scaffold.
 
 ```markdown
 # Research: {topic}
@@ -55,35 +56,15 @@ Per option: description, pros, cons, migration effort (low/med/high), risk, comp
 Table: options × criteria (performance, migration effort, community, learning curve, compatibility)
 ## Recommendation
 ## Next Steps
-
-## Coverage gaps
-
-```gaps
-- id: {g1}
-  material: {true|false}
-  web_closeable: {true|false}
-  desc: "{what is still missing}"
-  angle: "{narrow search angle, or 'n/a'}"
 ```
 
-## Residual Gaps
 
-**Termination reason:** {no-material-closeable-gaps | round-cap-reached | all-gaps-closed}
-
-- `{gap-id}`: {desc} — reason: {non-material | not-web-closeable | round-cap-reached}
-```
-
-Re-emit the same fenced `gaps` block shape each round, reconciled against the
-synthesis: remove or de-materialize addressed gaps; `- none` when none remain.
-`## Residual Gaps` is mandatory at termination and names exactly one
-termination reason. When all gaps closed across rounds, say so; when none ever
-existed, write "No coverage gaps identified."
 
 ## Audit Mode
 
 Produces a diagnostic report with severity-categorized findings and concrete
 file references — never a proposal or task breakdown. Output:
-`workspaces/{feature-name}/research/00-audit.md`.
+`{workspace}/research/00-audit.md`.
 
 1. **Scope** — full project, module, or layer.
 2. **Deep scan** with Glob/Grep/Read: structure, dependency graph, pattern
@@ -123,7 +104,7 @@ file references — never a proposal or task breakdown. Output:
 
 Produces a structured task breakdown the coordinator turns into GitHub
 issues — no architecture proposal, research report, code, or tests. Output:
-`workspaces/{feature-name}/01-planning.md`.
+`{workspace}/01-planning.md`.
 
 **Task sizing (agent-time, never human-time).** XS 5-15 min (config change,
 single-file fix) max 2-3 AC; S 15-30 min (1-3 file feature) max 3-4; M 30-60
@@ -272,7 +253,7 @@ holds the mode contract):
 |---|---|---|---|
 | `light-root-cause` | `bug_tier: 2` | TL;DR (1 line) + `## Mechanism` (≤5 sentences) + `## Scope of Fix` (≤3 sentences) + `## Regression Test Approach`; omit Prior Art, Trade-offs, Decisions, Services Touched, Work Plan | ≤30 lines; plan-reviewer Rule 7 accepts the abbreviated shape when `bug_tier: 2` is declared |
 | `full-root-cause` (Tier 3) | `bug_tier: 3` | full template; `## Prior Art` optional (only with a known relevant `process-insight`) | ≤80 body lines; Rule 7 flags >120 as `concerns` |
-| `full-root-cause` (Tier 4) | `bug_tier: 4` | full template + mandatory `## Prior Art`: query `mcp__memory__search_nodes` with 1-3 failure-mode queries; when nothing is relevant, write `No prior art found in the knowledge graph for this failure mode.` — the empty section signals the agent looked | ≤80 body lines; Prior Art excluded (≤15 more) |
+| `full-root-cause` (Tier 4) | `bug_tier: 4` | full template + optional `## Prior Art` when the operator or dispatch explicitly requests a KG lookup; record an unavailable or empty result when queried | ≤80 body lines; Prior Art excluded (≤15 more) |
 
 ```markdown
 # Root-Cause Analysis: {feature-name}
@@ -332,6 +313,7 @@ mutates that one technical placeholder to the real path — functional ACs
 describe corrected behavior, never test existence. The compact operator plan
 carries no classification block. Return optional design-surface hints for
 sketch selection only; Main derives post-Freeze security impact independently
-from the frozen changed surface. Task shards cover confirming the mechanism, applying the correction, and
-verifying the result — combined into as few tasks as the fix genuinely needs;
+from the frozen changed surface. Task entries cover confirming the mechanism,
+applying the correction, and verifying the result — combined into as few tasks
+as the fix genuinely needs;
 `01-plan.md` is always produced for a `type: fix` dispatch.

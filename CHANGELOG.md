@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.35.0] - 2026-09-20
+
+### Changed
+- Workflows use native coordination and permissions, with advisory reviews and shared local or Obsidian context.
+- Setup and update no longer require nesting depth, remote memory or a restart for reloadable workflow changes.
+
+### Fixed
+- Review consolidation preserves duplicate findings and location evidence; preflight leaves tracked files unchanged.
+- Auxiliary workflows use native tools and the selected workspace; historical pipeline records remain readable.
+- Windows bootstrap forwards supported directory options; update preserves UTF-8 instructions and operator text.
+
+### Removed
+- Retired Claude installer paths, remote flow telemetry and TH lease, gate-token and security-floor requirements in current workflows.
+
 ## [3.34.0] - 2026-09-20
 
 ### Added

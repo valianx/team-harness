@@ -5,20 +5,24 @@ description: Create and edit JSON Canvas files (.canvas) with nodes, edges, grou
 
 # JSON Canvas Skill
 
-## Vault Configuration
+## Destination
 
-**MANDATORY — do this before writing any file.** Resolve the vault path:
+Before writing, use the absolute output path supplied by the caller. For an
+Obsidian destination, resolve the named vault through the active runtime's
+configured mapping and keep paths relative to that vault root. If no output
+path or vault was supplied, use the selected workspace or ask the operator for
+the missing destination. Do not assume a host-specific configuration path and
+do not create configuration merely to run this skill.
 
-1. Read `~/.claude/config/obsidian-vaults.json`
-2. If the file **does not exist** or has no vaults configured:
-   - Ask the user for their **vault path** — this is the folder that contains the hidden `.obsidian/` directory. To find it: open Obsidian → Settings → look at the vault name in the sidebar, or browse the filesystem for a folder with a `.obsidian` subfolder inside it.
-   - Ask for a short name (e.g., `work`, `personal`)
-   - Create/update the config file with the new vault entry
-   - Set it as `default` if it is the only vault
-3. If the file exists, use the `default` vault unless the user specifies another by name
-4. All file paths are **relative to the vault root**
+The legacy lookup details below are retained only as background; the active
+runtime owns configuration and destination selection.
 
-> **How to find your vault path:** Your Obsidian vault is the folder that contains a `.obsidian/` subdirectory. For example, if your notes are in `D:\my-notes\Work` and `D:\my-notes\Work\.obsidian\` exists, then `D:\my-notes\Work` is your vault path.
+1. Use the explicit absolute destination or the active runtime's vault mapping.
+2. If the operator has not selected a destination, use the selected workspace
+   or ask for the missing destination before writing.
+3. Keep paths relative to the selected vault root only after that root is known.
+
+> Vault paths come from the active runtime's mapping or the explicit absolute destination supplied by the caller.
 
 ---
 

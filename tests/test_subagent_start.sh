@@ -111,6 +111,12 @@ cat > "$WORKDIR/workspaces/test-feature/00-state.md" <<'EOF'
 - status: in_progress
 EOF
 
+# Observational hooks require an explicit absolute workspace binding. Keep the
+# existing start-side cases focused on breadcrumb semantics by binding this
+# fixture directly; workspace selection itself is covered by
+# test_workspace_bound_hooks.mjs.
+export TH_WORKSPACE="$WORKDIR/workspaces/test-feature"
+
 TRACE_FILE="$WORKDIR/workspaces/test-feature/00-subagent-trace.jsonl"
 
 # ---------------------------------------------------------------------------
@@ -215,12 +221,17 @@ assert_true "non-string subagent_type exits 0" "$r"
 # 3e. Unreachable workspace path — no workspaces/ directory at all.
 NOWORKSPACE_DIR="$(mktemp -d)"
 payload="$(make_payload "th:tester")"
-out="$(cd "$NOWORKSPACE_DIR" && echo "$payload" | node "$CJS" 2>/dev/null)"
+# Clear the explicit fixture binding for this case: the temporary cwd is
+# intentionally not a workspace, and an inherited TH_WORKSPACE would route a
+# valid th:* dispatch back to TRACE_FILE before the oversize case runs.
+out="$(cd "$NOWORKSPACE_DIR" && echo "$payload" | TH_WORKSPACE= node "$CJS" 2>/dev/null)"
 rc=$?
 [ "$rc" -eq 0 ] && r=1 || r=0
 assert_true "no-workspace-dir dispatch exits 0" "$r"
 [ -z "$out" ] && r=1 || r=0
 assert_true "no-workspace-dir dispatch emits no stdout" "$r"
+[ ! -f "$TRACE_FILE" ] && r=1 || r=0
+assert_true "no-workspace-dir dispatch does NOT write the trace file" "$r"
 rm -rf "$NOWORKSPACE_DIR"
 
 # 3f. Oversize payload — SEC-07 pre-parse size bound (MAX_PAYLOAD_BYTES = 1 MiB).
@@ -260,7 +271,7 @@ print(json.dumps({'tool_name': 'SubagentStop', 'tool_input': {'agent_type': sys.
 
     rm -f "$TRACE_FILE"
     stop_payload="$(make_stop_payload "th:tester" "agent-fixture-42")"
-    out="$(cd "$WORKDIR" && echo "$stop_payload" | TH_HOOK_PROFILE=minimal node "$STOP_CJS" 2>/dev/null)"
+    out="$(cd "$WORKDIR" && echo "$stop_payload" | TH_WORKSPACE="$WORKDIR/workspaces/test-feature" TH_HOOK_PROFILE=minimal node "$STOP_CJS" 2>/dev/null)"
     rc=$?
 
     [ "$rc" -eq 0 ] && r=1 || r=0

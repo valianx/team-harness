@@ -21,11 +21,16 @@ chat replies, status blocks, error messages, and self-corrections alike.
 
 ## Config file
 
-ClickUp settings live inside the shared plugin config file `~/.claude/.team-harness.json`, under a top-level `clickup` key. This skill does **not** create a separate config file. The plugin config is the single source of truth for all Team Harness settings (workspace log mode, paths, and now ClickUp credentials); fragmenting it across multiple files in `~/.claude/` is not supported.
+ClickUp settings live inside the active installation's shared Team Harness
+configuration, under a top-level `clickup` key. `/th:setup` supplies its
+absolute path; this skill must not assume a Claude-specific directory or create
+a second config file. The shared config is the single source of truth for the
+installation's workspace settings and ClickUp credentials.
 
-`~/.claude/.team-harness.json` is the operator's private config file written by `/th:setup`. It must never be committed to any repository — it lives exclusively in the operator's home directory.
+The runtime configuration is private, written by `/th:setup`, and must never
+be committed to a repository.
 
-ClickUp config block (the `clickup` key within `~/.claude/.team-harness.json`):
+ClickUp config block (the `clickup` key within the runtime configuration):
 ```json
 {
   "clickup": {
@@ -38,7 +43,11 @@ ClickUp config block (the `clickup` key within `~/.claude/.team-harness.json`):
 
 `default_status_filter` is an array of status strings. Tasks matching any of these statuses are excluded from the `tasks` output by default.
 
-**Read/write rules — preserve the rest of the file.** `~/.claude/.team-harness.json` also holds keys this skill must never touch: `format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, and the installer `files` manifest. Every write is a merge: read the full JSON, replace only the `clickup` sub-object, and write the whole document back. Never overwrite the file with a ClickUp-only payload — doing so destroys the workspace-log configuration and the file manifest.
+**Read/write rules — preserve the rest of the file.** The runtime configuration
+also holds installation and workspace keys this skill must never touch. Every
+write is a merge: read the full JSON, replace only the `clickup` sub-object,
+and write the whole document back. Never overwrite it with a ClickUp-only
+payload.
 
 ---
 
@@ -49,7 +58,9 @@ ClickUp config block (the `clickup` key within `~/.claude/.team-harness.json`):
 Configure or reconfigure ClickUp credentials and defaults.
 
 **Contract:**
-- Read `~/.claude/.team-harness.json` if it exists; use the existing `clickup` sub-object's values as defaults. If the file exists but has no `clickup` key, treat ClickUp as unconfigured (fresh ClickUp setup) while preserving all other keys.
+- Read the runtime configuration at the path supplied by setup if it exists;
+  use the existing `clickup` sub-object's values as defaults. If it has no
+  `clickup` key, treat ClickUp as unconfigured while preserving all other keys.
 - Prompt the operator interactively for each field:
   - `workspace_id` (required — reject empty input with "workspace_id is required").
   - `default_list_id` (optional — press Enter to skip or keep current).
@@ -59,8 +70,11 @@ Configure or reconfigure ClickUp credentials and defaults.
     - If the operator types a value, split it on commas into an array, trim whitespace, and drop empty entries (e.g. `done, closed, archived` → `["done", "closed", "archived"]`).
     - To exclude nothing, the operator types the literal `none`, which stores `[]`.
     - Always store the parsed array, never the operator's raw string.
-- Before writing, back up the existing config file to `~/.claude/.team-harness.json.bak-YYYYMMDD-HHMMSS` (timestamp in UTC). If no file exists, skip the backup step.
-- Merge and write: read the full `~/.claude/.team-harness.json`, replace only the `clickup` sub-object with the collected values (preserving `format_version`, `installed_version`, `updated_at`, `logs-*`, and the `files` manifest), and write the whole document back as pretty-printed JSON. If the file does not exist, create it with just the `clickup` key (`/th:setup` populates the rest on its own run).
+- Before writing, back up the supplied runtime configuration to a sibling
+  timestamped file when it exists. If no file exists, skip the backup step.
+- Merge and write the supplied runtime configuration, replacing only the
+  `clickup` sub-object and preserving all other keys. If it does not exist,
+  create it with the `clickup` key; setup can populate the remaining keys.
 - Print a confirmation table showing the saved ClickUp values. Re-running the sub-command is idempotent: it displays current values as defaults and overwrites only what the operator changes.
 
 **Error handling:**
@@ -75,7 +89,8 @@ Configure or reconfigure ClickUp credentials and defaults.
 List the operator's open ClickUp tasks.
 
 **Contract:**
-1. Read the `clickup` sub-object from `~/.claude/.team-harness.json`. If the file is missing, has no `clickup` key, or `clickup.workspace_id` is empty, print:
+1. Read the `clickup` sub-object from the runtime configuration. If it is
+   missing, has no `clickup` key, or `clickup.workspace_id` is empty, print:
    `Config not found. Run /th:clickup setup first.` and exit.
 2. Resolve the operator's ClickUp member ID by calling `clickup_find_member_by_name` with the workspace ID and the operator's name (derived from `git config user.name`). If resolution fails, fall back to listing tasks without an assignee filter and note the fallback in the output.
 3. Build the task filter:
@@ -102,7 +117,8 @@ List the operator's open ClickUp tasks.
 Fetch a single task and optionally route it to the team-harness pipeline.
 
 **Contract:**
-1. Read the `clickup` sub-object from `~/.claude/.team-harness.json`. If the file is missing or has no `clickup` key, print: `Config not found. Run /th:clickup setup first.` and exit.
+1. Read the `clickup` sub-object from the runtime configuration. If it is
+   missing or has no `clickup` key, print: `Config not found. Run /th:clickup setup first.` and exit.
 2. Call `clickup_get_task` with the literal `<id>` value from the arguments.
 3. If the MCP returns a 404 or equivalent not-found error, print:
    `Task <id> not found in workspace.` and exit.
@@ -134,11 +150,12 @@ Fetch a single task and optionally route it to the team-harness pipeline.
    Where `title-slug` = title lowercased, non-alphanumeric characters replaced with hyphens, collapsed and trimmed, maximum 30 characters, no trailing hyphen.
 7. Print:
    ```
-   Handoff payload for @th:orchestrator:
+   Handoff payload for the current coordinator:
    ---
    <payload>
    ---
-   Forward this to @th:orchestrator to start the pipeline.
+   Return this payload to the current coordinator. It may continue the
+   explicitly requested route using the host's native task/session mechanism.
    ```
 
 **Error handling:**
@@ -155,7 +172,8 @@ Create a new ClickUp task.
 
 - `<title>` is required. If absent or empty, report `Title required to create a task.` and stop.
 
-**Config read:** read the `clickup` sub-object from `~/.claude/.team-harness.json`. If the file is missing or has no `clickup` key, report `Config not found. Run /th:clickup setup first.` and stop.
+**Config read:** read the `clickup` sub-object from the runtime configuration.
+If it is missing or has no `clickup` key, report `Config not found. Run /th:clickup setup first.` and stop.
 
 **List resolution (order of precedence):**
 1. `--list <id>` if present.
@@ -198,7 +216,8 @@ Update fields of an existing ClickUp task.
 
 - `<id>` is required and must be a literal task ID. This sub-command never resolves a task by title or search — an explicit ID is the only permitted identifier.
 
-**Config read:** read the `clickup` sub-object from `~/.claude/.team-harness.json`. If the file is missing or has no `clickup` key, report `Config not found. Run /th:clickup setup first.` and stop.
+**Config read:** read the `clickup` sub-object from the runtime configuration.
+If it is missing or has no `clickup` key, report `Config not found. Run /th:clickup setup first.` and stop.
 
 **Workspace resolution:** same session-scoped override rule as `create`.
 
@@ -348,18 +367,26 @@ This skill calls the following ClickUp MCP tools. Tool names are used verbatim �
 
 ### Session-scoped workspace override
 
-Within a pipeline run, read the resolved `workspace_id` from `00-state.md` § Current State if it exists. If not present in state, fall back to the persistent `clickup.workspace_id` from `~/.claude/.team-harness.json`.
+Within a pipeline run, read the resolved `workspace_id` from `00-state.md` §
+Current State if it exists. If not present in state, fall back to the
+persistent `clickup.workspace_id` from the runtime configuration.
 
 When running standalone (outside a pipeline, no `00-state.md` available), a `--workspace <id>` flag prevails over the persistent `clickup.workspace_id` for that run.
 
-This flow does not write the persistent config file — the `single-config-file` rule preserves the document. Session overrides are read-only on `~/.claude/.team-harness.json`.
+This flow does not write the persistent config file — the `single-config-file`
+rule preserves the document. Session overrides are read-only on the supplied
+runtime configuration.
 
 ---
 
 ## Important
 
-- This skill does NOT route through the orchestrator. The `task <id>` sub-command prepares a handoff payload and prints it for the operator to forward to `@th:orchestrator` — the skill itself never invokes another agent.
-- ClickUp settings are stored in the `clickup` key of `~/.claude/.team-harness.json` — the shared plugin config file. This skill never creates a separate config file. The file is the operator's private config and must not be committed to any repository.
+- This skill does NOT activate a pipeline. The `task <id>` sub-command prepares
+  a handoff payload for the current coordinator; the caller chooses whether to
+  continue it through a native task/session route.
+- ClickUp settings are stored in the `clickup` key of the supplied runtime
+  configuration. This skill never creates a second config file, and the file
+  remains private and uncommitted.
 - Run ClickUp MCP operations from the top-level context, not from inside a subagent. The ClickUp connector can report "Failed to connect" within a dispatched subagent while the same tools succeed at the top level. When a pipeline needs a ClickUp comment or status change, the orchestrator performs it at top level (Step 6c / Phase 5), not by delegating the MCP call to a phase agent.
 - Real MCP tool errors (4xx, validation, not-found, auth) are surfaced verbatim to the operator, with no fallback assumptions. Transient infrastructure errors (5xx / 502) are retried 1–2 times with backoff before surfacing — see § "Transient-error retry policy".
 - A ClickUp-originated task is closed with a single, functional comment when the work completes — see § "Closing a ClickUp-originated task — mandatory". Comments cannot be edited or deleted by the agent; post once and correct.

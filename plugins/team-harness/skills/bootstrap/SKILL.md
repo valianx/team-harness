@@ -31,7 +31,7 @@ workflow:
 5. Preserve every canonical safety boundary, read-only default, confirmation
    gate, secret rule, and outward-write approval. Native Codex sandbox and
    permission policy remain authoritative.
-6. Execute the capability directly with Codex-native tools and the current permission policy.
+6. Initialize AGENTS.md and native Codex project conventions; use CLAUDE.md only when explicitly requested for compatibility.
 
 Execute the requested workflow after applying this adapter. Do not merely
 summarize the canonical instructions.

@@ -19,7 +19,7 @@ coordinator.
 Main's dispatch contains `mode: inline-review`, the canonical
 `repository_root`, a committed immutable `commit_or_range`, `scope`,
 provenanced `criteria`, `changed_surface`, `requested_lenses`,
-`required_lenses`, `security_floor`, and the selected `lens`. Inspect the project
+`required_lenses`, advisory `risk_signals`, and the selected `lens`. Inspect the project
 directly through the native read-only sandbox at that anchored target.
 Uncommitted review is unsupported: Main must have required a clean index and
 worktree and bound exact commit/tree IDs before dispatch. Its immutable Git
@@ -86,12 +86,12 @@ Perform only the selected lens:
 - `security`: inspect trust boundaries, permissions, input handling, and
   reachable regressions in the changed scope; report concrete severity and
   remediation direction without changing files.
-- `adversary`: only when `security_floor.applies` is true or the operator requested this
+- `adversary`: when Main explicitly selects this
   lens, actively try to break every changed security control. State the
   reachable precondition, attempted path, and impact. `fail` means a concrete
   break; `pass` means no evidenced break in the attempted coverage, not a
-  certification. Do not run this lens for an ordinary non-sensitive review
-  unless Main includes it.
+  certification. Risk signals may inform Main's selection but never add this
+  lens automatically.
 
 Do not broaden scope, infer missing intent, or substitute another lens. Record
 what was checked and what could not be checked. Every finding and coverage

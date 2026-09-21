@@ -1,46 +1,21 @@
-# Coordinator state contract (v5)
+# Coordinator context
 
-Main owns one hash-linked `control/control.jsonl`. It is the only durable control
-authority. Each canonical record is written through
-`skills/pipeline/scripts/control-plane.mjs` and has a contiguous sequence,
-previous-event hash, Main provenance, closed event type, and canonical identity.
-
-The log records only operator authority, lease lifecycle, accepted results,
-pipeline transitions, and mechanical release. Main appends a record before it
-performs the transition represented by that record. A corrupt or incomplete
-suffix is ignored after the last valid prefix and blocks later control actions.
-
-`00-state.md`, `reviews/findings-ledger.md`, Gate displays, counters, summaries,
-and receipts are projections or telemetry. They never authorize, revoke, pause,
-rotate, or advance work. On disagreement Main rebuilds them idempotently from the
-valid log; it does not re-present a Gate or synthesize a decision.
-
-Main is the only log appender and projection writer. Specialists return a
-`result_envelope` through native terminal transport and never edit coordinator
-state, control events, Gate records, findings projections, or acceptance views.
-The Main-only `control-plane.mjs` is never materialized in a specialist helper
-bundle; capsules receive only `control-plane-specialist.mjs`, whose exports can
-validate leases/capsules and construct results but cannot append or project.
-Before accepting a result, Main compares its commit list and `changed_paths`
-with the real Git diff and dirty state since the lease's bound baseline commit.
-
-Current v5 execution rejects legacy writable release/state fields. A workspace
-without a control log is closed administratively, never converted.
+Retain the objective, plan, tasks, decisions and evidence in the workspace.
+Main keeps the summary coherent; specialists write assigned artifacts. Reuse
+OpenSpec tasks instead of inventing another state machine.
 
 ## Current State — the schema you write
 
-Write canonical control events only. The current state document is generated
-from `buildControlProjection` and carries no writable authority field.
+Use existing Markdown plans and handoffs. No control schema or permission
+journal is required. Historical v5 readers inspect old runs as evidence.
 
 ## Artifact verification
 
-Verify every identity-bound input as a contained regular non-symlink file with
-its expected SHA-256 before an event can cite it.
+Check cited artifacts belong to the task. For pinned reviews verify candidate
+identity and freshness. Preserve safe file handling in executable tools.
 
 ## Terminal status write — mandatory
 
-Append a terminal transition event first, then rebuild the terminal projection.
-Never mark only the projection complete or aborted.
-
-Then apply `skills/spec/references/lifecycle.md` for OpenSpec completion or
-retirement. Pending archive never blocks the terminal transition.
+Record completion or actual unresolved work in the summary and tasks. Apply
+`skills/spec/references/lifecycle.md`; completed archive accompanies implementation
+before publication. Never mark unfinished work complete.

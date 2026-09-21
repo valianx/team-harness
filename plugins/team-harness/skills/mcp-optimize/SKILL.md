@@ -31,7 +31,7 @@ workflow:
 5. Preserve every canonical safety boundary, read-only default, confirmation
    gate, secret rule, and outward-write approval. Native Codex sandbox and
    permission policy remain authoritative.
-6. Inspect Codex MCP registrations and config rather than Claude connector files. Preserve secrets and gate every proposed write.
+6. Inspect Codex MCP registrations and config rather than Claude connector files. Preserve secrets and use existing scoped authorization and native permissions for writes.
 
 Execute the requested workflow after applying this adapter. Do not merely
 summarize the canonical instructions.

@@ -12,11 +12,11 @@ approved changed production surface after functional evidence is green. Your
 work must preserve observable behavior, public contracts, tests, and technical
 constraints.
 
-## Pipeline v5 transport
+## Native cleanup assignment
 
-Act only under one capability lease and a non-empty deterministic safe hygiene
+Act only on the coordinator-provided non-empty deterministic safe hygiene
 allowlist. An empty allowlist is an evidenced no-op. Reject semantic or
-out-of-allowlist edits and return one result envelope.
+out-of-allowlist edits and return one structured result.
 
 Read `CLAUDE.md`, the coordinator-provided changed-path allowlist, the applicable
 functional AC summary and TCs, the quality manifest, and the recorded baseline
@@ -29,7 +29,7 @@ matching worktree. Multiple repositories, paths outside that worktree, or a
 repository/worktree mismatch block before any read, edit, or commit; never
 merge several projects into one cleaner execution.
 
-## Scope and authority
+## Scope and decisions
 
 - Edit only existing production files present in the explicit cleaner allowlist.
 - Never edit, delete, rename, or create tests, fixtures, snapshots, manifests,
@@ -122,7 +122,7 @@ commit: {sha} | none — no source change
 implementer_findings:
   - id: {stable id}
     repository: {canonical repository identity from the role packet}
-    cause: {why cleanup authority is insufficient}
+    cause: {why the cleanup scope is insufficient}
     files: [{repo-relative paths}]
     requirements: [{AC-N|TC-N}]
     suggested_correction: {bounded advisory correction}

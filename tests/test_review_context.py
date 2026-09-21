@@ -425,7 +425,11 @@ class ReviewContextTests(unittest.TestCase):
     def test_preflight_reports_blockers_without_raising(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
-            (repo / ".gitignore").write_text("node_modules\n", encoding="utf-8")
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            tracked_ignore = repo / ".gitignore"
+            tracked_ignore.write_text("node_modules\n", encoding="utf-8")
+            local_exclude = repo / ".git" / "info" / "exclude"
+            local_exclude.write_text("/build/\n", encoding="utf-8")
             agents = repo / ".codex" / "agents"
             agents.mkdir(parents=True)
             for name in MODULE.REVIEW_AGENT_NAMES[:-1]:
@@ -435,18 +439,30 @@ class ReviewContextTests(unittest.TestCase):
                     f'name = "{name}"\nsandbox_mode = "read-only"\n',
                     encoding="utf-8",
                 )
-            with patch.dict(os.environ, {"PATH": str(repo), "CODEX_HOME": str(repo / "codex-home")}):
+            real_run = subprocess.run
+
+            def fake_run(command, *args, **kwargs):
+                if command and command[0] == "gh":
+                    raise FileNotFoundError("gh unavailable in fixture")
+                return real_run(command, *args, **kwargs)
+
+            with patch.object(MODULE.subprocess, "run", side_effect=fake_run), patch.dict(
+                os.environ, {"CODEX_HOME": str(repo / "codex-home")}
+            ):
                 result = MODULE.preflight(repo, "codex", None)
             self.assertFalse(result["ok"])
             self.assertEqual(result["codex_agents"]["searched"], [str(agents), str(repo / "codex-home" / "agents")])
             self.assertEqual(result["gh"], "unavailable")
-            self.assertEqual(result["workspaces_ignore"], "added")
+            self.assertEqual(result["workspaces_ignore"], "local-exclude-added")
             self.assertEqual(result["codex_agents"]["status"], "complete")
             self.assertEqual(result["codex_agents"]["missing"], [])
             self.assertEqual(result["review_agents"], ["reviewer", "pr-review-verifier"])
-            self.assertIn("/workspaces/", (repo / ".gitignore").read_text(encoding="utf-8"))
+            self.assertEqual(tracked_ignore.read_text(encoding="utf-8"), "node_modules\n")
+            self.assertIn("/build/\n/workspaces/\n", local_exclude.read_text(encoding="utf-8"))
             (agents / "reviewer-consolidator.toml").write_text('name = "reviewer-consolidator"\n', encoding="utf-8")
-            with patch.dict(os.environ, {"PATH": str(repo), "CODEX_HOME": str(repo / "codex-home")}):
+            with patch.object(MODULE.subprocess, "run", side_effect=fake_run), patch.dict(
+                os.environ, {"CODEX_HOME": str(repo / "codex-home")}
+            ):
                 again = MODULE.preflight(repo, "codex", None, ["reviewer-consolidator"])
             self.assertEqual(again["workspaces_ignore"], "present")
             self.assertEqual(again["codex_agents"]["invalid"], ["reviewer-consolidator"])
@@ -459,17 +475,21 @@ class ReviewContextTests(unittest.TestCase):
                     f'name = "{name}"\nsandbox_mode = "read-only"\n',
                     encoding="utf-8",
                 )
-            with patch.dict(os.environ, {"PATH": str(repo), "CODEX_HOME": str(repo / "codex-home")}):
+            with patch.object(MODULE.subprocess, "run", side_effect=fake_run), patch.dict(
+                os.environ, {"CODEX_HOME": str(repo / "codex-home")}
+            ):
                 from_global = MODULE.preflight(repo, "codex", None, ["reviewer-consolidator"])
             # A broken project override cannot be hidden by a valid global role.
             self.assertEqual(from_global["codex_agents"]["invalid"], ["reviewer-consolidator"])
             (agents / "reviewer-consolidator.toml").unlink()
-            with patch.dict(os.environ, {"PATH": str(repo), "CODEX_HOME": str(repo / "codex-home")}):
+            with patch.object(MODULE.subprocess, "run", side_effect=fake_run), patch.dict(
+                os.environ, {"CODEX_HOME": str(repo / "codex-home")}
+            ):
                 from_global = MODULE.preflight(repo, "codex", None, ["reviewer-consolidator"])
             self.assertEqual(from_global["codex_agents"]["status"], "complete")
             self.assertEqual(from_global["codex_agents"]["agents_dir"], str(global_agents))
             self.assertEqual(from_global["blockers"], ["gh unavailable"])
-            with patch.dict(os.environ, {"PATH": str(repo)}):
+            with patch.object(MODULE.subprocess, "run", side_effect=fake_run):
                 claude = MODULE.preflight(repo, "claude", None)
             self.assertIsNone(claude["codex_agents"])
             self.assertEqual(claude["blockers"], ["gh unavailable"])
@@ -477,6 +497,7 @@ class ReviewContextTests(unittest.TestCase):
     def test_preflight_selected_roles_and_prerequisites_only(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
             agents = repo / "agents"
             agents.mkdir()
             name = "reviewer"
@@ -484,7 +505,14 @@ class ReviewContextTests(unittest.TestCase):
                 f"# Instruction source: runtime/codex/instructions/{name}.md\n"
                 f"# Semantic source: agents/{name}.md\n# Projection tier: x\n"
                 f'name = "{name}"\nsandbox_mode = "read-only"\n', encoding="utf-8")
-            with patch.object(MODULE.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)):
+            real_run = subprocess.run
+
+            def fake_run(command, *args, **kwargs):
+                if command and command[0] == "gh":
+                    return subprocess.CompletedProcess(command, 0, b"", b"")
+                return real_run(command, *args, **kwargs)
+
+            with patch.object(MODULE.subprocess, "run", side_effect=fake_run):
                 initial = MODULE.preflight(repo, "codex", agents, prerequisites_only=True)
                 self.assertTrue(initial["ok"])
                 self.assertEqual(initial["review_agents"], [])
@@ -779,10 +807,63 @@ class ReviewContextTests(unittest.TestCase):
                     with self.assertRaisesRegex(MODULE.ContextError, "invalid UTF-8"):
                         runner(invalid_command)
 
+    def test_workspace_ignore_uses_common_metadata_for_linked_worktree(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            linked = root / "linked"
+            subprocess.run(["git", "init", "-q", str(source)], check=True)
+            subprocess.run([
+                "git", "-C", str(source), "-c", "user.name=Test",
+                "-c", "user.email=test@example.invalid", "commit", "-q",
+                "--allow-empty", "-m", "fixture",
+            ], check=True)
+            subprocess.run([
+                "git", "-C", str(source), "worktree", "add", "--quiet",
+                "--detach", str(linked), "HEAD",
+            ], check=True)
+            MODULE.ensure_workspaces_ignored(linked)
+            MODULE.ensure_workspaces_ignored(linked)
+            exclude = source / ".git" / "info" / "exclude"
+            self.assertEqual(exclude.read_text(encoding="utf-8").count("/workspaces/"), 1)
+            self.assertFalse((source / ".gitignore").exists())
+            self.assertFalse((linked / ".gitignore").exists())
+            ignored = subprocess.run([
+                "git", "-C", str(linked), "check-ignore", "workspaces/review/report.md",
+            ], capture_output=True)
+            self.assertEqual(ignored.returncode, 0)
+
+    def test_workspace_ignore_ignores_inherited_git_metadata_overrides(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "root"
+            external = Path(directory) / "external"
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            subprocess.run(["git", "init", "-q", str(external)], check=True)
+            external_exclude = external / ".git" / "info" / "exclude"
+            with patch.dict(
+                os.environ,
+                {
+                    "GIT_DIR": str(external / ".git"),
+                    "GIT_COMMON_DIR": str(external / ".git"),
+                },
+                clear=False,
+            ):
+                MODULE.ensure_workspaces_ignored(root)
+
+            self.assertIn(
+                "/workspaces/\n",
+                (root / ".git" / "info" / "exclude").read_text(encoding="utf-8"),
+            )
+            self.assertNotIn(
+                "/workspaces/\n",
+                external_exclude.read_text(encoding="utf-8"),
+            )
+
     def test_workspace_ignore_update_is_atomic_and_rejects_symlink(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            ignore = root / ".gitignore"
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            ignore = root / ".git" / "info" / "exclude"
             ignore.write_text("/build/\n", encoding="utf-8")
             MODULE.ensure_workspaces_ignored(root)
             self.assertEqual(ignore.read_text(encoding="utf-8"), "/build/\n/workspaces/\n")
@@ -793,7 +874,15 @@ class ReviewContextTests(unittest.TestCase):
             root = Path(directory)
             outside = root / "outside"
             outside.write_text("keep", encoding="utf-8")
-            (root / ".gitignore").symlink_to(outside)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            ignore = root / ".git" / "info" / "exclude"
+            ignore.unlink()
+            try:
+                ignore.symlink_to(outside)
+            except OSError as error:
+                if getattr(error, "winerror", None) == 1314:
+                    self.skipTest("Windows symlink privilege is unavailable in this test environment")
+                raise
             with self.assertRaises(MODULE.ContextError):
                 MODULE.ensure_workspaces_ignored(root)
             self.assertEqual(outside.read_text(encoding="utf-8"), "keep")
@@ -809,7 +898,12 @@ class ReviewContextTests(unittest.TestCase):
             outside = root / "outside"
             outside.write_text("secret", encoding="utf-8")
             link = root / "inline.json"
-            link.symlink_to(outside)
+            try:
+                link.symlink_to(outside)
+            except OSError as error:
+                if getattr(error, "winerror", None) == 1314:
+                    self.skipTest("Windows symlink privilege is unavailable in this test environment")
+                raise
             with self.assertRaises(MODULE.ContextError):
                 MODULE.safe_read_leaf(root, "inline.json")
 
@@ -856,7 +950,12 @@ class ReviewContextTests(unittest.TestCase):
 
             def swap_then_replace(source, destination, **kwargs):
                 temporary.unlink()
-                temporary.symlink_to(outside)
+                try:
+                    temporary.symlink_to(outside)
+                except OSError as error:
+                    if getattr(error, "winerror", None) == 1314:
+                        self.skipTest("Windows symlink privilege is unavailable in this test environment")
+                    raise
                 return real_replace(source, destination, **kwargs)
 
             with patch.object(MODULE.artifact_fs, "replace", side_effect=swap_then_replace):
@@ -883,7 +982,7 @@ class ReviewContextTests(unittest.TestCase):
 
             self.assertEqual((root / "review.md").read_text(encoding="utf-8"), "safe")
 
-    def test_security_selection_maps_reason_and_triggers(self):
+    def test_security_selection_maps_reason_and_advisory_signal(self):
         cases = [
             ("agents/security.md\n", "+permission boundary\n", "known-sensitive", True),
             ("docs/guide.md\n", "+clarify review behavior\n", "known-non-executable", False),
@@ -891,7 +990,7 @@ class ReviewContextTests(unittest.TestCase):
             ("src/plugin.future\n", "+run new handler\n", "unmatched-executable", True),
             ("", "", "indeterminate", False),
         ]
-        for changed_files, diff, reason, required in cases:
+        for changed_files, diff, reason, recommended in cases:
             with self.subTest(reason=reason):
                 self.assertEqual(
                     MODULE.classify_security_change(changed_files, diff),
@@ -915,9 +1014,11 @@ class ReviewContextTests(unittest.TestCase):
                         )
                     result = json.loads(output.getvalue())
                 self.assertEqual(result["reason"], reason)
-                self.assertEqual(result["security_required"], required)
+                self.assertEqual(result["security_recommended"], recommended)
+                self.assertFalse(result["security_selected"])
+                self.assertFalse(result["security_required"])
 
-    def test_explicit_and_tier_four_selection_require_security(self):
+    def test_explicit_and_tier_four_selection_record_selection_and_recommendation(self):
         for explicit_security, tier, trigger in (
             (True, None, "explicit"),
             (False, 4, "tier-4"),
@@ -940,7 +1041,9 @@ class ReviewContextTests(unittest.TestCase):
                     )
                 result = json.loads(output.getvalue())
                 self.assertEqual(result["reason"], "known-non-executable")
-                self.assertTrue(result["security_required"])
+                self.assertEqual(result["security_selected"], trigger == "explicit")
+                self.assertEqual(result["security_required"], trigger == "explicit")
+                self.assertTrue(result["security_recommended"])
                 self.assertEqual(result["triggers"], [trigger])
 
     def test_extended_suffix_set_does_not_override_filename_sensitivity(self):
@@ -998,7 +1101,8 @@ class ReviewContextTests(unittest.TestCase):
                     )
                 )
             result = json.loads(output.getvalue())
-        self.assertTrue(result["security_required"])
+        self.assertTrue(result["security_recommended"])
+        self.assertFalse(result["security_selected"])
 
     def test_non_utf8_diff_in_a_sensitive_path_still_classifies_security_sensitive(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1027,7 +1131,8 @@ class ReviewContextTests(unittest.TestCase):
                 )
             result = json.loads(output.getvalue())
         self.assertEqual(result["reason"], "known-sensitive")
-        self.assertTrue(result["security_required"])
+        self.assertTrue(result["security_recommended"])
+        self.assertFalse(result["security_selected"])
 
     def test_unreadable_diff_artifact_prevents_security_selection(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1080,17 +1185,18 @@ class ReviewContextTests(unittest.TestCase):
         )
         reason = MODULE.classify_security_change(changed_files, diff)
         self.assertEqual(reason, "known-sensitive")
-        self.assertTrue(MODULE.resolve_security_required(reason, []))
+        self.assertFalse(MODULE.resolve_security_required(reason, []))
 
-    def test_concrete_security_reasons_and_explicit_triggers_require_the_lens(self):
+    def test_risk_reasons_recommend_but_only_explicit_triggers_select_the_lens(self):
         for reason in ("known-sensitive", "unmatched-executable"):
             with self.subTest(reason=reason):
-                self.assertTrue(MODULE.resolve_security_required(reason, []))
+                self.assertFalse(MODULE.resolve_security_required(reason, []))
+                self.assertTrue(MODULE.resolve_security_required(reason, ["explicit"]))
         for reason in ("known-non-executable", "indeterminate"):
             with self.subTest(reason=reason):
                 self.assertFalse(MODULE.resolve_security_required(reason, []))
                 self.assertTrue(MODULE.resolve_security_required(reason, ["explicit"]))
-                self.assertTrue(MODULE.resolve_security_required(reason, ["tier-4"]))
+                self.assertFalse(MODULE.resolve_security_required(reason, ["tier-4"]))
 
     def test_indeterminate_classification_alone_does_not_add_a_security_lens(self):
         producers = {
@@ -1124,7 +1230,7 @@ class ReviewContextTests(unittest.TestCase):
         )
         reason = MODULE.classify_security_change(changed_files, diff)
         self.assertEqual(reason, "known-sensitive")
-        self.assertTrue(MODULE.resolve_security_required(reason, []))
+        self.assertFalse(MODULE.resolve_security_required(reason, []))
 
     def test_capture_binds_mergeability_and_rejects_mid_capture_drift(self):
         metadata = {
