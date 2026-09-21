@@ -260,7 +260,7 @@ print(json.dumps({'tool_name': 'SubagentStop', 'tool_input': {'agent_type': sys.
 
     rm -f "$TRACE_FILE"
     stop_payload="$(make_stop_payload "th:tester" "agent-fixture-42")"
-    out="$(cd "$WORKDIR" && echo "$stop_payload" | TH_HOOK_PROFILE=minimal node "$STOP_CJS" 2>/dev/null)"
+    out="$(cd "$WORKDIR" && echo "$stop_payload" | TH_WORKSPACE="$WORKDIR/workspaces/test-feature" TH_HOOK_PROFILE=minimal node "$STOP_CJS" 2>/dev/null)"
     rc=$?
 
     [ "$rc" -eq 0 ] && r=1 || r=0

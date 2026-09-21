@@ -1,6 +1,11 @@
 # gate-single-approve-autonomy Specification
 
 ## Purpose
+This retained specification describes legacy v5 helper behavior and historical
+records. Current workflow coordination is defined by `pipeline-control-plane`
+and `specialist-coordination-protocol`; new tasks do not require these old
+gates, leases, journals or administrative transitions.
+
 One Gate-1 approval carries bounded autonomous correction and the ship decision; Gate 3 executes mechanically. Eliminates the approve/approve-autonomous duality and every intermediate human touchpoint between Gate 1 and the draft PR.
 
 ## Requirements

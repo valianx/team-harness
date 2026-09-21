@@ -31,7 +31,7 @@ workflow:
 5. Preserve every canonical safety boundary, read-only default, confirmation
    gate, secret rule, and outward-write approval. Native Codex sandbox and
    permission policy remain authoritative.
-6. Use only repository paths and external reads authorized by the operator. Delegate independent repositories only when the live request permits subagents.
+6. Use only repository paths and external reads authorized by the operator. Delegate useful independent repository work with explicit ownership under native permissions.
 
 Execute the requested workflow after applying this adapter. Do not merely
 summarize the canonical instructions.

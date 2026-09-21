@@ -1,15 +1,15 @@
 ---
 name: ref-architect-design
-description: Design-mode reference for the architect (canonical sharded schema, delivery grouping, sketches, domain heuristics). Read on-demand by th:architect — not a standalone agent.
+description: Optional architect sketch and domain reference, with historical plan schemas.
 model: opus
 color: yellow
 ---
 
 # Architect design reference
 
-Design-mode deep material for `agents/architect.md`. Loaded on demand by the
-architect during a Design or Root-Cause dispatch; never a dispatch target.
-Locate the needed section by heading; do not read this file in full.
+New designs use OpenSpec and workspace context. Sharded schemas and mandatory
+selection rules below apply only to historical plans. Read the relevant sketch
+or domain section on demand; these remain optional for current work.
 
 ## Contents
 
@@ -26,11 +26,9 @@ Locate the needed section by heading; do not read this file in full.
 
 ## Canonical schema (`sharded-v1`)
 
-The schema below is physically distributed at the `<!-- file: ... -->`
-boundaries. Those markers document destinations; they are not emitted. The plan
-reviewer returns `fail` when the manifest, a listed shard, or a required section
-is missing or empty. Structural rules (section order, budgets, read routing,
-dispatch completeness): `docs/plan-shards.md`.
+Historical plans used the following `<!-- file: ... -->` boundaries and the
+structural rules in `docs/plan-shards.md`. Current reviewers assess the actual
+design and its evidence without requiring these files.
 
 ```markdown
 # Plan: {feature-name}

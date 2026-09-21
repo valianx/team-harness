@@ -26,7 +26,6 @@ const ARCHIVED_CHANGE_NAME = /^archive\/\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+
 const RANGE = /^([^\s.]+(?:\.[^\s.]+)*)\.{2,3}([^\s.]+(?:\.[^\s.]+)*)$/;
 
 export const LENSES = ["tester", "qa", "security", "adversary"];
-const FLOOR_LENSES = ["security", "adversary"];
 
 export const ERROR_CODES = new Set([
   "ARGUMENT_INVALID",
@@ -57,8 +56,8 @@ function signal(alternatives) {
   return new RegExp(`${OPEN}(?:${alternatives.join("|")})${CLOSE}`, "i");
 }
 
-/** Path signals: a changed path under these matches a security floor category outright. */
-const FLOOR_PATHS = [
+/** Path signals: a changed path under these contributes advisory risk context. */
+const RISK_PATHS = [
   [/(^|\/)\.github\/workflows\//i, "executable-code handling"],
   [/(^|\/)(auth|authn|authz|oauth|permission)[^/]*\.[a-z]+$/i, "authentication, authorization or permissions"],
   [/(^|\/)(session|login|identity)[^/]*\.[a-z]+$/i, "identity or session handling"],
@@ -69,7 +68,7 @@ const FLOOR_PATHS = [
 ];
 
 /** Content signals: matched against every line the change touches, added and removed alike. */
-const FLOOR_CONTENT = [
+const RISK_CONTENT = [
   [signal(["authenticate", "authoriz\\w*", "permission", "rbac", `access${SEP}control`]), "authentication, authorization or permissions"],
   [signal(["session", "jwt", "bearer", `cookie${SEP}secret`]), "identity or session handling"],
   [signal([`api${SEP}key`, "secret", "credential", "password", "token"]), "credentials or secrets"],
@@ -253,7 +252,7 @@ const PROSE_CATEGORY = "security policy/audit enforcement";
 function contentCategories(filePath, addedText) {
   const prose = PROSE.test(filePath);
   const found = [];
-  for (const [pattern, category] of FLOOR_CONTENT) {
+  for (const [pattern, category] of RISK_CONTENT) {
     if (prose && category !== PROSE_CATEGORY) continue;
     if (pattern.test(addedText)) found.push(category);
   }
@@ -273,13 +272,15 @@ export async function readUnscannablePaths(root, range) {
 }
 
 /**
- * Classify the security floor from changed paths and added content.
- * An unscannable path leaves the classification ambiguous, and ambiguous resolves sensitive.
+ * Classify risk signals from changed paths and touched content.
+ *
+ * This is advisory context for Main's reviewer choice. It never adds a lens,
+ * grants authority, or decides whether a change may ship.
  */
-export function classifyFloor(changedSurface, addedByFile, unscannable = []) {
+export function classifyRiskSignals(changedSurface, addedByFile, unscannable = []) {
   const categories = new Set();
   for (const entry of changedSurface) {
-    for (const [pattern, category] of FLOOR_PATHS) {
+    for (const [pattern, category] of RISK_PATHS) {
       if (pattern.test(entry.path)) categories.add(category);
     }
   }
@@ -299,6 +300,10 @@ export function classifyFloor(changedSurface, addedByFile, unscannable = []) {
     unscannable_paths: unscannable.slice(0, 32),
   };
 }
+
+// Kept as a source-compatible alias for callers that used the old helper name.
+// The returned value is a recommendation signal only; it is not an approval rule.
+export const classifyFloor = classifyRiskSignals;
 
 function requirementHeaders(text) {
   return text
@@ -481,10 +486,10 @@ function normalizeLenses(value) {
   return [...new Set(requested)].sort();
 }
 
-function resolveRequiredLenses(requested, floorApplies) {
-  const required = new Set(requested);
-  if (floorApplies) for (const lens of FLOOR_LENSES) required.add(lens);
-  return [...required].sort();
+function resolveRequiredLenses(requested) {
+  // Reviewer selection is an explicit Main/operator decision. Risk signals may
+  // recommend another lens, but never turn it into a hidden requirement.
+  return [...new Set(requested)].sort();
 }
 
 function resolveScope(priorAnchor, requestedScope) {
@@ -509,14 +514,14 @@ async function buildPackage(input) {
   const allChanged = await readChangedSurface(root, range);
   const verified = await readVerifiedExclusions(root, range);
   const changedSurface = allChanged.filter((entry) => !verified.paths.has(entry.path));
-  const floor = classifyFloor(
+  const riskSignals = classifyRiskSignals(
     allChanged,
     await readChangedContentByFile(root, range),
     await readUnscannablePaths(root, range),
   );
   const requested = normalizeLenses(input.lens);
   const coordinateBlock = { commit_or_range: range, base: coordinates.base, head: coordinates.head, source: "derived" };
-  const required = resolveRequiredLenses(requested, floor.applies);
+  const required = resolveRequiredLenses(requested);
   const draft = {
     mode: "inline-review",
     repository_root: root,
@@ -533,7 +538,7 @@ async function buildPackage(input) {
     changed_surface: changedSurface,
     requested_lenses: requested,
     required_lenses: required,
-    security_floor: floor,
+    risk_signals: riskSignals,
     review_surface: verified.surface,
     read_only: true,
   };
@@ -561,9 +566,22 @@ function validReturn(value) {
     (value.findings === undefined || Array.isArray(value.findings));
 }
 
-function findingFiles(entry) {
-  const files = Array.isArray(entry?.files) ? entry.files : [entry?.file];
-  return files.filter((file) => typeof file === "string" && file.length > 0);
+function locationPath(location) {
+  if (typeof location !== "string" || location.length === 0) return null;
+  // The shared contract uses `path:line`. Keep a path-only value usable for
+  // older returns and split only a numeric trailing line component so a literal
+  // colon in a repository path is not lost.
+  const match = /^(.*?):\d+(?::\d+)?$/.exec(location);
+  return (match ? match[1] : location).trim() || null;
+}
+
+/** Read both the current locations format and older file/files returns. */
+export function findingFiles(entry) {
+  const legacy = Array.isArray(entry?.files) ? entry.files : [entry?.file];
+  const locations = Array.isArray(entry?.locations) ? entry.locations : [];
+  return [...legacy, ...locations]
+    .map(locationPath)
+    .filter((file, index, files) => file !== null && files.indexOf(file) === index);
 }
 
 /**
@@ -594,12 +612,13 @@ export function partitionFindings(pkg, findings) {
 
 /**
  * A finding the authored criteria anticipated closes by executing that criterion's oracle.
- * One the criteria did not anticipate is a defect in the spec, never another review pass.
+ * A finding with no unambiguous criterion mapping remains unknown for Main to
+ * judge; it is not automatically a defect in the authored spec.
  */
 export function classifyCoverage(pkg, finding) {
   const criteria = Array.isArray(pkg.criteria) ? pkg.criteria : [];
   const declared = typeof finding?.criterion === "string" ? finding.criterion.toLowerCase() : null;
-  if (declared === null) return { coverage: "uncovered", criterion: null, source: null };
+  if (declared === null) return { coverage: "unknown", criterion: null, source: null };
   const texts = criteria.map((entry) => ({ entry, text: String(entry?.text ?? "").toLowerCase() })).filter((item) => item.text.length > 0);
   const exact = texts.filter((item) => item.text === declared);
   // Containment is a fallback, and only when it picks out exactly one criterion: binding a
@@ -607,7 +626,7 @@ export function classifyCoverage(pkg, finding) {
   const candidates = exact.length > 0
     ? exact
     : texts.filter((item) => item.text.includes(declared) || declared.includes(item.text));
-  if (candidates.length !== 1) return { coverage: "uncovered", criterion: null, source: null };
+  if (candidates.length !== 1) return { coverage: "unknown", criterion: null, source: null };
   const match = candidates[0].entry;
   return { coverage: "covered", criterion: match.text, source: match.source ?? null };
 }
@@ -618,21 +637,57 @@ function blockingDisagreements(entry) {
 }
 
 /**
- * Two returns for one lens do not contend: the worse outcome wins. A later benign return can
- * therefore never bury an earlier failure, and no return is ever discarded to achieve that —
- * which is what keying on identity would have cost.
+ * Stable serialization lets consolidation sort evidence without depending on
+ * arrival order. Duplicates intentionally remain duplicates: they are evidence
+ * from separate returns, even when their payloads are identical.
  */
-function worseOf(left, right) {
-  if (left === null) return right;
-  const rank = (entry) => {
-    // An omitted lens_status is not a completed one: a lens that did not finish and simply
-    // left the field out must not outrank a lens that said so.
-    if (entry.lens_status !== "complete") return 3;
-    if (entry.verdict !== "pass") return 2;
-    if (blockingDisagreements(entry).length > 0) return 2;
-    return (entry.findings ?? []).length > 0 ? 1 : 0;
+function stableSerialize(value) {
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(",")}]`;
+  if (object(value)) {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableSerialize(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+const FINDING_SEVERITY_RANK = new Map([
+  ["info", 0],
+  ["low", 1],
+  ["medium", 2],
+  ["high", 3],
+  ["blocker", 4],
+]);
+
+function returnRank(entry) {
+  // Missing/non-terminal status is the most serious return state. A pass with
+  // a high/blocker finding still outranks a pass with only a medium finding,
+  // which removes the old equal-rank/order dependency.
+  const statusRank = entry.lens_status === "complete" ? 0 : 100;
+  const verdictRank = { pass: 0, concerns: 20, "not-run": 30, fail: 40 }[entry.verdict] ?? 40;
+  const disagreementRank = blockingDisagreements(entry).length > 0 ? 10 : 0;
+  const findings = Array.isArray(entry.findings) ? entry.findings : [];
+  const severityRank = findings.reduce((max, finding) => {
+    const value = typeof finding?.severity === "string" ? FINDING_SEVERITY_RANK.get(finding.severity) : undefined;
+    // Unknown severity remains fail-closed and therefore ranks above a known blocker.
+    return Math.max(max, value === undefined ? 5 : value);
+  }, 0);
+  return statusRank + verdictRank + disagreementRank + severityRank;
+}
+
+function aggregateLensReturns(entries) {
+  const ranked = entries
+    .map((entry, index) => ({ entry, index, rank: returnRank(entry), key: stableSerialize(entry) }))
+    .sort((left, right) => right.rank - left.rank || left.key.localeCompare(right.key) || left.index - right.index);
+  const representative = ranked[0].entry;
+  const findings = entries.flatMap((entry) => Array.isArray(entry.findings) ? entry.findings : [])
+    .sort((left, right) => stableSerialize(left).localeCompare(stableSerialize(right)));
+  const disagreements = entries.flatMap((entry) => Array.isArray(entry.disagreements) ? entry.disagreements : [])
+    .sort((left, right) => stableSerialize(left).localeCompare(stableSerialize(right)));
+  return {
+    ...representative,
+    findings,
+    disagreements,
+    source_returns: entries.slice().sort((left, right) => stableSerialize(left).localeCompare(stableSerialize(right))),
   };
-  return rank(right) > rank(left) ? right : left;
 }
 
 /** Fail-closed join: an absent required return is never a pass. */
@@ -642,23 +697,27 @@ export function gateDecision(pkg, returns) {
   const extra = [];
   for (const entry of returns) {
     if (!pkg.required_lenses.includes(entry.lens)) { extra.push(entry); continue; }
-    byLens.set(entry.lens, worseOf(byLens.get(entry.lens) ?? null, entry));
+    const group = byLens.get(entry.lens) ?? [];
+    group.push(entry);
+    byLens.set(entry.lens, group);
   }
 
   const concerns = [];
   const covered = [];
+  const unknownCoverage = [];
   const specDefects = [];
   for (const lens of pkg.required_lenses) {
-    const entry = byLens.get(lens);
-    if (entry === undefined) {
+    const entries = byLens.get(lens);
+    if (entries === undefined) {
       reasons.push(`required lens ${lens} returned nothing`);
       continue;
     }
+    const entry = aggregateLensReturns(entries);
     const split = partitionFindings(pkg, entry.findings ?? []);
     concerns.push(...split.concerns);
     for (const blocker of split.blockers) {
       const classified = { ...classifyCoverage(pkg, blocker), lens, finding: blocker };
-      (classified.coverage === "covered" ? covered : specDefects).push(classified);
+      (classified.coverage === "covered" ? covered : unknownCoverage).push(classified);
     }
     // A lens that did not finish says so, and an unfinished pass is not a pass. That is the
     // lens's own knowledge about its work, not a correlation field. An absent status is
@@ -673,7 +732,17 @@ export function gateDecision(pkg, returns) {
     if (entry.verdict !== "pass") reasons.push(`required lens ${lens} returned ${entry.verdict}`);
     if (split.blockers.length > 0) reasons.push(`required lens ${lens} returned ${split.blockers.length} blocker(s)`);
   }
-  return { ready: reasons.length === 0, reasons, concerns, covered, spec_defects: specDefects, unrequested: extra };
+  return {
+    ready: reasons.length === 0,
+    reasons,
+    concerns,
+    covered,
+    unknown_coverage: unknownCoverage,
+    // Retain the field for consumers that read historical gate output. New
+    // decisions never infer a spec defect from an unmatched criterion.
+    spec_defects: specDefects,
+    unrequested: extra.slice().sort((left, right) => stableSerialize(left).localeCompare(stableSerialize(right))),
+  };
 }
 
 async function readJson(target, code) {

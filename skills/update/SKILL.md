@@ -23,7 +23,7 @@ Operators run this skill routinely; the value is a clean result, not a play-by-p
 
 - **Do not narrate intermediate steps.** Execute the contract steps without emitting prose between tool calls — no "Now refreshing…", no per-command commentary, no restating what a command returned, no step-by-step headers. Work silently until the end.
 - **The harness's activity indicator is the progress bar.** While the tool calls run, Claude Code shows its own running-command indicator; that is the progress signal. A skill cannot render an animated progress bar of its own, and must not simulate one with repeated text, percentage prints, or spinner characters. Rely on the harness indicator during execution and the single final report after it.
-- **Emit exactly one operator-facing message: the final report** (step 7), after all steps complete. There are two, and only two, exceptions: (1) an error that halts the flow (see Error handling) — report it immediately, then stop; (2) a **gated write requiring explicit operator consent before this skill may proceed** — Step 6a's subagent-nesting-depth Y/n gate(s) and Step 6b's python3-install offer. Both write outside this repository's scope (a machine-wide `~/.claude/settings.json` key, or a system package), so the consent step is not narration of progress — it is the operator authorizing an action this skill cannot take on its own — and it is exempt from the single-final-report rule for that reason, not a silent narration leak. No other step in this flow gets a third exception.
+- **Emit exactly one operator-facing message: the final report** (step 7), after all steps complete. There are two, and only two, exceptions: (1) an error that halts the flow (see Error handling) — report it immediately, then stop; (2) the **gated python3-install offer** in Step 6b. It is the sole inline consent step because it authorizes a system package action outside this repository's scope; it is exempt from the single-final-report rule for that reason, not a silent narration leak. No other step in this flow gets a third exception.
 - **The report is the product.** It must read like the output of a mature CLI tool: a titled status block with left-aligned labels and aligned values, neutral declarative voice, no emoji, no celebration, no filler. Keep it scannable in a couple of seconds.
 
 ---
@@ -57,7 +57,7 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
 
 5. **Download the new version** (only when an update is available). Run `claude plugin update th@team-harness-marketplace`. This fetches the new version into the plugin cache. Surface any error verbatim and stop on failure. Do NOT skip this — the catalog refresh in step 2 does not download files, so without this step `/reload-plugins` has nothing new to activate.
 
-6. **Sync the managed `~/.claude/CLAUDE.md` blocks (always — idempotent).** This is the recurring counterpart to `/th:setup`'s one-time bootstrap: `/th:setup` runs once to configure MCP servers and workspace mode; `/th:update` keeps the managed blocks aligned on every run. Do NOT tell the operator to re-run `/th:setup` for this — `/th:update` owns the recurring sync.
+6. **Sync the managed `~/.claude/CLAUDE.md` blocks (always — idempotent).** This is the recurring counterpart to `/th:setup`'s one-time bootstrap: `/th:setup` runs once to configure workspace mode and native preferences; `/th:update` keeps the managed blocks aligned on every run. Do NOT tell the operator to re-run `/th:setup` for this — `/th:update` owns the recurring sync.
    - **Source of truth.** The two active managed blocks live in canonical files under `skills/setup/managed-blocks/` in the plugin cache. Read each file directly from the **highest version directory** present under `~/.claude/plugins/cache/team-harness-marketplace/th/` (semver-sorted) — after step 5 that is the just-downloaded version, so the synced blocks match the version the operator is about to activate:
      - `managed-blocks/orchestrator-dispatch-rule.md` (markers: `<!-- orchestrator-dispatch-rule:start -->` … `<!-- orchestrator-dispatch-rule:end -->`)
      - `managed-blocks/voice-rule.md` (markers: `<!-- voice-rule:start -->` … `<!-- voice-rule:end -->`)
@@ -428,32 +428,6 @@ print(json.dumps(outcomes))
    # Style migration is handled separately after inspecting the effective selection.
    ```
 
-6a. **Provision the subagent-nesting-depth prerequisite (gated).** Full mechanism: `docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`. This step applies only the concrete values below — it does not restate the mechanism.
-
-   - **Already-present check.** Read `~/.claude/settings.json` (if present). If `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` already equals `"2"`, or `nested_spawn_depth.declined` is already `true` in `~/.claude/.team-harness.json`, skip with no prompt and no write — record the fact for the `nesting` row of the final report (step 7) only.
-   - **Absent-value gate (reached only when the checks above are false AND the key is absent from `settings.json`):**
-     ```text
-     Provision Claude Code's subagent-nesting depth (env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH = "2")
-     in ~/.claude/settings.json? Without it, th:orchestrator cannot dispatch its own specialists and
-     falls back to a relayed dispatch instead.
-
-     This setting applies to every Claude Code session on this machine, on every project, not only
-     this pipeline, and persists until removed manually. It requires a session restart to take effect.
-
-     Write this value now? [y/N]
-     ```
-   - **Present-but-different-value gate (reached only when the checks above are false AND the key IS present with a value other than `"2"`).** Never silently folded into the absent-value gate above — a present-but-different value is disclosed and confirmed on its own terms before any write:
-     ```text
-     ~/.claude/settings.json currently sets env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH = "{current-value}".
-     Team Harness recommends "2" so th:orchestrator can dispatch its own specialists directly; any
-     other value (including this one) falls back to a relayed dispatch instead.
-
-     Overwrite "{current-value}" with "2"? [y/N]
-     ```
-   - **On `y` (either gate):** merge-write-whole-document to `~/.claude/settings.json` — back up to `settings.json.bak` at `0o600` (skipped if the file does not exist). Read the target file: if it does not exist, start from `{}`; if it exists but fails to parse as JSON, **abort before writing** and report the corrupted-file failure by name — never fall back to `{}` for an existing-but-unparseable file, since that would silently discard any `permissions.*` rules already present. Otherwise set only `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` to `"2"`, write to a temp file at `0o600`, validate as JSON, rename atomically. Re-read and re-parse: assert exactly one JSON path changed and that `permissions.allow`/`permissions.deny`/`permissions.additionalDirectories` are unchanged element-for-element; on any other delta, restore `.bak` and report the write as failed. Record `provisioned (restart required)` for the `nesting` report row. Never state that it is already active in this session.
-   - **On `n`/Enter (decline, either gate):** persist `nested_spawn_depth.declined: true` to `~/.claude/.team-harness.json` via merge-write-whole-document, preserving every other key. This is the ONE closed exception this skill's write scope has to that file (`docs/setup-update-model.md § "The residual seam: new operator keys"`) — no other key in that file is ever written by `/th:update`. Record `declined` for the `nesting` report row (a kept different value reads the same as a decline of "2"). This decline is durable — neither this command nor `/th:setup` re-offers it in a future run.
-   - This step is advisory-blocking only in the sense of its own Y/n — it never blocks the rest of the update flow; a decline, an aborted corrupted-file write, or a failed write simply leaves the depth setting unprovisioned — a specialist leaf agent invoked one level deep (a skill wrapper, an `@`-mention inside an ongoing session) may not retain the tools its own contract grants (`docs/subagent-orchestration.md § "Nested-context dispatch — RETIRED protocol, retained provisioning"`).
-
 6b. **Runtime probe — python3 presence (advisory).** After the managed-block sync, run `command -v python3`. This step is advisory — update always completes regardless of the outcome. If python3 is available, record `python3: available` for the final report (Step 7) and continue silently.
 
 If python3 is absent: record `python3: WARN: absent — python-dependent skills degraded` for the final report, then recommend installing python3 with the rationale and offer a Y/n prompt. Because Step 6's output discipline requires a single final report, the Y/n prompt for python3 install is the ONLY inline message permitted by this step (all other progress is silent).
@@ -502,7 +476,6 @@ Install python3 now for full coverage? [Y/n]
      installed version   <X>
      downloaded version  <Y>
      managed blocks      <per-block outcome — examples: "in sync (2/2)", "orchestrator-dispatch-rule: updated; voice-rule: already current", "orchestrator-dispatch-rule: preserved (operator-edited); voice-rule: already current", "orchestrator-dispatch-rule: force-adopted; voice-rule: already current", "orchestrator-dispatch-rule: inserted; voice-rule: inserted">
-     nesting             <"already provisioned" | "provisioned (restart required)" | "declined">
      python3             <"available" | "WARN: absent — python-dependent skills degraded" | "installed — full coverage active" | "installed — restart the terminal for PATH refresh">
    ```
    Closing line: `Next: /reload-plugins to activate <Y>; reconnect only if reload reports a specific remaining requirement.`
@@ -515,7 +488,6 @@ Install python3 now for full coverage? [Y/n]
      installed version   <X>
      latest version      <X>
      managed blocks      <e.g. "in sync (2/2)" or "orchestrator-dispatch-rule: updated; voice-rule: already current" or "orchestrator-dispatch-rule: preserved (operator-edited); voice-rule: already current">
-     nesting             <"already provisioned" | "provisioned (restart required)" | "declined">
      python3             <"available" | "WARN: absent — python-dependent skills degraded" | "installed — full coverage active" | "installed — restart the terminal for PATH refresh">
    ```
    Closing line: `No action required.`
@@ -535,7 +507,6 @@ Install python3 now for full coverage? [Y/n]
 
 ## Important
 
-- This skill is for **plugin installations**. For legacy Go-installer installations, file syncing is a different path (deprecated).
-- The skill refreshes the marketplace catalog, downloads the new version into the plugin cache (`claude plugin update`), reports the version delta, syncs the marker-delimited managed blocks in `~/.claude/CLAUDE.md` to the version being activated, removes retired blocks (`dev-mode`, `nested-dispatch-takeover`, `dev-mode-entry`), and provisions the subagent-nesting-depth architecture prerequisite (Step 6a). It never edits repository files, **never writes an operator KEY to `~/.claude/.team-harness.json`** (that remains `/th:setup`'s domain) with one closed exception — Step 6a's `nested_spawn_depth.declined` key, which is not an operator KEY (`docs/setup-update-model.md § "The residual seam: new operator keys"`). It never touches `~/.claude/CLAUDE.md` content outside the managed-block markers, and never reloads the session — the reload/restart is always operator-driven.
+- This skill is for **plugin installations**. It refreshes the marketplace catalog, downloads the new version into the plugin cache (`claude plugin update`), reports the version delta, syncs the marker-delimited managed blocks in `~/.claude/CLAUDE.md` to the version being activated, and removes retired blocks (`dev-mode`, `nested-dispatch-takeover`, `dev-mode-entry`). It never edits repository files or writes operator configuration keys; it never touches `~/.claude/CLAUDE.md` content outside the managed-block markers, and never reloads the session — the operator activates the update with `/reload-plugins`.
  **New session context and observation assets reach installed machines without re-running `/th:setup`.** The plugin runtime loads updated assets after `/th:update` and `/reload-plugins`. This flow does not install a Codex or Go-installer policy-hook layer; retained runtime-specific context or observation integrations follow their host's activation rules.
-- Division of labour with `/th:setup`: setup is the one-time bootstrap (MCP servers, workspace mode, first write of the managed blocks); update is the repeatable command that keeps the catalog and the managed blocks in sync on every run. Re-running setup is never required as part of the update flow.
+- Division of labour with `/th:setup`: setup is the one-time bootstrap (workspace mode, native preferences, and the first write of the managed blocks); update is the repeatable command that keeps the catalog and the managed blocks in sync on every run. Re-running setup is never required as part of the update flow.

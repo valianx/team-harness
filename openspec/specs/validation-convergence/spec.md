@@ -1,6 +1,11 @@
 # validation-convergence Specification
 
 ## Purpose
+This retained specification describes legacy v5 helper behavior and historical
+records. Current workflow coordination is defined by `pipeline-control-plane`
+and `specialist-coordination-protocol`; new tasks do not require these old
+gates, leases, journals or administrative transitions.
+
 Make first-pass review exhaustiveness a contract and give the correction loop memory and a termination rule, so correction rounds converge instead of dripping findable findings one packet at a time. Review scope stays full; nothing here bounds a verifier.
 
 ## Requirements

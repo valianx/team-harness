@@ -41,16 +41,12 @@ EXEMPT = {
     "agents/gcp-infra.md": {"words"},
     "agents/implementer.md": {"words"},
     "agents/mentor.md": {"words"},
-    "agents/orchestrator.md": {"words"},
-    "agents/plan-reviewer.md": {"words"},
     "agents/qa.md": {"words"},
     "agents/security.md": {"words"},
     "agents/tester.md": {"words"},
     "agents/_shared/apply-review-disposition.md": {"words"},
     "agents/_shared/gh-fallback.md": {"words"},
     "agents/_shared/inline-review-contract.md": {"words"},
-    "agents/_shared/kg-write-policy.md": {"words"},
-    "agents/_shared/orchestrator-state.md": {"lines"},
 }
 
 # Reference files over 100 lines that have no contents block today. Same ratchet as

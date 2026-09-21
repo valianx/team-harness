@@ -35,19 +35,6 @@ function assertUniqueStringArray(value, label, { nonEmpty = false } = {}) {
   return seen;
 }
 
-function markdownSection(document, heading, label) {
-  const marker = `## ${heading}\n`;
-  const start = document.indexOf(marker);
-  if (start < 0 || document.indexOf(marker, start + marker.length) >= 0) {
-    fail(`${label} must contain exactly one ${marker.trim()} section`);
-  }
-  const bodyStart = start + marker.length;
-  const next = document.indexOf("\n## ", bodyStart);
-  const body = document.slice(bodyStart, next < 0 ? document.length : next).trim();
-  if (body === "") fail(`${label} section ${heading} is empty`);
-  return body;
-}
-
 function repositoryPath(rootDir, path, label) {
   assertNonEmptyString(path, label);
   if (isAbsolute(path) || path.includes("\\")) fail(`${label} must be a repository-relative POSIX path`);
@@ -296,11 +283,11 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
   const selectedProfileName = profileName ?? contract.default_profile;
   const profile = validateProfile(contract, selectedProfileName, usedProjectionTiers, allowedRuntimeReasoningEfforts);
   const dispatchContractSource = "agents/_shared/dispatch-contract.md";
-  const specialistDispatch = markdownSection(
-    await readFile(repositoryPath(rootDir, dispatchContractSource, "specialist dispatch contract"), "utf8"),
-    "Pipeline specialist reference",
-    dispatchContractSource,
-  );
+  const specialistDispatch = (await readFile(
+    repositoryPath(rootDir, dispatchContractSource, "specialist dispatch contract"),
+    "utf8",
+  )).trim();
+  if (specialistDispatch === "") fail(`${dispatchContractSource} must not be empty`);
   const files = new Map();
   for (const agent of validatedAgents) {
     const sourcePath = repositoryPath(rootDir, agent.instruction_source, `${agent.name}.instruction_source`);
@@ -363,7 +350,7 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     const codexSurface = names.has(agent.name)
       ? "installed custom agent"
       : agent.name === "orchestrator"
-        ? "Main via `init` / `pipeline` skills"
+        ? "Main via `init` / `pipeline` workflows"
         : "not shipped in Codex beta";
     return `| \`${agent.name}\` | \`${agent.sourceModel}\` | \`${agent.sourceEffort}\` | \`${mapping.model}\` | \`${mapping.reasoning_effort}\` | ${codexSurface} |`;
   });
@@ -374,11 +361,11 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     "",
     "## Improve Team Harness from Codex",
     "",
-    "Start Codex from the repository root. Use `@Team-Harness init <request>` for lightweight intake or a small bounded improvement; it stays in Main without creating pipeline state or spawning specialists. Use `@Team-Harness pipeline <request>` only when you explicitly want the full gated workflow.",
+    "Start Codex from the repository root. Use `@Team-Harness init <request>` for lightweight intake or a small bounded improvement. Use `@Team-Harness pipeline <request>` when you want explicit coordination across design, implementation, validation, and delivery; Main remains the native general agent and specialists provide optional evidence.",
     "",
     "Author shared role intent in `agents/*.md`. Codex model and effort values are projected from that frontmatter, while Codex-specific execution instructions live in `runtime/codex/instructions/*.md` and workflow adapters live in `plugins/team-harness/skills/`. A semantic prompt change is not translated automatically into those adapters, so review both surfaces when behavior should change in Claude Code and Codex.",
     "",
-    "The seven additional `pipeline-*` custom-agent identities reuse the corresponding logical role adapter but intentionally omit `model` and `model_reasoning_effort`. The pipeline passes both values explicitly on every spawn, using the standard role matrix by default or one ephemeral pair selected in the current live Main session.",
+    "The seven additional `pipeline-*` custom-agent identities reuse the corresponding logical role adapter but intentionally omit `model` and `model_reasoning_effort`. A coordinated workflow may pass both values explicitly to a bounded native assignment, using the standard role matrix by default or one ephemeral pair selected in the current live Main session; their presence is not a preflight or permission requirement.",
     "",
     "After changing any canonical agent's model or effort, an installed role contract, a Codex instruction adapter, or `runtime/schema/codex-agents.json`, run `$sync-codex-agents`. The equivalent repository commands are:",
     "",

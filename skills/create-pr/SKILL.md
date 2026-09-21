@@ -3,7 +3,11 @@ name: create-pr
 description: Prepare or publish a pull request for completed repository work, or resume an intended PR creation, from direct, OpenSpec, or Team Harness pipeline flows. Use for requests to create, open, update, or publish a PR; do not use for PR review, applying review comments, or merge-only work.
 ---
 
-Analyze `$ARGUMENTS`.
+Analyze `$ARGUMENTS` by the requested action before extracting any PR number or URL. A number
+or URL identifies the target; it does not choose the workflow. Route a request to review an
+existing PR to `review-pr`, a request to evaluate or apply its comments to `apply-review`, and a
+merge-only request to the repository's merge flow. Enter this skill only for preparing or
+publishing a PR from completed repository work.
 
 Use this shared skill at two checkpoints in one PR lifecycle. Use it whenever a direct PR
 request or the spec or pipeline flow reaches candidate preparation or publication; no
@@ -20,7 +24,7 @@ tools and existing repository helpers.
 
 ## Checkpoint 1: prepare the candidate
 
-Before final review or pipeline Freeze, resolve the exact repository, working branch,
+Before final review or publication authorization, resolve the exact repository, working branch,
 base, candidate head, and intended PR scope. Respect repository instructions, project
 branch conventions, PR templates, commit conventions, and native permissions.
 
@@ -62,15 +66,15 @@ Do not replace that contract with this skill's prose.
 
 Publication reuses the completed preparation and its existing authorization. Revalidate
 the exact repository, base, head commit/tree, branch, worktree, body bytes, and applicable
-review or Freeze evidence before an outward write. A direct/spec ordinary in-scope repair
+candidate review or authorization evidence before an outward write. A direct/spec ordinary in-scope repair
 may advance the head or revise its body after this diff check while reusing existing
 authority; ask only for a decision when scope, acceptance, security authority, or another
-real prerequisite is new. An active pipeline keeps the delivery contract's strict accepted
-Freeze and preview identities; a mismatch returns to validation/Freeze.
+real prerequisite is new. An active pipeline keeps the delivery contract's accepted candidate,
+review and preview identities; a mismatch returns to validation and rechecks authorization.
 
-An active pipeline publishes its accepted frozen tree through the existing delivery
-mechanics. Once an accepted Freeze is handed to publication, perform no edits, tests,
-commits, rebases, or re-review; validation runs before that Freeze is accepted. Direct
+An active pipeline publishes its accepted candidate through the existing delivery
+mechanics. Once the candidate and its authorization are handed to publication, perform no
+edits, tests, commits, rebases, or re-review; validation runs before authorization is accepted. Direct
 and spec publication follows their already-satisfied completion and author-review
 conditions without inventing a second gate. A native permission prompt remains a
 technical boundary; it is not silently answered by this skill.

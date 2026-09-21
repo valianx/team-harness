@@ -43,9 +43,10 @@ export const opencodeOverrides = new Set([
 ]);
 
 const codexSpecialMappings = new Map([
+  ["bootstrap", "Initialize AGENTS.md and native Codex project conventions; use CLAUDE.md only when explicitly requested for compatibility."],
   ["background", "Use Codex subagents for bounded background work. Never launch or require the `claude` binary."],
   ["clickup", "Store persistent values in the Codex-native Team Harness configuration. Preserve all opaque keys and never print credentials."],
-  ["cross-repo", "Use only repository paths and external reads authorized by the operator. Delegate independent repositories only when the live request permits subagents."],
+  ["cross-repo", "Use only repository paths and external reads authorized by the operator. Delegate useful independent repository work with explicit ownership under native permissions."],
   ["diagram", "Create the diagram directly in Main using the packaged Excalidraw workflow; do not dispatch a Claude orchestrator."],
   ["d2-diagram", "Author the `.d2` source directly. Treat D2 CLI rendering as optional and report when the executable is unavailable."],
   ["excalidraw-diagram", "Use the packaged schema, templates, and renderer directly; preserve its render-validation loop when dependencies are available."],
@@ -56,7 +57,7 @@ const codexSpecialMappings = new Map([
   ["learn-english", "Read and update only the Codex-native Team Harness configuration through its packaged configuration helper."],
   ["likec4-diagram", "Author the `.c4` source directly. Treat LikeC4 rendering as optional and report when the CLI is unavailable."],
   ["lint", "Audit Codex plugin skills, generated agents, native hooks, and configuration paths; do not inspect or repair a Claude Code installation."],
-  ["mcp-optimize", "Inspect Codex MCP registrations and config rather than Claude connector files. Preserve secrets and gate every proposed write."],
+  ["mcp-optimize", "Inspect Codex MCP registrations and config rather than Claude connector files. Preserve secrets and use existing scoped authorization and native permissions for writes."],
   ["obsidian-bases", "Resolve vault settings from Codex-native Team Harness configuration or explicit operator input, never from a Claude-only config path."],
   ["obsidian-cli", "Resolve vault settings from Codex-native Team Harness configuration or explicit operator input, never from a Claude-only config path."],
   ["pipelines", "Resolve workspace settings from the Codex-native Team Harness configuration and render state read-only."],

@@ -7,8 +7,8 @@ name: issue
 ## Parse flags
 
 Before processing modes, check if the input contains flags:
-- `--skip-version` → pass `skip-version: true` to the orchestrator payload. Remove the flag from the input before processing.
-- `--skip-delivery` → pass `skip-delivery: true` to the orchestrator payload. Remove the flag. When set, the orchestrator runs the full pipeline (specify → design → implement → verify) but STOPS before delivery. Used in batch mode where delivery is consolidated.
+- `--skip-version` → pass `skip-version: true` to the current coordinator payload. Remove the flag from the input before processing; the active delivery method honors it.
+- `--skip-delivery` → pass `skip-delivery: true` to the current coordinator payload. Remove the flag. The active coordinator runs the requested planning, implementation, and verification work, then stops before delivery. Do not create a separate batch protocol to interpret this option.
 
 ---
 name: issue
@@ -70,7 +70,8 @@ name: issue
    - Issue: #{number}
    ...
    ```
-   The orchestrator will create `workspaces/batch-progress.md` to track all tasks.
+   The coordinator tracks the batch in the selected workspace using its current
+   task list and result reports; do not require a separate legacy batch protocol.
 
 ---
 name: issue
@@ -82,7 +83,7 @@ name: issue
    - **Label**: classify as one of: `bug`, `enhancement`, `feature`, `refactor`, `docs`, `security`
    - **Body**: structured with the template below
 
-2. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — create an issue". When `has_gh=true`, create with `gh issue create`. When `has_gh=false` and a token + GitHub origin are available, use the curl POST fallback. When neither is available, write the SDD body to `workspaces/{feature}/inputs/issue-create.md` and prompt the operator to paste it into GitHub, then reply with the new issue number.
+2. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — create an issue". When `has_gh=true`, create with `gh issue create`. When `has_gh=false` and a token + GitHub origin are available, use the curl POST fallback. When neither is available, write the SDD body to `{workspace}/inputs/issue-create.md` and prompt the operator to paste it into GitHub, then reply with the new issue number.
 
    Create the issue with auto-label, auto-assign, and **SDD-compliant body**:
    ```

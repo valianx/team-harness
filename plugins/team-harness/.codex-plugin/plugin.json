@@ -1,7 +1,7 @@
 {
   "name": "team-harness",
-  "version": "3.34.0",
-  "description": "Run the complete shared Team Harness skill catalog in Codex with native setup, updates, hooks, and gated workflows.",
+  "version": "3.35.0",
+  "description": "Shared development workflows in Codex with native agents, permissions, setup and updates.",
   "author": {
     "name": "Mario Gutierrez",
     "url": "https://github.com/valianx"

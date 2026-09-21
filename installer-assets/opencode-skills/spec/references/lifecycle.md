@@ -30,8 +30,8 @@ validation and delivery evidence. A checked task list identifies an archive
 candidate; it does not prove implementation or verification. Missing evidence stays explicit.
 
 - **Completed:** when implementation and its relevant checks are complete,
-  prepare archive on the same feature branch before the final review package
-  or pipeline Freeze. Include implementation, updated living specs and the
+  prepare archive on the same feature branch before the final candidate review
+  or publication authorization. Include implementation, updated living specs and the
   archived change in the same PR. An absent or open PR does not prevent archive;
   merge integrates the prepared state. Apply the same preparation to agreed
   delivery without a PR.
@@ -92,10 +92,11 @@ do not claim closure.
 
 Archive follows the repository's normal branch and outward-write permissions.
 It belongs to candidate assembly, before final validation and acceptance.
-In a pipeline, accept outstanding results and close their leases before moving
-the change. Preserve its content identity, refresh its location and projection,
-and bind subsequent leases to the archived sources. Delivery publishes the
-accepted candidate unchanged; archive grants no push, PR or merge authority.
+In a pipeline, resolve outstanding review results against the candidate before
+moving the change. Preserve its content identity, refresh its location and
+projection, and carry the archived source references into the candidate review.
+Delivery publishes the accepted candidate unchanged; archive grants no push, PR
+or merge authority.
 
 Review corrections keep code, living specs and the archived record consistent
 on the same branch. Revalidate the changed candidate through the existing flow.

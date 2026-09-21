@@ -10,7 +10,8 @@ Analyze `$ARGUMENTS`. Accept a PR number (`45`, `#45`) or URL; remove options be
 - `--reviewers <focus[,focus]>`: request explicit lenses. `general` and `architecture`
   use reviewer passes; `security` selects the security specialist.
 - `--multi`: shorthand for `--reviewers general,architecture`.
-- `[TIER: N]`: compatibility override. Tier 4 forces the security specialist; other values do not add reviewers.
+- `[TIER: N]`: compatibility context. Tier 4 emits a security recommendation; only an explicit
+  `--reviewers security` selection adds the specialist.
 - `--resume-from-draft`: publish a saved draft only after snapshot validation.
 - `--auto-publish`: operator opt-in to skip the preview menu.
 - `--converge`: compatibility alias for `--multi`; one set of independent passes, never a loop.
@@ -18,6 +19,12 @@ Analyze `$ARGUMENTS`. Accept a PR number (`45`, `#45`) or URL; remove options be
   An explicit live request to investigate regressions selects the same behavior.
 - `workspaces path: <directory>`: optional coordinator-supplied acceptance workspace, including
   Obsidian; capture its relevant context before dispatch as described in the snapshot reference.
+
+Existing review maintenance remains available through the same Main-owned run: an `update-body`
+request revises the captured review draft, and a `reply` request drafts a response to a selected
+review thread. Both reuse the immutable snapshot, currentness checks, artifact ownership, and
+publication contract below; they do not start a second Review Mode coordinator. Use
+`apply-review` when the request is to evaluate and incorporate reviewer comments into code.
 
 ## Non-negotiable invariants
 
@@ -61,7 +68,8 @@ Do not call agents abstract "lenses" in operator-facing prose.
 
 Never emit a message whose only content is tool-status narration; during an extended wait, name
 the active specialists and their surfaces. Expose SHAs or the context hash only when identity
-drift blocks the review or the operator asks. Report a `workspaces_ignore: added` once.
+drift blocks the review or the operator asks. Report whether the Git local exclude was already
+present or added once.
 
 ## Resume
 

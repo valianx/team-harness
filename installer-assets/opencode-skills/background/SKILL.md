@@ -1,16 +1,18 @@
 ---
 name: background
-description: Dispatch a bounded task through opencode's native subtask capability and report its handle and result.
+description: Dispatch bounded work through OpenCode native subtasks and report progress and results.
 ---
 
-# Background work in opencode
+# Background work in OpenCode
 
-Use only after an explicit operator request. Reject tasks that require live
-interactive gates, secrets, or an outward write. Dispatch one bounded subtask
-through opencode's native agent/task mechanism when available; never invoke the
-`claude` or `codex` binaries. If the host exposes no background mechanism,
-state that limitation and offer to complete the task in the current session.
+Use the host's supported native agent/task mechanism, with a concrete objective,
+owned surface, repository and selected absolute workspace. Reuse local/Obsidian
+context and preserve other writers' work.
 
-Report the task scope, agent, status, and how the operator can retrieve the
-result. Background completion never authorizes a publish, deploy, merge, or
-other outward mutation.
+Keep native permissions and approval behavior. Do not launch another runtime or
+set a TH permission bypass. If the requested action cannot run unattended, report
+the actual limitation; existing authorization for unchanged work remains valid.
+
+Report the task handle, status and how its result can be retrieved. If the host
+has no background mechanism, offer direct continuation without inventing a task
+or claiming completion.

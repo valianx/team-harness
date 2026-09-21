@@ -1,0 +1,3 @@
+- [ ] Fix duplicate finding consolidation, location normalization and unknown criterion coverage.
+- [ ] Make preflight read-only and align spec, PR and comment-application instructions.
+- [ ] Validate helper regressions and the advisory review decision contract.

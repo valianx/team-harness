@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Configure Team Harness — MCP servers, workspace mode, and orchestrator dispatch rule. Run after installing the plugin or to reconfigure. Accepts an optional argument to target a single concern (e.g. /th:setup memory, /th:setup language, /th:setup context7).
+description: Configure Team Harness — workspace mode, native preferences, and orchestrator dispatch rule. Run after installing the plugin or to reconfigure. Accepts an optional argument to target a single concern (e.g. /th:setup workspace, /th:setup language, /th:setup context7).
 ---
 
 Configure the Team Harness system. Run this after installing the plugin or to reconfigure existing settings.
@@ -22,14 +22,12 @@ Match on the normalized argument containing any listed cue (substring or close s
 
 | Target concern | Routes to | EN cues | ES cues |
 |----------------|-----------|---------|---------|
-| **memory** | Step 2 — Memory MCP block | `memory`, `mcp`, `knowledge graph`, `kg`, `memory url`, `bearer` | `memoria`, `grafo de conocimiento`, `url de memoria`, `token de memoria` |
 | **context7** | Step 2 — context7 block | `context7`, `context 7`, `docs`, `library docs`, `api key`, `c7` | `context7`, `clave api`, `documentación`, `docs de librerías` |
 | **workspace** | Step 3 — workspace output mode | `workspace`, `logs`, `logs mode`, `obsidian vault`, `vault`, `output location` | `espacio de trabajo`, `logs`, `modo de logs`, `bóveda`, `obsidian`, `ubicación de salida` |
 | **language** | Step 3.5 — default language | `language`, `lang`, `default language`, `locale` | `idioma`, `lenguaje`, `idioma por defecto` |
 | **english-learning** | Step 3.6 — english-learning correction mode | `english learning`, `english-learning`, `english corrections`, `learn english`, `correction mode` | `aprender inglés`, `correcciones de inglés`, `modo de corrección`, `inglés` |
 | **clickup** | § Targeted: ClickUp | `clickup`, `click up`, `clickup workspace`, `clickup id` | `clickup`, `id de clickup`, `espacio de clickup` |
 | **obsidian-tasks** | § Targeted: Obsidian Tasks | `obsidian tasks`, `obsidian-tasks`, `tasks plugin` | `tareas de obsidian`, `obsidian tasks` |
-| **flow-telemetry** | Step 4f — flow telemetry opt-in | `flow telemetry`, `flow-telemetry`, `telemetry`, `friction events` | `telemetría`, `telemetría de flujo`, `eventos de fricción` |
 | **python / deps** | Step 6b — python3 probe | `python`, `python3`, `dependencies`, `deps`, `secret scan`, `entropy` | `python`, `dependencias`, `escaneo de secretos` |
 | **github-accounts** | Step 3b — workspace/account identity routes | `github-accounts`, `gh-accounts`, `gh accounts`, `gh config dir`, `gh_config_dir`, `gh identity`, `github accounts` | `cuentas gh`, `identidad gh`, `directorio de configuración gh`, `cuentas de github` |
 | **capability** | Step 6c — retired, reports the retirement | `capability`, `probe`, `probe result`, `probe_result`, `nested lane`, `nested-lane`, `gate messaging` | `capacidad`, `probe`, `resultado de probe`, `verificación de capacidad`, `carril anidado` |
@@ -42,14 +40,12 @@ When the normalized argument does not confidently match any concern in the inten
 No configuration concern matched for: '<original argument>'
 
 Routable concerns for /th:setup <intent>:
-  memory           — Memory MCP URL and bearer token
   context7         — context7 API key
   workspace        — workspace output mode (local / obsidian vault path)
   language         — default response language (ISO 639-1)
   english-learning  — english-learning correction mode
   clickup          — ClickUp workspace ID
   obsidian-tasks   — Obsidian Tasks integration
-  flow-telemetry   — cross-user flow telemetry opt-in (default: off)
   python           — python3 presence and dependency probe
   github-accounts  — workspace/account identity routes (paths and logins, no tokens)
   capability       — retired; the coordinator fusion removed the split this probe verified
@@ -66,7 +62,7 @@ When a confident match is found, enter targeted mode:
 1. **Skip Step 0** (version-staleness guard). A targeted run is a quick single-concern reconfiguration; the advisory staleness check is a full-setup concern and adds latency. Step 0 runs only on the full no-argument flow.
 2. **Read current values (Step 1 detect-mode only for the matched concern).** Read `~/.claude/.team-harness.json` and show the current value for that concern as the default hint.
 3. **Execute only the matched sub-step** (see the Routes-to column). Every safety gate of that sub-step is inherited: merge-write-whole-document, secret handling, the english-learning persistence-marker + Y/n gate, the `~/.claude.json` backup, the session-override whitelist.
-4. **Run Step 6 verification ONLY when the target is `memory` or `context7`** (the two MCP-touching targets). Skip Step 6 for all other targets.
+4. **Run Step 6 verification ONLY when the target is `context7`.** Skip Step 6 for all other targets.
 5. **Print a one-line targeted summary** (the single concern configured) and stop. Do NOT walk the remaining sections.
 
 For the `clickup` and `obsidian-tasks` targets, which do not have a pre-existing full-flow sub-step, execute the minimal sub-steps defined in the §§ Targeted sections below.
@@ -108,30 +104,6 @@ This guard never writes any file; it only reads versions and, when stale, advise
 
 Read `~/.claude/.team-harness.json`. If the file exists, this is a reconfiguration — show current values. If missing, this is a first-time setup — create the file with defaults.
 
-### 2. Configure MCP servers
-
-The system requires two MCP servers: **Memory** (Knowledge Graph) and **context7** (library docs).
-
-**Memory MCP:**
-1. Ask the user for the Memory MCP URL. Example format: `https://your-mcp.example.com/mcp`
-2. Optionally ask for a bearer token (if the server requires authentication).
-3. Read `~/.claude.json` and merge the memory MCP entry:
-   ```json
-   "memory": {
-     "type": "url",
-     "url": "<user-provided-url>",
-     "headers": { "Authorization": "Bearer <token>" }
-   }
-   ```
-   Omit `headers` if no token was provided.
-4. Back up `~/.claude.json` before writing. Create the backup at `~/.claude.json.bak-YYYYMMDD-HHMMSS` with `0o600` permissions **from the moment of creation** — never copy with the ambient umask and tighten afterward, which leaves a brief world-readable window (the backup holds the same secrets as the live file). Use a create-then-fill sequence that sets the mode at creation: `( umask 077; cp ~/.claude.json ~/.claude.json.bak-YYYYMMDD-HHMMSS )`, or write the bytes through a tool that creates the file at `0o600`.
-5. **Atomic write + secret-safe permissions (mandatory):**
-   - Create a temporary file in the same directory (e.g. `~/.claude.json.tmp-$$`) with `0o600` permissions **at creation**, BEFORE any bytes are written — a crash after the write but before a later `chmod` must never leave the secrets readable. Use `( umask 077; … )` around the write, or create the file `0o600` and then fill it.
-   - Write the merged JSON to that temporary file.
-   - Rename (move) the temporary file to `~/.claude.json`. This is the atomic step — a crash before the rename leaves the original untouched; a crash after the rename leaves the new file in place.
-   - After the rename, verify permissions are still `0o600` (`chmod 600 ~/.claude.json`).
-   - Do NOT apply any secret-pattern scanner (e.g. `scanForSecrets`) to the config bytes — the file intentionally contains bearer tokens and API keys. The `0o600` permission is the mitigation; scanning would always trip on valid input.
-
 **context7 MCP:**
 1. Ask the user for their Context7 API key. Get one at https://context7.com/
 2. Merge the context7 MCP entry:
@@ -145,9 +117,9 @@ The system requires two MCP servers: **Memory** (Knowledge Graph) and **context7
      }
    }
    ```
-3. Follow the same atomic write + `0o600` permissions sequence as Memory MCP (step 5 above) for every write to `~/.claude.json`.
+3. Use an atomic write with `0o600` permissions for `~/.claude.json` when the operator explicitly configures Context7. Preserve every unrelated MCP entry, including existing Memory or Context Harness entries, and never request or copy their credentials.
 
-If both entries already exist in `~/.claude.json`, show current values and ask whether to keep or change each one.
+If a Context7 entry already exists, show its current status and ask whether to keep or change it. MCP setup is optional; an existing configuration is left untouched when Context7 is not selected.
 
 ### 3. Configure workspace output mode
 
@@ -181,13 +153,13 @@ The obsidian vault sits outside the current project's working tree, so every sub
        Bash(git rev-parse:*), Bash(git branch --list:*), Bash(git worktree list:*),
        Bash(ls:*), Bash(cat:*), Bash(rg:*), Bash(grep:*),
        Bash(gh pr view:*), Bash(gh pr list:*), Bash(gh issue view:*), Bash(gh issue list:*),
-       Bash(gh auth switch:*), mcp__memory__*
+        Bash(gh auth switch:*)
      ```
    - **Missing (any of the entries) → present the gated Y/n offer below.**
 4. Present the exact rules for confirmation, including the `.git/` deny pair (never covers `.git/` — `docs/permission-provisioning.md § ".git/" exclusion invariant`), the read-only allowlist set (`docs/permission-provisioning.md § "Read-only allowlist — disjointness invariant"` — canonical definition; excludes every form of `gh api` and every effective git verb), and the cross-project blast-radius note. Write nothing until the operator answers:
    ```text
-   Grant write access without prompting to the obsidian workspace, and add a
-   read-only allowlist (inert Bash commands, gh read verbs, gh auth switch, KG tools)?
+    Grant write access without prompting to the obsidian workspace, and add a
+    read-only allowlist (inert Bash commands and gh read verbs)?
      Edit(//{base}/**)
      Write(//{base}/**)
      additionalDirectories: //{base}
@@ -196,7 +168,7 @@ The obsidian vault sits outside the current project's working tree, so every sub
      Bash(git rev-parse:*), Bash(git branch --list:*), Bash(git worktree list:*),
      Bash(ls:*), Bash(cat:*), Bash(rg:*), Bash(grep:*),
      Bash(gh pr view:*), Bash(gh pr list:*), Bash(gh issue view:*), Bash(gh issue list:*),
-     Bash(gh auth switch:*), mcp__memory__*
+      Bash(gh auth switch:*)
 
    This rule applies to every Claude Code session on any project, not just this pipeline,
    and persists until manually removed from ~/.claude/settings.json.
@@ -218,7 +190,7 @@ The obsidian vault sits outside the current project's working tree, so every sub
      Bash(git rev-parse:*), Bash(git branch --list:*), Bash(git worktree list:*),
      Bash(ls:*), Bash(cat:*), Bash(rg:*), Bash(grep:*),
      Bash(gh pr view:*), Bash(gh pr list:*), Bash(gh issue view:*), Bash(gh issue list:*),
-     Bash(gh auth switch:*), mcp__memory__*
+      Bash(gh auth switch:*)
    ```
 
 This sub-step never adds a rule for an outward action (`git push`, `gh pr *`, any GitHub/ClickUp API write, any form of `gh api`). The read-only allowlist stays limited to inert inspection commands and the explicitly listed read-only integrations; the `Edit`/`Write`/`additionalDirectories` rules stay scoped strictly to the obsidian workspace base resolved in Step 3. Native host permissions and approvals remain the authority for outward actions.
@@ -307,35 +279,6 @@ Ask the operator whether to enable the english-learning correction mode. This mo
 - On `y`: persist `english_learning: true` to `~/.claude/.team-harness.json` via **merge-write-whole-document** — read the full JSON, replace or add only the `english_learning` key (set to `true`), write the whole document back. Never emit a partial payload — this preserves `logs-mode`, `logs-path`, `logs-subfolder`, `files`, `clickup`, and all other existing keys. Then ask a separate immersion question: `Also set English as the response language for immersion? [y/N]` (default: N). On `y`, additionally set `language: en` in the same merge-write. On `n`/Enter, leave `language` unchanged.
 - On `n`/Enter (declining the correction mode): if no prior `english_learning` key existed, omit the key entirely (absence of the key means mode OFF — matching the `language` omit-when-blank rule). If a prior value of `true` existed and the operator declines, write `english_learning: false` to clear it. Do NOT modify the `language` key on disable.
 
-### 3.7. Provision the subagent-nesting-depth prerequisite (gated)
-
-Full mechanism: `docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`. This step applies only the concrete values below — it does not restate the mechanism.
-
-1. **Already-present check.** Read `~/.claude/settings.json` (if present). If `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` already equals `"2"`, or a prior decline is already recorded at `nested_spawn_depth.declined` in `~/.claude/.team-harness.json`, skip to Step 4a with no prompt and no write — record the fact for the Step 7 summary row only.
-2. **Absent-value gate (reached only when the checks above are false AND the key is absent from `settings.json`).**
-   ```text
-   Provision Claude Code's subagent-nesting depth (env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH = "2")
-   in ~/.claude/settings.json? Without it, th:orchestrator cannot dispatch its own specialists and
-   falls back to a relayed dispatch instead.
-
-   This setting applies to every Claude Code session on this machine, on every project, not only
-   this pipeline, and persists until removed manually. It requires a session restart to take effect.
-
-   Write this value now? [y/N]
-   ```
-2a. **Present-but-different-value gate (reached only when the checks in Step 1 are false AND the key IS present with a value other than `"2"`).** A present-but-different value is a distinct case from "absent" — it is never silently folded into the absent-value gate above, and the write never proceeds on that gate's text alone.
-   ```text
-   ~/.claude/settings.json currently sets env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH = "{current-value}".
-   Team Harness recommends "2" so th:orchestrator can dispatch its own specialists directly; any
-   other value (including this one) falls back to a relayed dispatch instead.
-
-   Overwrite "{current-value}" with "2"? [y/N]
-   ```
-   On `n`/Enter here: record the same durable decline as Step 4 below (keeping a deliberately-different value is treated the same as declining "2") — never re-prompted once recorded.
-3. **On `y` (either gate):** merge-write-whole-document to `~/.claude/settings.json` — back up to `settings.json.bak` at `0o600` (skipped if the file does not exist). Read the target file: if it does not exist, start from `{}`; if it exists but fails to parse as JSON, **abort before writing** and report the corrupted-file failure by name — never fall back to `{}` for an existing-but-unparseable file, since that would silently discard any `permissions.*` rules already present. Otherwise set only `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` to `"2"`, write to a temp file at `0o600`, validate as JSON, rename atomically. Then re-read and re-parse: assert exactly one JSON path changed and that `permissions.allow`/`permissions.deny`/`permissions.additionalDirectories` are unchanged element-for-element; on any other delta, restore `.bak` and report the write as failed. Report: `Subagent nesting depth provisioned in ~/.claude/settings.json. Restart the session (or start a new one) for it to take effect.` Never state that it is already active in the current session.
-4. **On `n`/Enter (decline, either gate):** persist `nested_spawn_depth.declined: true` to `~/.claude/.team-harness.json` via merge-write-whole-document (preserving every other key). Do not write to `~/.claude/settings.json`. Continue to Step 4a. This decline is durable — neither this command nor `/th:update` re-offers it in a future run.
-5. **Never claim liveness.** No message in this step, on any branch, states or implies the value is active in the current session.
-
 ### 4a. Write orchestrator dispatch rule
 
 Read the canonical block from `managed-blocks/orchestrator-dispatch-rule.md` (resolved from the plugin cache: `~/.claude/plugins/cache/team-harness-marketplace/th/<highest-version>/skills/setup/managed-blocks/orchestrator-dispatch-rule.md`).
@@ -377,21 +320,6 @@ Use neutral, standard language that reads the same to a reader from any country.
 - Keep the tone declarative and professional; the reader's country should not be inferable from word choice.
 <!-- voice-rule:end -->
 
-### 4f. Configure flow telemetry opt-in
-
-Ask the operator whether to enable cross-user flow telemetry emission. When ON, the
-th:orchestrator emits metadata-only pipeline friction events (gate failures, guard blocks,
-iteration loops, etc.) to `context-harness-mcp` via the `record_flow_event` MCP tool for
-cross-fleet observability. Emission is always best-effort and non-blocking — it never affects
-the pipeline outcome. The default is OFF (opt-in, never on by surprise).
-
-- **Prompt:** `Enable flow telemetry? Sends metadata-only friction events to context-harness-mcp when the CH server is reachable. [y/N]` (default: N — off)
-- Show the current configured value from `~/.claude/.team-harness.json` `flow_telemetry.enabled` field (if present) as the default hint.
-- Accept `y` (enable) or `n`/Enter (disable / keep off).
-- On `y`: persist `flow_telemetry.enabled: true` to `~/.claude/.team-harness.json` via **merge-write-whole-document** — read the full JSON, replace or add only the `flow_telemetry.enabled` key (boolean `true`), write the whole document back. Never emit a partial payload.
-- On `n`/Enter: if no prior `flow_telemetry.enabled` key existed, omit the key entirely (absence = OFF). If a prior value of `true` existed and the operator declines, write `flow_telemetry.enabled: false`.
-- The key is namespaced under `flow_telemetry` as a nested object: `{"flow_telemetry": {"enabled": true}}`.
-
 ### 5. Write manifest
 
 Write `~/.claude/.team-harness.json` with:
@@ -404,26 +332,21 @@ Write `~/.claude/.team-harness.json` with:
   "logs-path": "<vault path or empty>",
   "logs-subfolder": "<subfolder or empty>",
   "language": "<ISO 639-1 code, e.g. 'en' or 'es'; omit key if not configured>",
-  "english_learning": "<true|false; omit key if not configured>",
-  "flow_telemetry": {"enabled": false}
+  "english_learning": "<true|false; omit key if not configured>"
 }
 ```
 
-Preserve ALL existing unrelated fields (like `files`, `clickup`, `github`, `nested_lane_capability`, and `nested_spawn_depth`) if the manifest already exists. Legacy route/profile selectors are not active settings: report `1 — inline` / `2 — pipeline` when present and remove only those legacy keys during this legitimate manifest write. Use the **merge-write-whole-document** contract: read the full JSON, replace or add only the keys this step owns (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, and optionally `language`, and optionally `english_learning`, and optionally `flow_telemetry.enabled`), write the whole document back. NEVER emit a partial payload — that would destroy unrelated operator-configured keys.
+Preserve ALL existing unrelated fields (like `files`, `clickup`, `github`, and legacy MCP or capability settings) if the manifest already exists. Legacy route/profile selectors are not active settings: report `1 — inline` / `2 — pipeline` when present and remove only those legacy keys during this legitimate manifest write. Use the **merge-write-whole-document** contract: read the full JSON, replace or add only the keys this step owns (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, and optionally `language` and `english_learning`), write the whole document back. NEVER emit a partial payload — that would destroy unrelated operator-configured keys.
 
 The `language` key is written only when the operator provided a value in Step 3.5; if they left it blank and no prior value existed, omit the key entirely (absence of the key means detection-based behavior, which is the default).
 
 The `english_learning` key is written only when the operator answered in Step 3.6; if they declined and no prior value existed, omit the key entirely (absence of the key means mode OFF, which is the default).
 
-The `flow_telemetry.enabled` key defaults to `false` (opt-in). When absent from an existing manifest, treat it as `false` — do not emit telemetry until the operator explicitly opts in via Step 4f or `/th:setup flow-telemetry`.
-
 ### 6. Verify connectivity
 
-**On a targeted run, runs only when the target is `memory` or `context7`.** Skip for all other targeted concerns (workspace, language, english-learning, clickup, obsidian-tasks, python/deps).
+**On a targeted run, runs only when the target is `context7`.** Skip for all other targeted concerns (workspace, language, english-learning, clickup, obsidian-tasks, python/deps).
 
-Test each MCP server:
-- **Memory:** call `mcp__memory__read_graph` (or equivalent). Report success or failure.
-- **context7:** call `mcp__context7__resolve-library-id` with a test query like `react`. Report success or failure.
+When Context7 was explicitly configured, call `mcp__context7__resolve-library-id` with a test query like `react`. Report success or failure.
 
 If a server fails, show the error and suggest troubleshooting steps (check URL, check API key, check network).
 
@@ -499,10 +422,8 @@ Display a structured summary:
 ```
 Team Harness setup complete.
 
-  Memory MCP:  connected (https://your-mcp.example.com/mcp)
-  context7:    connected (API key: ****...abcd)
+  context7:    connected (API key: ****...abcd) | not configured | unchanged
   Workspaces:  obsidian (D:\vault\Work\work-logs)
-  Nesting:     provisioned (restart required) | already provisioned | declined
   Agents:      22 registered
   Skills:      38 available
 
@@ -515,8 +436,8 @@ Team Harness setup complete.
 This skill can be run multiple times safely. Each run:
 - Shows current config values as defaults
 - Only writes files that changed
-- Backs up `~/.claude.json` before every write
-- Never deletes existing MCP server entries (only adds or updates memory + context7)
+  - Backs up `~/.claude.json` before an explicit Context7 write
+  - Preserves every existing MCP server entry and credential; Context7 is the only MCP this flow may configure
 
 ---
 

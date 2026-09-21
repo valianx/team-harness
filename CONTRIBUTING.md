@@ -1,7 +1,7 @@
 # Contributing to Team Harness
 
-Thanks for your interest in contributing. Team Harness is an open-source,
-multi-runtime agent harness for Claude Code, Codex, and opencode. This guide
+Team Harness provides shared development workflows for the native agents of
+Claude Code, Codex, and OpenCode. This guide
 covers how to propose a change. The **binding rules** for any change live in
 [`CLAUDE.md` §6 — Mandatory Working Agreements](./CLAUDE.md#6-mandatory-working-agreements);
 this document summarizes them and shows you the contribution flow.
@@ -48,12 +48,11 @@ These are the floor for every change. The full, authoritative text is in
 [`CLAUDE.md` §6](./CLAUDE.md#6-mandatory-working-agreements) — this is a summary,
 not a second source of truth.
 
-- **Branch naming:** `feat/`, `fix/`, `chore/`, `docs/`, or `refactor/` + `<kebab>`. Never commit on `main`.
+- **Branch naming:** use a task branch, including the native host's `codex/` prefix or the repository's `feat/`, `fix/`, `chore/`, `docs/`, `refactor/` conventions.
 - **Conventional commits:** `feat(area): …`, `fix(area): …`, `docs(area): …`, etc.
 - **Never push to `main`** — every change ships via pull request.
-- **Changelog fragment:** add `changelog.d/{slug}.md` (a Keep-a-Changelog block —
-  `### Added` / `### Changed` / `### Fixed` / `### Security`). One file per PR; the
-  delivery step assembles them at release. Do not edit `## [Unreleased]` inline.
+- **Changelog:** write the versioned section in the implementation PR. Fragments
+  remain available for explicitly grouped release batches.
 - **Distributed-asset version bump:** if your change touches `agents/`, `skills/`,
   `hooks/`, or another distributed runtime input, you MUST bump the shared
   version across the four sites documented in
@@ -75,14 +74,14 @@ adapters. Do not assume that editing one agent prompt updates every runtime.
 
 | Change | Shared or canonical source | What Codex receives |
 |---|---|---|
-| Model or effort for any canonical Team Harness agent | Frontmatter in its `agents/{role}.md` | The generator updates the complete comparison roster. For the ten installed Codex specialists it also rewrites the generated TOML. |
-| Semantic behavior for one of those ten specialists | The matching `agents/{role}.md` role contract | Review and, when necessary, update `runtime/codex/instructions/{role}.md`; Codex adapters are concise and the generator does not translate the full Claude prompt body. |
-| Any other Claude agent | Its file under `agents/` | Nothing automatically. Codex ships only the ten roles registered in `runtime/schema/codex-agents.json`. |
+| Model or effort for any canonical Team Harness agent | Frontmatter in its `agents/{role}.md` | The generator updates the comparison roster and the registered installed roles' TOML. |
+| Semantic behavior for an installed specialist | The matching `agents/{role}.md` | Update the corresponding `runtime/codex/instructions/{role}.md`; generation does not translate the full role body. |
+| Other canonical agent | Its file under `agents/` | The current installed roster is defined by `runtime/schema/codex-agents.json`. |
 | Orchestrator, intake, pipeline, or workflow behavior | Claude's `agents/orchestrator.md`, pipeline references, and relevant root `skills/` | Update the corresponding Codex plugin skill under `plugins/team-harness/skills/` (`init`, `pipeline`, or another explicit adapter). |
-| General skill behavior | The relevant root `skills/{name}/SKILL.md` | Nothing automatically unless the capability has a Codex plugin counterpart; update that counterpart deliberately. |
+| General skill behavior | The relevant root `skills/{name}/SKILL.md` | Run `sync-skills.mjs` to distribute canonical resources; update authored runtime overrides when needed. |
 | Hook policy | Shared TypeScript bodies where applicable, plus runtime entrypoints | Build the TypeScript hooks, sync the plugin bundle, and validate the runtime-specific manifest. Codex's native sandbox and approval semantics remain authoritative. |
 
-After changing any canonical agent's model/effort, one of the ten installed
+After changing any canonical agent's model/effort, an installed
 role contracts, its Codex adapter, or the Codex registry, run
 `$sync-codex-agents` in Codex, or run the equivalent commands:
 

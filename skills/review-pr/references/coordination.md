@@ -2,7 +2,7 @@
 
 The default is one `general` reviewer. PR size alone never adds reviewers.
 
-Run the local selector before adding specialist agents:
+Run the local selector when its risk context will help Main choose reviewers:
 
 ```bash
 python3 "$REVIEW_CONTEXT_HELPER" select-security \
@@ -10,17 +10,19 @@ python3 "$REVIEW_CONTEXT_HELPER" select-security \
   {--explicit-security when requested} {--tier 4 when supplied}
 ```
 
-The selector returns `security_required` with its `reason` and triggers: omitted only for
-`known-non-executable` or `indeterminate`; required for `known-sensitive`, `unmatched-executable`,
-an explicit request, or Tier 4. Indeterminate alone is not a security trigger or evidence of
-safety. A missing selector or unreadable required artifact prevents a trustworthy review and
-fails closed. NUL-bearing text or a changed-file list inconsistent with an empty diff is an
-invalid capture, not a classification waiver. State the resolved `reason` in the preview whenever security is omitted.
+The selector returns an advisory `security_recommended` signal with its `reason` and triggers.
+It never adds a reviewer or creates an approval decision. An explicit `--reviewers security`
+selection remains authoritative; legacy Tier 4 input may be reported as a recommendation but
+does not force a lens. Indeterminate is neither a safety claim nor a blocker by itself. A missing
+selector or unreadable artifact limits only the recommendation; the captured review artifacts
+remain the source for Main's evidence. NUL-bearing text or a changed-file list inconsistent with
+an empty diff is still an invalid capture. State the resolved reason as context when it helps the
+operator understand Main's lens choice.
 
 Keep coverage obligations fixed: **QA** when a pipeline workspace with acceptance criteria exists
-and the diff changes executable behavior; **security** when the selector requires it; and every
-explicit `--reviewers`/`--multi` focus. Main may partition or add focused reviewer passes when
-independent risks or dependency boundaries justify them. File count alone does not.
+and the diff changes executable behavior; every explicit `--reviewers`/`--multi` focus; and any
+additional focused pass Main selects for an evidenced risk or dependency boundary. A selector
+recommendation alone does not create a coverage obligation. File count alone does not.
 Record a short coverage map: obligation, assigned reviewer, relevant paths/dependencies and why
 parallel or sequential. Keep one general reviewer responsible for cross-component interactions;
 do not leave contracts between partitions unowned. Respect native concurrency and configured

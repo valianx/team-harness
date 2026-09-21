@@ -10,9 +10,10 @@ import (
 	"charm.land/huh/v2"
 )
 
-// opencodeSetupValues holds the values collected during opencode interactive
-// setup. Only Memory MCP and context7 are configurable interactively — all
-// other keys are set to their defaults.
+// opencodeSetupValues holds the values collected during opencode setup.
+// Context7 can be enabled from the native form; knowledge-graph registration
+// is available only through an explicit flag/environment value. Existing MCP
+// entries remain untouched when no explicit value is supplied.
 //
 // No secret values are stored here — the Memory bearer and context7 key are
 // NEVER captured for persistence (SEC-OC-R1).
@@ -27,8 +28,8 @@ type opencodeSetupValues struct {
 	// (#424): "" means the model-less baseline (unchanged default); a curated
 	// provider name (e.g. "anthropic") means the transform bakes a concrete
 	// model: id per agent. Resolved by resolveActiveTierProvider — NOT a huh
-	// form field (the interactive setup form is intentionally capped at the
-	// Memory MCP + context7 groups; see TestBuildOpencodeSetupGroups_GroupCountIsInRange).
+	// form field (the interactive setup form exposes only the independent
+	// context7 choice; see TestBuildOpencodeSetupGroups_GroupCountIsInRange).
 	CostTierProvider string
 }
 
@@ -43,7 +44,8 @@ type opencodeMCPValues struct {
 }
 
 // opencodeSetupFormData holds huh pointer bindings for the trimmed interactive
-// opencode setup form. Only Memory MCP and context7 fields remain (AC-2).
+// opencode setup form. Memory fields remain as compatibility data for explicit
+// --memory-url/MEMORY_MCP_URL callers; they are never rendered as a prompt.
 type opencodeSetupFormData struct {
 	// P3 import confirm (shown only when an existing config is detected).
 	importExisting bool
@@ -58,7 +60,8 @@ type opencodeSetupFormData struct {
 }
 
 // collectOpencodeSetupInteractive presents the trimmed .team-harness.json
-// setup form (Memory MCP + context7 only) and returns the collected values.
+// setup form (context7 only) and returns the collected values. Memory/KG MCP
+// registration is opt-in through --memory-url or MEMORY_MCP_URL.
 //
 // When cand is non-nil (P3 detected a pre-existing config from either the
 // opencode-owned path or the Claude Code fallback path), a STANDALONE PRE-FORM
@@ -79,6 +82,7 @@ func collectOpencodeSetupInteractive(cand *importCandidate, importSource string)
 		memoryRequiresAuth: false,
 		configureContext7:  false,
 	}
+	seedExplicitMemoryURL(data)
 
 	// Pre-form import decision: runs BEFORE the main form so that on accept the
 	// flow can short-circuit straight to write+register (AC-4).
@@ -143,7 +147,7 @@ func collectOpencodeSetupInteractive(cand *importCandidate, importSource string)
 }
 
 // collectOpencodeSetupInteractivePreFilled is identical to
-// collectOpencodeSetupInteractive but pre-fills data.memoryURL with initialURL
+// collectOpencodeSetupInteractive but accepts an explicit initialURL
 // (and flips data.configureMCP = true) and, when initialContext7Enabled is true,
 // flips data.configureContext7 = true before building the form groups.
 //
@@ -164,6 +168,7 @@ func collectOpencodeSetupInteractivePreFilled(cand *importCandidate, importSourc
 		memoryRequiresAuth: false,
 		configureContext7:  false,
 	}
+	seedExplicitMemoryURL(data)
 
 	// Inject the resolved URL before the import confirm so that, if the operator
 	// chooses "Start fresh", the URL is still pre-populated.
@@ -292,70 +297,21 @@ func importSourceNote(importSource string) string {
 		"Choose Start fresh to begin with default values."
 }
 
-// buildOpencodeSetupGroups assembles all huh form groups for the trimmed opencode
-// setup flow: Memory MCP (confirm + URL + auth + bearer note) and context7 only.
+// buildOpencodeSetupGroups assembles the huh form groups for the trimmed
+// opencode setup flow. Context7 is independent and can be selected here;
+// Memory/KG configuration is intentionally absent from the normal form and is
+// available only through an explicit flag or environment value.
 //
-// The five groups removed by AC-2 are: Agent Output Location, Language,
-// English-Learning, ClickUp, Obsidian Tasks. The final "Write configuration?"
-// confirm is also removed (AC-3 — config is written directly after form.Run()).
+// The prior setup-only groups (agent output location, language,
+// English-Learning, ClickUp, Obsidian Tasks, and the final write confirmation)
+// remain absent; config is written directly after form.Run().
 //
 // The import-confirm group is collected by a standalone pre-form confirm in
 // collectOpencodeSetupInteractive BEFORE this function is called.
 func buildOpencodeSetupGroups(data *opencodeSetupFormData) []*huh.Group {
 	var groups []*huh.Group
 
-	// ── Group 4: Memory MCP ───────────────────────────────────────────────────
-	memURLField := huh.NewInput().
-		Value(&data.memoryURL).
-		Title("Memory MCP URL").
-		Description("Paste the bare URL (https://...) or a full JSON snippet (starts with '{').").
-		Placeholder("https://your-mcp.example.com/mcp").
-		Validate(func(v string) error {
-			v = strings.TrimSpace(v)
-			if v == "" {
-				return fmt.Errorf("URL is required — no default URL exists")
-			}
-			if strings.HasPrefix(v, "{") {
-				return nil // JSON snippet: passes form; handled after Run()
-			}
-			return validateMCPURL(v)
-		})
-
-	groups = append(groups,
-		huh.NewGroup(
-			huh.NewNote().
-				Title("Memory MCP").
-				Description("The Memory MCP is an external server that provides knowledge-graph\nmemory for the agents. Only the URL is configured here — the bearer\ntoken (if required) stays in your shell environment.\n\nRegister it now (optional — re-run the install to add it later)."),
-			huh.NewConfirm().
-				Value(&data.configureMCP).
-				Title("Configure Memory MCP now?").
-				Affirmative("Yes").
-				Negative("Skip"),
-		).Title("Memory MCP"),
-
-		huh.NewGroup(
-			memURLField,
-		).Title("Memory MCP URL").
-			WithHideFunc(func() bool { return !data.configureMCP }),
-
-		huh.NewGroup(
-			huh.NewConfirm().
-				Value(&data.memoryRequiresAuth).
-				Title("Does this Memory MCP server require authentication?").
-				Affirmative("Yes — it requires a bearer token").
-				Negative("No — unauthenticated"),
-		).Title("Memory MCP Auth").
-			WithHideFunc(func() bool { return !data.configureMCP }),
-
-		huh.NewGroup(
-			huh.NewNote().
-				Title("Bearer token required").
-				Description("The bearer token is NEVER captured by this installer.\nopencode resolves it at runtime from your shell environment.\n\nExport it before launching opencode:\n\n  export MEMORY_MCP_BEARER=<your-token>\n\nYou can also add it to your shell profile (~/.bashrc, ~/.zshrc, etc.)."),
-		).Title("Memory MCP Bearer").
-			WithHideFunc(func() bool { return !data.configureMCP || !data.memoryRequiresAuth }),
-	)
-
-	// ── Group 5: context7 ─────────────────────────────────────────────────────
+	// Context7 is an independent, explicitly selected integration.
 	groups = append(groups,
 		huh.NewGroup(
 			huh.NewNote().
@@ -370,6 +326,20 @@ func buildOpencodeSetupGroups(data *opencodeSetupFormData) []*huh.Group {
 	)
 
 	return groups
+}
+
+// seedExplicitMemoryURL carries an operator-supplied knowledge-graph URL into
+// the interactive path without turning it into a setup offer. Existing MCP
+// entries are preserved by registerOpencodeMCPFromValues when this returns no
+// value.
+func seedExplicitMemoryURL(data *opencodeSetupFormData) {
+	url := resolveMemoryURLWithCCFallback("")
+	if url == "" {
+		return
+	}
+	data.memoryURL = url
+	data.configureMCP = true
+	data.memoryRequiresAuth = strings.TrimSpace(os.Getenv("MEMORY_MCP_BEARER")) != ""
 }
 
 // buildOpencodeSetupValues converts the raw form data into the typed

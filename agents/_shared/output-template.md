@@ -1,23 +1,15 @@
-# Specialist result envelope (v5)
+# Specialist result
 
-Every pipeline role returns exactly one closed `result_envelope` through its
-native terminal-result channel. It contains schema version, result and lease
-identities, `progress|completed|blocked|failed` status, changed/evidence paths,
-artifact references, commits, structured findings, closure evidence, bounded
-diagnostics, next-prerequisite facts, observed control-log sequence, and context
-identity.
+Return outcome, changed files or inspected scope, checks and results, concrete
+findings, artifact paths and material limits through native transport. Findings
+explain evidence, impact and suggested corrections; suggestions are not orders.
 
-Findings use the closed classes `acceptance|correctness|quality|security|scope`,
-severities `info|low|medium|high|critical`, and states
-`open|resolved|accepted`. Paths are relative, contained, non-symlink, bounded,
-and bound to the active lease. Secret-shaped or unknown fields are invalid.
-
-Main validates provenance, immutable inputs, current sequence, terminal identity,
-and path scope. It appends one idempotent `result_accepted` event before it
-projects commits, findings, evidence, or prerequisites. Specialists never choose
-pipeline phase, Gate, peer, recovery route, or acceptance.
+Main checks actual changes and evidence, consolidates recommendations and
+updates progress. A clear report needs no TH envelope or log sequence.
+Historical structured returns remain readable.
 
 ## Output Discipline
 
-Keep narrative copies of authority or scope, raw command logs and secret-shaped
-diagnostics out of the envelope.
+Keep raw logs and scratch scripts in permitted temporary storage or the selected
+workspace. Retain only maintained product documentation and reusable fixtures
+in the repository. Never expose secrets or duplicate whole task documents.

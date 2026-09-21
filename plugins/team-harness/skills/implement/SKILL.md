@@ -1,17 +1,21 @@
 ---
 name: implement
-description: Continue implementation of an explicitly activated and Stage-Gate-1-approved Team Harness pipeline. This skill does not activate the pipeline; without active Team Harness state, implement directly with normal Codex behavior.
+description: Implement approved work with focused verification.
 ---
 
 # Implement
 
-Locate state whose `activation` is `explicit`. If none exists, do not create
-pipeline state or gates; read `../init/references/configuration.md`, resolve the
-persistent settings, and continue the user's ordinary Codex implementation.
+Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
+its configured local or Obsidian mode. Main coordinates with native tools and
+permissions. Reuse authorization for unchanged work and ask only for a missing
+decision. Specialists provide evidence and recommendations; Main judges them.
 
-For an active pipeline, read
-`../pipeline/references/state-and-gates.md` and
-`../pipeline/references/implementation.md`. Require the dual-record Gate 1
-release, execute approved dependency rounds, and leave validation to the
-validation phase. The primary thread remains the state owner and never delegates
-gate approval.
+Read the existing objective and relevant OpenSpec tasks. Main may implement or
+delegate independent bounded tasks with explicit ownership. Preserve other
+writers' edits, serialize overlapping changes and Git mutations, and run
+appropriate checks. Report changes, results and material limits to the shared
+workspace. This entry does not automatically activate a pipeline.
+
+Use Codex's native agent and task tools. Never require a Claude executable or
+configuration. In an active pipeline, read the matching phase reference under
+`../pipeline/references/` only as needed.

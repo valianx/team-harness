@@ -6,6 +6,55 @@ REM Canonical install: /plugin marketplace add valianx/team-harness && /plugin i
 REM See bin/README.md for details.
 setlocal enableextensions
 
+REM Claude Code is installed from its native marketplace. Download the binary
+REM only when a native-engine subcommand was requested explicitly. The manifest
+REM dispatcher accepts supported flags before the subcommand, for example
+REM --runtime codex apply.
+set "FORWARD_ARGS=%*"
+
+:inspect_args
+if "%~1"=="" goto :native_notice
+set "CURRENT_ARG=%~1"
+if /i "%~1"=="plan" goto :download
+if /i "%~1"=="apply" goto :download
+if /i "%~1"=="update" goto :download
+if /i "%~1"=="uninstall" goto :download
+if /i "%~1"=="--runtime" goto :skip_value
+if /i "%~1"=="--scope" goto :skip_value
+if /i "%~1"=="--opencode-dir" goto :skip_value
+if /i "%~1"=="--codex-dir" goto :skip_value
+if /i "%~1"=="--memory-url" goto :skip_value
+if /i "%~1"=="--opencode-tier" goto :skip_value
+if /i "%~1"=="--force" goto :next_arg
+if /i "%~1"=="--non-interactive" goto :next_arg
+if /i "%~1"=="--yes" goto :next_arg
+if /i "%CURRENT_ARG:~0,10%"=="--runtime=" goto :next_arg
+if /i "%CURRENT_ARG:~0,8%"=="--scope=" goto :next_arg
+if /i "%CURRENT_ARG:~0,14%"=="--opencode-dir=" goto :next_arg
+if /i "%CURRENT_ARG:~0,11%"=="--codex-dir=" goto :next_arg
+if /i "%CURRENT_ARG:~0,13%"=="--memory-url=" goto :next_arg
+if /i "%CURRENT_ARG:~0,15%"=="--opencode-tier=" goto :next_arg
+goto :native_notice
+
+:skip_value
+shift
+if "%~1"=="" goto :native_notice
+
+:next_arg
+shift
+goto :inspect_args
+
+:native_notice
+echo Claude Code installation is native:
+echo   /plugin marketplace add valianx/team-harness
+echo   /plugin install th
+echo   /th:setup
+echo.
+echo For opencode or Codex, pass an explicit subcommand (plan, apply, update, or uninstall).
+exit /b 0
+
+:download
+
 set REPO=valianx/team-harness
 set BASE_URL=https://github.com/%REPO%/releases/latest/download
 

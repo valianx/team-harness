@@ -7,6 +7,44 @@
 # See bin/README.md for details.
 set -eu
 
+# Claude Code is installed from its native marketplace. Download the binary
+# only when a native-engine subcommand was requested explicitly. The manifest
+# dispatcher accepts supported flags before the subcommand, for example
+# `--runtime codex apply`; inspect those flags before deciding whether this
+# bootstrap should download anything.
+has_subcommand=false
+expect_value=false
+for arg in "$@"; do
+    if [ "$expect_value" = true ]; then
+        expect_value=false
+        continue
+    fi
+    case "$arg" in
+        plan|apply|update|uninstall)
+            has_subcommand=true
+            break
+            ;;
+        --runtime|--scope|--opencode-dir|--codex-dir|--memory-url|--opencode-tier)
+            expect_value=true
+            ;;
+        --runtime=*|--scope=*|--opencode-dir=*|--codex-dir=*|--memory-url=*|--opencode-tier=*|--force|--non-interactive|--yes)
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+if [ "$has_subcommand" != true ]; then
+        echo "Claude Code installation is native:"
+        echo "  /plugin marketplace add valianx/team-harness"
+        echo "  /plugin install th"
+        echo "  /th:setup"
+        echo
+        echo "For opencode or Codex, pass an explicit subcommand (plan, apply, update, or uninstall)."
+        exit 0
+fi
+
 REPO="valianx/team-harness"
 BASE_URL="https://github.com/${REPO}/releases/latest/download"
 

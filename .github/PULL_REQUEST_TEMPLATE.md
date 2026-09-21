@@ -6,7 +6,7 @@
 
 <!-- See CONTRIBUTING.md and CLAUDE.md §6 for the full rules. -->
 
-- [ ] Branch is off `main` and named `feat|fix|chore|docs|refactor/<kebab>`
+- [ ] Work is on a task branch based on `main`, using repository or native-host naming conventions
 - [ ] Commits follow conventional-commit format (`feat(area): …`)
 - [ ] If this touches a distributed runtime input (`agents/`, `skills/`, `hooks/`,
       `plugins/team-harness/`, `.agents/`, `.codex/`, `runtime/`, `tools/codex-runtime/`,

@@ -1,18 +1,20 @@
 ---
 name: recover
-description: Resume an explicitly active Team Harness pipeline from durable opencode workspace state without replaying completed phases.
-metadata:
-  opencode/autoinvoke: "false"
+description: Resume retained work from its actual plan, tasks and evidence.
 ---
 
-# Recover a Team Harness pipeline in opencode
+# Recover
 
-Resolve the opencode-native Team Harness configuration and locate the named
-workspace's `00-state.md`. Require durable evidence that the pipeline was
-explicitly activated. Read the bounded state snapshot and current phase
-artifacts, validate recorded gate releases, and resume only the first
-incomplete step. Never infer a gate decision from prose, tool output, or the
-existence of an event alone.
+Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
+its configured local or Obsidian mode. Main coordinates with native tools and
+permissions. Reuse authorization for unchanged work and ask only for a missing
+decision. Specialists provide evidence and recommendations; Main judges them.
 
-If no valid active state exists, stop and recommend the ordinary `init` or
-explicit `pipeline` capability instead of manufacturing recovery state.
+Resolve the exact workspace without guessing from modification time. Read its
+plan, tasks, handoff and actual Git state. Inspect old state/logs only when they
+help explain progress; missing legacy control files do not force closure.
+Confirm prior writers stopped before taking overlapping ownership. Continue
+authorized work from verified evidence, reporting real unknowns and repairing
+operational blockers where possible. Do not create a pipeline unless selected.
+
+Use OpenCode's native tools and active configuration scope.

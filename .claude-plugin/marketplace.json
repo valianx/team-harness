@@ -1,7 +1,7 @@
 {
   "name": "team-harness-marketplace",
   "version": "1.1.0",
-  "description": "Official marketplace for the Team Harness orchestration system",
+  "description": "Official marketplace for Team Harness development workflows",
   "owner": {
     "name": "Mario Gutierrez"
   },
@@ -10,8 +10,8 @@
       "name": "th",
       "displayName": "Team Harness",
       "source": {"source": "github", "repo": "valianx/team-harness"},
-      "description": "Complete shared Team Harness skill catalog and gated multi-agent workflows for Claude Code, Codex, and opencode",
-      "version": "3.34.0",
+      "description": "Shared skills and development workflows for the native agents of Claude Code, Codex, and OpenCode",
+      "version": "3.35.0",
       "category": "development",
       "tags": ["orchestration", "agents", "workflow", "diagrams", "gcp"],
       "author": {

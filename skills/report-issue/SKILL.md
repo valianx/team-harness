@@ -32,7 +32,7 @@ Ejemplos:
   /th:report-issue bug "The /th:pipelines command does not show the status when..."
   /th:report-issue feature "Add support for reporting security issues"
   /th:report-issue docs "The gh-fallback.md documentation does not mention case X"
-  /th:report-issue question "How is the Memory MCP configured in a Docker-less environment?"
+  /th:report-issue question "How is an MCP integration configured in a Docker-less environment?"
 ```
 
 Then stop. Do not proceed.
@@ -74,17 +74,19 @@ name: report-issue
 
 Read the following environment data. All reads are silent (no intermediate chat output).
 
-**th plugin version:**
+**Team Harness version:**
 ```bash
-# Read from .claude-plugin/plugin.json in the team-harness repo root
-# If the file is not accessible from the current working directory, try
-# ~/.claude/plugins/cache/team-harness-marketplace/th/*/plugin.json (highest version)
-# Fall back to "unknown" if not found.
+# Read the installed native-runtime manifest for the active host. If no
+# manifest is available in the current repository or native cache, report
+# "unknown"; never assume a Claude Code path for Codex or OpenCode.
 ```
 
-**Claude Code version:**
+**Native runtime diagnosis:**
 ```bash
-claude --version 2>/dev/null || echo "unknown"
+# Use the runtime supplied by the active host when available. Otherwise check
+# only the installed native commands and record the first matching runtime:
+#   codex --version, opencode --version, or claude --version
+# Report both the runtime name and version; use "unknown" when unavailable.
 ```
 
 **OS / platform:** detect from `$OSTYPE`, `uname -s`, or the shell environment. Report as `Windows`, `macOS`, or `Linux`.
@@ -114,7 +116,8 @@ Examples:
 | Field | Value |
 |-------|-------|
 | th version | {th_version} |
-| Claude Code | {claude_version} |
+| Native runtime | {runtime} |
+| Runtime version | {runtime_version} |
 | OS | {os} |
 
 {# [bug block — include only when type=bug] }

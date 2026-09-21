@@ -34,70 +34,63 @@ The Claude Code plugin is the canonical install path. Run the following three co
 /th:setup
 ```
 
-`/th:setup` configures the two required MCP servers (Memory and context7) and sets your **logs mode** (local `./workspaces/` or an Obsidian vault). After setup, restart Claude Code to pick up the new agents and skills.
+`/th:setup` configures your **logs mode** (local `./workspaces/` or an Obsidian vault), native preferences, and the managed instruction block. Context7 remains an optional, explicit MCP integration. Existing MCP registrations and credentials are preserved; setup does not provision Memory or Context Harness. Activate changed plugin assets with `/reload-plugins` when the host supports it, and reconnect only when the host reports that reload cannot activate them.
 
 ---
 
-## Legacy installer (contributors / offline / CI)
+## Native-runtime installer (contributors / offline / CI)
 
-> **Note:** The Go binary installer is the legacy install path as of v2.33.0. It remains functional for offline environments, CI pipelines, and operators who require `low-cost` mode (the plugin cannot transform frontmatter on install). End-users installing for the first time should use the plugin path above.
+The Go binary installs agents and skills for OpenCode or Codex through explicit
+subcommands. Claude Code uses the marketplace path above. The bootstrap scripts
+`bin/install.sh`, `bin/install.ps1`, and `bin/install.cmd` print the native
+Claude Code commands and exit without downloading when called with no
+subcommand. They download and forward arguments only for `plan`, `apply`,
+`update`, or `uninstall`.
 
-The bootstrap scripts detect your OS and architecture, download the latest released binary from GitHub Releases, and run it. Agents, skills, and hooks are embedded in the binary (no separate downloads) and written directly to `~/.claude/`.
+Examples:
 
-See [`bin/README.md`](../bin/README.md) for the full legacy bootstrap documentation.
+```text
+install apply --runtime opencode --scope global
+install apply --runtime codex --scope project
+install update --runtime opencode --scope global --non-interactive
+```
 
-After install, **restart Claude Code** to pick up the new agents and MCP servers.
+See [`bin/README.md`](../bin/README.md) for bootstrap details. Native host
+activation determines whether a reload or reconnect is needed.
 
 ---
 
-### What the installer asks
+### Native-runtime configuration
 
-On an interactive terminal, the installer walks through three prompts in order:
-
-1. **Memory MCP URL** — paste the public URL of your Knowledge Graph MCP server (typically [`context-harness-mcp`](https://github.com/valianx/context-harness-mcp) deployed to Railway, Render, Fly, your own server, or any Docker host). There is **no default URL** — paste your URL or the full JSON snippet from your `context-harness-mcp /dashboard`.
-2. **context7 API key** — for library docs retrieval. Get one at [context7.com](https://context7.com/). Preserved from a prior install if already configured.
-3. **Install mode** — `[s] standard` (default) or `[l] low-cost`. Press Enter to accept standard.
+The installer applies the selected manifest and preserves existing native
+configuration. Context7 can be configured explicitly with the runtime's native
+MCP command and `CONTEXT7_API_KEY`; Team Harness does not ask for or copy
+Memory or Context Harness credentials. Workspace, language, voice, and native
+permission settings remain operator-owned.
 
 ---
 
-### Install modes
+### Native model selection
 
-| Mode | Who it's for | What changes |
-|---|---|---|
-| `standard` (default) | Operators on Max / Team plans | Agent files copied byte-identical; canonical quality contract |
-| `low-cost` | Operators on Free / Pro / tight personal budget | Rewrites agent `model:` / `effort:` frontmatter in-flight; all agents run on `sonnet` |
-
-Low-cost trades documented quality for lower API cost. Standard is the default precisely because Max / Team operators should stay there. See [`agents/README.md §"Low-cost mode"`](../agents/README.md#low-cost-mode) for the full matrix and trade-off analysis.
+Team Harness does not select an installation tier or rewrite agent model metadata.
+Choose the model and reasoning effort with the active runtime's native controls;
+Codex's role projection and ephemeral model override are documented in the
+[Codex runtime guide](./codex-runtime.md#roles-and-model-projection). Claude Code
+and OpenCode continue to use their own native model and approval settings.
 
 ### Non-interactive install (CI / scripts)
 
-Set env vars instead of prompting:
+Pass the native subcommand and runtime explicitly. The binary keeps native
+configuration separate and does not require Memory or Context Harness values.
 
 ```bash
-MEMORY_MCP_URL=https://your-mcp.example.com/mcp \
-CONTEXT7_API_KEY=ctx7sk-... \
-INSTALL_MODE=standard \
-curl -fsSL https://valianx.github.io/team-harness/install.sh | bash
+install apply --runtime opencode --scope global --non-interactive
+install update --runtime codex --scope project --non-interactive
 ```
 
-| Env var | Required? | Notes |
-|---|---|---|
-| `MEMORY_MCP_URL` | Yes (for fresh install) | Preserved from existing `~/.claude.json` if already set |
-| `MEMORY_MCP_BEARER` | Optional | JWT for authenticated MCPs |
-| `CONTEXT7_API_KEY` | Recommended | Empty = context7 features disabled |
-| `INSTALL_MODE` | Optional | `standard` (default) or `low-cost` |
-
----
-
-### Reset MCP config
-
-Pass `--force` to reset existing `mcpServers` entries in `~/.claude.json` (bypass the Keep/Change preservation menu):
-
-```bash
-curl -fsSL https://valianx.github.io/team-harness/install.sh | bash -s -- --force
-```
-
-The installer always overwrites agents, skills, and hooks in `~/.claude/`. Customizations made directly to those files will be replaced on every install. To customize, fork the repo and re-deploy. Operator-specific identity (`mcpServers.memory` URL, context7 API key) keeps its existing Keep/Change preservation logic.
+`CONTEXT7_API_KEY` is read only when Context7 is explicitly configured by the
+native runtime. Existing MCP registrations, credentials, and permission
+settings are preserved.
 
 ---
 
@@ -106,10 +99,15 @@ The installer always overwrites agents, skills, and hooks in `~/.claude/`. Custo
 ```bash
 git clone https://github.com/valianx/team-harness.git
 cd team-harness
-go run ./cmd/install
+go run ./cmd/install apply --runtime opencode --scope global
 ```
 
-`go run ./cmd/install` builds from local source. The `//go:embed` directive snapshots `agents/`, `skills/`, and `hooks/` at compile time, so the binary reflects your working tree exactly. The bootstrap scripts (`./bin/install.sh` / `.\bin\install.ps1`) always download the released binary — they don't use the local clone.
+`go run ./cmd/install` builds from local source. With no subcommand it prints
+the native Claude marketplace path; pass `apply`, `plan`, `update`, or
+`uninstall` with `--runtime opencode|codex` for a native engine. The
+`//go:embed` directive snapshots `agents/`, `skills/`, and `hooks/` at compile
+time, so the binary reflects your working tree exactly. The bootstrap scripts
+always download the released binary — they do not use the local clone.
 
 ---
 
@@ -152,14 +150,14 @@ After install, the native general agent discovers TH skills and coordinates the 
 
 1. **Refresh the catalog** — `claude plugin marketplace update team-harness-marketplace` (updates marketplace metadata; downloads nothing).
 2. **Download the new version** — `claude plugin update th@team-harness-marketplace` (fetches the new version into the plugin cache).
-3. **Activate** — `/reload-plugins` (or restart Claude Code) to load the downloaded version.
+3. **Activate** — `/reload-plugins` to load the downloaded version. Reconnect only when the host reports that reload cannot activate it.
 
 `/th:update` performs steps 1 and 2 from Bash, then re-syncs the managed general-agent and voice blocks in `~/.claude/CLAUDE.md`. It no longer copies a replacement output style; existing selections follow [the bounded migration](./dev-mode.md#retire-an-existing-developer-mode-selection). Step 3 is operator-driven — the skill cannot reload the session. Running `/th:update` every release keeps both the cache and the fixed-path artifacts aligned; re-running `/th:setup` is **not** part of the update flow. For the full mental model — division of labour, the cache-vs-fixed-path propagation model, and the self-healing property — see [`setup-update-model.md`](./setup-update-model.md).
 
-**Legacy installer:** re-run the bootstrap. Unchanged files are skipped; files that differ from the embedded release bytes are overwritten.
+**Native-runtime binary:** run an explicit `update` for the selected engine. Existing native settings and MCP registrations remain operator-owned.
 
 ```bash
-curl -fsSL https://valianx.github.io/team-harness/install.sh | bash
+install update --runtime opencode --scope global --non-interactive
 ```
 
 ---
@@ -167,11 +165,12 @@ curl -fsSL https://valianx.github.io/team-harness/install.sh | bash
 ## Requirements
 
 **Required:**
-- [Claude Code](https://docs.claude.com/en/docs/claude-code) — the runtime team-harness depends on
-- [context7](https://context7.com/) API key — for library docs retrieval
-- A reachable [Memory MCP](https://github.com/valianx/context-harness-mcp) URL — for the knowledge graph
+- A supported native runtime: [Claude Code](https://docs.claude.com/en/docs/claude-code), Codex, or OpenCode
 
 **Recommended (not required):**
 - [`gh`](https://cli.github.com/) CLI — for `/issue`, `/deliver`, and `/review-pr` GitHub integration. When `gh` is absent or unauthenticated, these skills use `curl` against the GitHub REST API (if `$GH_TOKEN`/`$GITHUB_TOKEN` is set) or fall back to operator-paste paths with `blocked-manual-push` status. The installer prints a note when `gh` is missing.
 
-No Python, no `uv` — the binary is stdlib-only Go.
+**Optional:**
+- [context7](https://context7.com/) API key — for library docs retrieval when explicitly configured
+
+No Python, no `uv` — the installer binary is stdlib-only Go.

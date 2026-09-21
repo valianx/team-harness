@@ -1,35 +1,32 @@
 
 # Plan Review (explicit direct mode)
 
-This skill runs only when the operator invokes `/th:plan-review`. It is not an automatic pipeline
-phase, a Gate 1 prerequisite, or a post-approval offer. The canonical pipeline remains
-`design → waiting_gate1 → implementation → validation → waiting_gate3 → delivery → complete`.
+This skill runs only when the operator invokes `/th:plan-review`. It is an
+on-demand review of existing OpenSpec and plan artifacts, not a pipeline phase
+or approval prerequisite.
 
 ## Input
 
-1. If a feature name is supplied, resolve `workspaces/{feature-name}/01-plan.md` (or the
-   configured Obsidian `docs_root`) and its bound OpenSpec change.
-2. Without a name, find active workspace plans. If none exist, report that the operator must run
-   `/th:design` or `/th:plan` first. If several exist, ask which plan to review.
-3. Read the compact projection, current OpenSpec artifacts, strict-validation result, and pinned
-   identity. Never infer a gate release or modify `00-state.md`.
+1. Use the explicitly supplied absolute workspace and read its `01-plan.md`
+   and bound OpenSpec change. If no workspace is supplied, ask the caller to
+   select one; do not search by date, mtime, or newest directory.
+2. Read the current OpenSpec artifacts and the plan. Use existing validation or
+   review notes when supplied; do not require a generated projection identity.
+3. Never modify planning sources or coordinator state.
 
 ## Review
 
-The coordinator dispatches exactly one surviving `plan-reviewer`. It checks canonical OpenSpec
-coherence and `01-plan.md` projection fidelity. It does not define acceptance, run a security
-design panel, or create a second semantic plan. The coordinator alone may persist the returned
-report and remains the sole writer of `00-state.md`, events, and the control log.
+The coordinator dispatches exactly one `plan-reviewer`. It checks canonical
+OpenSpec coherence and `01-plan.md` projection fidelity. It does not define
+acceptance, run a security design panel, or create a second semantic plan. Main
+may persist the returned report at `{workspace}/reviews/01-plan-review.md`.
 
 The report must distinguish a functional defect, a security finding, a structural contradiction,
 and an editorial concern. It must include file/section pointers and a concise verdict. A plan
-review never edits the plan and never releases either pipeline gate.
+review never edits the plan or changes pipeline state.
 
-This single-reviewer mode does not dispatch the dedicated `security`
-specialist. Always make that omission visible in the operator result:
-`Security specialist: not run — invoke /th:security for a separate security
-assessment.` This notice is not a security pass and does not add an automatic
-panel.
+This mode does not dispatch the dedicated `security` specialist unless the
+operator explicitly requests that separate assessment.
 
 ## Output
 
@@ -37,9 +34,9 @@ Print the combined `pass|concerns|fail` verdict and the artifact pointer:
 
 ```text
 Plan review: {pass|concerns|fail} — {one-line finding summary}
-Security specialist: not run — invoke /th:security for a separate security assessment.
-Report: workspaces/{feature-name}/reviews/01-plan-review.md
+Report: {workspace}/reviews/01-plan-review.md
 ```
 
-If OpenSpec changes, Main regenerates `01-plan.md`; only a new explicit `/th:plan-review`
-invocation reviews the new identity. The pipeline never re-fires a panel automatically.
+If OpenSpec changes, Main regenerates `01-plan.md`; only a new explicit
+`/th:plan-review` invocation reviews the updated artifacts. No panel is
+re-fired automatically.

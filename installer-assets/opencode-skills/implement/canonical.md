@@ -1,12 +1,13 @@
 
 # Implement
 
-If there is no explicitly active Team Harness pipeline, implement the request
-directly with the current runtime's normal tools and permission model. Do not
-create pipeline state or gates.
+Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
+its configured local or Obsidian mode. Main coordinates with native tools and
+permissions. Reuse authorization for unchanged work and ask only for a missing
+decision. Specialists provide evidence and recommendations; Main judges them.
 
-If durable state proves that a pipeline is explicitly active, require its
-recorded design approval before changing files. Follow the approved task and
-file scope, preserve unrelated changes, record implementation evidence, and
-leave acceptance validation to the pipeline's validation phase. The primary
-thread owns state and operator decisions; specialists cannot approve gates.
+Read the existing objective and relevant OpenSpec tasks. Main may implement or
+delegate independent bounded tasks with explicit ownership. Preserve other
+writers' edits, serialize overlapping changes and Git mutations, and run
+appropriate checks. Report changes, results and material limits to the shared
+workspace. This entry does not automatically activate a pipeline.

@@ -1,5 +1,10 @@
 # Output Contract Patterns — Intensity Levels, Preservation, and Measurement
 
+Legacy formatting reference for existing reports. Current specialists return
+useful outcomes, checks, findings and limits through native transport under
+`agents/_shared/output-template.md`; no compression tier or fixed packet budget
+is an execution prerequisite.
+
 > Canonical reference for the full-lane workspace I/O contract. Defines the four named
 > compression intensity levels, enforceable artifact budgets, section-scoped reads, the
 > verbatim-preservation rule, the iteration re-narration ban, and measurement.

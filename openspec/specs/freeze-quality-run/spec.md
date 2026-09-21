@@ -1,6 +1,11 @@
 # freeze-quality-run Specification
 
 ## Purpose
+This retained specification describes legacy v5 helper behavior and historical
+records. Current workflow coordination is defined by `pipeline-control-plane`
+and `specialist-coordination-protocol`; new tasks do not require these old
+gates, leases, journals or administrative transitions.
+
 Exactly one quality run per candidate tree, at Freeze, driven by the workspace-local `.team-harness/quality.json` manifest outside the product diff. Retires the cleaner pre/post transitions and CRAP enforce as a coupled unit while preserving the checks with real detection value.
 
 ## Requirements

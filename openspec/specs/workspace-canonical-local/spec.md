@@ -3,7 +3,7 @@
 ## Purpose
 Work has one configured local or Obsidian home for useful context and continuity.
 The shared workspace skill serves direct and specialized flows; an active pipeline
-retains its existing persisted identity and authority in that selected home.
+retains its existing identity and useful context in that selected home.
 
 ## Requirements
 

@@ -28,7 +28,6 @@ ALLOWED_KEYS = {
 DEFAULTS = {
     "logs-mode": "local",
     "english_learning": False,
-    "flow_telemetry.enabled": False,
     "agent-scope": "global",
 }
 LEGACY_SELECTOR_KEYS = frozenset({

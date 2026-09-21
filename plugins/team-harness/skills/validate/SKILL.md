@@ -1,16 +1,23 @@
 ---
 name: validate
-description: Continue validation for an explicitly activated Team Harness pipeline using tester, QA, and security roles as required. This skill does not activate the pipeline; without active Team Harness state, validate directly with normal Codex behavior.
+description: Validate delivered behavior with proportionate checks and independent advice.
 ---
 
 # Validate
 
-Locate state whose `activation` is `explicit`. If none exists, do not create
-pipeline state or gates; read `../init/references/configuration.md`, resolve the
-persistent settings, and continue the user's ordinary Codex validation.
+Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
+its configured local or Obsidian mode. Main coordinates with native tools and
+permissions. Reuse authorization for unchanged work and ask only for a missing
+decision. Specialists provide evidence and recommendations; Main judges them.
 
-For an active pipeline, read
-`../pipeline/references/state-and-gates.md` and
-`../pipeline/references/validation.md`. The primary thread consolidates results
-and owns all coordination-state writes. Do not modify acceptance criteria to
-turn a failure into a pass.
+Compare the actual candidate with the objective and relevant scenarios. Run
+repository-required checks and targeted validation for affected behavior.
+Read agreed sketches when relevant; no Claude-only sketch probe is needed.
+Use native testers, QA or security reviewers when their expertise helps or was
+requested. Preserve findings and missing coverage. Main judges recommendations,
+verifies corrections and reuses valid evidence when unaffected.
+This entry does not activate a pipeline or impose a security classifier floor.
+
+Use Codex's native agent and task tools. Never require a Claude executable or
+configuration. In an active pipeline, read the matching phase reference under
+`../pipeline/references/` only as needed.

@@ -1,5 +1,10 @@
 
-This is a standalone utility skill that reads and writes `~/.claude/.team-harness.json` directly to toggle the english-learning correction mode. It does NOT route through the orchestrator (mirrors `/th:setup` and `/th:update`, which read/write config directly). Writing `.team-harness.json` is this skill's purpose, exactly as it is `/th:setup`'s — so the "`/th:update` never writes `.team-harness.json`" rule does not apply here. Changes take effect at the next SessionStart, when `hooks/session-start.sh` reads the keys.
+This is a standalone utility skill that reads and writes the active native
+runtime's Team Harness settings document to toggle english-learning correction
+mode. It does NOT route through the orchestrator. The native runtime reads the
+stored preference on subsequent responses or sessions according to its own
+activation rules; this skill does not install or promise a Team Harness
+SessionStart hook, OpenCode hook, restart, or reload.
 
 Usage: `/th:learn-english [on|off|status]`
 
@@ -86,7 +91,7 @@ Also set English as the response language for immersion? [y/N]
 
      english_learning    true
 
-   The change takes effect at the next SessionStart.
+   The native runtime will use the preference on its next supported response or session.
    ```
 
    **Final report (immersion path):**
@@ -97,8 +102,7 @@ Also set English as the response language for immersion? [y/N]
      english_learning    true
      language            en
 
-   The response language is now English. The change takes effect at the next
-   SessionStart.
+   The response language is now English. The native runtime will use the preference on its next supported response or session.
    ```
 
 Edge case — **already on**: if `english_learning` is already `true`, still perform the (idempotent) merge-write and run the same interactive flow. Do not branch into a "no change" message — the operator asked for `on`; reporting the resulting state is correct.
@@ -156,7 +160,7 @@ Edge case — **already on**: if `english_learning` is already `true`, still per
      english_learning    false
      language            en (kept)
 
-   Corrections are off. The change takes effect at the next SessionStart.
+   Corrections are off. The native runtime will use the preference on its next supported response or session.
    ```
 
    **Final report (change path):**
@@ -167,8 +171,7 @@ Edge case — **already on**: if `english_learning` is already `true`, still per
      english_learning    false
      language            <code> (changed)
 
-   Corrections are off and the response language is now <code>. The change takes
-   effect at the next SessionStart.
+   Corrections are off and the response language is now <code>. The native runtime will use the preference on its next supported response or session.
    ```
 
 Edge case — **off when the mode was never on**: if `english_learning` is absent or already `false`, still merge-write `false` (explicit, auditable) and run the same interactive flow. State the current `language` accurately in the prompt — do not assert `language: en` when that is not the on-disk value.
@@ -192,7 +195,7 @@ Edge case — **off when the mode was never on**: if `english_learning` is absen
 
    Enable with /th:learn-english on. The correction mode is active whenever
    english_learning is true, regardless of the configured language. Changes
-   take effect at the next SessionStart.
+   take effect on the next supported response or session in the native runtime.
    ```
 
 3. If the file is absent: report `english_learning false (inactive)` and `language not set`, with no write.

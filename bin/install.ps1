@@ -6,6 +6,47 @@
 # See bin/README.md for details.
 $ErrorActionPreference = "Stop"
 
+# Claude Code is installed from its native marketplace. Download the binary
+# only when a native-engine subcommand was requested explicitly. The manifest
+# dispatcher accepts supported flags before the subcommand, for example
+# `--runtime codex apply`.
+$nativeSubcommands = @("plan", "apply", "update", "uninstall")
+$valueFlags = @("--runtime", "--scope", "--opencode-dir", "--codex-dir", "--memory-url", "--opencode-tier")
+$hasSubcommand = $false
+$skipValue = $false
+foreach ($argument in $args) {
+    $value = [string]$argument
+    if ($skipValue) {
+        $skipValue = $false
+        continue
+    }
+    if ($nativeSubcommands -contains $value.ToLowerInvariant()) {
+        $hasSubcommand = $true
+        break
+    }
+    if ($valueFlags -contains $value) {
+        $skipValue = $true
+        continue
+    }
+    if ($value.StartsWith("--runtime=") -or $value.StartsWith("--scope=") -or
+        $value.StartsWith("--opencode-dir=") -or $value.StartsWith("--codex-dir=") -or
+        $value.StartsWith("--memory-url=") -or $value.StartsWith("--opencode-tier=") -or
+        $value -in @("--force", "--non-interactive", "--yes")) {
+        continue
+    }
+    break
+}
+
+if (-not $hasSubcommand) {
+    Write-Host "Claude Code installation is native:"
+    Write-Host "  /plugin marketplace add valianx/team-harness"
+    Write-Host "  /plugin install th"
+    Write-Host "  /th:setup"
+    Write-Host ""
+    Write-Host "For opencode or Codex, pass an explicit subcommand (plan, apply, update, or uninstall)."
+    exit 0
+}
+
 $Repo    = "valianx/team-harness"
 $BaseUrl = "https://github.com/$Repo/releases/latest/download"
 

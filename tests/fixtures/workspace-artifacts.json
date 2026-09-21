@@ -34,16 +34,19 @@
       "producer": "docs/observability.md"
     },
     "00-knowledge-context.md": {
-      "producer": "agents/ref-special-flows.md"
+      "status": "legacy",
+      "producer": "docs/observability.md"
     },
     "00-leader-roster.md": {
-      "producer": "agents/ref-dispatch-machinery.md"
+      "status": "legacy",
+      "producer": "docs/observability.md"
     },
     "00-pipeline-summary.md": {
       "producer": "docs/observability.md"
     },
     "00-state.md": {
-      "producer": "agents/_shared/orchestrator-state.md"
+      "status": "legacy",
+      "producer": "skills/pipeline/scripts/control-plane.mjs"
     },
     "00-suite-evidence.md": {
       "producer": "docs/suite-evidence.md"
@@ -52,7 +55,8 @@
       "status": "retired"
     },
     "00-verify-packet.md": {
-      "producer": "agents/ref-pipeline.md"
+      "status": "legacy",
+      "producer": "docs/verification-packet.md"
     },
     "01-plan.md": {
       "producer": "agents/ref-pipeline.md"
@@ -76,13 +80,15 @@
       "producer": "agents/tester.md"
     },
     "control/control.jsonl": {
-      "producer": "agents/ref-pipeline.md"
+      "status": "legacy",
+      "producer": "skills/pipeline/scripts/control-plane.mjs"
     },
     "failure-brief.md": {
       "producer": "agents/qa.md"
     },
     "inputs/00-frozen.diff": {
-      "producer": "agents/ref-pipeline.md"
+      "status": "legacy",
+      "producer": "docs/verification-packet.md"
     },
     "inputs/acceptance-matrix.md": {
       "producer": "agents/delivery.md"
@@ -121,7 +127,7 @@
       "producer": "agents/researcher.md"
     },
     "reviews/01-plan-review.md": {
-      "producer": "agents/plan-reviewer.md"
+      "producer": "skills/plan-review/SKILL.md"
     },
     "reviews/01-ux-review.md": {
       "producer": "agents/ux-reviewer.md"
@@ -145,7 +151,8 @@
       "producer": "agents/qa.md"
     },
     "reviews/findings-ledger.md": {
-      "producer": "agents/_shared/orchestrator-state.md"
+      "status": "legacy",
+      "producer": "docs/observability.md"
     },
     "sketches/*": {
       "producer": "agents/architect.md"

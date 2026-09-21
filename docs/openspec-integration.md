@@ -14,7 +14,13 @@ layout; archive treats a change from either origin identically.
 
 OpenSpec owns the repository-local change under `openspec/changes/<change>/`: `proposal.md`,
 `specs/**/spec.md`, `design.md`, and `tasks.md`. TH never copies or paraphrases those artifacts
-into a second editable specification. A change exists only for product behavior: it adds or modifies at least one capability. Installing a tool, delivering an already-approved change, and other repository chores use the normal branch and pull-request flow with no change directory. `openspec/config.yaml` records the per-artifact sizes and `tests/test_openspec_scope.py` enforces them on every active change.
+into a second editable specification. A change exists only for product behavior: it adds or
+modifies at least one capability. A new capability needs an `ADDED` requirement in
+`specs/**/spec.md`; an existing capability change uses `MODIFIED` or `REMOVED` as appropriate.
+`design.md` is optional when no meaningful design decision needs recording. Installing a tool,
+delivering an already-approved change, and other mechanical repository chores use the normal
+branch and pull-request flow with no change directory. `openspec/config.yaml` records the
+per-artifact sizes and `tests/test_openspec_scope.py` enforces them on every active change.
 
 Design pins the change once as a content identity over its canonical Markdown, with task
 checkbox state normalized out, and records it in the control log. Every writable service owns

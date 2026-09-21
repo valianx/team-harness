@@ -1,52 +1,36 @@
-# Pipeline v5 migration
+# Pipeline v5 compatibility
 
-Current pipeline execution reads only the v5 control contract. Its durable
-authority is a canonical hash-linked control log; state, Gate, finding,
-acceptance, counters, and receipts are projections or telemetry.
+Current TH pipelines use native tasks, permissions and the shared workspace.
+The [current pipeline reference](../agents/ref-pipeline.md) describes the working
+method. New work does not require v5 leases, result envelopes, gate nonces or a
+control journal.
 
-Every pre-v5 workspace is complete or aborted, and no converter remains. A
-workspace without `control/control.jsonl` is closed administratively: Main
-appends one `pipeline.close` entry with `terminal_state:
-closed-administratively` to its events file and offers inline continuation or a
-fresh run. Mixed writable schemas fail closed.
+## Existing workspaces
 
-After cutover, Main derives one minimal capability lease immediately before a
-dependency-ready coherent worktree batch and native return transport carries
-one result envelope. A transport envelope may serialize the lease, but Design
-does not create semantic overlays, permanent future task capsules, or an
-exhaustive execution graph. The hot path never imports legacy routing, numeric
-ceilings, fixed replacement allowances, or projection release fields.
+Reuse the exact workspace, plan, OpenSpec tasks, handoff and actual repository
+state. Historical logs and receipts can explain prior progress. Their absence
+does not require administrative closure or conversion. Treat corrupt or missing
+history as an evidence limitation and use trustworthy current sources where
+possible. Ask only for a genuinely missing decision.
 
-The content identity is `openspecContentIdentity` in `control-plane.mjs`: the
-sorted relative paths and bytes of every file under the change root, with the
-checkbox markers in `tasks.md` normalized out, so a renamed, added, or removed
-file changes it while a tick does not. `taskProgressDelta` classifies a
-checkbox-only difference as `progress`, `regression`, or `structural`; only
-progress continues without a recorded action. An identity pinned before this
-formula is not comparable and requires Gate 1 again.
+## Retained helpers
 
-Design now treats strict-valid OpenSpec as the sole semantic plan and generates
-compact read-only `01-plan.md` for the operator. An existing valid change needs
-no architect. Acceptance authoring remains in OpenSpec; explicit plan review
-uses one surviving read-only reviewer. Implementation owns ordinary tests,
-while separate tester, cleaner, and security dispatches are risk/impact derived.
-Security impact is not authored by architect or copied into `01-plan.md`.
-Main derives it after Freeze from the canonical type-agnostic changed-surface
-classifier; ambiguous or unresolved evidence maps to `unknown` and requires a
-fresh security specialist.
+`skills/pipeline/scripts/control-plane.mjs` and its specialist companion retain
+their v5 schema validation, safe file handling and log/receipt compatibility.
+Their tests cover those existing APIs. They are not the dispatch or authorization
+path for new work, and current instructions do not call their administrative
+closure or gate-release operations.
 
-`tests/test_pipeline_simplification_benchmark.mjs` is a deterministic contract
-benchmark, not a wall-clock claim. Its three fixtures compare normalized Gate-1
-work units, helper/dispatch operations, agent attempts, quality-run count, and
-exclusive lens defects for a small fix, medium public feature, and
-security-sensitive change. Candidate metrics are computed from the actual
-control-plane helper results and selected role set; only the historical baseline
-remains fixture data. The executable assertions require fewer pre-Gate
-operations/attempts, no architect for valid OpenSpec, no empty cleaner, no
-unconditional tester, and exactly one complete quality run per candidate.
+The legacy `openspecContentIdentity` and `taskProgressDelta` APIs remain useful
+to understand old receipts. Their historical identity changes do not invalidate
+current user authorization or force another Gate 1 conversation.
 
-`docs/benchmarks/pipeline-baseline.md` retains an optional live-measurement
-method and three reusable requests. No live baseline was recorded. When useful,
-compare equivalent runs and record their anchors, timings, dispatches and quality
-evidence in the configured workspace. Missing live measurements do not block
-unrelated delivery, and deterministic helper counts do not prove live savings.
+## Measurements
+
+`tests/test_pipeline_simplification_benchmark.mjs` compares retained v5 helper
+operations against its historical fixture. It is not a benchmark of current
+native workflow time, token cost or reviewer quality.
+
+`docs/benchmarks/pipeline-baseline.md` retains requests useful for optional
+measurement. Record any actual comparison, candidate identities and limitations
+in the shared workspace. Do not claim savings from unmeasured live behavior.

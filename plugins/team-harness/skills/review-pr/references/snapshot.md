@@ -2,17 +2,18 @@
 
 ### 1. Resolve the helper and run preflight
 
-Resolve `{owner}/{repo}` from the URL or `gh repo view`. Resolve the bundled helper, in order:
+Resolve `{owner}/{repo}` from the URL or `gh repo view`. Resolve the bundled helper from the
+selected skill installation, in order:
 
-1. latest `~/.claude/plugins/cache/team-harness-marketplace/th/*/skills/review-pr/scripts/review_context.py`
-2. `~/.claude/skills/review-pr/scripts/review_context.py`
-3. the opencode skill install:
-   `${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/skills/review-pr/scripts/review_context.py`
-   (Windows: `%APPDATA%\opencode\skills\review-pr\scripts\review_context.py`; a project-scope
-   install uses `<repo>/.opencode/skills/review-pr/scripts/review_context.py`)
-4. `scripts/review_context.py` resolved against this skill's own directory — the packaged copy on
-   Codex and opencode installs
-5. `./skills/review-pr/scripts/review_context.py`
+1. `scripts/review_context.py` resolved against this skill's own directory — the selected
+   packaged copy for the active runtime
+2. `./skills/review-pr/scripts/review_context.py` in the repository when developing TH itself
+3. the explicitly configured native runtime installation (for example the selected project or
+   global OpenCode skill path)
+
+Do not choose the newest Claude cache or combine a helper from one installation with instructions
+from another. Keep the selected helper identity for the complete run; use a documented fallback
+only when the selected installation has no helper and record which fallback was used.
 
 Keep the bundled `scripts/` directory intact: on Windows the helper loads
 `windows_artifact_fs.py` for handle-relative artifact access and rejects reparse
@@ -24,8 +25,9 @@ REVIEW_ROOT="$(git rev-parse --show-toplevel)"
 python3 "$REVIEW_CONTEXT_HELPER" preflight --repo-root "$REVIEW_ROOT" --runtime {claude|codex|opencode} --prerequisites-only
 ```
 
-`preflight` verifies `gh` authentication and ensures the repository `.gitignore` carries an
-anchored `/workspaces/` entry. Agent checks wait until policy and required coverage are known.
+`preflight` verifies `gh` authentication and ensures Git's local `info/exclude` carries an
+anchored `/workspaces/` entry. It does not edit the tracked `.gitignore`; agent checks wait until
+policy and selected coverage are known.
 It returns `ok` with a `blockers` list. Repair authorized prerequisites and retry the affected
 check; if trustworthy capture remains unavailable, report the concrete blocker.
 

@@ -8,11 +8,17 @@
 
 ### Skills
 
-**No migration step required.** The target harness discovers `.claude/skills/` directly and reads `SKILL.md` files in the same format Claude Code uses. Skills are already cross-harness. Optionally, a future packaging decision may require surfacing skills under `.opencode/skills/` — that is an install-time placement step, not a content conversion.
+**No content migration required.** The Go installer projects each `SKILL.md`
+directory into `.opencode/skills/`; the adapter preserves the canonical skill
+body and native argument contract.
 
-### Rules / context (`CLAUDE.md`)
+### Rules / context (`AGENTS.md`)
 
-**No migration step required.** The target harness falls back to `CLAUDE.md` when no `AGENTS.md` exists. Rules are effectively cross-harness without conversion. Optionally, add `AGENTS.md` as a cross-tool entry point that points at or summarizes the same rule content — this is a near-zero-effort authoring step, not a conversion.
+**No migration step required.** The OpenCode adapter passes `runtime: opencode`
+to `init-project`, which writes `AGENTS.md` as the native project instruction
+file. `CLAUDE.md` is created only when the operator explicitly requests a
+Claude compatibility file. Codex uses the same `AGENTS.md` target through its
+own adapter.
 
 ### Agents and commands
 
@@ -48,8 +54,8 @@ The following table shows where each converted asset type lands after migration:
 | Agents | `.opencode/agents/` (or registered as entries in `opencode.json`) |
 | Agent reference documents (`agents/ref-*.md`, `agents/_shared/`, `agents/testing-refs/`, `agents/review-lenses/`, `agents/gcp-infra-refs/`) | `.opencode/th-references/agents/` — deliberately OUTSIDE `.opencode/agents/`, which auto-registers every `.md` as a dispatchable agent by filename |
 | Commands | `.opencode/commands/` |
-| Skills | `.opencode/skills/` — or reuse `.claude/skills/` directly (the target harness reads CC skill directories; no placement step may be needed) |
-| Rules | `AGENTS.md` (cross-tool standard), with `CLAUDE.md` as fallback |
+| Skills | `.opencode/skills/` |
+| Rules | `AGENTS.md` (native OpenCode instruction file); `CLAUDE.md` only for explicit Claude compatibility |
 | Hooks | Not installed; OpenCode uses native permissions and approvals |
 | Config | Merged into `opencode.json` |
 

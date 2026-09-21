@@ -10,7 +10,10 @@ Parse the user's input to extract:
 1. **Topic(s):** what to document (service name, database, API, library, product, etc.)
 2. **Language:** look for `--lang <code>` flag. Default: `en`. Examples: `--lang es`, `--lang pt`.
 3. **Folder:** look for `--folder <name>` flag. Default: derived from the topic name (kebab-case).
-4. **Vault:** look for `--vault <name>` flag. Default: the `default` vault from `~/.claude/config/obsidian-vaults.json`.
+4. **Destination:** look for an explicit `--vault <name>` and optional
+   `--folder <name>`. Without one, use the caller's selected absolute workspace
+   as the documentation destination. Resolve a vault through the active runtime's
+   configured mapping; do not assume a host-specific config path.
 
 ## Examples
 
@@ -40,8 +43,10 @@ Task: documentation
 Type: docs
 Topics: {parsed topic list}
 Language: {parsed language code, default: en}
+Workspace: {absolute workspace path supplied by the caller}
 Folder: {parsed folder name, default: derived from topic}
-Vault: {parsed vault name, default: from config}
+Vault: {parsed vault name or null}
+Output: {explicit absolute destination for the generated pages}
 
 Operator request: {original user input}
 ```

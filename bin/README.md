@@ -9,7 +9,9 @@
 
 These scripts download the latest released Go binary, verify its SHA256 checksum against the published `SHA256SUMS`, and run `apply --runtime opencode --scope global`. They are **NOT deprecated** — these are the live opencode install paths.
 
-See the README `### Install into opencode` section for the full env-var contract (`MEMORY_MCP_URL`, `MEMORY_MCP_BEARER`, `CONTEXT7_API_KEY`).
+See the README `### Install into opencode` section for the native runtime
+contract. Context7 can be configured explicitly with `CONTEXT7_API_KEY`;
+existing MCP registrations and credentials remain untouched.
 
 ## opencode update (live path)
 
@@ -32,13 +34,9 @@ install update --runtime opencode --scope global --non-interactive
 
 ---
 
-## Claude Code install (legacy path)
+## Claude Code install
 
-> **These scripts are the legacy install path as of v2.33.0.** The canonical install path is the Claude Code plugin. Use these scripts only for offline environments, CI pipelines, or `low-cost` mode installs.
-
-### Canonical install (recommended)
-
-Run the following three commands inside Claude Code:
+Claude Code uses its native marketplace. Run these commands inside Claude Code:
 
 ```
 /plugin marketplace add valianx/team-harness
@@ -46,7 +44,7 @@ Run the following three commands inside Claude Code:
 /th:setup
 ```
 
-### Legacy bootstrap scripts (DEPRECATED)
+### Bootstrap scripts
 
 | Script | Platform | Usage |
 |--------|----------|-------|
@@ -54,17 +52,11 @@ Run the following three commands inside Claude Code:
 | `install.ps1` | Windows — PowerShell | `irm https://valianx.github.io/team-harness/install.ps1 \| iex` |
 | `install.cmd` | Windows — cmd.exe | `curl -fsSL https://valianx.github.io/team-harness/install.cmd -o install.cmd && install.cmd` |
 
-Each script detects the OS and architecture, downloads the latest released Go binary from GitHub Releases, and runs it. The binary is self-contained — agents, skills, and hooks are embedded and written directly to `~/.claude/`.
+With no arguments, each script prints the native Claude Code commands above and exits without downloading anything. To use the binary for an OpenCode or Codex operation, pass an explicit subcommand such as `apply`, `plan`, `update`, or `uninstall`; all remaining arguments are forwarded unchanged.
 
 These scripts are served at `https://valianx.github.io/team-harness/install.{sh,ps1,cmd}` via GitHub Pages.
 
-## When to use the legacy installer
-
-- **Offline / air-gapped environments** — download the binary from [GitHub Releases](https://github.com/valianx/team-harness/releases) and run it directly.
-- **CI pipelines** — use env vars to skip prompts: `MEMORY_MCP_URL`, `CONTEXT7_API_KEY`, `INSTALL_MODE`.
-- **`low-cost` mode** — the plugin cannot transform agent frontmatter on install. Set `INSTALL_MODE=low-cost` to install all agents on `sonnet` / `medium` effort.
-
-For full documentation see [`docs/install.md` § Legacy installer](../docs/install.md#legacy-installer-contributors--offline--ci).
+For offline or CI use, download a release binary directly and pass the desired native-runtime subcommand. Context7 configuration remains an independent, explicit option; existing MCP entries and credentials are preserved.
 
 ## Relationship to cmd/install/
 

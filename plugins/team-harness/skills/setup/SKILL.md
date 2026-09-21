@@ -1,6 +1,6 @@
 ---
 name: setup
-description: "Configure or reconfigure the complete Team Harness Codex installation: native settings, bundled specialist agents, optional MCP servers, workspace preferences, and integration verification. Use when the operator invokes Team Harness setup or asks to configure any Codex integration."
+description: "Configure or reconfigure the complete Team Harness Codex installation: native settings, bundled specialist agents, workspace preferences, and integration verification. Use when the operator invokes Team Harness setup or asks to configure any Codex integration."
 ---
 
 # Team Harness setup for Codex
@@ -11,9 +11,9 @@ pipeline state, or spawn subagents.
 
 Team Harness settings are native and runtime-isolated at
 `${CODEX_HOME:-$HOME/.codex}/.team-harness.json`. Never read Claude Code or
-opencode settings during ordinary operation and never modify their files.
-The only cross-runtime operation allowed here is an explicit one-time copy of
-values selected by the operator.
+opencode settings during ordinary operation and never modify their files. MCP
+registrations and credentials are owned by the native runtime and are left
+untouched unless the operator explicitly configures Context7.
 
 Resolve all helpers relative to this skill and use them for every managed
 write:
@@ -29,9 +29,8 @@ write:
 
 With no targeted intent, run the complete flow. For a targeted request, change
 only that concern and still ensure the native settings document exists.
-Supported targets are `workspace`, `language`, `english-learning`, `memory`,
-`context7`, `agents`, `features`, `github-accounts`, `clickup`, `obsidian-tasks`, and
-`flow-telemetry`.
+Supported targets are `workspace`, `language`, `english-learning`, `context7`,
+`agents`, `features`, `github-accounts`, `clickup`, and `obsidian-tasks`.
 
 `lane-autoselect` is legacy migration metadata, not a supported target or an
 active selector. Never use it to choose a route; require the live operator's
@@ -128,8 +127,7 @@ migration, and preserve every unrelated value.
      permission settings and server-side GitHub branch protection remain
      authoritative; TH no longer supplies an additional force-push interceptor.
    - Language is a two-letter lowercase code or absent for automatic detection.
-   - English learning, Obsidian Tasks, and flow telemetry are booleans;
-     telemetry defaults off.
+   - English learning and Obsidian Tasks are booleans.
    - Legacy `lane-autoselect` values (`announce-and-proceed-on-trivial` or
      `always-stop`) are migration-only and non-authoritative; never set or use
      them to route. Require the live `1 — inline` / `2 — pipeline` choice.
@@ -194,15 +192,13 @@ migration, and preserve every unrelated value.
    invalidate an already verified reviewer profile. Never require a new chat
    solely because setup ran.
 
-8. Configure selected MCP servers after `codex mcp list --json`. Preserve an
-   existing registration unless the operator explicitly requests replacement.
-
-   - Memory: register a streamable HTTP URL, optionally with the name (not the
-     value) of a bearer-token environment variable:
-     `codex mcp add memory --url URL [--bearer-token-env-var ENV_NAME]`.
-   - Context7: require `CONTEXT7_API_KEY` in the launch environment without
-     printing it, then run
-     `codex mcp add context7 --env DEFAULT_MINIMUM_TOKENS=10000 -- npx -y @upstash/context7-mcp@3.2.5`.
+8. Inspect MCP registrations with `codex mcp list --json`. Preserve every
+   existing registration and credential. Context7 remains an independent,
+   explicit option: only when the operator selects the `context7` target,
+   require `CONTEXT7_API_KEY` in the launch environment without printing it,
+   then run
+   `codex mcp add context7 --env DEFAULT_MINIMUM_TOKENS=10000 -- npx -y @upstash/context7-mcp@3.2.5`.
+   Team Harness setup never registers Memory or Context Harness servers.
 
 9. The Codex distribution has no TH permission-hook manifest or launcher.
    Treat those retired assets as unnecessary; do not recreate them or request

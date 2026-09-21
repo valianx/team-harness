@@ -14,6 +14,7 @@ Pass to the `orchestrator` agent:
 ```
 Direct Mode Task:
 - Mode: init-project
+- runtime: {active native runtime supplied by the adapter: claude-code | codex | opencode}
 - scaffold_rereview_workflow: {true if --scaffold-rereview-workflow was passed, omit otherwise}
 - scaffold_review_policy: {true if --scaffold-review-policy was passed, omit otherwise}
 ```
@@ -25,6 +26,6 @@ name: bootstrap
 
 - Always invoke the `orchestrator` agent — do NOT invoke agents directly
 - The orchestrator will route to the `init-project` agent
-- The init-project agent detects the project type, tech stack, and generates/updates CLAUDE.md
+- The init-project agent detects the project type and tech stack, then generates or updates the runtime instruction file selected by `runtime` (`CLAUDE.md` for Claude Code; `AGENTS.md` for Codex and OpenCode)
 - Also creates CHANGELOG.md if missing and ensures workspaces is in .gitignore
 - Optional flags: `--scaffold-rereview-workflow` (GitHub Actions re-review reminder), `--scaffold-review-policy` (team review policy file)

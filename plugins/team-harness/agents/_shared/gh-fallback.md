@@ -71,13 +71,9 @@ it, re-read on the next invocation.
 `gh pr view {number} --json number,title,body,baseRefName,headRefName,state,labels`
 · curl `GET /repos/$repo_path/pulls/{number}`.
 
-**STOP-on-access-failure (PR read is not best-effort).** Resolving the PR head
-is load-bearing — a review must read from the real head, never a guess. When
-the `gh` call fails (repository not resolvable, auth/account error) AND the
-curl fallback fails or no token is set AND `git fetch origin {headRefName}`
-fails, STOP and wait. Do NOT substitute the checked-out branch, assume the
-local branch is the PR, or review the primary working tree. A PR review reads
-from a worktree at the resolved PR head or it does not run. Operator-facing
+**PR identity.** Review the resolved PR head. If `gh`, authenticated curl and
+`git fetch origin {headRefName}` cannot resolve it, report the missing access;
+do not substitute the checked-out branch or guess the candidate. Operator-facing
 STOP message:
 
 ```
@@ -264,9 +260,9 @@ Composes every reply and resolve of one comment-incorporation pass
 (`apply-review-disposition.md` Steps 5-6) into a single `gh api graphql` call
 — the default when `has_gh=true`. Additive, not a replacement: `gh` missing,
 no token, non-GitHub remote, or the batch call failing outright all fall
-through unchanged to the single-thread sections above. Rationale: each
-reply/resolve is a gated outward mutation; batching drops N+M operator
-prompts to one without weakening the approval floor.
+through unchanged to the single-thread sections above. Batching preserves the
+per-comment decisions and the operator's existing authorization for this
+external pass; it does not add a second approval rule or resolve extra threads.
 
 **Fixed query template — integer-indexed aliases.** One
 `reply{i}: addPullRequestReviewThreadReply(input: {pullRequestReviewThreadId: $thread{i}, body: $body{i}})`
@@ -290,10 +286,10 @@ run a small script (argv = manifest path only) that emits the combined
 `gh api graphql --input "$batch_payload_file"` (token-only fallback:
 `curl -sf -X POST -H "Authorization: Bearer $token" https://api.github.com/graphql --data @"$batch_payload_file"`).
 
-**Payload preview mandate:** before the single gated call, render the full
-composed batch in chat — every reply body and which threads resolve — so the
-one `ask` covers a payload the operator has actually seen
-(`docs/dev-mode.md § Outward-Action Gate`).
+Before the call, retain the composed batch manifest and report its per-comment
+reply and resolve mapping when the operator has not already authorized that
+exact external pass. Reuse an existing explicit authorization for the same
+effect; do not create a new prompt solely because the request is batched.
 
 **Partial failure — per-alias, not all-or-nothing.** A failed alias resolves
 to `null` in `data` with its name in `errors[].path[0]`; map it back by index
