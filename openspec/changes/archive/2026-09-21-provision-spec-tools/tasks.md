@@ -10,5 +10,5 @@
 ## 3. Verify and deliver
 
 - [x] 3.1 Check provider preparation scenarios, distribution, generation and relevant repository suites.
-- [ ] 3.2 Execute TEA test-review/trace, Superpowers completion verification and OpenSpec verify with the retained evidence.
+- [x] 3.2 Execute TEA test-review/trace, Superpowers completion verification and OpenSpec verify with the retained evidence.
 - [x] 3.3 Confirm the candidate retains necessary product/spec assets and excludes local provider installations and execution debris.
