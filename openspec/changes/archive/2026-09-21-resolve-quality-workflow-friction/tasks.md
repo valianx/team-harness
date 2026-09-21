@@ -10,6 +10,6 @@
 
 ## 3. Integration and completion
 
-- [ ] 3.1 Exercise actual project/PR integrations and available native runtime routes; record evidence, limitations and dispositions in the shared workspace.
-- [ ] 3.2 Complete affected upstream verification stages, regenerate distributions and run relevant executable suites on the corrected candidate.
-- [ ] 3.3 Verify implementation against this amendment and prepare its living-spec/archive delivery in the existing PR.
+- [x] 3.1 Exercise actual project/PR integrations and available native runtime routes; record evidence, limitations and dispositions in the shared workspace.
+- [x] 3.2 Complete affected upstream verification stages, regenerate distributions and run relevant executable suites on the corrected candidate.
+- [x] 3.3 Verify implementation against this amendment and prepare its living-spec/archive delivery in the existing PR.
