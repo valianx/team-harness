@@ -79,8 +79,15 @@ new identity schema or event log is required for ordinary work.
 Refresh context when decisions or progress materially change and at handoff or
 completion, not after every tool call. Link to canonical OpenSpec in its owning
 repository rather than duplicating requirements or tasks in workspace notes.
-Keep scratch files and execution evidence outside tracked product files; retain
-reusable product code, tests and documentation in their normal repository homes.
+In every repository using TH, keep working plans, reports, execution evidence,
+logs and scratch scripts out of commits and PRs. Use the selected workspace or
+temporary storage and the repository's ignore conventions; local provider installs
+can use Git's local excludes. Include a file only when it has a necessary durable
+role, such as product code, maintained tests/tooling, canonical OpenSpec or project
+documentation. Judge that role from its purpose, not its extension or generator.
+Preserve unrelated tracked files; this guidance does not authorize deleting or
+untracking them. PR preparation uses [create-pr](../create-pr/SKILL.md) to inspect
+the candidate and explain any necessary retained artifact.
 Honor an explicit output destination: a deliverable may live elsewhere while its
 workspace note links to it. Obsidian mode does not create a second local copy.
 Helpers that own isolated operational runs, such as PR-review capture/worktrees,

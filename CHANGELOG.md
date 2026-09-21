@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.37.0] - 2026-09-21
+
+### Added
+- Spec prepares OpenSpec, TEA and Superpowers through their official installers and reuses healthy installations.
+
+### Changed
+- Workspace and PR guidance keep task-only artifacts out of consumer commits while retaining necessary project assets.
+
 ## [3.36.0] - 2026-09-21
 
 ### Added

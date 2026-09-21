@@ -29,6 +29,10 @@ branch conventions, PR templates, commit conventions, and native permissions.
 - Keep maintained tests, tools, fixtures, and required shipped generated outputs that
   belong to the candidate. Keep transient reports, logs, and scratch material in the
   existing workspace or a temporary directory; do not add them to the repository.
+  Apply [workspace's artifact guidance](../workspace/SKILL.md#keep-context-useful)
+  in every consumer repository, including provider-generated work files and local
+  installations. A necessary durable project artifact may remain; explain its role
+  rather than treating every generated or Markdown file as disposable.
 - Reuse verification that still applies to this exact candidate and scope. Run the
   selected required checks when needed, and report omitted checks, their reasons, and
   unknown counts honestly. Unrelated optional skips do not erase sufficient evidence.

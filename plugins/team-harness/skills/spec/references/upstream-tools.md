@@ -9,6 +9,31 @@ TEA supply their own maintained methods. TH selects an installed capability,
 passes the relevant context, follows its current instructions and uses its result.
 The capability's algorithm, checklist, templates and scoring remain upstream.
 
+## Spec dependency preparation
+
+At spec entry or resumption, reuse [workspace](../../workspace/SKILL.md), read the
+[policy](../../pipeline/openspec-policy.json), and resolve OpenSpec, TEA and
+Superpowers for the active host, including each provider's required native skills.
+Reuse healthy installations without an automatic update or reinstall. If a
+declared capability is missing or incomplete, and the task is authorized with
+native permissions, use the existing [setup provider route](../../setup/SKILL.md)
+and the provider's official owner to install or repair it. Preparation only makes
+dependencies available; it does not run future stages or configure inactive hosts.
+
+Pass the selected local or Obsidian workspace through supported provider settings,
+and report installed, discoverable and active states separately. Check a resolved
+version against the policy baseline and its prerequisites; validate compatibility
+for another version instead of forcing a downgrade or pinning an unavailable
+marketplace release. A failed action or pending activation gets a concrete recovery,
+not a generic restart. Updating TH does not reinstall these providers.
+
+TEA preparation uses BMAD's official module installer (`npx bmad-method install`),
+which generates project-local native entries and uses `uv` for shared scripts.
+Its optional CLI runners invoke a supported coding agent. Check each configured
+report destination, including derived paths, against the selected workspace.
+Superpowers is installed as the official plugin for the active
+host, then the required verification skill is selected from that installation.
+
 ## When each capability is used
 
 | Tool / capability | When TH selects it | How it is applied and what it contributes |

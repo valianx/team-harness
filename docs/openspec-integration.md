@@ -25,6 +25,14 @@ the tested CLI, prerequisites, host targets and required workflows. Resolve the
 actual installation and read its current generated instructions. For installation
 and update, follow the [shared upstream-tool reference](../skills/spec/references/upstream-tools.md).
 
+At spec entry or resumption, check the policy's OpenSpec, TEA and Superpowers
+capabilities for the active host. When authorized, repair missing capabilities
+through the setup skill's official upstream routes; reuse healthy providers without
+updates. Preparation does not configure inactive hosts or execute later stages.
+Report installed capability separately from active-session readiness, and validate
+version differences against provider prerequisites instead of forcing unavailable
+marketplace versions.
+
 A CLI binary alone is insufficient: verify must be present in the upstream-generated
 host integration. Use official profile/init/update mechanisms to include required
 workflows while preserving existing selections and other host targets. Reuse
