@@ -9,6 +9,14 @@ Generate `.d2` diagram files using the D2 declarative language that **communicat
 
 ---
 
+## Workspace and Runtime Paths
+
+For a direct invocation without a bound workspace, use the [workspace skill](../workspace/SKILL.md) to resolve or create the configured local/Obsidian home before writing. The current agent is Main; no parent workflow is required.
+
+Before writing, consume the `workspace` and optional `deliverable_target` supplied by Main. `workspace` is the absolute shared local or Obsidian home already resolved for this effort; it is not a repository-relative template. Set `output_dir` to the explicit target directory when supplied, otherwise to `workspace`. If the target names a file, use its parent as `output_dir`, keep that exact `source_file`, and derive `render_file` and `summary_file` alongside it. Otherwise use `source_file = {output_dir}/diagram.d2`, `render_file = {output_dir}/diagram.svg`, and `summary_file = {output_dir}/05-diagram.md`. Resolve references and render helpers from `skill_root`, the active installation directory containing this document. Never derive output from the current working directory or read another runtime's configuration.
+
+---
+
 ## Core Philosophy
 
 **Diagrams should argue, not inventory.**
@@ -243,7 +251,7 @@ Use Glob, Grep, and Read to identify what exists:
 
 ### Step 2: Select diagram type and pattern
 
-Match to the closest pattern in `references/patterns.md`. Read the pattern, adapt names and connections to match the actual system.
+Match to the closest pattern in `{skill_root}/references/patterns.md`. Read the pattern, adapt names and connections to match the actual system.
 
 ### Step 3: Write the header
 
@@ -274,7 +282,7 @@ Write connections with labels. Start with external → entry points, then trace 
 ### Step 8: Format and validate
 
 ```bash
-d2 fmt diagram.d2
+d2 fmt "{source_file}"
 ```
 
 `d2 fmt` validates syntax AND pretty-prints the file. Run it after every significant change.
@@ -282,7 +290,7 @@ d2 fmt diagram.d2
 ### Step 9: Compile to SVG
 
 ```bash
-d2 diagram.d2 diagram.svg
+d2 "{source_file}" "{render_file}"
 ```
 
 Read the error output if compilation fails — D2 errors point to exact line
@@ -423,9 +431,9 @@ This produces fewer syntax errors than writing everything at once and makes debu
 ## Output Files
 
 The skill produces:
-- `workspaces/{feature}/diagram.d2` — the D2 source (primary output, version-controllable)
-- `workspaces/{feature}/diagram.svg` — compiled SVG (or PNG if requested)
-- `workspaces/{feature}/05-diagram.md` — design decision summary
+- `{source_file}` — the D2 source (primary output, version-controllable)
+- `{render_file}` — compiled SVG (or PNG if requested)
+- `{summary_file}` — design decision summary
 
 The `.d2` file is the authoritative output. It is readable, diffable, and can be re-rendered with different themes or layouts at any time.
 
@@ -433,23 +441,23 @@ The `.d2` file is the authoritative output. It is readable, diffable, and can be
 
 ## Obsidian Output Mode
 
-When `logs-mode: obsidian` is active (resolved from `~/.claude/.team-harness.json`), the diagrammer agent follows this extended contract so the diagram displays INLINE in Obsidian. Local mode behavior is unchanged.
+When `logs-mode: obsidian` is active in the resolved runtime context, the diagrammer agent follows this extended contract so the diagram displays inline in Obsidian. Local mode uses the same resolved output directory.
 
 ### What the agent does in obsidian mode
 
-1. **Render:** After generating and formatting `diagram.d2`, compile an SVG into the vault workspace folder (`docs_root`):
+1. **Render:** After generating and formatting `{source_file}`, compile an SVG into the resolved output directory:
    ```bash
-   d2 "{docs_root}/diagram.d2" "{docs_root}/diagram.svg"
+   d2 "{source_file}" "{render_file}"
    ```
    SVG is D2's native default export — no extra dependency beyond the `d2` CLI.
 
-2. **Embed:** Append the following block to `{docs_root}/05-diagram.md` so the diagram displays inline:
+2. **Embed:** Append the following block to `{summary_file}` so the diagram displays inline. Use the render file's basename in the embed:
    ```markdown
    ## Rendered Diagram
    ![[diagram.svg]]
    ```
 
-3. **Output:** Both `diagram.d2` (source, re-editable) and `diagram.svg` (vault-visible image) are written to `docs_root`. Obsidian renders `![[diagram.svg]]` inline when the note is opened.
+3. **Output:** Both `source_file` (source, re-editable) and `render_file` (vault-visible image) are written to `output_dir`. Obsidian renders the render file's basename inline when the note is opened.
 
 ### CLI-absent degradation
 
@@ -458,7 +466,7 @@ When the `d2` CLI is not installed, the agent does NOT hard-fail. Instead it wri
 ```markdown
 ## Rendered Diagram
 > Image not rendered — the `d2` CLI is not installed. Install it and re-run to embed the diagram.
-> Source: `diagram.d2`
+> Source: `{source_file}`
 ```
 
 Status remains `success` (source produced); the status block adds `render: skipped`.
@@ -508,11 +516,11 @@ Then report `status: blocked — d2 CLI not installed` and stop. Do NOT skip com
 
 ## Compilation Error Protocol
 
-If `d2 diagram.d2 output.svg` fails:
+If `d2 "{source_file}" "{render_file}"` fails:
 
 1. Read the error output — D2 errors include the line number and a description
-2. Open `diagram.d2`, find the reported line, fix the issue
-3. Re-run `d2 fmt diagram.d2` first, then re-compile
+2. Open `{source_file}`, find the reported line, fix the issue
+3. Re-run `d2 fmt "{source_file}"` first, then re-compile
 4. Report `status: failed` with the last error only when no verifiable causal
    repair remains
 

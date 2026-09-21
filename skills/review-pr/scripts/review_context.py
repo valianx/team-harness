@@ -602,12 +602,27 @@ def cleanup_review_run(repo_root: Path, artifact_root: Path, owner_token: str) -
 
 
 def command_environment(extra_env: dict[str, str] | None = None) -> dict[str, str]:
-    return {
+    environment = {
         **os.environ,
         "GH_PROMPT_DISABLED": "1",
         "GIT_TERMINAL_PROMPT": "0",
         **(extra_env or {}),
     }
+    # A caller supplies the repository through an explicit cwd or Git argument.  Do not let
+    # ambient repository-selection variables redirect a helper-owned Git operation elsewhere.
+    for name in (
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_COMMON_DIR",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_NAMESPACE",
+        "GIT_PREFIX",
+        "GIT_CEILING_DIRECTORIES",
+    ):
+        environment.pop(name, None)
+    return environment
 
 
 def _decode_command_output(
@@ -1359,10 +1374,40 @@ def load_context(path: Path) -> dict[str, Any]:
     return value
 
 
+CODE_IDENTITY_FIELDS = ("base_oid", "head_oid", "merge_base_oid")
+FULL_OID_RE = re.compile(r"^[0-9a-f]{40}(?:[0-9a-f]{24})?$")
+
+
+def is_full_oid(value: Any) -> bool:
+    """Return whether value is a complete SHA-1 or SHA-256 Git object ID."""
+    return isinstance(value, str) and FULL_OID_RE.fullmatch(value) is not None
+
+
+def derived_code_hash(context: dict[str, Any]) -> str:
+    return stable_hash({field: context.get(field) for field in CODE_IDENTITY_FIELDS})
+
+
+def derived_technical_hash(context: dict[str, Any], code_hash: str) -> str:
+    return stable_hash({"code_hash": code_hash, "commits": context.get("commits", [])})
+
+
 def compare_contexts(expected: dict[str, Any], actual: dict[str, Any]) -> dict[str, Any]:
-    # Invalidation keys on head_oid/commits/code_hash only; mergeability drift is
-    # reported for the operator but never forces a restart.
-    code_changed = expected.get("code_hash") != actual.get("code_hash")
+    # OIDs are the source identity.  Stored hashes are useful evidence, but must not be
+    # trusted as the only freshness signal: a stale or edited context can retain equal hashes.
+    expected_code_hash = derived_code_hash(expected)
+    actual_code_hash = derived_code_hash(actual)
+    expected_technical_hash = derived_technical_hash(expected, expected_code_hash)
+    actual_technical_hash = derived_technical_hash(actual, actual_code_hash)
+    expected_hash_consistent = (
+        all(is_full_oid(expected.get(field)) for field in CODE_IDENTITY_FIELDS)
+        and (expected.get("code_hash") is None or expected.get("code_hash") == expected_code_hash)
+        and (expected.get("technical_hash") is None or expected.get("technical_hash") == expected_technical_hash)
+    )
+    actual_hash_consistent = (
+        all(is_full_oid(actual.get(field)) for field in CODE_IDENTITY_FIELDS)
+        and (actual.get("code_hash") is None or actual.get("code_hash") == actual_code_hash)
+        and (actual.get("technical_hash") is None or actual.get("technical_hash") == actual_technical_hash)
+    )
     commits_changed = expected.get("commits") != actual.get("commits")
     expected_semantic_hash = expected.get("semantic_conversation_hash") or stable_hash(
         semantic_conversation_identity(expected)
@@ -1382,9 +1427,12 @@ def compare_contexts(expected: dict[str, Any], actual: dict[str, Any]) -> dict[s
     mergeability_changed = expected.get("mergeability") != actual.get("mergeability")
     changed_fields = [
         key
-        for key in ("base_oid", "head_oid", "merge_base_oid")
+        for key in CODE_IDENTITY_FIELDS
         if expected.get(key) != actual.get(key)
     ]
+    code_changed = bool(changed_fields) or commits_changed or expected_code_hash != actual_code_hash
+    context_integrity_changed = not expected_hash_consistent or not actual_hash_consistent
+    code_changed = code_changed or context_integrity_changed
     return {
         "status": (
             "code-changed"
@@ -1412,18 +1460,15 @@ def compare_contexts(expected: dict[str, Any], actual: dict[str, Any]) -> dict[s
         "technical_results_reusable": not (
             code_changed or commits_changed or semantic_conversation_changed
         ),
+        "context_integrity_changed": context_integrity_changed,
         "mergeability_changed": mergeability_changed,
         "changed_fields": changed_fields,
         "expected_head_oid": expected.get("head_oid"),
         "actual_head_oid": actual.get("head_oid"),
         "expected_context_hash": expected.get("context_hash"),
         "actual_context_hash": actual.get("context_hash"),
-        "expected_technical_hash": expected.get("technical_hash") or stable_hash(
-            {"code_hash": expected.get("code_hash"), "commits": expected.get("commits", [])}
-        ),
-        "actual_technical_hash": actual.get("technical_hash") or stable_hash(
-            {"code_hash": actual.get("code_hash"), "commits": actual.get("commits", [])}
-        ),
+        "expected_technical_hash": expected_technical_hash,
+        "actual_technical_hash": actual_technical_hash,
     }
 
 

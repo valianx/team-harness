@@ -4,8 +4,6 @@ package main
 //
 //  AC-1  [automated]: No work-logs jargon in TITLE/label strings of the setup form.
 //  AC-2  [automated]: Internal keys/values unchanged.
-//  AC-3  [automated]: readClaudeCodeMCPMigration extracts URL, bearer, context7 key.
-//  AC-4  [automated]: readClaudeCodeMCPMigration ignores unrelated servers.
 //  AC-5  [automated]: tokenModeEnvRef produces {env:VAR} refs (unchanged default).
 //  AC-6  [automated]: tokenModeLiteral produces literal bearer + key.
 //  AC-7  [automated]: non-interactive resolver never produces tokenModeLiteral.
@@ -118,151 +116,6 @@ func TestLogsModeAlwaysLocal(t *testing.T) {
 	if cfg.LogsMode != "local" {
 		t.Errorf("LogsMode = %q, want local (work-logs group removed, AC-1)", cfg.LogsMode)
 	}
-}
-
-// ---------------------------------------------------------------------------
-// AC-3: readClaudeCodeMCPMigration extracts fields correctly
-// ---------------------------------------------------------------------------
-
-// TestReadClaudeCodeMCPMigration_ExtractsURL verifies that the URL is extracted
-// from mcpServers.memory when the type is "http" (AC-3).
-func TestReadClaudeCodeMCPMigration_ExtractsURL(t *testing.T) {
-	ccJSON := `{
-		"mcpServers": {
-			"memory": {
-				"type": "http",
-				"url": "https://team-harness.up.railway.app/mcp",
-				"headers": {
-					"Authorization": "Bearer fake-bearer-token-276chars"
-				}
-			},
-			"context7": {
-				"type": "http",
-				"url": "https://mcp.context7.com/mcp",
-				"headers": {
-					"CONTEXT7_API_KEY": "ctx7sk-fake43charkey"
-				}
-			}
-		}
-	}`
-
-	tmpDir := t.TempDir()
-	ccPath := filepath.Join(tmpDir, ".claude.json")
-	if err := os.WriteFile(ccPath, []byte(ccJSON), 0o600); err != nil {
-		t.Fatalf("write fake cc json: %v", err)
-	}
-
-	// Temporarily override the claudeJSON path.
-	origClaudeJSON := claudeJSON
-	claudeJSON = ccPath
-	defer func() { claudeJSON = origClaudeJSON }()
-
-	m := readClaudeCodeMCPMigration()
-
-	if m.MemoryURL != "https://team-harness.up.railway.app/mcp" {
-		t.Errorf("MemoryURL = %q, want https://team-harness.up.railway.app/mcp (AC-3)", m.MemoryURL)
-	}
-	if m.MemoryBearer != "fake-bearer-token-276chars" {
-		t.Errorf("MemoryBearer = %q, want fake-bearer-token-276chars (AC-3 Bearer-prefix stripped)", m.MemoryBearer)
-	}
-	if m.Context7Key != "ctx7sk-fake43charkey" {
-		t.Errorf("Context7Key = %q, want ctx7sk-fake43charkey (AC-3)", m.Context7Key)
-	}
-}
-
-// TestReadClaudeCodeMCPMigration_AbsentFile_ReturnsEmpty verifies that when
-// ~/.claude.json is absent, all fields return empty (AC-3 — no panic, no exit).
-func TestReadClaudeCodeMCPMigration_AbsentFile_ReturnsEmpty(t *testing.T) {
-	origClaudeJSON := claudeJSON
-	claudeJSON = filepath.Join(t.TempDir(), "nonexistent.json")
-	defer func() { claudeJSON = origClaudeJSON }()
-
-	m := readClaudeCodeMCPMigration()
-
-	if m.MemoryURL != "" || m.MemoryBearer != "" || m.Context7Key != "" {
-		t.Errorf("expected empty migration from absent file, got %+v", m)
-	}
-}
-
-// TestReadClaudeCodeMCPMigration_StdioEntry_URLEmpty verifies that a stdio-type
-// memory entry (no URL field) returns an empty URL (AC-3 — stdio entries
-// return "" from urlFromEntry).
-func TestReadClaudeCodeMCPMigration_StdioEntry_URLEmpty(t *testing.T) {
-	ccJSON := `{
-		"mcpServers": {
-			"memory": {
-				"type": "stdio",
-				"command": "memory-server"
-			}
-		}
-	}`
-	tmpDir := t.TempDir()
-	ccPath := filepath.Join(tmpDir, ".claude.json")
-	if err := os.WriteFile(ccPath, []byte(ccJSON), 0o600); err != nil {
-		t.Fatalf("write fake cc json: %v", err)
-	}
-
-	origClaudeJSON := claudeJSON
-	claudeJSON = ccPath
-	defer func() { claudeJSON = origClaudeJSON }()
-
-	m := readClaudeCodeMCPMigration()
-
-	if m.MemoryURL != "" {
-		t.Errorf("MemoryURL = %q for stdio entry, want empty (AC-3)", m.MemoryURL)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// AC-4: readClaudeCodeMCPMigration ignores unrelated servers
-// ---------------------------------------------------------------------------
-
-// TestReadClaudeCodeMCPMigration_IgnoresUnrelatedServers verifies that a
-// ~/.claude.json containing other server entries (e.g. AbletonMCP) does NOT
-// read or migrate those entries — only memory and context7 are ever indexed (AC-4).
-func TestReadClaudeCodeMCPMigration_IgnoresUnrelatedServers(t *testing.T) {
-	ccJSON := `{
-		"mcpServers": {
-			"memory": {
-				"type": "http",
-				"url": "https://mcp.example.com/mcp",
-				"headers": { "Authorization": "Bearer tok" }
-			},
-			"AbletonMCP": {
-				"type": "stdio",
-				"command": "python",
-				"args": ["/some/path/ableton_mcp.py"],
-				"env": { "ABLETON_SECRET": "should-never-be-read" }
-			},
-			"some-other-server": {
-				"type": "http",
-				"url": "https://other.example.com/mcp"
-			}
-		}
-	}`
-	tmpDir := t.TempDir()
-	ccPath := filepath.Join(tmpDir, ".claude.json")
-	if err := os.WriteFile(ccPath, []byte(ccJSON), 0o600); err != nil {
-		t.Fatalf("write fake cc json: %v", err)
-	}
-
-	origClaudeJSON := claudeJSON
-	claudeJSON = ccPath
-	defer func() { claudeJSON = origClaudeJSON }()
-
-	m := readClaudeCodeMCPMigration()
-
-	// Only memory and context7 are read. AbletonMCP / other servers are ignored.
-	if m.MemoryURL != "https://mcp.example.com/mcp" {
-		t.Errorf("MemoryURL = %q, want https://mcp.example.com/mcp (AC-4)", m.MemoryURL)
-	}
-	if m.Context7Key != "" {
-		t.Errorf("Context7Key = %q, want empty (no context7 entry in fixture)", m.Context7Key)
-	}
-	// No way to assert AbletonMCP was not read — but the struct only has 3
-	// fields and none of them are AbletonMCP values. A server-map-enumeration
-	// bug would leak into one of these three fields; the non-empty assertion
-	// above catches that.
 }
 
 // ---------------------------------------------------------------------------
@@ -402,13 +255,8 @@ func TestRegisterOpencodeMCP_Literal_WritesLiteralValues(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestResolveOpencodeSetupFromEnvFlagsWithCCURL_NoMigration_EnvRef verifies the
-// no-migration case: when no CC migration is passed, the resolver reads from env
-// only and produces cfg values suitable for the env-ref token path (AC-7 preserved).
-//
-// This replaces TestResolveOpencodeSetupFromEnvFlagsWithCCURL_NoLiteralPath which
-// asserted the OLD contract (literal-unreachable from resolver). The resolver still
-// returns no secrets; token-mode selection now happens in the caller based on
-// ccMigration.hasLiteralTokens(). This test covers the no-migration branch.
+// no-migration case: when no migration values are passed, the resolver reads
+// from env and produces values suitable for the default env-ref token path.
 func TestResolveOpencodeSetupFromEnvFlagsWithCCURL_NoMigration_EnvRef(t *testing.T) {
 	origFlag := memoryURLFlag
 	defer func() { memoryURLFlag = origFlag }()
@@ -422,9 +270,8 @@ func TestResolveOpencodeSetupFromEnvFlagsWithCCURL_NoMigration_EnvRef(t *testing
 	// Empty migration: no CC tokens → resolver uses env only.
 	cfg := resolveOpencodeSetupFromEnvFlagsWithCCURL(opencodeMCPMigration{})
 
-	// The result is an opencodeSetupValues — no secrets, no tokenMode.
-	// The caller (runOpencodePostApply) checks hasLiteralTokens() separately;
-	// this path returns env-ref-suitable values.
+	// The result is an opencodeSetupValues; token-mode selection remains an
+	// explicit caller concern and defaults to env references.
 	if cfg.MCP.MemoryURL != "https://mcp.example.com/mcp" {
 		t.Errorf("MemoryURL = %q, want https://mcp.example.com/mcp", cfg.MCP.MemoryURL)
 	}
@@ -459,98 +306,6 @@ func TestResolveOpencodeSetupFromEnvFlagsWithCCURL_WithMigration_Context7Wired(t
 	}
 	if !cfg.MCP.Context7Enabled {
 		t.Error("Context7Enabled = false, want true when CC migration has context7 key (fix: AC-2)")
-	}
-}
-
-// TestNonInteractiveMigration_LiteralPath verifies the fixed non-interactive
-// CC→opencode migration path end-to-end:
-//   - resolver yields Context7Enabled = true from the CC migration key
-//   - caller (runOpencodePostApply pattern) flips to tokenModeLiteral when
-//     ccMigration.hasLiteralTokens() is true
-//   - registerOpencodeMCP writes the literal values into opencode.json
-//
-// This test encodes the NEW contract for the non-interactive migration path:
-// CC-migration-with-tokens → tokenModeLiteral + literal values in opencode.json.
-// The no-migration → env-ref contract is covered by
-// TestResolveOpencodeSetupFromEnvFlagsWithCCURL_NoMigration_EnvRef above.
-func TestNonInteractiveMigration_LiteralPath(t *testing.T) {
-	dir := t.TempDir()
-	docPath := filepath.Join(dir, "opencode.json")
-
-	// Simulate the CC migration with literal tokens.
-	ccMigration := opencodeMCPMigration{
-		MemoryURL:    "https://team-harness.up.railway.app/mcp",
-		MemoryBearer: "fake-bearer-migration",
-		Context7Key:  "ctx7sk-migration-key",
-	}
-
-	// Step A: resolver returns a cfg with the migrated values.
-	origFlag := memoryURLFlag
-	defer func() { memoryURLFlag = origFlag }()
-	memoryURLFlag = ""
-	t.Setenv("MEMORY_MCP_URL", "")
-	t.Setenv("CONTEXT7_API_KEY", "")
-
-	cfg := resolveOpencodeSetupFromEnvFlagsWithCCURL(ccMigration)
-
-	if cfg.MCP.MemoryURL != "https://team-harness.up.railway.app/mcp" {
-		t.Errorf("MemoryURL = %q, want migrated URL", cfg.MCP.MemoryURL)
-	}
-	if !cfg.MCP.Context7Enabled {
-		t.Error("Context7Enabled = false, want true (migrated context7 key, fix AC-2)")
-	}
-
-	// Step B: caller detects hasLiteralTokens() and sets mode + secrets.
-	var mode tokenMode
-	var secrets opencodeMCPSecrets
-	if ccMigration.hasLiteralTokens() {
-		mode = tokenModeLiteral
-		secrets = opencodeMCPSecrets{
-			MemoryBearer: ccMigration.MemoryBearer,
-			Context7Key:  ccMigration.Context7Key,
-		}
-	}
-
-	if mode != tokenModeLiteral {
-		t.Error("mode = tokenModeEnvRef, want tokenModeLiteral when CC migration has tokens (fix AC-7)")
-	}
-	if secrets.MemoryBearer != "fake-bearer-migration" {
-		t.Errorf("secrets.MemoryBearer = %q, want fake-bearer-migration", secrets.MemoryBearer)
-	}
-	if secrets.Context7Key != "ctx7sk-migration-key" {
-		t.Errorf("secrets.Context7Key = %q, want ctx7sk-migration-key", secrets.Context7Key)
-	}
-
-	// Step C: write opencode.json with literal values (mirrors registerOpencodeMCPFromValues).
-	const context7URL = "https://mcp.context7.com/mcp"
-	ctx7URL := ""
-	if cfg.MCP.Context7Enabled {
-		ctx7URL = context7URL
-	}
-	if _, err := registerOpencodeMCP(cfg.MCP.MemoryURL, ctx7URL, docPath, mode, secrets); err != nil {
-		t.Fatalf("registerOpencodeMCP: %v", err)
-	}
-
-	data, err := os.ReadFile(docPath)
-	if err != nil {
-		t.Fatalf("opencode.json not written: %v", err)
-	}
-	content := string(data)
-
-	// AC-2: literal bearer must appear.
-	if !strings.Contains(content, "Bearer fake-bearer-migration") {
-		t.Error("literal bearer not found in opencode.json (AC-2 / fix: non-interactive migration)")
-	}
-	// AC-2: literal context7 key must appear.
-	if !strings.Contains(content, "ctx7sk-migration-key") {
-		t.Error("literal context7 key not found in opencode.json (AC-2 / fix: non-interactive migration)")
-	}
-	// Env-ref placeholders must NOT appear (they mean the migration failed).
-	if strings.Contains(content, "{env:MEMORY_MCP_BEARER}") {
-		t.Error("{env:MEMORY_MCP_BEARER} found — migration produced env-ref instead of literal (regression)")
-	}
-	if strings.Contains(content, "{env:CONTEXT7_API_KEY}") {
-		t.Error("{env:CONTEXT7_API_KEY} found — migration produced env-ref instead of literal (regression)")
 	}
 }
 

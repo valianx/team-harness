@@ -21,7 +21,7 @@ A config-dependent hook or integration test uses temporary configuration and con
 - **Config bleed** — the developer's own `settings.json` and permission mode can mask a plugin-level bug whose symptom depends on environment.
 - **Perceptual mask** — dialog-free operation on Edit/Write/benign-Bash is the *expected feel*, so a bug that auto-approves those actions produces exactly the experience the operator already expects. There is no symptom to notice. This is precisely how #298 escaped its author.
 
-The retained session, language and subagent suites exercise context and observation behavior. `tests/test_opencode_session_enforcement.sh` uses temporary `OPENCODE_CONFIG_DIR` fixtures and a mock client to exercise session context. `tests/test_hook_registration.mjs` checks the shipped wiring. These checks do not prove how a host's native permission dialog renders or what a live user's policy allows.
+The retained session, language and subagent suites exercise context and observation behavior. OpenCode installer tests exercise native-guide registration, deduplication and preservation of user instructions and agent selection. `tests/test_hook_registration.mjs` checks the shipped wiring and retirement of the disconnected context adapter. These checks do not prove how a host's native permission dialog renders or what a live user's policy allows.
 
 ### (iii) A failing test names a defect in code, not a missing sentence
 
@@ -94,7 +94,7 @@ contracts listed below.
 | Suite | Covers |
 |---|---|
 | `go test ./cmd/install/` | The Go installer — preservation, mode transform, import candidates, platform behaviour |
-| `test_opencode_session_enforcement.sh` | OpenCode session context injection, temporary configuration fixtures, and fail-silent behavior with a mock client. |
+| OpenCode native-guide installer tests | Guide registration, managed-path deduplication, and preservation of user instructions and agent selection. |
 | `test_th_update_block_sync.sh` | The `/th:update` managed-block sync matrix |
 | `test_update_opencode_sh.sh` | `update-opencode.sh` non-interactive pre-check |
 | `test_bin_tty_execbit.py`, `test_bin_tty_behavioral.sh` | `bin/` TTY openability and exec bit (#473) |

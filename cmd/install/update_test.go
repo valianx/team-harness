@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -89,6 +90,155 @@ func TestCompareSemver_ThreeStateDispatch(t *testing.T) {
 	// Absent installed → treated as update-available (embedded > "").
 	if compareSemver(embedded, "") <= 0 {
 		t.Error("expected compareSemver(embedded, '') > 0 (absent=update-available)")
+	}
+}
+
+// captureUpdateStdout runs an updater handler with stdout redirected to an
+// in-process pipe. The update handlers are intentionally exercised directly so
+// these tests cover the executable reporting path without starting a real
+// runtime session or mutating a user's global configuration.
+func captureUpdateStdout(t *testing.T, fn func()) string {
+	t.Helper()
+	original := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	os.Stdout = w
+	defer func() { os.Stdout = original }()
+	fn()
+	if err := w.Close(); err != nil {
+		t.Fatalf("close captured stdout: %v", err)
+	}
+	os.Stdout = original
+	defer r.Close()
+
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("read captured stdout: %v", err)
+	}
+	return buf.String()
+}
+
+// isolatedUpdateHome keeps the Windows ownership guard focused on directories
+// created by this test. The host's real profile directory may intentionally be
+// owned by the Administrators group, while the updater requires its state root
+// to be owned by the current user.
+func isolatedUpdateHome(t *testing.T) string {
+	t.Helper()
+	home := filepath.Join(t.TempDir(), "home")
+	if err := os.Mkdir(home, 0o700); err != nil {
+		t.Fatalf("create isolated home: %v", err)
+	}
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("HOME", home)
+	return home
+}
+
+// TestRunCodexUpdate_ReportsRealStateWithoutRestartAdvice exercises both the
+// changed and no-op updater paths against an isolated Codex root. The first
+// run writes the managed agents; the second run sees the same files and must
+// report that they are already current. Neither successful result should tell
+// the operator to restart or reconnect a session.
+func TestRunCodexUpdate_ReportsRealStateWithoutRestartAdvice(t *testing.T) {
+	previousRuntime, previousNonInteractive := runtimeFlag, nonInteractiveFlag
+	previousLedgerFilename := activeLedgerFilename
+	previousLedgerConfigRoot, previousLedgerRoot := activeLedgerConfigRoot, activeLedgerRoot
+	t.Cleanup(func() {
+		runtimeFlag, nonInteractiveFlag = previousRuntime, previousNonInteractive
+		activeLedgerFilename = previousLedgerFilename
+		activeLedgerConfigRoot, activeLedgerRoot = previousLedgerConfigRoot, previousLedgerRoot
+	})
+
+	runtimeFlag = "codex"
+	nonInteractiveFlag = true
+	placer := newCodexPlacerAt(filepath.Join(isolatedUpdateHome(t), "codex"))
+	configureLedger(placer)
+
+	firstOutput := captureUpdateStdout(t, func() {
+		if err := runCodexUpdate(placer); err != nil {
+			t.Fatalf("first Codex update: %v", err)
+		}
+	})
+	if !strings.Contains(firstOutput, "Codex agent files updated.") {
+		t.Fatalf("changed Codex update did not report the applied result: %q", firstOutput)
+	}
+	assertUpdateOutputHasNoSessionAdvice(t, "changed Codex update", firstOutput)
+
+	secondOutput := captureUpdateStdout(t, func() {
+		if err := runCodexUpdate(placer); err != nil {
+			t.Fatalf("no-op Codex update: %v", err)
+		}
+	})
+	if !strings.Contains(secondOutput, "Codex agent files already current.") {
+		t.Fatalf("no-op Codex update did not report the real state: %q", secondOutput)
+	}
+	assertUpdateOutputHasNoSessionAdvice(t, "no-op Codex update", secondOutput)
+}
+
+// TestApplyUpdateDiff_ReportsChangedOpenCodeWithoutRestartAdvice exercises the
+// successful OpenCode apply path with an actual managed asset update in an
+// isolated config root. The native /th-reload hint remains useful, while
+// generic restart/reconnect advice does not belong in the updater output.
+func TestApplyUpdateDiff_ReportsChangedOpenCodeWithoutRestartAdvice(t *testing.T) {
+	previousRuntime, previousNonInteractive := runtimeFlag, nonInteractiveFlag
+	previousLedgerFilename := activeLedgerFilename
+	previousLedgerConfigRoot, previousLedgerRoot := activeLedgerConfigRoot, activeLedgerRoot
+	t.Cleanup(func() {
+		runtimeFlag, nonInteractiveFlag = previousRuntime, previousNonInteractive
+		activeLedgerFilename = previousLedgerFilename
+		activeLedgerConfigRoot, activeLedgerRoot = previousLedgerConfigRoot, previousLedgerRoot
+	})
+
+	runtimeFlag = "opencode"
+	nonInteractiveFlag = true
+	dir := filepath.Join(isolatedUpdateHome(t), "opencode")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatalf("create isolated OpenCode root: %v", err)
+	}
+	placer := newOpencodePlacerAt(dir)
+	configureLedger(placer)
+	cfgPath := opencodeSettingsConfigPath(dir)
+	seed := map[string]interface{}{
+		"installed_version": "1.0.0",
+		"format_version":    "1",
+		"logs-mode":         "local",
+	}
+	seedBytes, err := json.Marshal(seed)
+	if err != nil {
+		t.Fatalf("marshal config seed: %v", err)
+	}
+	if err := os.WriteFile(cfgPath, seedBytes, 0o644); err != nil {
+		t.Fatalf("write config seed: %v", err)
+	}
+
+	templatedPath := "{config_root}/" + opencodeGuideRelativePath
+	diff := PlanDiff{ToCreate: []PlannedFile{{
+		Component:    opencodeGuideComponent,
+		TemplatedDst: templatedPath,
+		ConcreteDst:  filepath.Join(dir, filepath.FromSlash(opencodeGuideRelativePath)),
+		ConfigKeys:   []string{opencodeGuideOwnershipKey},
+		OwnedFiles:   []string{templatedPath},
+		SrcData:      []byte("native workflow guide fixture\n"),
+	}}}
+
+	output := captureUpdateStdout(t, func() {
+		applyUpdateDiff(diff, cfgPath, placer)
+	})
+	if !strings.Contains(output, "Asset files updated on disk.") {
+		t.Fatalf("changed OpenCode update did not report the applied result: %q", output)
+	}
+	if !strings.Contains(output, "/th-reload") {
+		t.Fatalf("changed OpenCode update lost its concrete native reload hint: %q", output)
+	}
+	assertUpdateOutputHasNoSessionAdvice(t, "changed OpenCode update", output)
+}
+
+func assertUpdateOutputHasNoSessionAdvice(t *testing.T, label, output string) {
+	t.Helper()
+	// Match words in the message, not a test name embedded in a fixture path.
+	if regexp.MustCompile(`(?i)\b(restart|reconnect)\b|new codex session`).MatchString(output) {
+		t.Errorf("%s contains generic session advice: %q", label, output)
 	}
 }
 

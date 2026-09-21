@@ -73,6 +73,7 @@ Operators run this skill routinely; the value is a clean result, not a play-by-p
 - **The harness's activity indicator is the progress bar.** While the tool calls run, Claude Code shows its own running-command indicator; that is the progress signal. A skill cannot render an animated progress bar of its own, and must not simulate one with repeated text, percentage prints, or spinner characters. Rely on the harness indicator during execution and the single final report after it.
 - **Emit exactly one operator-facing message: the final report** (step 7), after all steps complete. There are two, and only two, exceptions: (1) an error that halts the flow (see Error handling) — report it immediately, then stop; (2) the **gated python3-install offer** in Step 6b. It is the sole inline consent step because it authorizes a system package action outside this repository's scope; it is exempt from the single-final-report rule for that reason, not a silent narration leak. No other step in this flow gets a third exception.
 - **The report is the product.** It must read like the output of a mature CLI tool: a titled status block with left-aligned labels and aligned values, neutral declarative voice, no emoji, no celebration, no filler. Keep it scannable in a couple of seconds.
+- **Report the actual outcome.** Ordinary updates have no restart/reconnect commentary, including negative assurances and hypothetical advice. Keep activation observations in diagnostic evidence; report a failure or concrete operator action with its impact and supported next step. Missing visibility alone is not an action.
 
 ---
 
@@ -510,7 +511,7 @@ Install python3 now for full coverage? [Y/n]
 
 **Post-install re-probe:** run `command -v python3` after a consented install.
 - If available: update the `python3` row to `python3 installed — full coverage active`.
-- If still absent: **Windows PATH caveat** — a winget-installed python3 may not appear on PATH in the current Git Bash session. When the re-probe fails immediately after a reported-successful winget install, update the row to `python3 installed — restart the terminal for PATH refresh`. On other platforms: record the degraded advisory and continue.
+- If still absent: **Windows PATH visibility** — a winget-installed python3 may not appear on PATH in the current Git Bash session. When the re-probe fails immediately after a reported-successful winget install, update the row to `python3 installed — unavailable on this session's PATH`. The Python-dependent capability remains unverified; this lookup alone does not establish a terminal lifecycle requirement. On other platforms: record the degraded advisory and continue.
 
 **Failed install / declined / unavailable manager:** record the degraded status in the `python3` row and continue. The bash fallback floor remains the enforcement guarantee.
 
@@ -524,9 +525,9 @@ Install python3 now for full coverage? [Y/n]
      installed version   <X>
      downloaded version  <Y>
      managed blocks      <per-block outcome — examples: "in sync (2/2)", "orchestrator-dispatch-rule: updated; voice-rule: already current", "orchestrator-dispatch-rule: preserved (operator-edited); voice-rule: already current", "orchestrator-dispatch-rule: force-adopted; voice-rule: already current", "orchestrator-dispatch-rule: inserted; voice-rule: inserted">
-     python3             <"available" | "WARN: absent — python-dependent skills degraded" | "installed — full coverage active" | "installed — restart the terminal for PATH refresh">
+     python3             <"available" | "WARN: absent — python-dependent skills degraded" | "installed — full coverage active" | "installed — unavailable on this session's PATH">
    ```
-   Closing line: `Next: /reload-plugins to activate <Y>; reconnect only if reload reports a specific remaining requirement.`
+   Closing line: `Next: /reload-plugins to activate <Y>.`
 
    **(b) Already current** (no download):
    ```
@@ -536,7 +537,7 @@ Install python3 now for full coverage? [Y/n]
      installed version   <X>
      latest version      <X>
      managed blocks      <e.g. "in sync (2/2)" or "orchestrator-dispatch-rule: updated; voice-rule: already current" or "orchestrator-dispatch-rule: preserved (operator-edited); voice-rule: already current">
-     python3             <"available" | "WARN: absent — python-dependent skills degraded" | "installed — full coverage active" | "installed — restart the terminal for PATH refresh">
+     python3             <"available" | "WARN: absent — python-dependent skills degraded" | "installed — full coverage active" | "installed — unavailable on this session's PATH">
    ```
    Closing line: `No action required.`
 

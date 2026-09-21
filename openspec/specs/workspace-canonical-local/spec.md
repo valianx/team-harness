@@ -7,6 +7,21 @@ retains its existing identity and useful context in that selected home.
 
 ## Requirements
 
+### Requirement: Direct visual work resolves the selected physical workspace
+Workspace preparation SHALL validate existing parent directories before accepting
+a missing destination. Direct visual skills SHALL use the shared local/Obsidian
+workspace method and resources from the active skill installation, while honoring
+an explicit deliverable destination.
+
+#### Scenario: Missing destination under an escaping link
+- **WHEN** an existing ancestor redirects the requested workspace outside its selected home
+- **THEN** preparation reports a destination conflict before declaring the workspace ready
+
+#### Scenario: Visual skill is invoked directly on any supported runtime
+- **WHEN** no parent workflow has supplied a workspace
+- **THEN** the skill resolves the configured home before writing working files and resolves renderer resources without depending on another runtime's installation
+
+
 ### Requirement: A pipeline has one canonical persisted workspace identity
 Team Harness SHALL resolve a workspace identity once before the first state write and SHALL persist its absolute coordinator root, mode, repository base, date, and initiative or feature slug. In Obsidian mode a confirmed multi-repository initiative SHALL use `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}` as its coordinator root, with each participating service below that root. Activation, recovery, trace, pipeline listing, gates, and specialist dispatch MUST consume the persisted identity or the same shared resolver and MUST NOT compose an alternative path locally.
 

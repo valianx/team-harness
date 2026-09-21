@@ -2,7 +2,7 @@
 
 import { constants as fsConstants } from "node:fs";
 import { lstat, mkdtemp, open, realpath, rmdir, unlink } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import process from "node:process";
 
 const SCHEMA_VERSION = 1;
@@ -55,17 +55,24 @@ async function validateWorkspace(root, input) {
   if (!isAbsolute(input)) throw new Error("workspace must be absolute");
   const requested = resolve(input);
   if (!isContained(root, requested)) throw new Error("workspace must remain strictly below root");
-  try {
-    const stat = await lstat(requested);
+  // A missing leaf can still traverse an existing junction or symlink.
+  // Inspect the nearest existing ancestor before accepting a future path.
+  for (let ancestor = requested; ancestor !== root; ancestor = dirname(ancestor)) {
+    let stat;
+    try {
+      stat = await lstat(ancestor);
+    } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      throw error;
+    }
     if (stat.isSymbolicLink() || !stat.isDirectory()) {
       throw new Error("existing workspace must be a non-symlink directory");
     }
-    const canonical = await realpath(requested);
-    if (!isContained(root, canonical) || canonical !== requested) {
+    const canonical = await realpath(ancestor);
+    if (!isContained(root, canonical) || canonical !== ancestor) {
       throw new Error("existing workspace escapes or aliases its canonical root");
     }
-  } catch (error) {
-    if (error?.code !== "ENOENT") throw error;
+    break;
   }
   return requested;
 }

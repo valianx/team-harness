@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -80,8 +81,25 @@ func TestCodexRuntimeSelectsOwnLedger(t *testing.T) {
 	}
 }
 
+// skipCodexLedgerWhenAncestorOwnershipUnavailable keeps the runtime tests
+// honest on Windows hosts whose profile ancestry is managed by Administrators
+// (or another service account). Production still fails closed in that case;
+// the fixture cannot manufacture a current-user-owned profile root safely.
+func skipCodexLedgerWhenAncestorOwnershipUnavailable(t *testing.T, root string) {
+	t.Helper()
+	if err := lstatWalkPreResolution(filepath.Join(root, "team-harness")); err != nil {
+		homeDir, homeErr := os.UserHomeDir()
+		homeMismatch := homeErr == nil && strings.Contains(err.Error(), fmt.Sprintf("path component %q ownership check failed", filepath.Clean(homeDir)))
+		if homeMismatch {
+			t.Skipf("unsupported Windows ACL fixture: Codex ledger ancestry is not owned by the current user: %v", err)
+		}
+		t.Fatalf("Codex ledger path precondition failed: %v", err)
+	}
+}
+
 func TestCodexLedgerLivesUnderCodexRoot(t *testing.T) {
 	root := t.TempDir()
+	skipCodexLedgerWhenAncestorOwnershipUnavailable(t, root)
 	p := newCodexPlacerAt(root)
 	configureLedger(p)
 	t.Cleanup(func() {
@@ -119,7 +137,8 @@ func TestParseCodexDirAndSelectPlacer(t *testing.T) {
 }
 
 func TestCodexDirRejectsFilesystemRoot(t *testing.T) {
-	if _, err := newCodexPlacer("project", string(filepath.Separator)); err == nil || !strings.Contains(err.Error(), "filesystem or volume root") {
+	if _, err := newCodexPlacer("project", string(filepath.Separator)); err == nil ||
+		(!strings.Contains(err.Error(), "filesystem or volume root") && !strings.Contains(err.Error(), "must be absolute")) {
 		t.Fatalf("filesystem root was accepted: %v", err)
 	}
 }
@@ -136,6 +155,7 @@ func TestCodexRootDetectorRecognizesOnlyRoots(t *testing.T) {
 
 func TestCodexLifecyclePreservesConfigAndForeignAgents(t *testing.T) {
 	root := t.TempDir()
+	skipCodexLedgerWhenAncestorOwnershipUnavailable(t, root)
 	config := []byte("# operator comment\nmodel = \"operator-model\"\n[agents]\nmax_threads = 9\n")
 	if err := os.WriteFile(filepath.Join(root, "config.toml"), config, 0o640); err != nil {
 		t.Fatal(err)
@@ -295,6 +315,7 @@ func TestCodexUninstallRejectsCrossRuntimeLedger(t *testing.T) {
 
 func TestCodexPlanRemovesRetiredOwnedAgent(t *testing.T) {
 	root := t.TempDir()
+	skipCodexLedgerWhenAncestorOwnershipUnavailable(t, root)
 	p := newCodexPlacerAt(root)
 	originalRuntime := runtimeFlag
 	runtimeFlag = "codex"

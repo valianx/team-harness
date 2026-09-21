@@ -172,6 +172,22 @@ await check("missing or ambiguous lockfiles fail closed without mutable resoluti
   }, { lockfiles: ["pnpm-lock.yaml", "yarn.lock"] });
 });
 
+await check("dependency inspection ignores inherited Git repository overrides", async () => {
+  await fixture(async (repository) => {
+    const previous = process.env.GIT_DIR;
+    try {
+      process.env.GIT_DIR = path.join(repository, "not-a-git-directory");
+      const result = await inspectWorktreeDependencies({ repository });
+      assert.notEqual(result.error_code, "REPOSITORY_INVALID");
+      assert.equal(result.repository, repository);
+      assert.equal(result.package_manager, "pnpm");
+    } finally {
+      if (previous === undefined) delete process.env.GIT_DIR;
+      else process.env.GIT_DIR = previous;
+    }
+  });
+});
+
 if (failures.length > 0) {
   console.error(`\n${failures.length} worktree dependency check(s) failed.`);
   process.exitCode = 1;

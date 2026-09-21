@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { chmod, lstat, mkdtemp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdtemp, mkdir, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
-const repositoryRoot = resolve(new URL("..", import.meta.url).pathname);
+const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
 const helper = join(repositoryRoot, "skills/pipeline/scripts/workspace-preflight.mjs");
 
 function run(root, workspace) {
@@ -32,6 +33,20 @@ try {
   assert.equal(ready.json.workspace, workspace);
   await assert.rejects(() => lstat(workspace), { code: "ENOENT" });
   assert.deepEqual(await readdir(externalRoot), [], "write probe left an artifact behind");
+
+  const elsewhere = join(temp, "elsewhere");
+  await mkdir(elsewhere);
+  const link = join(externalRoot, "redirect");
+  await symlink(elsewhere, link, process.platform === "win32" ? "junction" : "dir");
+  const redirected = run(externalRoot, join(link, "new", "workspace"));
+  assert.equal(redirected.status, 2);
+  assert.equal(redirected.json.status, "invalid");
+  assert.deepEqual(await readdir(elsewhere), [], "preflight wrote through the redirected parent");
+  await rm(link);
+
+  const nested = run(externalRoot, join(externalRoot, "new", "nested"));
+  assert.equal(nested.json.status, "ready", "ordinary missing parents remain supported");
+  await assert.rejects(() => lstat(join(externalRoot, "new")), { code: "ENOENT" });
 
   const outside = run(externalRoot, join(temp, "local-fallback"));
   assert.equal(outside.status, 2);

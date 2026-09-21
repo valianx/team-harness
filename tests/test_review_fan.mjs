@@ -815,6 +815,17 @@ await check("rejects an unknown subcommand", async () => {
   assert.equal(result.error_code, "ARGUMENT_INVALID");
 });
 
+await check("malformed disagreements identify the invalid returns", async () => withRepository(async (root) => {
+  const packagePath = path.join(root, "package.json5");
+  const returnsPath = path.join(root, "returns.json");
+  await writeFile(packagePath, JSON.stringify(pkg()));
+  for (const disagreements of ["invalid", {}, [null], ["invalid"], [{ blocking: "yes" }]]) {
+    await writeFile(returnsPath, JSON.stringify([ret("qa", { disagreements })]));
+    const result = await runReviewFan({ subcommand: "summary", package: packagePath, returns: returnsPath });
+    assert.equal(result.error_code, "RETURNS_INVALID", JSON.stringify(disagreements));
+  }
+}));
+
 if (failures.length > 0) {
   console.error(`${failures.length} review fan checks failed: ${failures.join(", ")}`);
   process.exitCode = 1;

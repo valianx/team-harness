@@ -5,7 +5,9 @@
 #
 # Audits the shipped assets of a team-harness asset tree for the security
 # issues a config-distribution repo must never ship:
-#   Check 1 (FAIL) — read-only-tier agent carrying forbidden mutation tools:
+#   Check 0 (FAIL) — roster names that do not resolve to agent files
+#   Check 1 (FAIL) — read-only/no-mutation agents carrying forbidden tools
+#   Check 2 (FAIL) — Codex PR-review projections outside the read-only schema
 #   Check 3 (FAIL) — hooks/*.sh containing injection anti-patterns
 #   Check 4 (WARN) — hooks.json manifest non-canonical command / over-permissive matcher
 #   Check 5 (FAIL) — concrete secrets in shipped assets
@@ -78,6 +80,7 @@ READ_ONLY_AGENTS = {
     "architect", "security", "qa", "reviewer",
     "plan-reviewer", "mentor", "adversary", "pr-review-qa",
     "pr-review-security", "pr-review-verifier", "reviewer-consolidator",
+    "inline-reviewer",
 }
 
 PR_REVIEW_AGENT_TOOLS = {
@@ -91,7 +94,9 @@ PR_REVIEW_AGENT_TOOLS = {
     "reviewer-consolidator": ["Read", "Glob", "Grep"],
 }
 
-NO_MUTATION_AGENTS = set(PR_REVIEW_AGENT_TOOLS)
+# PR-review roles and the inline reviewer have an exact read-only boundary:
+# Check 1 must reject Bash, Edit, and Write for all of them.
+NO_MUTATION_AGENTS = set(PR_REVIEW_AGENT_TOOLS) | {"inline-reviewer"}
 
 # The full agent roster. check_0_roster_reachability() below fails when a name
 # here no longer resolves to a file.
@@ -102,6 +107,7 @@ EXPECTED_AGENTS = [
     "plan-reviewer", "diagrammer", "documenter", "likec4-diagrammer",
     "d2-diagrammer", "translator", "delivery", "mentor",
     "researcher", "research-consolidator", "code-researcher", "adversary", "ux-reviewer",
+    "inline-reviewer",
 ]
 
 # ---------------------------------------------------------------------------
@@ -644,7 +650,7 @@ def check_5_secrets() -> int:
 # ---------------------------------------------------------------------------
 
 def _self_test_check_1() -> None:
-    """Exercise the scanner on the verifier, with an authorized writer as control."""
+    """Exercise read-only and no-mutation tool validation with an authorized writer as control."""
     from contextlib import redirect_stdout
     from unittest.mock import patch
 
@@ -653,14 +659,44 @@ def _self_test_check_1() -> None:
         (root / "implementer.md").write_text(
             "---\nname: implementer\ntools: Read, Write, Edit, Bash\n---\n", encoding="utf-8")
         verifier = root / "pr-review-verifier.md"
-        for toolset, should_fail in (("Read, Glob, Grep", False),
-                                     ("Read, Glob, Grep, Bash", True),
-                                     ("Read, Glob, Grep, Write", True),
-                                     ("Read, Glob, Grep, Task", True)):
-            verifier.write_text(f"---\nname: pr-review-verifier\ntools: {toolset}\n---\n", encoding="utf-8")
-            with patch.dict(globals(), {"AGENTS_DIR": root, "findings": []}), redirect_stdout(io.StringIO()):
-                failures = check_1_readonly_bash()
-            assert (failures > 0) == should_fail, f"check-1 verifier fixture: {toolset}"
+        inline_reviewer = root / "inline-reviewer.md"
+        cases = [
+            (
+                "pr-review-verifier",
+                verifier,
+                (("Read, Glob, Grep", False),
+                 ("Read, Glob, Grep, Bash", True),
+                 ("Read, Glob, Grep, Write", True),
+                 ("Read, Glob, Grep, Task", True)),
+            ),
+            (
+                "inline-reviewer",
+                inline_reviewer,
+                (("Read, Glob, Grep", False),
+                 ("Read, Glob, Grep, Bash", True),
+                 ("Read, Glob, Grep, Edit", True),
+                 ("Read, Glob, Grep, Write", True)),
+            ),
+        ]
+        for agent_name, agent_path, toolsets in cases:
+            for toolset, should_fail in toolsets:
+                # Keep the other read-only fixture valid so each assertion is
+                # about the tool boundary under test.
+                verifier.write_text(
+                    "---\nname: pr-review-verifier\ntools: Read, Glob, Grep\n---\n",
+                    encoding="utf-8",
+                )
+                inline_reviewer.write_text(
+                    "---\nname: inline-reviewer\ntools: Read, Glob, Grep\n---\n",
+                    encoding="utf-8",
+                )
+                agent_path.write_text(
+                    f"---\nname: {agent_name}\ntools: {toolset}\n---\n",
+                    encoding="utf-8",
+                )
+                with patch.dict(globals(), {"AGENTS_DIR": root, "findings": []}), redirect_stdout(io.StringIO()):
+                    failures = check_1_readonly_bash()
+                assert (failures > 0) == should_fail, f"check-1 {agent_name} fixture: {toolset}"
 
 
 def _self_test_check_2() -> None:
@@ -753,7 +789,7 @@ def run_positive_fixtures() -> None:
     print("=== Positive fixtures (AC-9) ===")
     fixture_errors: list[str] = []
     for name, fn in [
-        ("check-1: read-only agent with Bash", _self_test_check_1),
+        ("check-1: read-only/no-mutation agent tool boundary", _self_test_check_1),
         ("check-2: Codex 0.146 projection with capabilities table", _self_test_check_2),
         ("check-3: curl | bash injection", _self_test_check_3),
         ("check-4: non-canonical chained manifest command", _self_test_check_4),
@@ -788,7 +824,7 @@ def main() -> None:
     check_0_roster_reachability()
     print()
 
-    print("--- Check 1: read-only tier excludes Bash ---")
+    print("--- Check 1: read-only/no-mutation tools stay within bounds ---")
     check_1_readonly_bash()
     print()
 

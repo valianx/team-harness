@@ -114,12 +114,22 @@ export function createBoundedJsonReader(makeError) {
   };
 }
 
+export function repositoryGitEnv(source = process.env) {
+  const selectionKeys = new Set([
+    "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE",
+    "GIT_PREFIX", "GIT_CEILING_DIRECTORIES",
+  ]);
+  return Object.fromEntries(Object.entries(source).filter(([key]) => !selectionKeys.has(key.toUpperCase())));
+}
+
 export function createGitRunners(makeError) {
   async function gitBytes(repo, args, code) {
     const timeoutMs = resolveGitTimeoutMs();
     try {
       const result = await execFileAsync("git", args, {
         cwd: repo,
+        env: repositoryGitEnv(),
         encoding: null,
         maxBuffer: MAX_JSON_BYTES,
         timeout: timeoutMs,

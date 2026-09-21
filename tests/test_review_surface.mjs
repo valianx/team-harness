@@ -6,12 +6,13 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 
 import { CHECKERS, canonicalSourceFor, computeReviewSurface, mirrorFor, provenMirrors } from "../skills/pipeline/scripts/review-surface.mjs";
 
 const run = promisify(execFile);
 const failures = [];
-const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 async function git(root, args) {
   await run("git", ["-C", root, ...args], { windowsHide: true });

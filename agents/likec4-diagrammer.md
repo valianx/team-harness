@@ -39,22 +39,28 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 
 **Before starting ANY work:**
 
-1. **Read the orchestrator's invocation** — extract:
-   - Path to architect's analysis: `workspaces/{feature}/research/00-research.md`
-   - Path to skill: `.claude/skills/likec4-diagram/`
-   - Output path: `workspaces/{feature}/diagram.c4`
-   - Feature name for workspaces and execution log
+1. **Read the orchestrator's invocation** — consume the absolute `workspace`, the
+   optional absolute `deliverable_target`, the absolute `analysis_path`, and the
+   active `skill_root` supplied by Main. `workspace` is the shared local or
+   Obsidian home for this effort; `deliverable_target` is the explicit source
+   file or output directory when one was requested. Never derive paths from the
+   current working directory or from a feature name.
 
-2. **Read the architect's analysis** — read `workspaces/{feature}/research/00-research.md` in full. This is your primary input. Do not start designing until you've read and understood it.
+2. **Resolve the output paths** using the LikeC4 skill contract: an explicit file
+   target remains the exact `source_file`; a directory target uses
+   `{output_dir}/diagram.c4` and `{output_dir}/05-diagram.md`; without a target,
+   use the supplied `workspace` as `output_dir`. Exported views stay in that
+   directory. The supplied workspace must already exist. Do not create a
+   repository-local feature folder or edit `.gitignore`.
 
-3. **Read the skill methodology** — read these files in order:
-   - `.claude/skills/likec4-diagram/SKILL.md` — design process, quality checklist
-   - `.claude/skills/likec4-diagram/references/dsl-reference.md` — all DSL syntax
-   - `.claude/skills/likec4-diagram/references/patterns.md` — use the closest matching pattern as a starting point
+3. **Read the architect's analysis** — read the supplied `analysis_path` in
+   full. This is the primary input. Do not start designing until it has been
+   read and understood.
 
-4. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature}/` for your output.
-
-5. **Ensure `.gitignore` includes `/workspaces`** — check and add if missing.
+4. **Read the skill methodology** from the supplied `skill_root` in this order:
+   - `{skill_root}/SKILL.md` — design process, quality checklist
+   - `{skill_root}/references/dsl-reference.md` — all DSL syntax
+   - `{skill_root}/references/patterns.md` — use the closest matching pattern as a starting point
 
 ---
 
@@ -133,23 +139,31 @@ Build the `.c4` file one pass at a time:
 
 ## Obsidian Output Mode
 
-When the resolved output path is inside an Obsidian vault (i.e., `logs-mode: obsidian` is active and `docs_root` points to a vault workspace folder), follow this contract INSTEAD OF writing only the source. The local-mode path (source + summary in `workspaces/`) is unchanged.
+When the resolved `output_dir` is inside an Obsidian vault, use the same
+workspace-resolved source, exported views, and summary paths below. Local and
+Obsidian mode share the supplied output directory; there is no second output
+root or repository-local workspace.
 
 ### Render step (mandatory in obsidian mode)
 
-After validating `diagram.c4`, export PNG views into the vault folder:
+After validating `{source_file}`, export PNG views into the resolved output directory:
 
 ```bash
-npx likec4 export png -o "{docs_root}"
+npx likec4 export png -o "{output_dir}"
 ```
 
 The `-o` flag is a **directory**. LikeC4 writes one `diagram_<viewId>.png` file per view into that directory. PNG is LikeC4's documented export format; this step requires Playwright (LikeC4 installs it automatically via `npx`).
 
-**Path quoting:** `{docs_root}` is double-quoted. Obsidian vault paths commonly contain spaces (e.g. `…/Obsidian Vault/…`); unquoted paths break the command on those systems. The `viewId`-derived embed filenames are discovered by globbing `{docs_root}/diagram_*.png` after export completes — they are never interpolated into a shell command.
+**Path quoting:** `{output_dir}` is double-quoted. Obsidian vault paths commonly
+contain spaces; unquoted paths break the command. Discover view filenames by
+globbing `{output_dir}/diagram_*.png` after export; never interpolate a view ID
+into a shell command.
 
 ### Embed step
 
-After the PNG files are written, append one embed per exported PNG to `{docs_root}/05-diagram.md`. Discover the exported files by globbing `{docs_root}/diagram_*.png` after the export command completes:
+After the PNG files are written, append one embed per exported PNG to
+`{summary_file}`. Discover the exported files by globbing
+`{output_dir}/diagram_*.png` after export completes:
 
 ```markdown
 ## Rendered Diagrams
@@ -162,12 +176,12 @@ One `![[...]]` line per exported PNG. This causes Obsidian to display each view 
 
 When `npx likec4` is not available (e.g., Node.js not installed, network unavailable), do NOT hard-fail. The `.c4` source is still the authoritative deliverable.
 
-In obsidian mode, append this marker to `{docs_root}/05-diagram.md` in place of the embeds:
+In the resolved workspace, append this marker to `{summary_file}` in place of the embeds:
 
 ```markdown
 ## Rendered Diagrams
 > Images not rendered — `npx likec4` is not available. Install Node.js and re-run to embed the diagrams.
-> Source: `diagram.c4`
+> Source: `{source_file}`
 ```
 
 Status remains `success` when the source was produced and validated. Add `render: skipped` to the status block so the orchestrator/operator can see the degradation explicitly.
@@ -175,6 +189,10 @@ Status remains `success` when the source was produced and validated. Add `render
 ---
 
 ## Phase 2 — Validation (MANDATORY)
+
+Run every LikeC4 CLI command, including preview and export, with its working
+directory set to `output_dir`. The invocation's original directory is not the
+diagram project.
 
 ### Step 1 — CLI validation
 
@@ -199,7 +217,7 @@ Read the complete `.c4` file and verify:
 
 If `npx likec4` CLI supports export:
 ```bash
-npx likec4 export png --output workspaces/{feature}/
+npx likec4 export png --output "{output_dir}"
 ```
 
 Read the PNG to verify the diagram communicates correctly. If elements are missing or relationships are unclear, revise.
@@ -247,13 +265,13 @@ Before finishing, verify the diagram passes the skill's Quality Checklist:
 
 ## Session Documentation
 
-Write your summary to `workspaces/{feature}/05-diagram.md`:
+Write your summary to `{summary_file}`:
 
 ```markdown
 # LikeC4 Diagram Summary: {feature}
 **Date:** {date}
 **Agent:** likec4-diagrammer
-**Output:** workspaces/{feature}/diagram.c4
+**Output:** {source_file}
 
 ## Design Decisions
 - **Pattern used:** {monolith/microservices/event-driven/layered/client-server/CQRS}
@@ -273,7 +291,9 @@ Write your summary to `workspaces/{feature}/05-diagram.md`:
 
 ## Execution Log Protocol
 
-The orchestrator writes observability events to `workspaces/{feature}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orchestrator propagates it.
+The orchestrator owns observability events for the supplied workspace. You do not
+create or write an execution-log file directly — return timing data in the status
+block and the orchestrator propagates it.
 
 ---
 
@@ -285,7 +305,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: likec4-diagrammer
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
-output: workspaces/{feature}/diagram.c4
+output: {source_file}
 views: {list of view names}
 render: done | skipped   # obsidian mode only; omit in local mode
 validation_cycles: {N}
@@ -298,4 +318,4 @@ issues: {blocking issues if failed/blocked, or "none"}
 - `failed` — validation or structural completeness has a blocking issue and no verifiable repair remains
 - `blocked` — `npx likec4` not available, or missing prerequisites
 
-Do NOT repeat the full workspaces content in your final message. The orchestrator uses this status block to validate completeness.
+Do NOT repeat the full workspace content in your final message. The orchestrator uses this status block to validate completeness.

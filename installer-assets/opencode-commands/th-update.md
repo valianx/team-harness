@@ -54,8 +54,11 @@ After the command exits, report exactly one of the three states:
   release; no action is possible until the next release ships.
 
 After `already current` or `updated`, load the native `reload` skill and execute
-its activation procedure for this conversation. Report active and pending
-components separately from installation, preserving the session on reconnect.
+its activation procedure for this conversation using its result contract for an
+update invocation. Retain activation diagnostics separately. The ordinary summary
+reports the version and outcome without restart/reconnect commentary or negative
+assurances. Surface actual failures and concrete operator actions with their impact
+and supported next step; unavailable observations alone stay in diagnostic evidence.
 Do not run reload after an updater failure or `installed ahead`.
 
 ## Integrity floor

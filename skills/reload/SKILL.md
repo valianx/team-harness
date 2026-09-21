@@ -81,7 +81,7 @@ history or create a new task.
 
 ## Result
 
-Report in the operator's language:
+For an explicit reload or diagnostic request, report in the operator's language:
 
 - Installed target version and root; observed active version, or `unknown`.
 - Components verified active, resources reread only, and components pending.
@@ -90,6 +90,14 @@ Report in the operator's language:
   above; `active` when every applicable component has valid active-host evidence;
   otherwise `partial`.
 - The smallest remaining action, with the same conversation ID when available.
+
+When update invokes reload, return these observations to the update flow as
+diagnostic evidence. The ordinary operator summary gives the installed version
+and actual update outcome. Omit routine restart/reconnect commentary, including
+negative assurances and hypothetical next steps; unavailable observations alone
+stay in the diagnostic record. Report a failed operation, observed stale component
+or actual operator action with its impact and supported remedy. A demonstrated
+reconnect need still follows the component-evidence contract above.
 
 Do not infer `active` from the absence of reported errors. Keep installation
 verification separate from session activation. If an operator workspace already

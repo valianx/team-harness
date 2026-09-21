@@ -230,6 +230,18 @@ func TestApplyPlan_RemoveAppendsClosure(t *testing.T) {
 	}
 }
 
+func TestTemplatedFilePaths_UsesPortableSeparators(t *testing.T) {
+	root := t.TempDir()
+	placer := newClaudeCodePlacerAt(root)
+	item := OwnedItem{Files: []string{filepath.Join(root, "plugins", "team-harness.ts")}}
+
+	got := templatedFilePaths(item, placer)
+	want := []string{"{config_root}/plugins/team-harness.ts"}
+	if len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("templatedFilePaths() = %v, want %v", got, want)
+	}
+}
+
 func TestApplyPlan_RejectsLedgerErrorsBeforeWrites(t *testing.T) {
 	root := t.TempDir()
 	placer := newClaudeCodePlacerAt(root)

@@ -9,6 +9,7 @@ import { captureRegression, validateRegression, classifyComparison } from "../sk
 
 const root = await realpath(await mkdtemp(path.join(tmpdir(), "th-regression-test-")));
 const repository = path.join(root, "source");
+const settingRelative = "nested/config/setting.txt";
 const token = "a".repeat(32);
 const run = path.join(root, `run-${token}`);
 const requestPath = path.join(run, "request.json");
@@ -30,11 +31,12 @@ try {
   git("init");
   git("config", "user.name", "Fixture");
   git("config", "user.email", "fixture@example.test");
-  await writeFile(path.join(repository, "setting.txt"), "preserved");
-  git("add", "setting.txt");
+  await mkdir(path.dirname(path.join(repository, settingRelative)), { recursive: true });
+  await writeFile(path.join(repository, settingRelative), "preserved");
+  git("add", settingRelative);
   git("commit", "-m", "base");
   const base = git("rev-parse", "HEAD");
-  await writeFile(path.join(repository, "setting.txt"), "deleted");
+  await writeFile(path.join(repository, settingRelative), "deleted");
   git("commit", "-am", "head");
   const head = git("rev-parse", "HEAD");
   git("clone", "--bare", "--no-hardlinks", repository, path.join(run, "pr-review-snapshot.git"));
@@ -49,7 +51,7 @@ try {
     timeout_ms: 1000, environment: "Same runtime; no dependencies", comparable: true, unavailable_reason: null,
   };
   const probe = `import { readFileSync } from 'node:fs';
-const passed = readFileSync('setting.txt', 'utf8') === 'preserved';
+const passed = readFileSync('${settingRelative}', 'utf8') === 'preserved';
 process.stdout.write('TH_ASSERT:preserve-config:' + (passed ? 'PASS' : 'FAIL'));
 process.exitCode = passed ? 0 : 1;
 `;
@@ -60,19 +62,34 @@ process.exitCode = passed ? 0 : 1;
     const record = await validateRegression(requestPath, receipt.evidence, receipt.sha256);
     return { receipt, record };
   }
-  let initial;
-  await check("real preserved-setting regression with unchanged operator checkout", async () => {
-    initial = await capture();
+  await check("nested preserved-setting regression with unchanged operator checkout", async () => {
+    const initial = await capture();
     assert.equal(initial.record.classification, "regression-candidate");
     assert.equal(initial.record.base.assertion, "pass");
     assert.equal(initial.record.head.assertion, "fail");
     assert.equal(initial.record.identity.merge_base_oid, base);
     assert.equal(initial.record.identity.head_oid, head);
-    assert.equal(await readFile(path.join(repository, "setting.txt"), "utf8"), "deleted");
+    assert.equal(await readFile(path.join(repository, settingRelative), "utf8"), "deleted");
     assert.equal(git("status", "--porcelain"), "");
     assert.equal(git("rev-parse", "HEAD"), head);
   });
+  await check("mixed-case ambient Git variables cannot redirect snapshot objects", async () => {
+    for (const key of ["git_object_directory", "Git_Object_Directory", "GIT_OBJECT_DIRECTORY"]) {
+      const previous = process.env[key];
+      try {
+        process.env[key] = path.join(root, "missing-objects");
+        const { record } = await capture();
+        assert.equal(record.classification, "regression-candidate", record.reason);
+        assert.equal(record.base.assertion, "pass");
+        assert.equal(record.head.assertion, "fail");
+      } finally {
+        if (previous === undefined) delete process.env[key];
+        else process.env[key] = previous;
+      }
+    }
+  });
   await check("head and comparison-base changes reject reuse", async () => {
+    const initial = await capture();
     for (const field of ["head_oid", "base_oid", "merge_base_oid"]) {
       await json(contextPath, { ...context, [field]: "c".repeat(40) });
       await assert.rejects(validateRegression(requestPath, initial.receipt.evidence, initial.receipt.sha256), /identity/);
@@ -80,6 +97,7 @@ process.exitCode = passed ? 0 : 1;
     await json(contextPath, context);
   });
   await check("changed command and original probe reject reuse", async () => {
+    const initial = await capture();
     await json(requestPath, { ...request, argv: [process.execPath, "--no-warnings", "{probe}"] });
     await assert.rejects(validateRegression(requestPath, initial.receipt.evidence, initial.receipt.sha256), /identity/);
     await json(requestPath, request);
@@ -88,6 +106,7 @@ process.exitCode = passed ? 0 : 1;
     await writeFile(probePath, probe);
   });
   await check("modified evidence and copied probe reject reuse", async () => {
+    const initial = await capture();
     const bytes = await readFile(initial.receipt.evidence);
     await writeFile(initial.receipt.evidence, `${bytes} `);
     await assert.rejects(validateRegression(requestPath, initial.receipt.evidence, initial.receipt.sha256), /digest/);
@@ -122,6 +141,28 @@ process.exitCode = passed ? 0 : 1;
       assert.ok(record.reason);
     }
   });
+  await check("probe outside the owned review run is rejected", async () => {
+    const outsideProbe = path.join(root, "outside-probe.mjs");
+    await writeFile(outsideProbe, probe);
+    await json(requestPath, { ...request, probe: outsideProbe });
+    await assert.rejects(captureRegression(requestPath), /owned review run/);
+    await json(requestPath, request);
+  });
+  await check("probe beneath a redirected directory is rejected before execution", async () => {
+    const outside = path.join(root, "outside-probes");
+    const link = path.join(run, "redirected-probes");
+    await mkdir(outside);
+    await writeFile(path.join(outside, "probe.mjs"), "throw new Error('must not run');");
+    await symlink(outside, link, process.platform === "win32" ? "junction" : "dir");
+    try {
+      await json(requestPath, { ...request, probe: path.join(link, "probe.mjs") });
+      await assert.rejects(captureRegression(requestPath), /symlink input/);
+      assert.equal(await readFile(path.join(outside, "probe.mjs"), "utf8"), "throw new Error('must not run');");
+    } finally {
+      await rm(link);
+      await json(requestPath, request);
+    }
+  });
   await check("missing executable and ambiguous assertion output remain inconclusive", async () => {
     for (const [source, overrides] of [
       ["", { argv: [path.join(root, "missing-executable"), "{probe}"] }],
@@ -152,11 +193,19 @@ process.exitCode = passed ? 0 : 1;
     const outside = path.join(root, "outside.json");
     await writeFile(outside, await readFile(receipt.evidence));
     await rm(receipt.evidence);
-    await symlink(outside, receipt.evidence);
+    try {
+      await symlink(outside, receipt.evidence);
+    } catch (error) {
+      if (error?.code === "EPERM" || error?.code === "EACCES") {
+        process.stdout.write("SKIP symlink evidence fixture lacks native link permission\n");
+        return;
+      }
+      throw error;
+    }
     await assert.rejects(validateRegression(requestPath, receipt.evidence, receipt.sha256), /symlink/);
   });
   await check("unsupported source entries disclose unavailable preparation", async () => {
-    git("update-index", "--add", "--cacheinfo", `120000,${git("rev-parse", "HEAD:setting.txt")},link`);
+    git("update-index", "--add", "--cacheinfo", `120000,${git("rev-parse", `HEAD:${settingRelative}`)},link`);
     git("commit", "-m", "symlink fixture");
     const next = git("rev-parse", "HEAD");
     execFileSync("git", ["--git-dir", path.join(run, "pr-review-snapshot.git"), "fetch", repository, next], { stdio: "pipe" });
@@ -177,7 +226,7 @@ process.exitCode = passed ? 0 : 1;
   await check("Windows-normalized paths never materialize outside the execution copy", async () => {
     for (const filename of [".. /escape.txt", "trailing./setting.txt", "NUL.txt", "setting.txt "]) {
       git("read-tree", base);
-      git("-c", "core.protectNTFS=false", "update-index", "--add", "--cacheinfo", `100644,${git("rev-parse", base + ":setting.txt")},${filename}`);
+      git("-c", "core.protectNTFS=false", "update-index", "--add", "--cacheinfo", `100644,${git("rev-parse", `${base}:${settingRelative}`)},${filename}`);
       const tree = git("write-tree");
       const revision = git("commit-tree", tree, "-p", base, "-m", "Windows path fixture");
       execFileSync("git", ["--git-dir", path.join(run, "pr-review-snapshot.git"), "fetch", repository, revision], { stdio: "pipe" });

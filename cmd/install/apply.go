@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 )
 
 // ApplyPlan executes the diff produced by ComputePlan:
@@ -132,7 +133,9 @@ func templatedFilePaths(item OwnedItem, placer Placer) []string {
 	for _, f := range item.Files {
 		rel := f
 		if len(f) > len(configRoot) && f[:len(configRoot)] == configRoot {
-			rel = "{config_root}" + f[len(configRoot):]
+			// Ledger paths use the portable manifest separator even when the
+			// concrete placer is running on Windows.
+			rel = "{config_root}" + filepath.ToSlash(f[len(configRoot):])
 		}
 		result = append(result, rel)
 	}

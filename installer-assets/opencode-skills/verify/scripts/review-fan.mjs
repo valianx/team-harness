@@ -563,7 +563,12 @@ function validReturn(value) {
   return object(value) &&
     LENSES.includes(value.lens) &&
     VERDICTS.includes(value.verdict) &&
-    (value.findings === undefined || Array.isArray(value.findings));
+    (value.findings === undefined || Array.isArray(value.findings)) &&
+    (value.disagreements === undefined || (Array.isArray(value.disagreements) &&
+      value.disagreements.every(entry => object(entry) &&
+        typeof entry.claim === "string" && entry.claim.trim().length > 0 &&
+        typeof entry.blocking === "boolean" &&
+        (entry.with === undefined || typeof entry.with === "string"))));
 }
 
 function locationPath(location) {

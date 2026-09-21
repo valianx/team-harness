@@ -5,6 +5,20 @@ Provide architectural and functional diagnosis with reconstructible coverage, ma
 
 ## Requirements
 
+### Requirement: Security self-scan describes its actual checks
+The self-scan entry SHALL describe the checks actually executed, including native
+review projections. Its read-only role checks SHALL cover the installed inline
+reviewer and report an inappropriate write or execution tool if introduced.
+
+#### Scenario: Inline reviewer gains a mutating tool
+- **WHEN** the self-scan inspects that changed role
+- **THEN** it reports the role/tool regression rather than omitting the role
+
+#### Scenario: The operator reads self-scan help
+- **WHEN** the current scan is described
+- **THEN** the advertised checks and purpose agree with the executed scanner
+
+
 ### Requirement: Architecture audit demonstrates its scope and coverage
 Audit SHALL identify the relevant components, relationships and quality scenarios within the agreed scope, using maintained arc42 perspectives and ATAM scenario references without claiming a formal ATAM evaluation. Its report SHALL connect examined areas and success, change or failure scenarios to actual evidence, findings and unverified limits. Relevant cross-component interactions SHALL have an identified inspection owner. Enumerating files or completing phases SHALL NOT be represented as proof of behavioral coverage or absence of defects.
 

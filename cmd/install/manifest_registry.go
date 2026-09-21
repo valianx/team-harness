@@ -27,19 +27,6 @@ func isInvocableAgent(name string, isDir bool) bool {
 	return name != "README.md" && !strings.HasPrefix(name, "ref-")
 }
 
-// opencodeSkillOverrides is the authoritative set of canonical skill names
-// whose Claude-oriented implementation is replaced by a native opencode
-// adapter from installer-assets/opencode-skills/<name>/. The capability name
-// remains shared across all runtimes; only the runtime mechanics differ.
-var opencodeSkillOverrides = map[string]bool{
-	"update":     true,
-	"setup":      true,
-	"background": true,
-	"cross-repo": true,
-	"tmux":       true,
-	"recover":    true,
-}
-
 // opencodeCopyableSkillExt is the fail-closed allowlist for skill asset
 // extensions (layer c — SEC-DR-2 hardening). Only these extensions are copied
 // into .opencode/skills/; any other extension (binaries, .exe, .pyd, .wasm,
@@ -73,57 +60,10 @@ var opencodeCopyableSkillExt = map[string]bool{
 	".lock": true,
 }
 
-// isCopyableSkillPath is the fail-closed copy predicate for skill files.
-// It returns true only when ALL of the following hold:
-//  1. No path segment begins with '.' or '_' (defensive .venv / _shared guard — layer b).
-//  2. The file is not skills/README.md.
-//  3. The first path segment after skills/ does not have an opencode override.
-//  4. The first path segment after skills/ is not "opencode-commands" (that
-//     folder is emitted by buildCommandComponents, not the skill walker).
-//  5. The file extension is in opencodeCopyableSkillExt (layer c — fail-closed).
-//
-// The rel argument is the path relative to the "skills/" root
-// (e.g. "d2-diagram/references/dsl-reference.md").
-func isCopyableSkillPath(rel string) bool {
-	segments := strings.Split(rel, "/")
-
-	// Rule 1: skip any segment beginning with '.' or '_'.
-	for _, seg := range segments {
-		if strings.HasPrefix(seg, ".") || strings.HasPrefix(seg, "_") {
-			return false
-		}
-	}
-
-	// Rule 2: skip skills/README.md (the top-level readme, rel == "README.md").
-	if rel == "README.md" {
-		return false
-	}
-
-	// Rules 3 & 4: the first segment is the skill folder name.
-	if len(segments) == 0 {
-		return false
-	}
-	topLevel := segments[0]
-	if opencodeSkillOverrides[topLevel] {
-		return false
-	}
-	if topLevel == "opencode-commands" {
-		return false
-	}
-
-	// Rule 5: fail-closed extension allowlist.
-	ext := strings.ToLower(path.Ext(rel))
-	if ext == "" || !opencodeCopyableSkillExt[ext] {
-		return false
-	}
-
-	return true
-}
-
 // buildSkillComponents returns one ComponentManifest per projected opencode
 // skill file, mirroring the buildHookSubdirComponents pattern (one component
-// per file). Every projection is generated from the canonical skills/ tree
-// except the small native override set above.
+// per file). The installer-assets projection is the complete OpenCode source;
+// it keeps native adapters and shared references under one explicit root.
 //
 // Source: installer-assets/opencode-skills/<rel>
 // Emit:   {config_root}/skills/<rel>  (preserves the subfolder path verbatim)
@@ -167,7 +107,7 @@ func buildSkillComponents(embeddedFS fs.FS) ([]ComponentManifest, error) {
 		return nil
 	})
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return nil, fmt.Errorf("walk opencode skill overrides: %w", err)
+		return nil, fmt.Errorf("walk projected opencode skills: %w", err)
 	}
 
 	return components, nil
@@ -190,9 +130,9 @@ func isCopyableProjectedSkillPath(rel string) bool {
 // installer-assets/opencode-commands/. Each file is emitted as a `command` kind
 // component to {config_root}/commands/<name>.md.
 //
-// The source directory is installer-assets/ (not skills/) so that changes here
-// do not touch a distributed plugin-asset path and do not require a plugin.json
-// version bump.
+// The source directory is installer-assets/ (not skills/) because these files
+// are shipped installer payload. Changes belong to the installer release
+// review and may require the appropriate release/version update.
 //
 // The command surface undergoes the standard transformToOpencode command
 // transform (kind == "command"), which projects the frontmatter into the
@@ -240,9 +180,8 @@ func buildCommandComponents(embeddedFS fs.FS) ([]ComponentManifest, error) {
 // runtime. The component set consists of:
 //   - Agent components: all invocable agents (excluding ref-*.md / README /
 //     _shared / testing-refs) transformed to .opencode/agents/<name>.md
-//   - Skill components: all copyable skill files (excluding the six
-//     opencode-incompatible skills and the opencode-commands source folder)
-//     copied verbatim to .opencode/skills/<name>/...
+//   - Skill components: all copyable files from the explicit OpenCode
+//     projection copied verbatim to .opencode/skills/<name>/...
 //   - Command components: skills/opencode-commands/*.md emitted as opencode
 //     commands to .opencode/commands/<name>.md
 //

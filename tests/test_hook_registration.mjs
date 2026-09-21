@@ -46,13 +46,19 @@ for (const path of [
   "plugins/team-harness/hooks/hooks.json",
   "plugins/team-harness/hooks/run-codex-hook.sh",
   "tools/codex-runtime/sync-hooks.mjs",
+  "hooks/adapters/notify-stage.opencode.yaml",
+  "hooks/ts/entry/notify-stage.opencode.ts",
+  "hooks/ts/entry/session-enforcement.opencode.ts",
+  "hooks/ts/opencode-plugin.ts",
+  "hooks/ts/shim/opencode-config.ts",
+  "plugins/team-harness/hooks/adapters/notify-stage.opencode.yaml",
+  "plugins/team-harness/hooks/ts/entry/notify-stage.opencode.ts",
+  "plugins/team-harness/hooks/ts/entry/session-enforcement.opencode.ts",
+  "plugins/team-harness/hooks/ts/opencode-plugin.ts",
+  "plugins/team-harness/hooks/ts/shim/opencode-config.ts",
 ]) {
   await assert.rejects(access(join(root, path)), { code: "ENOENT" }, `${path} still exists`);
 }
-
-const pluginSource = await readFile(join(root, "hooks/ts/opencode-plugin.ts"), "utf8");
-assert.match(pluginSource, /sessionEnforcementPlugin/);
-for (const name of forbidden) assert.doesNotMatch(pluginSource, new RegExp(name));
 
 const packageJson = JSON.parse(await readFile(join(root, "hooks/ts/package.json"), "utf8"));
 for (const script of Object.keys(packageJson.scripts)) {

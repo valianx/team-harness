@@ -27,10 +27,13 @@ or a bundle is unavailable, the launcher exits silently. The direct
 
 ## OpenCode context
 
-`hooks/ts/opencode-plugin.ts` retains the `session.created` integration through
-`session-enforcement.opencode.ts`. It injects the shared session context using
-the OpenCode-native client. OpenCode permission and approval behavior remains
-owned by OpenCode; no Team Harness guard plugin is installed.
+OpenCode discovers TH through its registered native instruction guide,
+`th-references/agents/_shared/native-workflow-guide.md`. That guide preserves
+workflow discovery and reads the relevant language, voice, English-learning and
+workspace preferences from the installation's own settings. The disconnected
+session-event adapter has been retired; it is not required for setup or update.
+OpenCode owns permissions and approvals. Unknown manually installed adapters are
+not removed automatically; use the native guide for supported installations.
 
 The TypeScript source and committed `.cjs` bundles are kept in the repository
 so the Claude Code marketplace package works without a build step. The

@@ -220,10 +220,10 @@ Gate: if `status: failed` → report to user and stop.
 ### Step 2 — Invoke likec4-diagrammer
 
 Invoke `likec4-diagrammer` via Task tool with:
-- Feature name; `workspaces path: {workspace}`
-- Path to architect's analysis: `{workspace}/research/00-research.md`
-- Path to skill: the active installation's `likec4-diagram` skill resources
-- Output path: `{resolved output path from Step 0}`
+- `workspace`: the exact absolute home resolved in Step 0
+- `analysis_path`: `{workspace}/research/00-research.md`
+- `skill_root`: the active installation's `likec4-diagram` skill directory
+- `deliverable_target`: the absolute output path resolved in Step 0
 
 Gate: if `status: failed` → report to user. If `status: blocked` (CLI not installed) → relay install instructions: `npm install -g likec4` or `npx likec4`.
 
@@ -233,7 +233,7 @@ Present output file path, view names, and how to render:
 - Preview: `npx likec4 start`
 - Export: `npx likec4 export png`
 
-In obsidian mode, the agent appends one `![[diagram_<viewId>.png]]` embed per exported view to `{workspace}/05-diagram.md`. Report the embed count and note that the diagrams display inline in Obsidian. If the CLI was absent (`render: skipped`), note that the source is available but images could not be rendered.
+In Obsidian mode, embed each exported view in the source's companion summary. Link that summary from the workspace when using another target. Report the embed count or explain `render: skipped`; the source remains available.
 
 ---
 
@@ -260,10 +260,10 @@ Gate: if `status: failed` → report to user and stop.
 ### Step 2 — Invoke d2-diagrammer
 
 Invoke `d2-diagrammer` via Task tool with:
-- Feature name; `workspaces path: {workspace}`
-- Path to architect's analysis: `{workspace}/research/00-research.md`
-- Path to skill: the active installation's `d2-diagram` skill resources
-- Output path: `{resolved output path from Step 0}`
+- `workspace`: the exact absolute home resolved in Step 0
+- `analysis_path`: `{workspace}/research/00-research.md`
+- `skill_root`: the active installation's `d2-diagram` skill directory
+- `deliverable_target`: the absolute output path resolved in Step 0
 
 Gate: if `status: failed` → report to user. If `status: blocked` (d2 not installed) → relay install instructions.
 
@@ -274,7 +274,7 @@ Present source file path, SVG output path, and re-render options:
 - Hand-drawn: `d2 --sketch diagram.d2 sketch.svg`
 - Better routing: `d2 --layout elk diagram.d2 elk.svg`
 
-In obsidian mode, the agent appends a `![[diagram.svg]]` embed to `{workspace}/05-diagram.md`. Report the SVG path and note that the diagram displays inline in Obsidian. If the CLI was absent (`render: skipped`), note that the source is available but the image could not be rendered.
+In Obsidian mode, embed the resolved SVG in the source's companion summary. Link that summary from the workspace when using another target. Report the SVG path or explain `render: skipped`; the source remains available.
 
 ---
 

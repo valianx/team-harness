@@ -237,6 +237,12 @@ export function isQualityCommandId(value) {
 }
 
 const PACKAGE_MANAGERS = new Set(["npm", "pnpm", "yarn", "bun"]);
+const PACKAGE_MUTATIONS = new Set([
+  "install", "i", "add", "ci", "install-test", "it", "install-ci-test", "cit",
+  "update", "up", "upgrade", "remove", "rm", "uninstall", "un", "unlink",
+  "link", "rebuild", "prune", "dedupe", "dedup", "import", "approve-builds",
+  "publish", "unpublish", "init", "set", "set-version",
+]);
 const LEADING_OPTIONS_WITH_VALUE = new Set([
   "--cache", "--config", "--cwd", "--dir", "--global-dir", "--globalconfig",
   "--install-directory", "--prefix", "--store-dir", "--userconfig",
@@ -309,6 +315,13 @@ function validateArgv(argv, { requireReportToken = false, allowLocalPnpmExec = f
   const invocation = packageManagerInvocation(argv);
   const operation = invocation?.operation ?? null;
   const manager = invocation?.executable ?? null;
+  const script = operation === "run" || operation === "run-script"
+    ? argv[skipLeadingOptions(argv, invocation.operationOffset + 1)]?.toLowerCase()
+    : operation;
+  if (invocation && (operation === null || PACKAGE_MUTATIONS.has(script)
+    || (operation === "audit" && argv.includes("--fix")))) {
+    throw qualityError("NON_HERMETIC_COMMAND", "quality commands require prepared dependencies; package mutation is a preparation action");
+  }
   const localPnpmExec = manager === "pnpm" && operation === "exec";
   const nonHermetic = ["npx", "pnpx", "bunx"].includes(executable)
     || (manager === "npm" && ["exec", "x"].includes(operation))
@@ -696,15 +709,19 @@ function windowsShimInvocation(candidate, args) {
   };
 }
 
+function localBinaryCandidates(requested, platform, includeLegacyExe = false) {
+  if (platform === "win32" && !/\.(?:bat|cmd|exe|ps1)$/iu.test(path.basename(requested))) {
+    return [`${requested}.exe`, `${requested}.ps1`, requested];
+  }
+  return includeLegacyExe ? [requested, `${requested}.exe`] : [requested];
+}
+
 export async function resolveLinkedLocalBinary(tool, args, cwd, repository, resolution, platform = process.platform) {
   const normalizedTool = tool.replace(/\.(?:bat|cmd|exe|ps1)$/iu, "");
   let directory = cwd;
   while (isContained(repository, directory)) {
-    const candidates = [
-      path.join(directory, "node_modules", ".bin", normalizedTool),
-      path.join(directory, "node_modules", ".bin", `${normalizedTool}.exe`),
-      ...(platform === "win32" ? [path.join(directory, "node_modules", ".bin", `${normalizedTool}.ps1`)] : []),
-    ];
+    const binary = path.join(directory, "node_modules", ".bin", normalizedTool);
+    const candidates = localBinaryCandidates(binary, platform, true);
     for (const candidate of candidates) {
       try {
         const stat = await lstat(candidate);
@@ -739,27 +756,27 @@ async function resolveDeclaredLocalBinary(argv, cwd, repository, platform = proc
   if (!isContained(repository, requested)) {
     throw qualityError("NON_HERMETIC_COMMAND", "declared local binary escapes the repository");
   }
-  try {
-    const stat = await lstat(requested);
-    if (!stat.isFile() && !stat.isSymbolicLink()) throw new Error("invalid local binary");
-    const target = await realpath(requested);
-    const targetStat = await lstat(target);
-    if (!targetStat.isFile() || !isContained(repository, target)) {
-      throw new Error("local binary escapes repository");
+  const args = argv.slice(1);
+  for (const candidate of localBinaryCandidates(requested, platform)) {
+    try {
+      const stat = await lstat(candidate);
+      if (!stat.isFile() && !stat.isSymbolicLink()) continue;
+      const target = await realpath(candidate);
+      const targetStat = await lstat(target);
+      if (!targetStat.isFile() || !isContained(repository, target)) continue;
+      const invocation = platform === "win32" && candidate.toLowerCase().endsWith(".ps1")
+        ? windowsShimInvocation(candidate, args)
+        : { argv: [candidate, ...args] };
+      return {
+        argv: invocation.argv,
+        identity: [`${"${TH_LOCAL_BIN}"}/${match[1]}`, ...args],
+        resolution: "repository-local-bin",
+      };
+    } catch (error) {
+      if (error instanceof QualityError) throw error;
     }
-    const args = argv.slice(1);
-    const invocation = platform === "win32" && requested.toLowerCase().endsWith(".ps1")
-      ? windowsShimInvocation(requested, args)
-      : { argv: [requested, ...args] };
-    return {
-      argv: invocation.argv,
-      identity: [`${"${TH_LOCAL_BIN}"}/${match[1]}`, ...args],
-      resolution: "repository-local-bin",
-    };
-  } catch (error) {
-    if (error instanceof QualityError) throw error;
-    throw qualityError("PREREQUISITE_UNAVAILABLE", "declared local binary does not resolve inside the repository");
   }
+  throw qualityError("PREREQUISITE_UNAVAILABLE", "declared local binary does not resolve inside the repository");
 }
 
 async function resolveRepositoryNodeScript(args, cwd, repository, resolution) {

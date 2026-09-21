@@ -5,6 +5,14 @@ Generate interactive web presentations that combine React Flow graphs, GSAP anim
 
 ---
 
+## Workspace and Runtime Paths
+
+For a direct invocation without a bound workspace, use the [workspace skill](../workspace/SKILL.md) to resolve or create the configured local/Obsidian home before writing. The current agent is Main; no parent workflow is required.
+
+Before writing, consume the `workspace` and optional `deliverable_target` supplied by Main. `workspace` is the absolute shared local or Obsidian home already resolved for this effort; it is not a repository-relative template. Set `output_dir` to the explicit target when supplied, otherwise to `workspace`, and preserve the template's relative project structure under that directory. For `add-scene`, use the existing project inside the resolved target. Project-relative edits and package commands use `output_dir` as their working directory. Resolve references and templates from `skill_root`, the active installation directory containing this document. Do not derive output from the current working directory, make an implicit repository-local duplicate, or read another runtime's configuration. An explicit deliverable target wins, including a requested project directory; keep any workspace note or handoff in `workspace`.
+
+---
+
 ## When To Use This Skill
 
 - User wants to explain a system architecture interactively (nodes you can click through)
@@ -25,8 +33,8 @@ Invoked when the user has no existing project. Creates the full template and gen
 
 **Steps:**
 
-1. Determine the target directory. Ask the user or use the current working directory + a name derived from the topic.
-2. Copy the entire `references/templates/` tree into the target directory.
+1. Determine `output_dir` from the explicit deliverable target or the resolved shared workspace. Do not derive it from the current working directory.
+2. Copy the entire `{skill_root}/references/templates/` tree into `output_dir`.
 3. Analyze the user's input (image, description, or both) to determine what type of scenes are needed.
 4. Generate the first scene(s) based on the input:
    - If the input shows a graph/flow/architecture → generate a `FlowSceneData` with nodes, edges, and highlight steps.
@@ -71,7 +79,7 @@ Invoked when the user has an existing slide deck (exported as images or screensh
 
 **Steps:**
 
-1. **Scaffold the project.** Copy the `references/templates/` tree into the target directory (same as `new` mode). Run `npm install`.
+1. **Scaffold the project.** Copy the `{skill_root}/references/templates/` tree into `output_dir` (same as `new` mode). Run `npm install`.
 
 2. **Catalog the slides.** For each provided image, classify it:
    - **Static** — no interactivity requested by the user
@@ -164,11 +172,11 @@ Read the appropriate reference files based on what the scene requires:
 
 | Scene needs | Read reference |
 |---|---|
-| Interactive graph with nodes/edges | `references/react-flow-patterns.md` |
-| Timeline animation, transitions, motion | `references/gsap-patterns.md` |
-| Custom shapes, icons, visual composition | `references/svg-patterns.md` |
-| Interactive controls (selectors, sliders) | `references/radix-patterns.md` |
-| File naming, directory layout | `references/project-structure.md` |
+| Interactive graph with nodes/edges | `{skill_root}/references/react-flow-patterns.md` |
+| Timeline animation, transitions, motion | `{skill_root}/references/gsap-patterns.md` |
+| Custom shapes, icons, visual composition | `{skill_root}/references/svg-patterns.md` |
+| Interactive controls (selectors, sliders) | `{skill_root}/references/radix-patterns.md` |
+| File naming, directory layout | `{skill_root}/references/project-structure.md` |
 
 **Always read `project-structure.md`** to ensure correct file placement.
 

@@ -5,6 +5,20 @@ Provide proportionate PR reviews through native agents in Codex, Claude Code and
 
 ## Requirements
 
+### Requirement: Regression evidence uses portable owned inputs
+Regression probes SHALL belong physically to their owning review run. Supported
+Windows and Unix execution SHALL compare the requested base and head without a
+platform-invalid Git configuration path preventing preparation.
+
+#### Scenario: Comparable regression probe runs on Windows
+- **WHEN** the required local tools and objects are available
+- **THEN** both revisions execute and classification reflects their results rather than a null-config path error
+
+#### Scenario: Probe lies outside its owning run
+- **WHEN** a request selects an external file directly or through a link
+- **THEN** the request is rejected before copying or executing that probe
+
+
 ### Requirement: Assignment adapts while required coverage remains explicit
 The coordinator SHALL choose reviewer count, bounded assignments, context and scheduling from the PR's risks and dependencies within available concurrency and resource limits. Existing general-review obligations, applicable QA/security triggers, explicit operator choices and verification policy SHALL remain satisfied or disclosed as incomplete. File count alone SHALL NOT prescribe the team. An assignment spanning components SHALL name responsibility for their interaction. Adaptation SHALL NOT change models or reasoning effort implicitly, and critical reviewers and the verifier SHALL retain their configured effort.
 

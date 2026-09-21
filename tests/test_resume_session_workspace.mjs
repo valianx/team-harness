@@ -45,7 +45,7 @@ try {
   const external = path.join(root, "external");
   await mkdir(external);
   await writeFile(path.join(external, "00-session-handoff.md"), "### What Worked\n", "utf8");
-  await symlink(external, path.join(root, "2026-08-24_symlinked"));
+  await symlink(external, path.join(root, "2026-08-24_symlinked"), process.platform === "win32" ? "junction" : "dir");
   assert.equal((await resolveWorkspace({ basePath: root, feature: "symlinked" })).status, "not-found");
 
   for (const invalid of ["../escape", "a/b", "*", "..", ""]) {

@@ -411,14 +411,24 @@ export async function syncClaudePackageAssets({ check, rootDir }) {
     const hooks = sourceRoot === join(rootDir, "hooks");
     if (hooks) {
       await assertSafeDestinationPath(rootDir, targetRoot, "directory");
-      for (const relativePath of (await walkFiles(targetRoot)).keys()) {
-        if (!isOpenCodeScratchBundle(relativePath)) continue;
-        stale = true;
-        if (check) process.stderr.write(`packaged local scratch bundle: ${relative(rootDir, join(targetRoot, relativePath))}\n`);
-        else await rm(join(targetRoot, relativePath));
-      }
     }
     const files = await walkFiles(sourceRoot);
+    if (hooks) {
+      for (const relativePath of (await walkFiles(targetRoot)).keys()) {
+        if (!isOpenCodeScratchBundle(relativePath) && files.has(relativePath)) continue;
+        stale = true;
+        const target = join(targetRoot, relativePath);
+        const reason = isOpenCodeScratchBundle(relativePath)
+          ? "packaged local scratch bundle"
+          : "stale Claude package asset missing canonical source";
+        if (check) {
+          process.stderr.write(`${reason}: ${relative(rootDir, target)}\n`);
+          continue;
+        }
+        await assertSafeDestinationPath(rootDir, target, "file");
+        await rm(target);
+      }
+    }
     for (const [relativePath, expected] of files) {
       if (allowlist !== null && !allowlist.has(relativePath)) continue;
       // OpenCode test bundles are local scratch output; the runtime ships raw TS.
