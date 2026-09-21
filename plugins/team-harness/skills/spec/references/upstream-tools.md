@@ -9,6 +9,74 @@ TEA supply their own maintained methods. TH selects an installed capability,
 passes the relevant context, follows its current instructions and uses its result.
 The capability's algorithm, checklist, templates and scoring remain upstream.
 
+## Quality capability preparation
+
+Quality providers are selected by the consuming objective, project stack, active host and
+available project configuration. They are declared separately in the policy's
+`quality_providers` map; their presence does not make them mandatory for every spec, pipeline or
+review. At entry or resumption of `audit`, `find-bugs` or `review-pr`, Main checks the selected
+provider's installed, discoverable and usable states and uses the existing native setup route to
+install or repair only the selected capability when the task is authorized. A healthy provider is
+reused. An unavailable selected provider leaves that analysis pending with a concrete recovery;
+an unselected provider or inactive host is not installed merely because it appears in the catalog.
+
+The current observed baselines are compatibility references, not TH-pinned releases. Recheck the
+policy and the official owner before installation/update, record the resolved version or commit,
+and verify the actual executable/skill and output configuration on the active host.
+
+| Capability | Select it for | Official owner/lifecycle | Native entry on Codex, Claude Code and OpenCode | Evidence/output |
+| --- | --- | --- | --- | --- |
+| Semgrep CE `1.177.0` (observed 2026-09-21; Python `>=3.10`) | Concrete bug candidates in `find-bugs` and applicable captured PR source | [Semgrep](https://github.com/semgrep/semgrep); PyPI/Brew/uv/pipx routes in the policy; local CE by default | `semgrep` executable resolved in the selected environment | Explicit rule/config and captured scope; raw JSON or SARIF under `research/quality-tools/semgrep/`, with version, invocation, skipped files and errors |
+| dependency-cruiser `18.4.0` (observed 2026-09-21; Node `^22 \|\| ^24 \|\| >=26`) | Dependency relationships and architecture questions in applicable JS/TS audits | [sverweij/dependency-cruiser](https://github.com/sverweij/dependency-cruiser); npm project or approved tool-cache route | `dependency-cruiser`/`depcruise` project executable | JSON/text/HTML report under `research/quality-tools/dependency-cruiser/`, with entry points, aliases/resolution and omissions |
+| Knip `6.37.0` (observed 2026-09-21; Node `^20.19.0 \|\| >=22.12.0`) | Unused files, exports and dependencies in applicable JS/TS audits | [webpro-nl/knip](https://github.com/webpro-nl/knip); npm project or approved tool-cache route, including peer TypeScript dependencies when needed | `knip` project executable | JSON/text report under `research/quality-tools/knip/`, with entry points, framework config, external-consumer checks and errors |
+| Sentry `find-bugs` (upstream `main`, resolved commit recorded per run) | Explicit request or scoped contextual bug investigation over a captured PR | [getsentry/skills](https://github.com/getsentry/skills); install/update through the official [Vercel Skills CLI](https://github.com/vercel-labs/skills), observed CLI baseline `1.7.0`, Node `>=22.20.0` | Native `find-bugs` skill selected for the active agent; no TH copy or rewritten checklist | Markdown assessment in the existing PR review artifact destination, linked from the finding ledger and verifier evidence, bound to captured base/head and scope |
+
+arc42 and ATAM remain non-installable references. They guide architecture questions and scenario
+coverage; they are not provider entries or command-line dependencies. dependency-cruiser and Knip
+are audit-only in this change and are not selected for ordinary `review-pr`. Sentry `find-bugs`
+is the existing general reviewer's optional upstream method, not a second TH reviewer. Provider
+scores, exit codes or recommendations remain evidence for Main; they do not grant delivery
+authority.
+
+### Official routes and compatibility checks
+
+Use a project-managed executable first when the selected project already owns the tool. A tool-only
+installation may use the official package manager into the approved task/tool cache, outside the
+repository and workspace evidence. Adding a development dependency or analysis configuration to a
+project is a separate product change and requires that scope; do not modify manifests merely to
+hide preparation. Verify the resolved command, version, prerequisites and output destination
+before use.
+
+- **Semgrep CE:** on macOS use `brew install semgrep`; on Windows/Linux use the official Python
+  route `python3 -m pip install semgrep`, or an isolated `uv tool`/`pipx` installation. Update
+  with the matching owner mechanism (`brew upgrade`, `uv tool upgrade`, `pipx upgrade` or pip
+  upgrade). Local CE does not require login or upload; do not silently select account-backed
+  rules or CI.
+- **dependency-cruiser:** the owner documents `npm install --save-dev dependency-cruiser` for a
+  project. If the task selects a tool-only install, use npm with an approved prefix/cache and
+  resolve the resulting `dependency-cruiser`/`depcruise` executable. Check Node engine compatibility
+  and the project's entry points, tsconfig/aliases and framework resolution before scanning.
+- **Knip:** the owner documents `npm install -D knip typescript @types/node` for a project. A
+  tool-only route uses npm with an approved prefix/cache and verifies the `knip` executable plus
+  any project peer dependencies. Check entry points and framework configuration before treating
+  unused output as a candidate.
+- **Sentry `find-bugs`:** use `npx --yes skills@1.7.0 add getsentry/skills --skill find-bugs
+  --agent <active-agent> --global --yes` for an authorized global/native installation, or the
+  corresponding project scope when explicitly requested. Refresh only this selected upstream
+  skill with the official targeted update command `npx --yes skills@1.7.0 update find-bugs
+  --global --yes`; never run a bare all-skills update for this selection. Verify the source/ref and
+  native discovery. Symlink is the CLI's preferred install mode where supported; use its documented
+  copy fallback only when the native host cannot use symlinks. The provider remains outside TH
+  packaging. The basename `find-bugs` can also name TH's project/module diagnostic skill; resolve
+  by owner/source and objective (`getsentry/skills` for captured branch review, TH's canonical
+  skill for a project without a PR). If both are discoverable on a host, verify the scoped native
+  entry before invocation and report a collision rather than overwriting either installation.
+
+Setup/update should report `installed`, `discoverable` and `usable` separately. A provider update
+does not imply that an interactive session needs a restart: report active versus pending state and
+request reload/reconnect only when the host documents that the changed entry cannot be activated in
+the current session.
+
 ## Spec dependency preparation
 
 At spec entry or resumption, reuse [workspace](../../workspace/SKILL.md), read the
@@ -54,15 +122,22 @@ host, then the required verification skill is selected from that installation.
 | TEA test-design | At the design stage of spec; elsewhere when behavior needs a testing strategy or the user requests it | Invoke the installed workflow with requirements, architecture and existing tests. Use its design to guide the existing implementation/testing work, without starting another development plan. |
 | TEA test-review | After implementation and relevant test execution in spec; elsewhere when tests need quality review or the user requests it | Invoke the installed workflow over the relevant tests and results. Its report supplies that testing-quality lens; another TH agent does not repeat the same review merely because TEA produced it. |
 | TEA trace | Before completing a spec change; elsewhere when requirement coverage needs explanation or the user requests it | Invoke the installed trace workflow with the current requirements and test evidence. Use its coverage analysis to find gaps and feed OpenSpec verify or acceptance review. |
+| Semgrep CE | When `find-bugs` needs rule-based candidates, or `review-pr` has selected a captured-source scan | Run the prepared local executable with explicit rules/configuration and scope. Retain raw JSON/SARIF, version, skipped/error scope and candidate identity; an empty result is not a clean bill. |
+| dependency-cruiser | When `audit` asks about dependency relationships or architecture in an applicable JS/TS project | Run the project/tool-cache executable with actual entry points and resolution configuration. Investigate dynamic/external consumers and generated ownership before recommending removal. Do not select it for ordinary `review-pr`. |
+| Knip | When `audit` asks about unused files, exports or dependencies in an applicable JS/TS project | Run the project/tool-cache executable with entry points/framework configuration and peer dependencies as needed. Treat output as candidates until contextual consumer checks complete. Do not select it for ordinary `review-pr`. |
+| Sentry `find-bugs` | When Main explicitly selects an installed upstream change-review method for a captured PR or scoped contextual bug investigation | Assign the existing general reviewer the captured base/head and permitted evidence. Reuse its bounded assessment; do not run a second equivalent TH checklist or allow a live default-branch lookup. |
 
-Advancing through spec executes all the capabilities listed above at their
-corresponding stages. They are part of that workflow, not merely suggestions in
-its documentation. The user need not invoke each tool separately. This integrates
-the named capabilities, not every workflow shipped by those projects.
+Advancing through spec executes OpenSpec's required stages and the declared
+TEA/Superpowers capabilities at their corresponding stages. Quality providers are
+optional: when a spec stage or consuming flow selects one by objective, stack and
+active host, prepare and use that provider and retain its evidence; otherwise leave
+it unselected. These integrations are part of the selected workflow, not a
+requirement to install every quality provider. The user need not invoke each
+selected upstream capability separately.
 
 A small documentation correction with no relevant OpenSpec change does not
 automatically run these tools. An explicit request for a capability still applies.
-Outside spec, contextual selection remains available. If a capability required by
+Outside spec, contextual selection remains available. If a declared capability required by
 the current spec stage is unavailable, report it as pending and continue independent
 authorized work. Do not declare that stage fully verified or silently replace the
 provider with a TH imitation. An upstream assessment that establishes no applicable
@@ -93,6 +168,12 @@ stops at its authorized scope; it does not need implementation results that do n
 yet exist. A resumed stage reuses its completed applicable assessment. New stages
 consume that evidence and execute their own upstream method, rerunning project
 commands only when required by the current candidate and upstream instructions.
+
+Audit, find-bugs and review-pr use the same preparation and workspace contract when selected
+outside the spec lane. Their entry/resume step selects only applicable quality capabilities, and
+the active host's setup/update route performs any authorized official installation or repair. The
+quality tools add evidence to the selected flow; they do not create a second top-level workflow or
+replace the native general agent.
 
 For example, a spec feature adding a third-party API uses test-design for failure
 cases, test-review for its assertions, trace for requirement coverage, Superpowers

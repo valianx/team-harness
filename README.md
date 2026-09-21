@@ -17,6 +17,8 @@ The current general agent selects and reads the relevant skill:
 | Inspect a proposed solution before implementation | [`sketch`](skills/sketch/SKILL.md), on demand in any flow |
 | Broader coordination and recoverable execution | [`pipeline`](skills/pipeline/SKILL.md) |
 | Review an existing pull request | [`review-pr`](skills/review-pr/SKILL.md) |
+| Assess architecture, relationships and technical debt | [`audit`](skills/audit/SKILL.md) |
+| Investigate functional defects in a project or module | [`find-bugs`](skills/find-bugs/SKILL.md) |
 | Prepare or publish a completed change | [`create-pr`](skills/create-pr/SKILL.md) |
 | Keep useful context across tasks, flows and sessions | [`workspace`](skills/workspace/SKILL.md) |
 
@@ -346,7 +348,7 @@ Full contract: docs/dev-mode.md.
 | [Configuration reference](./CLAUDE.md) | Architectural conventions, working agreements, subagent routing |
 | [Knowledge base](./docs/knowledge.md) | Decisions, patterns, stack notes, and constraints accumulated across features |
 | [Integration guide](./docs/integration.md) | Optional knowledge integrations; workspace context has no remote dependency |
-| [External tools](./docs/upstream-tools.md) | OpenSpec, Superpowers and TEA: stage execution, shared workspace and upstream installation/update ownership |
+| [External tools](./docs/upstream-tools.md) | OpenSpec, Superpowers, TEA and quality analyzers: selection, execution, shared workspace and upstream ownership |
 | [Troubleshooting](./docs/troubleshooting.md) | SSH/HTTPS errors, duplicate agents, missing dispatch rule |
 | [Changelog](./CHANGELOG.md) | Release history |
 

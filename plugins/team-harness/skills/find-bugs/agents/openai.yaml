@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Find Bugs"
+  short_description: "Team Harness Find Bugs workflow"
+  default_prompt: "Use $team-harness:find-bugs for this request."

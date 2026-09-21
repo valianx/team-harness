@@ -9,7 +9,9 @@ Analyze the input: $ARGUMENTS
 
 ## Upstream provider route
 
-Route the explicit targets `openspec`, `superpowers`, and `tea` (also `bmad tea`)
+Route the explicit targets `openspec`, `superpowers`, `tea`, `semgrep`,
+`dependency-cruiser`, `knip`, `sentry`, `find-bugs`, `quality` and `quality-tools`
+(also `bmad tea`)
 here before inspecting or reconciling TH configuration. For a provider-only
 request, complete that route and return without creating TH settings. Continue
 the TH-specific procedure only when TH setup was also requested.
@@ -19,16 +21,41 @@ substrings: `team` and `team-harness` do not select `tea`. TH-only options apply
 only to a separately requested TH operation.
 
 Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
-when the operator names OpenSpec, Superpowers, or TEA. A full Team Harness setup may
-report whether a provider is installed and available, but it does not install or update
-providers implicitly. When one is explicitly requested, use its official mechanism under
-native permissions:
+when the operator names OpenSpec, Superpowers, TEA, or a quality capability. A full Team
+Harness setup may report whether a provider is installed and available, but it does not
+install or update providers implicitly. When one is explicitly requested, use its official
+mechanism under native permissions:
 
 - OpenSpec: official package-manager install/update, then its project `init`/`update` for
   generated workflows.
 - Superpowers: official host-plugin install/update and native skill discovery.
 - TEA: official BMAD module install/update, then its upstream test-design, test-review, or
   trace entry (or runner when available).
+- Semgrep CE: the policy's host-appropriate PyPI/Brew/uv/pipx route; verify `semgrep` and
+  keep local CE scans unlogged-in unless the operator explicitly selects an account-backed
+  provider.
+- dependency-cruiser and Knip: the project's existing npm executable first; otherwise the
+  policy's official npm tool-cache route. They are applicable to JS/TS audit only and do not
+  silently modify project manifests.
+- Sentry `find-bugs`: the official Vercel Skills CLI route for `getsentry/skills`, targeted
+  to the active native agent. Resolve by owner/source plus objective because TH also has a
+  `find-bugs` skill; do not overwrite either installation.
+
+The explicit quality route is a preparation request, not a universal install switch. A bare
+`quality`/`quality-tools` target lists the four selectable capabilities and asks the operator
+to choose the objective/stack; it does not install all providers. For a selected capability:
+
+1. Read `skills/pipeline/openspec-policy.json` and select it only when the requested objective,
+   stack, active host and project configuration make it applicable.
+2. Check the existing project/tool-cache executable or native skill, its resolved version,
+   prerequisites, invocation and supported output destination. Report `installed`,
+   `discoverable` and `usable` separately.
+3. If missing or unusable and the operation is authorized, use the official owner route from the
+   policy. Keep tool-only installs outside the repository; adding a project dependency or
+   configuration is a separate product change and needs that scope.
+4. Verify the selected command/skill on the active host and pass the existing local/Obsidian
+   workspace. Report a concrete recovery when activation remains pending. Do not install an
+   inactive host or request a restart unless the host reports a specific activation limitation.
 
 Keep provider-owned files and configuration intact. Report installed capability and active
 session separately; propose a reload or restart only for a documented host limitation or
@@ -52,7 +79,7 @@ fallback rather than guessing.
 
 | Target concern | Routes to | EN cues | ES cues |
 |----------------|-----------|---------|---------|
-| **openspec / superpowers / tea** | § Upstream provider route; return before TH targeted setup | `openspec`, `superpowers`, `tea`, `bmad tea` | same provider names |
+| **upstream / quality provider** | § Upstream provider route; return before TH targeted setup | `openspec`, `superpowers`, `tea`, `bmad tea`, `quality`, `quality-tools`, `semgrep`, `dependency-cruiser`, `depcruise`, `knip`, `sentry find-bugs`, `find-bugs` | same provider names, `calidad`, `herramientas de calidad`, `buscar bugs` |
 | **context7** | Step 2 — context7 block | `context7`, `context 7`, `docs`, `library docs`, `api key`, `c7` | `context7`, `clave api`, `documentación`, `docs de librerías` |
 | **workspace** | Step 3 — workspace output mode | `workspace`, `logs`, `logs mode`, `obsidian vault`, `vault`, `output location` | `espacio de trabajo`, `logs`, `modo de logs`, `bóveda`, `obsidian`, `ubicación de salida` |
 | **language** | Step 3.5 — default language | `language`, `lang`, `default language`, `locale` | `idioma`, `lenguaje`, `idioma por defecto` |
@@ -72,6 +99,7 @@ No configuration concern matched for: '<original argument>'
 
 Routable concerns for /th:setup <intent>:
   openspec / superpowers / tea — official upstream provider setup
+  quality / quality-tools — choose an applicable quality capability (Semgrep, dependency-cruiser, Knip, Sentry find-bugs)
   context7         — context7 API key
   workspace        — workspace output mode (local / obsidian vault path)
   language         — default response language (ISO 639-1)

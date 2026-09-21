@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.38.0] - 2026-09-21
+
+### Added
+- Project and module `find-bugs` diagnosis with Semgrep CE candidates and contextual verification.
+- Shared preparation for selected Semgrep CE, dependency-cruiser, Knip and Sentry capabilities through their upstream owners.
+
+### Changed
+- Architecture audit records component interactions, quality scenarios, evidence and unverified coverage using arc42 and ATAM guidance.
+- PR review can reconcile captured Semgrep evidence and use Sentry's installed method within the existing reviewers, finding ledger and verifier.
+
 ## [3.37.0] - 2026-09-21
 
 ### Added

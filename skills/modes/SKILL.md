@@ -34,6 +34,7 @@ text. Keep mode names and invocations exact.
 | `docs` | Generate Obsidian documentation through the documentation pipeline. | Claude Code + opencode + Codex |
 | `eval` | Evaluate and score agent or pipeline performance. | Claude Code + opencode + Codex |
 | `excalidraw-diagram` | Create Excalidraw JSON diagrams that make visual arguments. | Claude Code + opencode + Codex |
+| `find-bugs` | Investigate functional defects in a project or module with contextual evidence. | Claude Code + opencode + Codex |
 | `gcp-costs` | Analyze GCP costs and optimization opportunities. | Claude Code + opencode + Codex |
 | `gcp-infra` | Inspect, plan and carry out authorized GCP changes. | Claude Code + opencode + Codex |
 | `hookify` | Report candidate deterministic hooks from observed session friction. | Claude Code + opencode + Codex |

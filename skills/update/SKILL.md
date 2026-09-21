@@ -11,7 +11,9 @@ Analyze the input: $ARGUMENTS
 
 ## Upstream provider updates
 
-Route the explicit targets `openspec`, `superpowers`, and `tea` (also `bmad tea`)
+Route the explicit targets `openspec`, `superpowers`, `tea`, `semgrep`,
+`dependency-cruiser`, `knip`, `sentry`, `find-bugs`, `quality` and `quality-tools`
+(also `bmad tea`)
 here before the TH update procedure. For a provider-only request, complete that
 route and return. Continue the TH-specific procedure below only when TH update
 was also requested; provider names are not flags for the TH updater.
@@ -21,14 +23,29 @@ substrings: `team` and `team-harness` do not select `tea`. TH-only options apply
 only to a separately requested TH operation.
 
 Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
-when the operator explicitly requests an OpenSpec, Superpowers, or TEA update. This skill
-updates Team Harness only; it never installs or updates those providers as a side effect.
-For an explicit provider request, use its official mechanism under native permissions:
+when the operator explicitly requests an OpenSpec, Superpowers, TEA, or quality-provider
+update. This skill updates Team Harness only; it never installs or updates providers as a
+side effect. For an explicit provider request, use its official mechanism under native
+permissions:
 
 - OpenSpec: official package-manager update, then its project `update` when generated
   workflows need refreshing.
 - Superpowers: the host's official plugin update and native skill discovery.
 - TEA: the official BMAD module update and its upstream runner/package when requested.
+- Semgrep CE: update through the mechanism that owns the active executable (Homebrew, uv,
+  pipx or Python/pip); verify the selected executable and local output configuration.
+- dependency-cruiser/Knip: update the selected project/tool-cache package through npm only
+  when that capability is explicitly selected; preserve project manifests unless their
+  change is separately authorized.
+- Sentry `find-bugs`: update only the selected upstream skill with the official Skills CLI;
+  resolve by owner/source and objective because TH's project diagnostic skill has the same
+  basename.
+
+For `quality`/`quality-tools` without a concrete provider, list the selectable capabilities
+and ask which one and which objective/stack to update. Do not update every quality provider.
+An update must verify `installed`, `discoverable` and `usable` separately and report active
+versus pending native activation. A provider update alone does not justify a restart; suggest
+reload/reconnect only when the host reports a specific activation limitation.
 
 Keep provider-owned files and configuration intact. Report the installed capability and
 active session separately; propose a reload or restart only for a documented host

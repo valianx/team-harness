@@ -28,7 +28,8 @@ publication contract below; they do not start a second Review Mode coordinator. 
    advise with scoped read access; they never edit, publish, change coordinator state or delegate.
    Main owns synthesis and evidence-backed decisions. Do not spawn another orchestrator.
 2. Bind technical results to `head_oid` and `technical_hash`; bind conversation-aware drafts,
-   previews, and GitHub writes to the current `context_hash`.
+   previews, and GitHub writes to the current `context_hash`. Bind selected external evidence to
+   the captured head/base and retain its tool, scope, error, skip and coverage identity.
 3. Review the detached worktree, never the operator's checkout or a moving branch.
 4. Fail closed when code or semantic conversation freshness cannot be verified.
 5. Never publish without preview and explicit approval unless `--auto-publish` was supplied.
@@ -91,23 +92,30 @@ Load the following references when entering their phase, resolving paths against
 Main owns the review run and final decisions; specialists need their role and scoped input packet,
 not these coordinator instructions or other specialists' initial conclusions.
 
-1. **Capture.** Read [snapshot.md](references/snapshot.md). Resolve the bundled helper, check
-   shared prerequisites, prepare the owned immutable run, read base policy and prior-review
+1. **Capture.** Read [snapshot.md](references/snapshot.md) and, when selected, the
+   [external-evidence reference](references/external-evidence.md). Resolve the bundled helper,
+   check shared prerequisites, prepare the owned immutable run, read base policy and prior-review
    identity. Preserve the snapshot until every reader has joined and integrity checks finish.
 2. **Assign and review.** Read [coordination.md](references/coordination.md). Map fixed coverage
    obligations to risks and dependencies, check only selected native roles and effective
-   permissions, and dispatch independent assessments with progressive context. Apply the
-   pre-dispatch freshness check from the snapshot reference immediately before dispatch.
+   permissions, and dispatch independent assessments with progressive context. An external scan is
+   coordinator evidence rather than another lens; an installed Sentry method stays inside the
+   existing general reviewer. Apply the pre-dispatch freshness check from the snapshot reference
+   immediately before dispatch.
 3. **Consolidate.** Follow the coordination reference to validate identities and integrity,
    repair an incomplete return once against the same snapshot, and reconcile conversation drift.
-   Main accounts for every source finding in the existing ledger, including duplicate,
-   discarded and unresolved claims. The compatibility consolidator is not required.
+   After initial returns, Main reconciles any selected external candidates into the existing
+   finding ledger and distinguishes captured-base issues from PR-caused regressions. Main accounts
+   for every source finding in the existing ledger, including duplicate, discarded and unresolved
+   claims. The compatibility consolidator is not required.
 4. **Verify.** Read [verification.md](references/verification.md). When explicitly requested,
    investigate concrete regressions through the existing isolated probe helper. Use an
-   independent verifier for the policy-selected claims. Assessments are advisory: Main records
+   independent verifier for the policy-selected claims, passing validated external evidence only
+   through the existing finding/evidence coordinates. Assessments are advisory: Main records
    evidence-backed dispositions without silently changing the source assessment.
 5. **Preview and publish.** Read [publication.md](references/publication.md). Validate the final
-   body, anchors, coverage and all-finding ledger, then present the exact review for approval.
+   body, anchors, coverage and all-finding ledger, including any selected external-evidence
+   status and limitations, then present the exact review for approval.
    Recheck freshness and exact approved bytes before a single atomic GitHub review write.
    Finish the coordinator-owned cleanup described in the snapshot reference.
 

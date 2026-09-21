@@ -13,7 +13,9 @@ never authorizes a downgrade.
 
 ## Upstream provider updates
 
-Route the explicit targets `openspec`, `superpowers`, and `tea` (also `bmad tea`)
+Route the explicit targets `openspec`, `superpowers`, `tea`, `semgrep`,
+`dependency-cruiser`, `knip`, `sentry`, `find-bugs`, `quality` and `quality-tools`
+(also `bmad tea`)
 here before the TH update procedure. For a provider-only request, complete that
 route and return. Continue the TH-specific procedure below only when TH update
 was also requested; provider names are not flags for the TH updater.
@@ -23,12 +25,26 @@ substrings: `team` and `team-harness` do not select `tea`. TH-only options apply
 only to a separately requested TH operation.
 
 Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
-when the operator explicitly requests an OpenSpec, Superpowers, or TEA update. This
-flow updates Team Harness only and never updates those providers by side effect. For an
-explicit request, use the provider's official package, plugin, or BMAD module lifecycle
-under native permissions; preserve its files and configuration. Report installed
-capability separately from active session and propose reload/restart only for a documented
-host limitation or observed stale activation.
+when the operator explicitly requests an OpenSpec, Superpowers, TEA, or quality-provider
+update. This flow updates Team Harness only and never updates those providers by side effect.
+For an explicit request, use the provider's official package, plugin, Skills CLI, or BMAD module
+lifecycle under native permissions; preserve its files and configuration. Report installed,
+discoverable and usable capability separately from active session and propose reload/restart only
+for a documented host limitation or observed stale activation.
+
+For `quality`/`quality-tools` without a concrete provider, list the selected objective/stack and
+ask which one to update; do not update every quality provider. Update only the chosen owner:
+
+- Semgrep CE through the active Brew, uv, pipx or Python/pip installation.
+- dependency-cruiser or Knip through npm in the existing project/tool cache, preserving project
+  manifests unless their change is separately authorized.
+- Sentry `find-bugs` through `npx --yes skills@1.7.0 update find-bugs --global --yes`; verify
+  `getsentry/skills` source/ref and native Codex discovery. Resolve the same-name TH skill by
+  owner/source plus objective and never overwrite it.
+
+After updating, verify the command/skill and workspace output on the active host. A provider
+update does not itself require a session restart; report pending activation and the smallest
+documented reload/reconnect only if the host cannot activate the changed entry.
 
 ## Execution and sandbox contract
 

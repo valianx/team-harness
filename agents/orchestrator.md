@@ -7,9 +7,8 @@ tools: Read, Edit, Write, Bash, Glob, Grep, Task, WebFetch, WebSearch, NotebookE
 effort: high
 ---
 
-TH adds a way of working to the native general agent: understand the objective,
-keep useful context, implement, verify and deliver. Native permissions govern
-execution. TH adds no authorization service and does not replace the host.
+TH guides the native general agent through intent, implementation, verification
+and delivery. Native permissions govern execution.
 
 ## Startup kernel
 
@@ -58,6 +57,7 @@ delegation and sequential repositories. Native permissions govern execution.
 | Broader coordinated development | `skills/pipeline/SKILL.md` |
 | Design or inspect a proposed solution | `skills/design/SKILL.md`, `skills/sketch/SKILL.md` |
 | Review an existing PR | `skills/review-pr/SKILL.md` |
+| Diagnose architecture or functional defects | `skills/audit/SKILL.md`, `skills/find-bugs/SKILL.md` |
 | Resolve PR comments | `skills/apply-review/SKILL.md` |
 | Prepare or publish a PR | `skills/create-pr/SKILL.md` |
 | Merge a PR | Existing authorization and native GitHub tools |

@@ -31,6 +31,9 @@ for (const relative of [
   "plugins/team-harness/.claude-plugin/hooks.json",
   "plugins/team-harness/agents/ref-pipeline.md",
   "plugins/team-harness/skills/pipeline/SKILL.md",
+  "skills/find-bugs/SKILL.md",
+  "plugins/team-harness/skills/find-bugs/SKILL.md",
+  "installer-assets/opencode-skills/find-bugs/SKILL.md",
   "plugins/team-harness/hooks/run-ts-hook.sh",
 ]) assert.ok((await readFile(path.join(root, relative))).length > 0, `missing curated Claude asset: ${relative}`);
 
@@ -48,6 +51,7 @@ const forbidden = [
   /(?:^|\/)\.superpowers\//,
   /(?:^|\/)\_bmad\/tea\//,
   /^openspec\//,
+  /^(?:\.agents|\.claude|\.opencode)\/skills\/find-bugs\//,
 ];
 let inspectedPackageFiles = 0;
 for (const packageRoot of new Set(Object.values(ownership.packages).flat())) {
@@ -72,11 +76,14 @@ const providerFixtures = [
   ".agents/skills/openspec-verify-change/SKILL.md",
   ".agents/skills/superpowers/verification-before-completion/SKILL.md",
   ".agents/skills/bmad-testarch-test-review/SKILL.md",
+  ".agents/skills/find-bugs/SKILL.md",
   ".claude/commands/opsx/verify.md",
   ".claude/skills/superpowers/verification-before-completion/SKILL.md",
   ".claude/skills/bmad-testarch-test-review/SKILL.md",
+  ".claude/skills/find-bugs/SKILL.md",
   ".opencode/commands/opsx-verify.md",
   ".opencode/commands/bmad-testarch-test-review.md",
+  ".opencode/skills/find-bugs/SKILL.md",
   ".superpowers/sdd/example/plan.md",
   "_bmad/tea/config.yaml",
   "openspec/changes/example/proposal.md",
@@ -88,6 +95,8 @@ assert.ok(declaredExternalPatterns.includes(".opencode/commands/opsx-*.md"),
 for (const required of [
   ".agents/skills/bmad-testarch-*", ".claude/skills/bmad-testarch-*",
   ".opencode/commands/bmad-testarch-*.md", "_bmad/tea/**",
+  ".agents/skills/find-bugs/**", ".claude/skills/find-bugs/**",
+  ".opencode/skills/find-bugs/**",
 ]) assert.ok(declaredExternalPatterns.includes(required), `missing external ownership: ${required}`);
 
 for (const fixture of [
@@ -96,12 +105,17 @@ for (const fixture of [
   "skills/superpowers/verification-before-completion/SKILL.md",
   "skills/bmad-testarch-test-review/SKILL.md",
   "skills/verification-before-completion/SKILL.md",
+  ".agents/skills/find-bugs/SKILL.md",
+  ".claude/skills/find-bugs/SKILL.md",
+  ".opencode/skills/find-bugs/SKILL.md",
   "opsx-verify.md",
   "bmad-testarch-test-review.md",
 ]) {
   assert.equal(forbidden.some((pattern) => pattern.test(fixture)), true,
     `provider asset would be accepted inside a TH package root: ${fixture}`);
 }
+assert.equal(forbidden.some((pattern) => pattern.test("skills/find-bugs/SKILL.md")), false,
+  "TH's canonical find-bugs skill must remain package-owned despite the upstream name collision");
 
 // Synchronize a real TH asset beside external installations: the packaging
 // writer must copy its owned asset while leaving provider files untouched.
@@ -118,6 +132,8 @@ try {
   for (const directory of [".claude-plugin", "agents", "hooks", "docs"]) {
     await mkdir(path.join(fixtureRoot, directory), { recursive: true });
   }
+  await mkdir(path.join(fixtureRoot, "skills/find-bugs"), { recursive: true });
+  await writeFile(path.join(fixtureRoot, "skills/find-bugs/SKILL.md"), "TH-owned find-bugs fixture\n");
   await writeFile(path.join(fixtureRoot, "agents/fixture.md"), "TH owned fixture\n");
   await syncClaudePackageAssets({ rootDir: fixtureRoot, check: false });
   assert.equal(await readFile(path.join(fixtureRoot, "plugins/team-harness/agents/fixture.md"), "utf8"), "TH owned fixture\n");
@@ -134,6 +150,7 @@ try {
     }
   }
   assert.ok(shipped.has("agents/fixture.md"), "the fixture must exercise a nonempty TH package");
+  assert.ok(shipped.has("skills/find-bugs/SKILL.md"), "TH's own find-bugs skill must remain package-owned");
   for (const relative of providerFixtures) {
     assert.equal(shipped.has(relative), false, `provider file crossed the package roots: ${relative}`);
   }

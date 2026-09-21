@@ -17,7 +17,9 @@ settings, and whether a new opencode session is required for discovery.
 
 ## Upstream provider route
 
-Route the explicit targets `openspec`, `superpowers`, and `tea` (also `bmad tea`)
+Route the explicit targets `openspec`, `superpowers`, `tea`, `semgrep`,
+`dependency-cruiser`, `knip`, `sentry`, `find-bugs`, `quality` and `quality-tools`
+(also `bmad tea`)
 here before inspecting or reconciling TH configuration. For a provider-only
 request, complete that route and return without creating TH settings. Continue
 the TH-specific procedure only when TH setup was also requested.
@@ -27,12 +29,30 @@ substrings: `team` and `team-harness` do not select `tea`. TH-only options apply
 only to a separately requested TH operation.
 
 Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
-when the operator names OpenSpec, Superpowers, or TEA. Full setup may report whether a
-provider is installed without installing it implicitly. For an explicit request, use the
-official OpenSpec package/project lifecycle, Superpowers plugin lifecycle, or BMAD TEA
-module lifecycle and native entries. Preserve provider-owned files and configuration;
-report installed capability separately from active session and propose a reload/restart
-only for a documented host limitation or observed stale activation.
+when the operator names OpenSpec, Superpowers, TEA, or a quality capability. Full setup may
+report whether a provider is installed without installing it implicitly. For an explicit
+request, use the official OpenSpec package/project lifecycle, Superpowers plugin lifecycle,
+BMAD TEA module lifecycle, or the selected quality provider's owner route. Preserve
+provider-owned files and configuration; report installed, discoverable and usable states
+separately from the active session. Propose a reload/restart only for a documented host
+limitation or observed stale activation.
+
+## Quality capability route
+
+`quality`/`quality-tools` is a selector, not an install-all command. Ask for the applicable
+objective and stack before preparing one capability. Read the policy's `quality_providers` and
+the [shared upstream-tool reference](../spec/references/upstream-tools.md), then:
+
+1. Reuse a healthy project-managed executable or native skill on the active OpenCode host.
+2. For missing/unusable selected tools, use the official route: Semgrep CE via Brew/Python/uv/
+   pipx; dependency-cruiser or Knip via npm project/tool-cache installation; Sentry `find-bugs`
+   via `npx --yes skills@1.7.0 add getsentry/skills --skill find-bugs --agent opencode --global --yes`.
+3. Verify the resolved version, prerequisites, invocation and workspace output before handing the
+   capability to audit, find-bugs or review-pr. Do not install inactive-host capabilities or
+   change project manifests unless that product change is separately authorized.
+4. Report any pending native activation and its recovery. The basename `find-bugs` may refer to
+   TH's project/module skill or Sentry's captured-branch method; resolve by owner/source and
+   objective, never by basename alone.
 
 ## GitHub identity routes
 
