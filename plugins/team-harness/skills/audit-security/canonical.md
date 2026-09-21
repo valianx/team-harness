@@ -1,6 +1,6 @@
 name: audit-security
 
-Run the five-check security self-scan over this repo's shipped assets (`agents/`, `skills/`, `hooks/`, `.claude-plugin/`) and present the severity-tagged report. REPORT-only — no auto-fix action is taken on any audited file.
+Run the six-check security self-scan over this repo's shipped assets (`agents/`, `skills/`, `hooks/`, `.claude-plugin/`) and present the severity-tagged report. REPORT-only — no auto-fix action is taken on any audited file.
 
 **IMPORTANT:** This skill runs directly — do NOT invoke the `orchestrator` agent or any other agent. Execute the scanner yourself using Bash and present the output verbatim.
 
@@ -14,7 +14,7 @@ chat replies, status blocks, error messages, and self-corrections alike.
 
 | Argument | Description |
 |----------|-------------|
-| (none)   | Run the full 5-check scan and present the report. |
+| (none)   | Run the full 6-check scan and present the report. |
 | `--help` | Print the check list, severity legend, and exit-code contract; do not run the scan. |
 
 ---
@@ -26,11 +26,12 @@ chat replies, status blocks, error messages, and self-corrections alike.
 If `$ARGUMENTS` contains `--help`, print the following and exit without running the scan:
 
 ```
-/th:audit-security — security self-scan (5-check MVP)
+/th:audit-security — security self-scan (6-check MVP)
 
 Checks:
-  1 (FAIL) — read-only-tier agent carrying Bash in frontmatter tools:
-  2 (FAIL) — web-facing agent (WebFetch/WebSearch in tools:) missing §6.6 preamble
+  0 (FAIL) — rostered agents resolve to real files and read-only rosters are coherent
+  1 (FAIL) — read-only agents exclude Bash; no-mutation roles exclude Bash/Edit/Write and PR-review allowlists match
+  2 (FAIL) — Codex PR-review projections are read-only and omit unsupported capability tables
   3 (FAIL) — hooks/*.sh injection anti-pattern (eval/$(), curl|bash, rm -rf $VAR)
   4 (WARN) — hook manifest non-canonical command / over-permissive .* matcher
   5 (FAIL) — concrete high-confidence secret in shipped assets

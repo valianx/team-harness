@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Keep routine update summaries focused on the installed version and actual result across Claude Code, Codex and OpenCode, without generic restart or reconnect advice.
 - Preserve detailed activation evidence for diagnostics and report concrete failures or operator actions without treating missing visibility or a Python PATH lookup as a restart requirement.
+- Bind review freshness to snapshot identity, confine regression probes to their review run, and restore regression evidence on Windows.
+- Resolve physical workspace ancestors, keep quality checks bound to the selected repository and prepared dependencies, and report malformed reviewer data as an input error.
+- Route visual skills through the shared workspace and active skill resources; keep GCP cost analysis coordinated by the current agent and align the security self-scan with its actual checks.
+- Give Windows-specific dependency guidance and recognize supported Python launchers in OpenCode setup.
+
+### Removed
+- Disconnected OpenCode context hooks and orphan installer migration/selection code. OpenCode retains its registered native workflow guide, workspace discovery and language/voice preferences.
 
 ## [3.38.0] - 2026-09-21
 

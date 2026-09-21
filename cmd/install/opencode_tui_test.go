@@ -23,6 +23,7 @@ package main
 //
 //   Dependency detect/guide (AC-9):
 //     - checkDep prints ok when tool is in PATH; prints hint when missing.
+//     - Python 3 accepts the supported platform executable aliases.
 //
 //   resolveOpencodeSetupFromEnvFlags (AC-8):
 //     - Resolves Memory URL from MEMORY_MCP_URL env.
@@ -34,6 +35,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -317,8 +319,6 @@ func TestNonInteractiveFlag_YesAliasAccepted(t *testing.T) {
 // nonInteractiveFlag is true, the interactive gate is closed. This test asserts
 // the gating logic: `interactive = !nonInteractiveFlag && hasInteractiveInput()`.
 // When nonInteractiveFlag is true, interactive must be false regardless of tty.
-// The token-mode within the non-interactive branch (env-ref vs literal) is a
-// separate concern tested by TestNonInteractiveMigration_LiteralPath.
 func TestNonInteractiveFlag_ForcesEnvFlagsPath(t *testing.T) {
 	// Setting nonInteractiveFlag = true means the gate expression evaluates to
 	// !true && <anything> = false. We verify this by computing the gate.
@@ -329,44 +329,6 @@ func TestNonInteractiveFlag_ForcesEnvFlagsPath(t *testing.T) {
 	interactive := !nonInteractiveFlag && hasInteractiveInput()
 	if interactive {
 		t.Error("interactive = true with --non-interactive set; gate must be false (SEC-DR-7)")
-	}
-}
-
-// TestNonInteractiveFlag_WithCCTokens_YieldsLiteralMode verifies that on the
-// non-interactive path, when the CC migration carries literal tokens, the caller
-// pattern (runOpencodePostApply) sets tokenModeLiteral + populated secrets.
-// This is the sibling to TestNonInteractiveFlag_ForcesEnvFlagsPath: the branch
-// is still taken (non-interactive), but the token-mode WITHIN it is now literal
-// when the CC migration had tokens (fix: scoped relaxation of SEC-OC-R1).
-func TestNonInteractiveFlag_WithCCTokens_YieldsLiteralMode(t *testing.T) {
-	// Simulate the caller logic from runOpencodePostApply non-interactive branch.
-	ccMigration := opencodeMCPMigration{
-		MemoryURL:    "https://mcp.example.com/mcp",
-		MemoryBearer: "fake-bearer",
-		Context7Key:  "ctx7sk-fake",
-	}
-
-	// Default mode (the starting point in runOpencodePostApply).
-	mode := tokenModeEnvRef
-	secrets := opencodeMCPSecrets{}
-
-	// The fix: caller sets literal mode when hasLiteralTokens().
-	if ccMigration.hasLiteralTokens() {
-		mode = tokenModeLiteral
-		secrets = opencodeMCPSecrets{
-			MemoryBearer: ccMigration.MemoryBearer,
-			Context7Key:  ccMigration.Context7Key,
-		}
-	}
-
-	if mode != tokenModeLiteral {
-		t.Error("mode = tokenModeEnvRef, want tokenModeLiteral for CC migration with tokens (fix: SEC-OC-R1 scoped relaxation)")
-	}
-	if secrets.MemoryBearer != "fake-bearer" {
-		t.Errorf("secrets.MemoryBearer = %q, want fake-bearer", secrets.MemoryBearer)
-	}
-	if secrets.Context7Key != "ctx7sk-fake" {
-		t.Errorf("secrets.Context7Key = %q, want ctx7sk-fake", secrets.Context7Key)
 	}
 }
 
@@ -401,12 +363,62 @@ func TestPython3InstallHint_ReturnsNonEmptyString(t *testing.T) {
 	}
 }
 
+func TestPythonCandidates_UseSupportedAliases(t *testing.T) {
+	candidates := pythonCandidates()
+	if len(candidates) == 0 {
+		t.Fatal("pythonCandidates() returned no candidates")
+	}
+
+	seen := make(map[string]bool, len(candidates))
+	for _, candidate := range candidates {
+		seen[candidate.binary] = true
+		if len(candidate.args) == 0 || candidate.args[len(candidate.args)-1] != "--version" {
+			t.Errorf("candidate %q does not use a version probe: %v", candidate.binary, candidate.args)
+		}
+	}
+	if runtime.GOOS == "windows" {
+		for _, binary := range []string{"py", "python", "python3"} {
+			if !seen[binary] {
+				t.Errorf("Windows Python candidate %q missing", binary)
+			}
+		}
+		if got := candidates[0].args; len(got) < 2 || got[0] != "-3" {
+			t.Errorf("Windows py candidate args = %v, want -3 --version", got)
+		}
+		return
+	}
+	for _, binary := range []string{"python3", "python"} {
+		if !seen[binary] {
+			t.Errorf("Unix Python candidate %q missing", binary)
+		}
+	}
+}
+
 // TestGhInstallHint_ReturnsNonEmptyString verifies that the platform hint for
 // gh is non-empty (the runtime.GOOS switch always returns a hint).
 func TestGhInstallHint_ReturnsNonEmptyString(t *testing.T) {
 	hint := ghInstallHint()
 	if hint == "" {
 		t.Error("ghInstallHint() returned empty string")
+	}
+}
+
+func TestWindowsDependencyHintsUseWindowsGuidance(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows-specific install guidance")
+	}
+	for name, hint := range map[string]string{
+		"Python 3":   python3InstallHint(),
+		"GitHub CLI": ghInstallHint(),
+	} {
+		if !strings.Contains(hint, "winget") {
+			t.Errorf("%s hint = %q, want winget guidance on Windows", name, hint)
+		}
+		for _, unixCommand := range []string{"apt install", "dnf install", "pacman -S"} {
+			if strings.Contains(hint, unixCommand) {
+				t.Errorf("%s hint = %q contains Unix command %q", name, hint, unixCommand)
+			}
+		}
 	}
 }
 
@@ -811,8 +823,9 @@ func TestImportShortCircuit_PreFilledSourceContainsEarlyReturn(t *testing.T) {
 // TestCheckOpencodeDependencies_IsNonBlocking verifies that
 // checkOpencodeDependencies() returns without blocking — it must not call
 // os.Exit, must not prompt for input, and must complete in bounded time.
-// We assert the structural contract: the function must not contain any
-// blocking call (exec.Command, os.Exit, promptMenu, bufio.Scanner.Scan).
+// We assert the structural contract: dependency probing uses only a bounded
+// exec.CommandContext version check (never an unbounded command), os.Exit,
+// promptMenu, or bufio.Scanner.Scan.
 func TestCheckOpencodeDependencies_NonBlockingStructural(t *testing.T) {
 	src, err := os.ReadFile(filepath.Join(sourceDir(t), "opencode_deps.go"))
 	if err != nil {
@@ -820,10 +833,10 @@ func TestCheckOpencodeDependencies_NonBlockingStructural(t *testing.T) {
 	}
 	content := string(src)
 
-	// These patterns must NOT appear in opencode_deps.go (AC-9 MVP: no execution, no prompt).
+	// These patterns must NOT appear in opencode_deps.go (AC-9: no unbounded
+	// execution or prompt). The bounded version probe is checked below.
 	forbidden := []string{
 		"exec.Command(",
-		"exec.CommandContext(",
 		"os.Exit(",
 		"promptMenu(",
 		"promptMenuWith(",
@@ -838,6 +851,9 @@ func TestCheckOpencodeDependencies_NonBlockingStructural(t *testing.T) {
 	// exec.LookPath is the ONLY exec package function that is permitted.
 	if !strings.Contains(content, "exec.LookPath(") {
 		t.Error("opencode_deps.go: exec.LookPath not found — dependency detection is missing")
+	}
+	if !strings.Contains(content, "exec.CommandContext(") || !strings.Contains(content, "context.WithTimeout(") {
+		t.Error("opencode_deps.go: Python version probe must use a bounded CommandContext")
 	}
 }
 

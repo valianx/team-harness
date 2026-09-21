@@ -76,7 +76,7 @@ gcloud auth application-default login
 Complete cost analysis across all accessible projects — inventory, billing, recommendations, report.
 
 - **Trigger:** user asks for GCP cost analysis, cloud spending audit, infrastructure optimization
-- **Output:** `workspaces/{feature-name}/00-gcp-costs.md`
+- **Output:** `{output_file}` (the resolved workspace, unless Main supplied an explicit deliverable target)
 - **Flow:** Phase 0 → Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5 (report)
 
 ### Scoped Analysis
@@ -84,7 +84,7 @@ Complete cost analysis across all accessible projects — inventory, billing, re
 Targeted analysis of specific projects, services, or resource types.
 
 - **Trigger:** user specifies projects, services, or areas (e.g., "analyze GKE costs", "audit project-X spending")
-- **Output:** `workspaces/{feature-name}/00-gcp-costs.md`
+- **Output:** `{output_file}` (the resolved workspace, unless Main supplied an explicit deliverable target)
 - **Flow:** Phase 0 → skip to relevant Phase 2/3 sections → Phase 5 (report)
 
 ### Quick Scan
@@ -92,7 +92,7 @@ Targeted analysis of specific projects, services, or resource types.
 Fast pass focused on idle resources and top Recommender findings only. No BigQuery billing analysis.
 
 - **Trigger:** user asks for quick scan, idle resources check, or waste detection
-- **Output:** `workspaces/{feature-name}/00-gcp-costs.md`
+- **Output:** `{output_file}` (the resolved workspace, unless Main supplied an explicit deliverable target)
 - **Flow:** Phase 0 → Phase 1 (project discovery only) → Phase 3 (recommenders only) → Phase 5 (abbreviated report)
 
 ---
@@ -101,15 +101,13 @@ Fast pass focused on idle resources and top Recommender findings only. No BigQue
 
 **Before starting ANY work:**
 
-1. **Check for existing session context** — use Glob to look for `workspaces/{feature-name}/`. If it exists, read ALL files inside to understand task scope.
+1. **Read the orchestrator's invocation** — consume the absolute `workspace`, optional absolute `deliverable_target`, and active `skill_root` supplied by Main. Do not derive any path from the current working directory or from a feature name.
 
-   **Path override:** If a `workspaces path:` was provided in the dispatch, use that path as the workspaces folder instead of `workspaces/{feature-name}/`. In obsidian mode the path is the orchestrator's resolved base or the session-start directive's announced base — never the repo-local default.
+2. **Resolve the report path** — when `deliverable_target` names a file, use that exact file; when it names a directory, write `00-gcp-costs.md` inside it; otherwise write `00-gcp-costs.md` directly in `workspace`. The supplied workspace must already exist; do not create a repository-local feature folder.
 
-2. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature-name}/` for your output.
+3. **Read existing context from the supplied workspace** when present. The workspace is the shared continuity surface; do not edit the repository `.gitignore`, create execution logs, or create another workspace.
 
-3. **Ensure `.gitignore` includes `workspaces`** — check `.gitignore` and verify `/workspaces` is present.
-
-4. **Write your output** to `workspaces/{feature-name}/00-gcp-costs.md` when done.
+4. **Write the report** to the resolved `{output_file}` and return that exact absolute path.
 
 ---
 
@@ -563,7 +561,7 @@ Analyze all collected data and identify optimization opportunities across these 
 
 ## Phase 5 — Cost Report
 
-Write the complete report to `workspaces/{feature-name}/00-gcp-costs.md`.
+Write the complete report to `{output_file}`.
 
 ```markdown
 # GCP Cost Analysis Report
@@ -800,13 +798,13 @@ Before marking the analysis as complete:
 
 ## Session Documentation
 
-Write the full report to `workspaces/{feature-name}/00-gcp-costs.md` (see Phase 5 above for the complete template).
+Write the full report to `{output_file}` (see Phase 5 above for the complete template).
 
 ---
 
 ## Execution Log Protocol
 
-The orchestrator writes observability events to `workspaces/{feature-name}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orchestrator propagates it.
+The orchestrator owns observability events for the supplied workspace. You do not create or write an execution-log file directly — return timing data in the status block and the orchestrator propagates it.
 
 ---
 
@@ -818,7 +816,7 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: gcp-cost-analyzer
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
-output: workspaces/{feature-name}/00-gcp-costs.md
+output: {output_file}
 summary: {1-2 sentences: N projects analyzed, total monthly spend ${N}, potential savings ${N}/mo, top finding}
 issues: {critical blockers or "none"}
 ```

@@ -46,13 +46,11 @@ for (const path of [
   "plugins/team-harness/hooks/hooks.json",
   "plugins/team-harness/hooks/run-codex-hook.sh",
   "tools/codex-runtime/sync-hooks.mjs",
+  "hooks/ts/opencode-plugin.ts",
+  "hooks/ts/entry/session-enforcement.opencode.ts",
 ]) {
   await assert.rejects(access(join(root, path)), { code: "ENOENT" }, `${path} still exists`);
 }
-
-const pluginSource = await readFile(join(root, "hooks/ts/opencode-plugin.ts"), "utf8");
-assert.match(pluginSource, /sessionEnforcementPlugin/);
-for (const name of forbidden) assert.doesNotMatch(pluginSource, new RegExp(name));
 
 const packageJson = JSON.parse(await readFile(join(root, "hooks/ts/package.json"), "utf8"));
 for (const script of Object.keys(packageJson.scripts)) {

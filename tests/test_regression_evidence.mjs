@@ -60,9 +60,8 @@ process.exitCode = passed ? 0 : 1;
     const record = await validateRegression(requestPath, receipt.evidence, receipt.sha256);
     return { receipt, record };
   }
-  let initial;
   await check("real preserved-setting regression with unchanged operator checkout", async () => {
-    initial = await capture();
+    const initial = await capture();
     assert.equal(initial.record.classification, "regression-candidate");
     assert.equal(initial.record.base.assertion, "pass");
     assert.equal(initial.record.head.assertion, "fail");
@@ -73,6 +72,7 @@ process.exitCode = passed ? 0 : 1;
     assert.equal(git("rev-parse", "HEAD"), head);
   });
   await check("head and comparison-base changes reject reuse", async () => {
+    const initial = await capture();
     for (const field of ["head_oid", "base_oid", "merge_base_oid"]) {
       await json(contextPath, { ...context, [field]: "c".repeat(40) });
       await assert.rejects(validateRegression(requestPath, initial.receipt.evidence, initial.receipt.sha256), /identity/);
@@ -80,6 +80,7 @@ process.exitCode = passed ? 0 : 1;
     await json(contextPath, context);
   });
   await check("changed command and original probe reject reuse", async () => {
+    const initial = await capture();
     await json(requestPath, { ...request, argv: [process.execPath, "--no-warnings", "{probe}"] });
     await assert.rejects(validateRegression(requestPath, initial.receipt.evidence, initial.receipt.sha256), /identity/);
     await json(requestPath, request);
@@ -88,6 +89,7 @@ process.exitCode = passed ? 0 : 1;
     await writeFile(probePath, probe);
   });
   await check("modified evidence and copied probe reject reuse", async () => {
+    const initial = await capture();
     const bytes = await readFile(initial.receipt.evidence);
     await writeFile(initial.receipt.evidence, `${bytes} `);
     await assert.rejects(validateRegression(requestPath, initial.receipt.evidence, initial.receipt.sha256), /digest/);
@@ -122,6 +124,28 @@ process.exitCode = passed ? 0 : 1;
       assert.ok(record.reason);
     }
   });
+  await check("probe outside the owned review run is rejected", async () => {
+    const outsideProbe = path.join(root, "outside-probe.mjs");
+    await writeFile(outsideProbe, probe);
+    await json(requestPath, { ...request, probe: outsideProbe });
+    await assert.rejects(captureRegression(requestPath), /owned review run/);
+    await json(requestPath, request);
+  });
+  await check("probe beneath a redirected directory is rejected before execution", async () => {
+    const outside = path.join(root, "outside-probes");
+    const link = path.join(run, "redirected-probes");
+    await mkdir(outside);
+    await writeFile(path.join(outside, "probe.mjs"), "throw new Error('must not run');");
+    await symlink(outside, link, process.platform === "win32" ? "junction" : "dir");
+    try {
+      await json(requestPath, { ...request, probe: path.join(link, "probe.mjs") });
+      await assert.rejects(captureRegression(requestPath), /symlink input/);
+      assert.equal(await readFile(path.join(outside, "probe.mjs"), "utf8"), "throw new Error('must not run');");
+    } finally {
+      await rm(link);
+      await json(requestPath, request);
+    }
+  });
   await check("missing executable and ambiguous assertion output remain inconclusive", async () => {
     for (const [source, overrides] of [
       ["", { argv: [path.join(root, "missing-executable"), "{probe}"] }],
@@ -152,7 +176,15 @@ process.exitCode = passed ? 0 : 1;
     const outside = path.join(root, "outside.json");
     await writeFile(outside, await readFile(receipt.evidence));
     await rm(receipt.evidence);
-    await symlink(outside, receipt.evidence);
+    try {
+      await symlink(outside, receipt.evidence);
+    } catch (error) {
+      if (error?.code === "EPERM" || error?.code === "EACCES") {
+        process.stdout.write("SKIP symlink evidence fixture lacks native link permission\n");
+        return;
+      }
+      throw error;
+    }
     await assert.rejects(validateRegression(requestPath, receipt.evidence, receipt.sha256), /symlink/);
   });
   await check("unsupported source entries disclose unavailable preparation", async () => {

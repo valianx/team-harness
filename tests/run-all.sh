@@ -402,7 +402,7 @@ fi
 
 echo
 echo "############################################################"
-echo "# Suite 20: opencode generated-agent and session behavior"
+echo "# Suite 20: opencode generated-agent behavior"
 echo "############################################################"
 if ! command -v go >/dev/null 2>&1; then
     report_skip_or_fail "opencode-agent-frontmatter" "go not found"
@@ -410,14 +410,6 @@ elif bash "$TESTS_DIR/test_opencode_agent_frontmatter.sh"; then
     echo "opencode-agent-frontmatter: PASS"
 else
     echo "opencode-agent-frontmatter: FAIL"
-    FAILED=$((FAILED + 1))
-fi
-if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
-    report_skip_or_fail "opencode-session-enforcement" "node and npm are required"
-elif bash "$TESTS_DIR/test_opencode_session_enforcement.sh"; then
-    echo "opencode-session-enforcement: PASS"
-else
-    echo "opencode-session-enforcement: FAIL"
     FAILED=$((FAILED + 1))
 fi
 

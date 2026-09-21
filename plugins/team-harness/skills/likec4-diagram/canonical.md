@@ -5,7 +5,19 @@ Generate `.c4` architecture diagram files using the LikeC4 DSL that **communicat
 
 ---
 
+## Workspace and Runtime Paths
+
+For a direct invocation without a bound workspace, use the [workspace skill](../workspace/SKILL.md) to resolve or create the configured local/Obsidian home before writing. The current agent is Main; no parent workflow is required.
+
+Before writing, consume the `workspace` and optional `deliverable_target` supplied by Main. `workspace` is the absolute shared local or Obsidian home already resolved for this effort; it is not a repository-relative template. Set `output_dir` to the explicit target directory when supplied, otherwise to `workspace`. If the target names a file, use its parent as `output_dir`, keep that exact `source_file`, and derive `summary_file` alongside it. Otherwise use `source_file = {output_dir}/diagram.c4` and `summary_file = {output_dir}/05-diagram.md`; exported views stay in `output_dir`. Resolve references and render helpers from `skill_root`, the active installation directory containing this document. Never derive output from the current working directory or read another runtime's configuration.
+
+---
+
 ## Core Philosophy
+
+Run LikeC4 CLI commands with their working directory set to the resolved
+`output_dir`, so validation and export read the generated source rather than
+the repository from which the task was invoked.
 
 **Architecture diagrams should argue, not display.**
 
@@ -86,7 +98,7 @@ views { ... }           // define what to render and how
 
 The specification is reusable across files. The model is the source of truth. Views are lenses into the model.
 
-See `references/dsl-reference.md` for complete syntax and all available shapes, colors, and properties.
+See `{skill_root}/references/dsl-reference.md` for complete syntax and all available shapes, colors, and properties.
 
 ---
 
@@ -123,7 +135,7 @@ Use built-in LikeC4 colors semantically:
 - `blue` — infrastructure, data stores
 - `gray` — disabled, out-of-scope elements
 
-See `references/dsl-reference.md` for the full color reference.
+See `{skill_root}/references/dsl-reference.md` for the full color reference.
 
 ---
 
@@ -245,7 +257,7 @@ Fix all errors before proceeding.
 
 ### Step 6: Visual validation (if CLI available)
 ```bash
-npx likec4 export png --output workspaces/{feature}/
+cd "{output_dir}" && npx likec4 export png --output "{output_dir}"
 ```
 Read the PNG to verify the diagram communicates correctly. If elements are missing or relationships are unclear, revise the model.
 
@@ -274,7 +286,7 @@ This produces fewer syntax errors than writing everything at once, and makes deb
 
 ## Pattern Library
 
-See `references/patterns.md` for complete working examples of:
+See `{skill_root}/references/patterns.md` for complete working examples of:
 - Monolith with modules
 - Microservices with API Gateway
 - Event-driven / Message Queue architecture
@@ -367,9 +379,9 @@ Icons appear in rendered views as small logos on elements. Use them to distingui
 ## Output Files
 
 The skill produces:
-- `workspaces/{feature}/diagram.c4` — the LikeC4 DSL source (primary output)
-- `workspaces/{feature}/05-diagram.md` — summary of design decisions
-- `workspaces/{feature}/diagram_*.png` — exported PNGs (if CLI export succeeded)
+- `{source_file}` — the LikeC4 DSL source (primary output)
+- `{summary_file}` — summary of design decisions
+- `{output_dir}/diagram_*.png` — exported PNGs (if CLI export succeeded)
 
 The `.c4` file is the authoritative output. It is readable, diffable, and can be re-rendered at any time.
 
@@ -377,24 +389,24 @@ The `.c4` file is the authoritative output. It is readable, diffable, and can be
 
 ## Obsidian Output Mode
 
-When `logs-mode: obsidian` is active (resolved from `~/.claude/.team-harness.json`), the diagrammer agent follows this extended contract so the diagrams display INLINE in Obsidian. Local mode behavior is unchanged.
+When `logs-mode: obsidian` is active in the resolved runtime context, the diagrammer agent follows this extended contract so the diagrams display inline in Obsidian. Local mode uses the same resolved output directory.
 
 ### What the agent does in obsidian mode
 
-1. **Render:** After validating `diagram.c4`, export PNG views into the vault workspace folder (`docs_root`):
+1. **Render:** After validating `{source_file}`, export PNG views into the resolved output directory:
    ```bash
-   npx likec4 export png -o "{docs_root}"
+   cd "{output_dir}" && npx likec4 export png -o "{output_dir}"
    ```
    The `-o` flag is a **directory**. LikeC4 writes one `diagram_<viewId>.png` per view. PNG is LikeC4's documented export format; the export requires Playwright (LikeC4 installs it automatically via `npx`).
 
-2. **Embed:** After the PNG files are written, glob `{docs_root}/diagram_*.png` and append one embed per PNG to `{docs_root}/05-diagram.md`:
+2. **Embed:** After the PNG files are written, glob `{output_dir}/diagram_*.png` and append one embed per PNG to `{summary_file}`:
    ```markdown
    ## Rendered Diagrams
    ![[diagram_<viewId>.png]]
    ```
    One line per exported view. Obsidian renders each `![[...png]]` inline when the note is opened.
 
-3. **Output:** Both `diagram.c4` (source, re-editable) and `diagram_*.png` (vault-visible images) are written to `docs_root`. The `.c4` source is kept alongside for re-editing.
+3. **Output:** Both `source_file` (source, re-editable) and `diagram_*.png` (vault-visible images) are written to `output_dir`. The `.c4` source is kept alongside for re-editing.
 
 ### CLI-absent degradation
 
@@ -403,7 +415,7 @@ When `npx likec4` is not available (Node.js not installed, network unavailable),
 ```markdown
 ## Rendered Diagrams
 > Images not rendered — `npx likec4` is not available. Install Node.js and re-run to embed the diagrams.
-> Source: `diagram.c4`
+> Source: `{source_file}`
 ```
 
 Status remains `success` (source produced); the status block adds `render: skipped`.
@@ -427,13 +439,13 @@ npx likec4 validate
 npx likec4 start
 
 # Export all views to PNG
-npx likec4 export png --output ./output/
+npx likec4 export png --output "{output_dir}"
 
 # Export all views to SVG
-npx likec4 export svg --output ./output/
+npx likec4 export svg --output "{output_dir}"
 
 # Build static site
-npx likec4 build --output ./dist/
+npx likec4 build --output "{output_dir}/dist"
 ```
 
 If `npx likec4` is not available, document the diagram path and instruct the user to install:

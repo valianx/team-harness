@@ -25,15 +25,20 @@ MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
+BASE_OID = "a" * 40
+HEAD_OID = "b" * 40
+MERGE_BASE_OID = "c" * 40
+NEW_HEAD_OID = "d" * 40
+
 
 def context(**overrides):
     value = {
         "schema_version": MODULE.SCHEMA_VERSION,
-        "base_oid": "base",
-        "head_oid": "head",
-        "merge_base_oid": "merge",
+        "base_oid": BASE_OID,
+        "head_oid": HEAD_OID,
+        "merge_base_oid": MERGE_BASE_OID,
         "pr": {"title": "Title", "body": "Body"},
-        "commits": [{"oid": "head", "subject": "fix: current"}],
+        "commits": [{"oid": HEAD_OID, "subject": "fix: current"}],
         "issue_comments": [],
         "review_comments": [],
         "review_threads": [],
@@ -871,6 +876,32 @@ class ReviewContextTests(unittest.TestCase):
                 external_exclude.read_text(encoding="utf-8"),
             )
 
+    def test_generic_git_commands_ignore_inherited_repository_overrides(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "root"
+            external = Path(directory) / "external"
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            subprocess.run(["git", "init", "-q", str(external)], check=True)
+            with patch.dict(
+                os.environ,
+                {
+                    "GIT_DIR": str(external / ".git"),
+                    "GIT_WORK_TREE": str(external),
+                    "GIT_COMMON_DIR": str(external / ".git"),
+                    "GIT_INDEX_FILE": str(external / "index"),
+                    "GIT_OBJECT_DIRECTORY": str(external / "objects"),
+                    "GIT_ALTERNATE_OBJECT_DIRECTORIES": str(external / "alternate"),
+                    "GIT_NAMESPACE": "external",
+                    "GIT_PREFIX": "external-prefix",
+                    "GIT_CEILING_DIRECTORIES": str(external.parent),
+                },
+                clear=False,
+            ):
+                git_dir = Path(
+                    MODULE.run_text(["git", "-C", str(root), "rev-parse", "--git-dir"])
+                )
+            self.assertEqual(git_dir, Path(".git"))
+
     def test_workspace_ignore_update_is_atomic_and_rejects_symlink(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -1330,8 +1361,8 @@ class ReviewContextTests(unittest.TestCase):
 
     def test_repeated_head_drift_is_detected_across_a_capped_restart(self):
         approved = context()
-        first_recapture = context(head_oid="new-head")
-        second_recapture = context(head_oid="new-head")
+        first_recapture = context(head_oid=NEW_HEAD_OID)
+        second_recapture = context(head_oid=NEW_HEAD_OID)
 
         first = MODULE.compare_contexts(approved, first_recapture)
         second = MODULE.compare_contexts(approved, second_recapture)
@@ -1340,6 +1371,37 @@ class ReviewContextTests(unittest.TestCase):
         self.assertEqual(second["status"], "code-changed")
         self.assertEqual(first["expected_head_oid"], second["expected_head_oid"])
         self.assertEqual(first["actual_head_oid"], second["actual_head_oid"])
+
+    def test_compare_uses_reviewed_oids_when_saved_hashes_are_stale(self):
+        approved = context()
+        stale = dict(approved, head_oid=NEW_HEAD_OID)
+
+        comparison = MODULE.compare_contexts(approved, stale)
+
+        self.assertEqual(comparison["status"], "code-changed")
+        self.assertEqual(comparison["next_action"], "restart-technical-review")
+        self.assertFalse(comparison["technical_results_reusable"])
+        self.assertEqual(comparison["changed_fields"], ["head_oid"])
+
+    def test_compare_rejects_equal_inconsistent_saved_hashes(self):
+        approved = context()
+        corrupt = dict(approved, code_hash="stale-code-hash", technical_hash="stale-technical-hash")
+
+        comparison = MODULE.compare_contexts(corrupt, corrupt)
+
+        self.assertEqual(comparison["status"], "code-changed")
+        self.assertEqual(comparison["next_action"], "restart-technical-review")
+        self.assertTrue(comparison["context_integrity_changed"])
+        self.assertFalse(comparison["technical_results_reusable"])
+
+    def test_compare_rejects_equal_malformed_oids_even_with_fresh_hashes(self):
+        malformed = context(base_oid="not-a-complete-git-oid")
+
+        comparison = MODULE.compare_contexts(malformed, malformed)
+
+        self.assertEqual(comparison["status"], "code-changed")
+        self.assertTrue(comparison["context_integrity_changed"])
+        self.assertFalse(comparison["technical_results_reusable"])
 
     def test_compare_distinguishes_code_and_conversation_changes(self):
         original = context()
@@ -1368,7 +1430,7 @@ class ReviewContextTests(unittest.TestCase):
                 }
             ]
         )
-        moved = context(head_oid="new-head")
+        moved = context(head_oid=NEW_HEAD_OID)
 
         self.assertEqual(
             MODULE.compare_contexts(original, original)["status"],
@@ -1745,7 +1807,7 @@ class ReviewContextTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "context.json"
             path.write_text(json.dumps(context()), encoding="utf-8")
-            self.assertEqual(MODULE.load_context(path)["head_oid"], "head")
+            self.assertEqual(MODULE.load_context(path)["head_oid"], HEAD_OID)
             path.write_text('{"schema_version": 999}', encoding="utf-8")
             with self.assertRaises(MODULE.ContextError):
                 MODULE.load_context(path)

@@ -39,22 +39,28 @@ See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" 
 
 **Before starting ANY work:**
 
-1. **Read the orchestrator's invocation** — extract:
-   - Path to architect's analysis: `workspaces/{feature}/research/00-research.md`
-   - Path to skill: `.claude/skills/d2-diagram/`
-   - Output path: `workspaces/{feature}/diagram.d2`
-   - Feature name for workspaces and execution log
+1. **Read the orchestrator's invocation** — consume the absolute `workspace`, the
+   optional absolute `deliverable_target`, the absolute `analysis_path`, and the
+   active `skill_root` supplied by Main. `workspace` is the shared local or
+   Obsidian home for this effort; `deliverable_target` is the explicit source
+   file or output directory when one was requested. Never derive paths from the
+   current working directory or from a feature name.
 
-2. **Read the architect's analysis** — read `workspaces/{feature}/research/00-research.md` in full. This is your primary input. Do not start designing until you've read and understood it.
+2. **Resolve the output paths** using the D2 skill contract: an explicit file
+   target remains the exact `source_file`; a directory target uses
+   `{output_dir}/diagram.d2`, `{output_dir}/diagram.svg`, and
+   `{output_dir}/05-diagram.md`; without a target, use the supplied `workspace`
+   as `output_dir`. The supplied workspace must already exist. Do not create a
+   repository-local feature folder or edit `.gitignore`.
 
-3. **Read the skill methodology** — read these files in order:
-   - `.claude/skills/d2-diagram/SKILL.md` — diagram type selection, generation process, quality checklist
-   - `.claude/skills/d2-diagram/references/dsl-reference.md` — all D2 syntax and shapes
-   - `.claude/skills/d2-diagram/references/patterns.md` — use the closest matching pattern as a starting point
+3. **Read the architect's analysis** — read the supplied `analysis_path` in
+   full. This is the primary input. Do not start designing until it has been
+   read and understood.
 
-4. **Create workspaces folder if it doesn't exist** — create `workspaces/{feature}/` for your output.
-
-5. **Ensure `.gitignore` includes `/workspaces`** — check and add if missing.
+4. **Read the skill methodology** from the supplied `skill_root` in this order:
+   - `{skill_root}/SKILL.md` — diagram type selection, generation process, quality checklist
+   - `{skill_root}/references/dsl-reference.md` — all D2 syntax and shapes
+   - `{skill_root}/references/patterns.md` — use the closest matching pattern as a starting point
 
 ---
 
@@ -137,27 +143,32 @@ Build the `.d2` file one pass at a time:
 
 ## Obsidian Output Mode
 
-When the resolved output path is inside an Obsidian vault (i.e., `logs-mode: obsidian` is active and `docs_root` points to a vault workspace folder), follow this contract INSTEAD OF writing only the source. The local-mode path (source + summary in `workspaces/`) is unchanged.
+When the resolved `output_dir` is inside an Obsidian vault, use the same
+workspace-resolved source, render, and summary paths below. Local and Obsidian
+mode share the supplied output directory; there is no second output root or
+repository-local workspace.
 
 ### Render step (mandatory in obsidian mode)
 
-After generating and formatting `diagram.d2`, compile the SVG into the vault folder:
+After generating and formatting `{source_file}`, compile the SVG alongside it:
 
 ```bash
-d2 "{docs_root}/diagram.d2" "{docs_root}/diagram.svg"
+d2 "{source_file}" "{render_file}"
 ```
 
 This is D2's native default export — no extra dependency beyond the `d2` CLI.
 
-**Path quoting:** all `{docs_root}`-derived arguments are double-quoted. Obsidian vault paths commonly contain spaces (e.g. `…/Obsidian Vault/…`); unquoted paths break the command on those systems.
+**Path quoting:** all workspace-derived arguments are double-quoted. Obsidian
+vault paths commonly contain spaces; unquoted paths break the command.
 
 ### Embed step
 
-After the SVG is written, append the following block to `{docs_root}/05-diagram.md`:
+After the SVG is written, append the following block to `{summary_file}`, using
+the basename of `{render_file}`:
 
 ```markdown
 ## Rendered Diagram
-![[diagram.svg]]
+![[{render_file basename}]]
 ```
 
 This embed causes Obsidian to display the diagram inline when the note is opened.
@@ -166,12 +177,12 @@ This embed causes Obsidian to display the diagram inline when the note is opened
 
 When the `d2` CLI is not installed, do NOT hard-fail. The `.d2` source is still the authoritative deliverable.
 
-In obsidian mode, append this marker to `{docs_root}/05-diagram.md` in place of the embed:
+In the resolved workspace, append this marker to `{summary_file}` in place of the embed:
 
 ```markdown
 ## Rendered Diagram
 > Image not rendered — the `d2` CLI is not installed. Install it and re-run to embed the diagram.
-> Source: `diagram.d2`
+> Source: `{source_file}`
 ```
 
 Status remains `success` when the source was produced and validated. Add `render: skipped` to the status block so the orchestrator/operator can see the degradation explicitly.
@@ -183,7 +194,7 @@ Status remains `success` when the source was produced and validated. Add `render
 ### Step 1 — Format and validate syntax
 
 ```bash
-d2 fmt workspaces/{feature}/diagram.d2
+d2 fmt "{source_file}"
 ```
 
 If `d2 fmt` fails, read the exact diagnostic, change the cause, and retry. Do
@@ -193,7 +204,7 @@ remains and return the blocker.
 ### Step 2 — Compile to SVG
 
 ```bash
-d2 workspaces/{feature}/diagram.d2 workspaces/{feature}/diagram.svg
+d2 "{source_file}" "{render_file}"
 ```
 
 If compilation fails, read the error, change the cause, and retry under the
@@ -255,14 +266,14 @@ Before finishing, verify:
 
 ## Session Documentation
 
-Write your summary to `workspaces/{feature}/05-diagram.md`:
+Write your summary to `{summary_file}`:
 
 ```markdown
 # D2 Diagram Summary: {feature}
 **Date:** {date}
 **Agent:** d2-diagrammer
-**Source:** workspaces/{feature}/diagram.d2
-**Output:** workspaces/{feature}/diagram.svg
+**Source:** {source_file}
+**Output:** {render_file}
 
 ## Design Decisions
 - **Diagram type:** {architecture|sequence|ER|class|flowchart}
@@ -283,7 +294,9 @@ Write your summary to `workspaces/{feature}/05-diagram.md`:
 
 ## Execution Log Protocol
 
-The orchestrator writes observability events to `workspaces/{feature}/00-execution-events.jsonl` (local mode) or `00-execution-events.md` (obsidian mode). You do not write to that file directly — return your timing data in the status block and the orchestrator propagates it.
+The orchestrator owns observability events for the supplied workspace. You do not
+create or write an execution-log file directly — return timing data in the status
+block and the orchestrator propagates it.
 
 ---
 
@@ -295,8 +308,8 @@ When invoked by the orchestrator via Task tool, your **FINAL message** must be a
 agent: d2-diagrammer
 status: success | failed | blocked
 failure_kind: {kind}   # mandatory when status is failed or blocked; omit on success. Taxonomy: agents/ref-pipeline.md § Failures
-output: workspaces/{feature}/diagram.d2
-svg: workspaces/{feature}/diagram.svg
+output: {source_file}
+svg: {render_file}
 render: done | skipped   # obsidian mode only; omit in local mode
 diagram_type: {architecture|sequence|ER|class|flowchart}
 node_count: {N}
@@ -314,4 +327,4 @@ issues: {blocking issues if failed/blocked, or "none"}
 - Windows: `winget install terrastruct.d2`
 - macOS/Linux: `curl -fsSL https://d2lang.com/install.sh | sh -s --`
 
-Do NOT repeat the full workspaces content in your final message. The orchestrator uses this status block to validate completeness.
+Do NOT repeat the full workspace content in your final message. The orchestrator uses this status block to validate completeness.

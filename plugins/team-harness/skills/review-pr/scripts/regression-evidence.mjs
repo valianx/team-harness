@@ -13,6 +13,7 @@ const exec = promisify(execFile);
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const digest = (value) => hash(JSON.stringify(value));
 const oid = /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/;
+const gitGlobalConfigNull = process.platform === "win32" ? "NUL" : devNull;
 const text = (value) => typeof value === "string" && value.trim().length > 0 && value.length <= 8192;
 const ensure = (condition, reason) => { if (!condition) throw new Error(reason); };
 
@@ -63,7 +64,12 @@ async function inputs(requestPath) {
   ensure([context.head_oid, context.base_oid, context.merge_base_oid].every((value) => typeof value === "string" && oid.test(value)),
     "invalid captured commits");
   ensure(/^[a-f0-9]{64}$/.test(context.technical_hash), "missing technical identity");
-  const probe = await regular(request.probe);
+  const probePath = path.resolve(request.probe);
+  const relativeProbe = path.relative(root, probePath);
+  ensure(relativeProbe && !path.isAbsolute(relativeProbe)
+    && relativeProbe !== ".." && !relativeProbe.startsWith(`..${path.sep}`),
+  "probe must remain inside the owned review run");
+  const probe = await regular(probePath);
   const identity = {
     run: owner.owner_token, head_oid: context.head_oid, base_oid: context.base_oid,
     merge_base_oid: context.merge_base_oid, technical_hash: context.technical_hash,
@@ -75,7 +81,7 @@ async function inputs(requestPath) {
 async function git(snapshot, args, maxBuffer = 4 * 1024 * 1024) {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
   Object.assign(env, {
-    GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_COUNT: "0",
+    GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: gitGlobalConfigNull, GIT_CONFIG_COUNT: "0",
     GIT_NO_REPLACE_OBJECTS: "1", GIT_TERMINAL_PROMPT: "0", GIT_NO_LAZY_FETCH: "1",
     GIT_ALLOW_PROTOCOL: "", GIT_OPTIONAL_LOCKS: "0",
   });

@@ -9,6 +9,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { isDirectExecution } from "./cli-entrypoint.mjs";
+import { repositoryGitEnv } from "./quality-lib.mjs";
 import { promisify } from "node:util";
 
 export const WORKTREE_DEPENDENCIES_SCHEMA_VERSION = 1;
@@ -103,6 +104,7 @@ function result(operation, outcome, errorCode, details = {}) {
 async function gitText(repository, args) {
   const { stdout } = await execFileAsync("git", args, {
     cwd: repository,
+    env: repositoryGitEnv(),
     encoding: "utf8",
     windowsHide: true,
     maxBuffer: 64 * 1024,

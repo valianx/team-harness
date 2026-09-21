@@ -18,7 +18,7 @@ import {
   runQualityChecks,
   validateQualityManifest,
 } from "../plugins/team-harness/skills/pipeline/scripts/quality-runner.mjs";
-import { resolveGitTimeoutMs } from "../plugins/team-harness/skills/pipeline/scripts/quality-lib.mjs";
+import { createGitRunners, resolveGitTimeoutMs } from "../plugins/team-harness/skills/pipeline/scripts/quality-lib.mjs";
 
 const failures = [];
 const node = process.execPath;
@@ -43,6 +43,23 @@ function git(repo, ...args) {
 async function writeJson(filePath, value) {
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+async function writeDualPlatformBinary(binary, expectedArgs) {
+  const expected = expectedArgs.join(" ");
+  await writeFile(
+    binary,
+    `#!/usr/bin/env node\nprocess.exit(process.argv.slice(2).join(' ') === ${JSON.stringify(expected)} ? 0 : 9);\n`,
+    "utf8",
+  );
+  await chmod(binary, 0o755);
+  if (process.platform === "win32") {
+    await writeFile(
+      `${binary}.ps1`,
+      `if (($args -join ' ') -eq ${JSON.stringify(expected)}) { exit 0 } else { exit 9 }\n`,
+      "utf8",
+    );
+  }
 }
 
 async function fileSha256(filePath) {
@@ -98,6 +115,7 @@ async function temporaryRepository({ manifest, candidateFiles = { "src/calc.go":
   try {
     await mkdir(repo);
     git(repo, "init", "-q");
+    if (process.platform === "win32") git(repo, "config", "--local", "core.longpaths", "true");
     git(repo, "config", "user.email", "quality-runner@example.invalid");
     git(repo, "config", "user.name", "Quality Runner Test");
     await writeFile(path.join(repo, "README.md"), "baseline\n", "utf8");
@@ -163,6 +181,30 @@ function assertClosedResult(result) {
 }
 
 console.log("=== Deterministic quality runner ===");
+
+await check("Git helpers ignore a parent's unrelated repository selection", async () => {
+  await temporaryRepository({ manifest: baseManifest({ test: command() }) }, async ({ repo, workspace, candidate }) => {
+    const unrelated = path.join(workspace, "unrelated");
+    await mkdir(unrelated);
+    git(unrelated, "init", "-q");
+    const keys = ["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY"];
+    const prior = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+    try {
+      process.env.GIT_DIR = path.join(unrelated, ".git");
+      process.env.GIT_COMMON_DIR = process.env.GIT_DIR;
+      process.env.GIT_WORK_TREE = unrelated;
+      process.env.GIT_INDEX_FILE = path.join(unrelated, ".git", "index");
+      process.env.GIT_OBJECT_DIRECTORY = path.join(unrelated, ".git", "objects");
+      const { gitText } = createGitRunners((code, detail) => new Error(`${code}: ${detail}`));
+      assert.equal(await gitText(repo, ["rev-parse", "HEAD"], "GIT_FAILED"), candidate);
+    } finally {
+      for (const key of keys) {
+        if (prior[key] === undefined) delete process.env[key];
+        else process.env[key] = prior[key];
+      }
+    }
+  });
+});
 
 await check("the internal git timeout is env-configurable within a clamped range", async () => {
   assert.equal(resolveGitTimeoutMs({}), 30_000);
@@ -335,6 +377,11 @@ await check("package-manager exec and download shims are rejected before launch"
     ["yarn", "exec", "vitest"], ["yarn", "dlx", "vitest"],
     ["bun", "x", "vitest"], ["corepack", "pnpm", "dlx", "vitest"],
     ["corepack", "--install-directory", ".", "pnpm.cmd", "--offline", "dlx", "vitest"],
+    ["npm", "install"], ["npm", "ci"], ["npm", "run", "install"],
+    ["npm.cmd", "--prefix", ".", "update"], ["yarn", "install"],
+    ["bun", "add", "example"], ["bun", "install"], ["pnpm", "remove", "example"],
+    ["corepack", "yarn", "install"], ["corepack", "bun", "link"],
+    ["yarn"], ["npm", "exec", "--", "node"],
   ];
   for (const argv of forbidden) {
     assert.throws(
@@ -344,6 +391,9 @@ await check("package-manager exec and download shims are rejected before launch"
     );
   }
   assert.doesNotThrow(() => validateQualityManifest(baseManifest({ test: { argv: ["pnpm", "run", "test"] } })));
+  for (const manager of ["npm", "yarn", "bun"]) {
+    assert.doesNotThrow(() => validateQualityManifest(baseManifest({ test: { argv: [manager, "run", "test"] } })));
+  }
   assert.doesNotThrow(() => validateQualityManifest(baseManifest({ test: { argv: ["node_modules/.bin/vitest", "run"] } })));
 
   const manifest = baseManifest({ test: { argv: ["pnpm", "dlx", "vitest"] } });
@@ -363,8 +413,7 @@ await check("pnpm exec resolves only an existing linked local binary without lau
   }, async ({ repo, base }) => {
     const binary = path.join(repo, "node_modules", ".bin", "vitest");
     await mkdir(path.dirname(binary), { recursive: true });
-    await writeFile(binary, "#!/usr/bin/env node\nprocess.exit(process.argv.slice(2).join(' ') === 'run focused' ? 0 : 9);\n");
-    await chmod(binary, 0o755);
+    await writeDualPlatformBinary(binary, ["run", "focused"]);
     const result = await runQualityChecks(options(repo, base, ["test"]));
     assert.equal(result.verdict, "pass");
     assert.equal(result.commands[0].execution_resolution, "linked-local-bin");
@@ -387,8 +436,7 @@ await check("direct node_modules binaries must resolve inside the current reposi
   }, async ({ repo, base }) => {
     const binary = path.join(repo, "node_modules", ".bin", "storybook");
     await mkdir(path.dirname(binary), { recursive: true });
-    await writeFile(binary, "#!/usr/bin/env node\nprocess.exit(process.argv[2] === 'build' ? 0 : 9);\n");
-    await chmod(binary, 0o755);
+    await writeDualPlatformBinary(binary, ["build"]);
     const result = await runQualityChecks(options(repo, base, ["test"]));
     assert.equal(result.verdict, "pass", JSON.stringify(result));
     assert.equal(result.commands[0].execution_resolution, "repository-local-bin");
@@ -404,7 +452,7 @@ await check("direct node_modules binaries must resolve inside the current reposi
       manifest,
       candidateFiles: { ".gitignore": "node_modules\n", "src/calc.go": "package calc\n" },
     }, async ({ repo, base }) => {
-      await symlink(sharedDependencies, path.join(repo, "node_modules"), "dir");
+      await symlink(sharedDependencies, path.join(repo, "node_modules"), process.platform === "win32" ? "junction" : "dir");
       const result = await runQualityChecks(options(repo, base, ["test"]));
       assert.equal(result.verdict, "fail");
       assert.equal(result.error_code, "PREREQUISITE_UNAVAILABLE");
@@ -434,8 +482,7 @@ await check("pnpm package scripts resolve to existing local binaries without lau
     }, async ({ repo, base }) => {
       const binary = path.join(repo, "node_modules", ".bin", tool);
       await mkdir(path.dirname(binary), { recursive: true });
-      await writeFile(binary, `#!/usr/bin/env node\nprocess.exit(process.argv.slice(2).join(' ') === ${JSON.stringify(expected)} ? 0 : 9);\n`);
-      await chmod(binary, 0o755);
+      await writeDualPlatformBinary(binary, expected.split(" "));
       const result = await runQualityChecks(options(repo, base, ["test"]));
       assert.equal(result.verdict, "pass", JSON.stringify(result));
       assert.equal(result.commands[0].execution_resolution, "linked-local-script");
@@ -510,6 +557,13 @@ await check("Windows linked-local shims use an explicit PowerShell interpreter w
     ]);
     assert.equal(resolved.argv[7], shim);
     assert.equal(resolved.argv[8], "run");
+
+    const nativeExe = path.join(repo, "node_modules", ".bin", "native.exe");
+    const nativePs1 = path.join(repo, "node_modules", ".bin", "native.ps1");
+    await writeFile(nativeExe, "native executable fixture\n", "utf8");
+    await writeFile(nativePs1, "exit 0\n", "utf8");
+    const resolvedNative = await resolveLinkedLocalBinary("native", ["run"], repo, repo, "linked-local-bin", "win32");
+    assert.deepEqual(resolvedNative.argv, [nativeExe, "run"]);
   } finally {
     await rm(repo, { recursive: true, force: true });
   }

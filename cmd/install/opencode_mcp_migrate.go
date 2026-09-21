@@ -1,58 +1,27 @@
 package main
 
-// opencodeMCPMigration carries values for the explicit, legacy migration
-// helper. The current install flow does not call this reader: cross-runtime
-// MCP credentials stay in their source runtime and existing native entries
-// are preserved. Keeping the helper makes the migration engine available to
-// an explicit migration command or compatibility test without making it part
-// of normal setup.
+// opencodeMCPMigration carries values supplied by an explicit migration or
+// compatibility caller. The normal setup flow preserves source-runtime MCP
+// credentials and existing native entries; this value carrier remains because
+// the active resolver and disclosure helpers use it.
 //
-// All three fields are non-secret FROM THE PERSPECTIVE of the reader
-// (MemoryURL is a URL, not a secret). MemoryBearer and Context7Key are
-// literal token strings extracted from the CC config; they are treated
-// as potentially sensitive and are NEVER persisted to any config file or
-// log. They flow through a transient opencodeMCPSecrets struct only when an
-// explicit migration caller requests it.
+// MemoryURL is a URL, not a secret. MemoryBearer and Context7Key are literal
+// token strings when supplied by a caller; they are treated as potentially
+// sensitive and are NEVER persisted to logs. They flow through a transient
+// opencodeMCPSecrets struct only when an explicit caller requests literal
+// output.
 type opencodeMCPMigration struct {
-	// MemoryURL is the http URL from mcpServers.memory (non-secret).
-	// Empty when the entry is absent or is a stdio-type entry.
+	// MemoryURL is the HTTP URL supplied by an explicit caller (non-secret).
+	// Empty when no migration value is available.
 	MemoryURL string
 
-	// MemoryBearer is the raw bearer token from
-	// mcpServers.memory.headers.Authorization (Bearer-prefix stripped).
-	// Empty when no auth header is present.
+	// MemoryBearer is a caller-supplied raw bearer token (without a Bearer
+	// prefix). Empty when no auth value is supplied.
 	MemoryBearer string
 
-	// Context7Key is the value of
-	// mcpServers.context7.headers.CONTEXT7_API_KEY.
-	// Empty when the entry or header is absent.
+	// Context7Key is a caller-supplied Context7 API key. Empty when no key is
+	// supplied.
 	Context7Key string
-}
-
-// readClaudeCodeMCPMigration reads the CC MCP config from ~/.claude.json and
-// returns the migration candidate. It reuses the existing readExistingMCPServers
-// helper and only ever indexes the "memory" and "context7" entries — no
-// enumeration of other servers (AC-4 security contract).
-//
-// Errors (file absent, malformed JSON, missing entries) are silently swallowed:
-// all fields default to empty, and the caller skips migration gracefully.
-func readClaudeCodeMCPMigration() opencodeMCPMigration {
-	servers := readExistingMCPServers()
-
-	memEntry := mapGet(servers, "memory")
-	ctx7Entry := mapGet(servers, "context7")
-
-	return opencodeMCPMigration{
-		MemoryURL:    urlFromEntry(memEntry),
-		MemoryBearer: bearerFromEntry(memEntry),
-		Context7Key:  mapGetString(ctx7Entry, "headers", "CONTEXT7_API_KEY"),
-	}
-}
-
-// hasLiteralTokens reports whether the migration contains any detectable
-// literal secret tokens (Memory bearer or context7 key).
-func (m opencodeMCPMigration) hasLiteralTokens() bool {
-	return m.MemoryBearer != "" || m.Context7Key != ""
 }
 
 // tokenMode controls whether secrets are written as literal values or as
@@ -64,22 +33,14 @@ const (
 	// opencode resolves the env var at runtime (SEC-OC-R1 preserved).
 	tokenModeEnvRef tokenMode = iota
 
-	// tokenModeLiteral writes the literal secret values into opencode.json.
-	// This conditionally relaxes SEC-OC-R1: literal copy is the unconditional
-	// default on both the interactive and non-interactive CC→opencode migration
-	// paths, gated on ccMigration.hasLiteralTokens() so that an empty/absent
-	// CC token never writes an empty literal (operator-locked, scoped relaxation).
+	// tokenModeLiteral writes caller-supplied literal secret values into
+	// opencode.json. It is opt-in; the normal setup path remains env-ref.
 	tokenModeLiteral
 )
 
 // opencodeMCPSecrets carries the literal token values for the tokenModeLiteral
-// path. It is constructed in runOpencodePostApply when ccMigration.hasLiteralTokens()
-// is true — on both the interactive and non-interactive paths, literal copy is
-// the unconditional default for the CC→opencode migration (scoped relaxation).
-//
-// The struct is transient: it is passed down the call chain and is never
-// stored in any persistent config file other than the deliberate
-// literal-into-opencode.json write on the migration path.
+// path. It is transient and passed only by an explicit caller that chooses
+// literal output; the normal setup path uses tokenModeEnvRef.
 type opencodeMCPSecrets struct {
 	MemoryBearer string
 	Context7Key  string

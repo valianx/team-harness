@@ -4,10 +4,9 @@ package main
 //
 // ACs covered:
 //   AC-1  : at least one kind:skill component whose Emits.Files starts with {config_root}/skills/
-//   AC-2  : all six runtime-specific skills are emitted from native opencode overrides
+//   AC-2  : runtime-specific skills are emitted from native opencode projections
 //   AC-3  : no emitted path contains .venv / site-packages / __pycache__ / a dot/underscore segment
-//   AC-3b : isCopyableSkillPath is fail-closed — a non-allowlisted extension is rejected;
-//           an allowlisted .md IS accepted
+//   AC-3b : the projected skill path predicate is fail-closed
 //   AC-4  : nested references/ file is emitted (skills/d2-diagram/references/dsl-reference.md)
 //   AC-5  : the th-update and th-modes command components emit to {config_root}/commands/
 //   AC-6  : th-update.md contains install-opencode.sh, and zero claude-binary invocations
@@ -124,7 +123,7 @@ func TestBuildOpencodeManifests_OverridesPresent(t *testing.T) {
 		t.Fatalf("buildOpencodeManifests: %v", err)
 	}
 
-	for name := range opencodeSkillOverrides {
+	for _, name := range []string{"update", "setup", "background", "cross-repo", "tmux", "recover"} {
 		wantEmit := "{config_root}/skills/" + name + "/SKILL.md"
 		wantSource := "installer-assets/opencode-skills/" + name + "/SKILL.md"
 		found := false
@@ -351,66 +350,26 @@ func TestBuildOpencodeManifests_NoDotUnderscorePaths(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-3b: isCopyableSkillPath is a fail-closed allowlist
+// AC-3b: projected skill paths remain a fail-closed allowlist
 // ---------------------------------------------------------------------------
 
-// TestIsCopyableSkillPath_NonAllowlistedExtensionRejected verifies that a file
-// with a non-allowlisted extension placed directly under a skill references/
-// path is NOT emitted — even when no dot/underscore segment is present.
-func TestIsCopyableSkillPath_NonAllowlistedExtensionRejected(t *testing.T) {
+func TestIsCopyableProjectedSkillPath_Allowlist(t *testing.T) {
 	cases := []struct {
 		path string
 		want bool
-		desc string
 	}{
-		{"some-skill/references/tool.exe", false, ".exe binary rejected"},
-		{"some-skill/references/font.ttf", false, ".ttf binary rejected"},
-		{"some-skill/references/binary", false, "extension-less rejected"},
-		{"some-skill/references/lib.so", false, ".so rejected"},
-		{"some-skill/references/mod.wasm", false, ".wasm rejected"},
-		{"some-skill/references/x.md", true, ".md accepted"},
-		{"some-skill/SKILL.md", true, "SKILL.md accepted"},
-		{"some-skill/references/palette.json", true, ".json accepted"},
-		{"some-skill/references/chart.svg", true, ".svg accepted"},
-		{"some-skill/references/render.py", true, ".py accepted"},
+		{"some-skill/SKILL.md", true},
+		{"some-skill/references/x.md", true},
+		{"some-skill/references/tool.exe", false},
+		{"some-skill/references/binary", false},
+		{"some-skill/.venv/main.py", false},
+		{"README.md", false},
+		{"some-skill/references/_private.md", false},
 	}
-
 	for _, tc := range cases {
-		got := isCopyableSkillPath(tc.path)
-		if got != tc.want {
-			t.Errorf("isCopyableSkillPath(%q) = %v, want %v (%s)", tc.path, got, tc.want, tc.desc)
+		if got := isCopyableProjectedSkillPath(tc.path); got != tc.want {
+			t.Errorf("isCopyableProjectedSkillPath(%q) = %v, want %v", tc.path, got, tc.want)
 		}
-	}
-}
-
-// TestIsCopyableSkillPath_OverrideSources verifies that the canonical body is
-// skipped when a native override owns the same emitted path, while the
-// explicit override path itself passes the bounded copy predicate.
-func TestIsCopyableSkillPath_OverrideSources(t *testing.T) {
-	for name := range opencodeSkillOverrides {
-		path := name + "/SKILL.md"
-		if isCopyableSkillPath(path) {
-			t.Errorf("isCopyableSkillPath(%q) = true, want false (overridden canonical skill)", path)
-		}
-		if !isCopyableProjectedSkillPath(path) {
-			t.Errorf("isCopyableProjectedSkillPath(%q) = false, want true", path)
-		}
-	}
-}
-
-// TestIsCopyableSkillPath_OpenCodeCommandsFolderRejected verifies that the
-// opencode-commands source folder is skipped by the skill walker.
-func TestIsCopyableSkillPath_OpenCodeCommandsFolderRejected(t *testing.T) {
-	if isCopyableSkillPath("opencode-commands/th-update.md") {
-		t.Error("isCopyableSkillPath(opencode-commands/th-update.md) = true, want false")
-	}
-}
-
-// TestIsCopyableSkillPath_READMERejected verifies that the top-level
-// skills/README.md is skipped.
-func TestIsCopyableSkillPath_READMERejected(t *testing.T) {
-	if isCopyableSkillPath("README.md") {
-		t.Error("isCopyableSkillPath(README.md) = true, want false")
 	}
 }
 
@@ -780,7 +739,7 @@ func TestValidateManifests_ProductionSetPasses(t *testing.T) {
 	}
 
 	// Assert every runtime override is represented in the validated set.
-	for name := range opencodeSkillOverrides {
+	for _, name := range []string{"update", "setup", "background", "cross-repo", "tmux", "recover"} {
 		want := "{config_root}/skills/" + name + "/SKILL.md"
 		found := false
 		for _, c := range components {

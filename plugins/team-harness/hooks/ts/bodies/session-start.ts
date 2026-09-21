@@ -142,8 +142,8 @@ function loadWorkspaceMode(config: Record<string, unknown>): string | null {
 // ---------------------------------------------------------------------------
 // composeSessionDirectives — pure shared composer.
 // Returns the ordered directive array for a given config (or null config).
-// Shared between the CC entry (evaluateSessionStart) and the opencode event
-// handler (session-enforcement.opencode.ts) so the text is NEVER duplicated.
+// Used by the Claude Code entry (evaluateSessionStart) and its behavior tests.
+// OpenCode obtains collaboration context through its native instruction guide.
 //
 // Loads (in order):
 //   1. workflow discovery — unconditional, native general-agent context.
