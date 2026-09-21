@@ -25,7 +25,7 @@ These scripts:
 2. Download the platform binary and verify its SHA256 checksum (fail-closed, anchored exact-asset-name match, case-insensitive compare — mirrors the install scripts).
 3. Run `binary update --runtime opencode --scope global "$@"`, which shows the four-bucket diff preview, prompts `[Y/n]` on a TTY (operator "n" → zero writes), applies asset changes through the proven `ComputePlan`/`ApplyPlan` engine, and bumps only the installer-managed config keys.
 
-After the update: **restart opencode** to activate. The update is NOT live in any running session until restart.
+After the update, use `/th-reload` in the current opencode conversation to verify activation.
 
 Direct subcommand (headless / CI — skips TTY prompt and applies directly):
 ```text

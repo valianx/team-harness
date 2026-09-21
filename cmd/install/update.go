@@ -45,8 +45,7 @@ func parseSemver(v string) [3]int {
 // runUpdateCommand implements the `install update` subcommand for the opencode
 // runtime. It performs a version-delta check, surfaces the ComputePlan diff as
 // a preview, confirms with the operator on an interactive TTY, applies the
-// changes, bumps the managed config keys, and prints the restart-to-activate
-// honesty block.
+// changes, bumps the managed config keys, and reports the resulting state.
 //
 // Security: all asset writes go through the reused ApplyPlan → appendLedger
 // path (SEC-04/05 enforced). Config key updates go through
@@ -162,7 +161,11 @@ func runCodexUpdate(placer Placer) error {
 	if err := ApplyPlan(diff, placer); err != nil {
 		return fmt.Errorf("apply: %w", err)
 	}
-	fmt.Println("Codex agent files updated. Start a new Codex session to activate them.")
+	if len(diff.ToCreate)+len(diff.ToUpdate)+len(diff.ToRemove) == 0 {
+		fmt.Println("Codex agent files already current.")
+	} else {
+		fmt.Println("Codex agent files updated.")
+	}
 	fmt.Println("The Team Harness plugin is updated separately through the Codex marketplace.")
 	return nil
 }
@@ -250,7 +253,6 @@ func applyUpdateDiff(diff PlanDiff, cfgPath string, placer *opencodePlacer) {
 	// Installation and activation are separate; reload verifies the live host.
 	fmt.Println()
 	fmt.Println("Asset files updated on disk. Use /th-reload to verify activation in this conversation.")
-	fmt.Println("If the host cannot reload, reconnect opencode and resume the same session.")
 }
 
 // confirmApply prompts the operator for [Y/n] and returns true when the

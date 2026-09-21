@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.38.1] - 2026-09-21
+
+### Fixed
+- Keep routine update summaries focused on the installed version and actual result across Claude Code, Codex and OpenCode, without generic restart or reconnect advice.
+- Preserve detailed activation evidence for diagnostics and report concrete failures or operator actions without treating missing visibility or a Python PATH lookup as a restart requirement.
+
 ## [3.38.0] - 2026-09-21
 
 ### Added

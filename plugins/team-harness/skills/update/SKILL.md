@@ -195,22 +195,24 @@ tool calls.
 ## Result and recovery
 
 - `current`: report versions and that no managed domain changed.
-- `converged`: report versions and only the receipt's changed domains; pass
-  activation signals to reload before deciding whether to propose a restart.
+- `converged`: report the installed version and the receipt's changed domains.
 - `partial-convergence`: report the failed domain, old/new identities, completed
   changed domains, and `$team-harness:update` as the exact retry. Never roll
   back a bridge, config, feature, agent, or other completed idempotent write.
 
 After `current` or `converged`, load `../reload/SKILL.md` from the validated new
-snapshot and execute it for the current conversation. This activation pass
-does not repeat installation-domain inspections or alter the receipt. Report
-the installation result and activation outcome separately. `restartRequired`
-identifies installation domains needing activation assessment, not an automatic
-instruction to restart. A successful skill reread cannot prove active agents or
-hooks, and unavailable evidence remains unverified. Reload covers all applicable
-Team Harness components, completes supported refreshes, and proposes a restart
-only for a demonstrated remaining need, explaining the affected component and
-impact while respecting the operator's constraints.
+snapshot and execute it for the current conversation, using its result contract
+for an update invocation. This activation pass does not repeat installation-domain
+inspections or alter the receipt. Keep installation and activation evidence
+distinct; a skill reread alone does not prove active agents or services.
+`restartRequired` remains an internal activation signal for reload to assess.
+
+Keep the operator summary focused on the version, actual outcome and any concrete
+action. An ordinary successful update has no restart or reconnect commentary,
+including "no restart needed" or "reconnect only if needed". Missing visibility
+alone stays in diagnostic evidence. Report actual failures or demonstrated
+activation problems with the affected component, impact and supported next step;
+do not turn an unknown observation into hypothetical advice.
 Do not run reload after a partial result or invalid receipt.
 
 When returning to a setup request, read `NEW_PLUGIN/skills/setup/SKILL.md` before

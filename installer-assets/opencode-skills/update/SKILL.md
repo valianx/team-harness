@@ -53,6 +53,10 @@ Do not substitute the full installer or bypass SHA256 verification. Report
 exactly one result: `already current`, `updated`, or `installed ahead`. When
 the result is `updated` or `already current`, load the native `reload` skill
 and execute its activation procedure for this conversation. Keep the updater's
-installation result separate from reload's active/pending components. Preserve
-the same session on reconnect; do not equate updated files with a live reload.
+installation result separate from reload's diagnostic evidence and use its result
+contract for an update invocation. The ordinary summary reports the version and
+actual outcome without restart/reconnect commentary, including negative assurances
+or hypothetical advice. Missing activation visibility stays in the diagnostic
+record. Report actual failures or demonstrated activation problems with their
+impact and supported next step; do not equate updated files with a live reload.
 Do not activate after a failed updater or `installed ahead` result.
