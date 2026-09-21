@@ -14,6 +14,10 @@ here before inspecting or reconciling TH configuration. For a provider-only
 request, complete that route and return without creating TH settings. Continue
 the TH-specific procedure only when TH setup was also requested.
 
+Match provider names as complete words in the requested target, never as
+substrings: `team` and `team-harness` do not select `tea`. TH-only options apply
+only to a separately requested TH operation.
+
 Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
 when the operator names OpenSpec, Superpowers, or TEA. A full Team Harness setup may
 report whether a provider is installed and available, but it does not install or update
@@ -41,7 +45,10 @@ Normalize `$ARGUMENTS`: trim surrounding whitespace; lowercase the result for ma
 
 ### Intent map (ES / EN)
 
-Match on the normalized argument containing any listed cue (substring or close synonym). The agent resolves intent in the operator's language. On ambiguous or multi-match, apply the no-match fallback rather than guessing.
+Provider names use the complete-word matching above. For TH concerns, match the
+normalized argument containing a listed cue or close synonym. The agent resolves
+intent in the operator's language. On ambiguous or multi-match, apply the no-match
+fallback rather than guessing.
 
 | Target concern | Routes to | EN cues | ES cues |
 |----------------|-----------|---------|---------|

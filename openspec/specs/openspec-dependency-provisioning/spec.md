@@ -1,11 +1,11 @@
 # openspec-dependency-provisioning Specification
 
 ## Purpose
-Defines a consistent and operator-controlled way for Team Harness to obtain and verify the OpenSpec CLI and upstream-generated runtime skills required by its Design phase.
+Defines how Team Harness obtains and verifies the OpenSpec CLI and upstream-generated runtime skills throughout planning, implementation verification and completed archive, within operator-authorized scope.
 
 ## Requirements
 
-### Requirement: Design preflight verifies the complete OpenSpec toolchain
+### Requirement: OpenSpec preflight verifies the complete toolchain
 Before OpenSpec-dependent work, TH SHALL check the supported Node.js/npm prerequisites, the resolved OpenSpec CLI version and the active runtime's upstream-generated capabilities. The required completion capabilities SHALL include implementation verification as well as planning/apply. Missing or stale generated instructions SHALL be refreshed by supported upstream initialization or update, preserving unrelated runtime targets and workflow selections.
 
 #### Scenario: Compatible toolchain is already installed
@@ -48,7 +48,7 @@ After provisioning, TH SHALL re-run the complete preflight, verify the CLI plus 
 
 #### Scenario: Provisioning succeeds
 - **WHEN** installation and OpenSpec integration generation complete successfully
-- **THEN** TH records the verified versions and generated integration status and resumes the same workspace at the pending Design action
+- **THEN** TH records the verified versions and generated integration status and resumes the same workspace at the pending OpenSpec action
 
 #### Scenario: Provisioning fails
 - **WHEN** installation, version verification, or integration generation fails

@@ -16,6 +16,10 @@ here before the TH update procedure. For a provider-only request, complete that
 route and return. Continue the TH-specific procedure below only when TH update
 was also requested; provider names are not flags for the TH updater.
 
+Match provider names as complete words in the requested target, never as
+substrings: `team` and `team-harness` do not select `tea`. TH-only options apply
+only to a separately requested TH operation.
+
 Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
 when the operator explicitly requests an OpenSpec, Superpowers, or TEA update. This skill
 updates Team Harness only; it never installs or updates those providers as a side effect.

@@ -22,6 +22,10 @@ here before inspecting or reconciling TH configuration. For a provider-only
 request, complete that route and return without creating TH settings. Continue
 the TH-specific procedure only when TH setup was also requested.
 
+Match provider names as complete words in the requested target, never as
+substrings: `team` and `team-harness` do not select `tea`. TH-only options apply
+only to a separately requested TH operation.
+
 Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
 when the operator names OpenSpec, Superpowers, or TEA. Full setup may report whether a
 provider is installed without installing it implicitly. For an explicit request, use the
