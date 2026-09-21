@@ -28,11 +28,25 @@
     ]
   },
   "external_project_patterns": [
+    ".agents/skills/superpowers/**",
     ".agents/skills/openspec-*",
+    ".agents/skills/bmad-testarch-*",
     ".claude/commands/opsx/**",
+    ".claude/skills/openspec-*",
+    ".claude/commands/superpowers/**",
+    ".claude/skills/superpowers/**",
+    ".claude/skills/bmad-testarch-*",
     ".cursor/commands/opsx/**",
     ".opencode/commands/opsx/**",
+    ".opencode/commands/opsx-*.md",
+    ".opencode/commands/superpowers/**",
+    ".opencode/commands/superpowers-*.md",
+    ".opencode/commands/bmad-testarch-*.md",
+    ".opencode/skills/openspec-*",
+    ".opencode/skills/bmad-testarch-*",
     ".windsurf/workflows/opsx/**",
+    ".superpowers/**",
+    "_bmad/tea/**",
     "openspec/**"
   ]
 }

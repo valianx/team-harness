@@ -346,6 +346,7 @@ Full contract: docs/dev-mode.md.
 | [Configuration reference](./CLAUDE.md) | Architectural conventions, working agreements, subagent routing |
 | [Knowledge base](./docs/knowledge.md) | Decisions, patterns, stack notes, and constraints accumulated across features |
 | [Integration guide](./docs/integration.md) | Optional knowledge integrations; workspace context has no remote dependency |
+| [External tools](./docs/upstream-tools.md) | OpenSpec, Superpowers and TEA: stage execution, shared workspace and upstream installation/update ownership |
 | [Troubleshooting](./docs/troubleshooting.md) | SSH/HTTPS errors, duplicate agents, missing dispatch rule |
 | [Changelog](./CHANGELOG.md) | Release history |
 

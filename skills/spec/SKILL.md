@@ -44,6 +44,11 @@ evidence in the selected workspace without adding pipeline control records.
 
 At entry, resumption, and before changing requirements, apply
 [the shared OpenSpec lifecycle](references/lifecycle.md) to the relevant active changes.
+Read [upstream tools](references/upstream-tools.md) for provider discovery and
+shared outputs. Spec executes TEA test-design, test-review and trace, Superpowers
+verification-before-completion, and OpenSpec implementation verification at the
+stages below. Use their current installed instructions, not TH copies of their
+methods. A missing provider leaves its stage pending while independent work continues.
 
 Main repairs operational failures before treating the objective as blocked. A
 wrong path, malformed contract, missing tool/library or recoverable transport
@@ -64,7 +69,9 @@ new effect.
    For a new capability, add a `specs/**/spec.md` delta with an `ADDED` requirement. For an
    existing capability, use `MODIFIED` or `REMOVED` as appropriate. Add `design.md` only when
    the implementation has a meaningful design decision; a purely mechanical repository chore
-   needs no change directory.
+   needs no change directory. During design, execute installed TEA test-design
+   with the current intent and existing tests; retain its working design in the
+   selected workspace and use it to guide the existing task plan.
 2. **Validate.** Run the pinned `openspec validate <change> --strict` CLI. A failure returns to
    authoring; there is no separate repair mode. Write or refresh the operator plan below.
 3. **Confirm intent.** Link the plan and reuse the user's existing authorization.
@@ -77,7 +84,12 @@ new effect.
    unverified even after exit zero; unrelated optional skips do not erase sufficient evidence.
    For a bug fix, optionally use [before/after evidence](references/author-review.md#optional-fix-evidence)
    when it adds useful proof without a new runner or mandatory review.
-   Once implementation and its relevant checks are complete, use [create-pr](../create-pr/SKILL.md)'s
+   After implementation and relevant tests, execute installed TEA test-review
+   and trace, then Superpowers verification-before-completion with their shared
+   evidence. Apply the upstream-tool reference for outputs and reuse, and resolve
+   actual completion defects. Execute upstream OpenSpec implementation verify
+   before archive; structural validate and optional TH review do not replace it.
+   Once these stages are complete, use [create-pr](../create-pr/SKILL.md)'s
    preparation checkpoint when PR delivery is agreed; otherwise apply the [shared
    lifecycle](references/lifecycle.md) directly. Prepare archive before committing the final
    review candidate, including the living specs and archived change with the implementation.

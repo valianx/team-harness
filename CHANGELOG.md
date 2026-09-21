@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.36.0] - 2026-09-21
+
+### Added
+- Integrate upstream TEA and Superpowers into spec stages with shared local or Obsidian working reports.
+
+### Changed
+- Require OpenSpec implementation verification before completing and archiving changes.
+
+### Fixed
+- Keep provider-owned assets out of TH packages, including flat OpenSpec commands for OpenCode.
+
 ## [3.35.0] - 2026-09-20
 
 ### Changed

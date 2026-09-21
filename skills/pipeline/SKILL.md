@@ -18,6 +18,11 @@ decision. Specialists provide evidence and recommendations; Main judges them.
 Apply [the OpenSpec lifecycle](../spec/references/lifecycle.md) at authoring,
 resumption, candidate preparation and completion. Use
 [create-pr](../create-pr/SKILL.md) for PR preparation and authorized publication.
+Use the shared [upstream-tool reference](../spec/references/upstream-tools.md)
+for selected TEA/Superpowers work and its workspace outputs. Completion of a
+relevant OpenSpec change includes upstream implementation verify before archive.
+If continuing an existing spec effort, retain its completed provider stages and
+pending work rather than restarting them.
 
 - Design: reuse suitable OpenSpec, complete missing decisions, keep a concise
   linked plan, and use sketch when preview helps.

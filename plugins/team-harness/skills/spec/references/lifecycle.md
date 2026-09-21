@@ -58,6 +58,17 @@ and a proposed replacement is not evidence that the old behavior was retired.
 
 ## Check archive readiness before the PR
 
+Execute the installed OpenSpec implementation-verification workflow before
+declaring a relevant change complete or preparing its completed archive. Use
+[upstream tools](upstream-tools.md) to resolve the actual native entry and retain
+its result in the existing workspace. Supply the current requirements, tasks,
+design, implementation and executable test evidence. Main evaluates findings and
+resolves real defects; an upstream verdict is not a new authorization token.
+Structural validation, checked tasks and optional TH review do not replace this
+execution. If optional review or archive is declined, verify still applies to
+completion; report any missing verification without claiming a completed change.
+Planning-only proposals and approved retirement do not invent implementation work.
+
 When preparing the candidate to create or update a PR, including direct work
 outside the OpenSpec lane or pipeline, assess archive readiness for the
 open changes related to its scope, including the bound change. Compare their requirements and tasks with the
@@ -100,8 +111,14 @@ or merge authority.
 
 Review corrections keep code, living specs and the archived record consistent
 on the same branch. Revalidate the changed candidate through the existing flow.
-If intended behavior changes, use the normal amendment/reopening procedure and
-obtain only missing scope authority; do not silently rewrite reviewed intent.
+Refresh only evidence affected by a correction. A path-only archive with unchanged
+intent and implementation reuses its verify result after links and strict checks
+are refreshed. For changed implementation, repeat upstream verify through a
+supported context under [upstream tools](upstream-tools.md); do not invent a
+reopen CLI or claim that an active-only workflow accepts archived paths.
+If intended behavior changes, author a bounded amendment through the upstream
+change workflow and obtain only missing scope authority. Preserve original history;
+do not create a durable spec just to make a verification command accept its input.
 
 ## Read-only status
 

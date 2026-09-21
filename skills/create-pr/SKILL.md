@@ -37,7 +37,11 @@ branch conventions, PR templates, commit conventions, and native permissions.
   selected required checks when needed, and report omitted checks, their reasons, and
   unknown counts honestly. Unrelated optional skips do not erase sufficient evidence.
 - When OpenSpec is relevant, read [the shared lifecycle](../spec/references/lifecycle.md)
-  and follow its current archive readiness and upstream archive contract. Preserve
+  and follow its upstream implementation-verification and archive readiness
+  contract. Confirm the relevant upstream verify ran on applicable implementation
+  evidence; a structural validate result or declined optional review does not
+  replace it. Reuse completed provider stages from spec instead of rerunning them
+  solely for PR preparation. Preserve
   OpenSpec's repository archive contract; do not invent external archive support or
   silently auto-delete history.
   Otherwise do not create OpenSpec artifacts for this PR task.

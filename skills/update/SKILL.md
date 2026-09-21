@@ -5,9 +5,34 @@ description: Update the th plugin — refresh catalog, download the new version,
 
 Refresh the `team-harness` plugin marketplace catalog, report whether a new `th` release is available, and keep the managed `~/.claude/CLAUDE.md` blocks aligned with the running plugin version. This is a standalone utility — it does NOT route through th:orchestrator. It is the repeatable update command; `/th:setup` is the one-time bootstrap and is never part of this flow.
 
-Usage: `/th:update [--force-blocks]`
+Usage: `/th:update [--force-blocks]` or `/th:update <openspec|superpowers|tea>`
 
 Analyze the input: $ARGUMENTS
+
+## Upstream provider updates
+
+Route the explicit targets `openspec`, `superpowers`, and `tea` (also `bmad tea`)
+here before the TH update procedure. For a provider-only request, complete that
+route and return. Continue the TH-specific procedure below only when TH update
+was also requested; provider names are not flags for the TH updater.
+
+Match provider names as complete words in the requested target, never as
+substrings: `team` and `team-harness` do not select `tea`. TH-only options apply
+only to a separately requested TH operation.
+
+Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
+when the operator explicitly requests an OpenSpec, Superpowers, or TEA update. This skill
+updates Team Harness only; it never installs or updates those providers as a side effect.
+For an explicit provider request, use its official mechanism under native permissions:
+
+- OpenSpec: official package-manager update, then its project `update` when generated
+  workflows need refreshing.
+- Superpowers: the host's official plugin update and native skill discovery.
+- TEA: the official BMAD module update and its upstream runner/package when requested.
+
+Keep provider-owned files and configuration intact. Report the installed capability and
+active session separately; propose a reload or restart only for a documented host
+limitation or observed stale activation.
 
 If `--force-blocks` is present in `$ARGUMENTS`, export `TH_FORCE_BLOCKS=1` before running the step-6 command block; otherwise export `TH_FORCE_BLOCKS=0`. This flag bypasses operator-edit preservation (row 5 of the decision matrix) and adopts the canonical block content.
 

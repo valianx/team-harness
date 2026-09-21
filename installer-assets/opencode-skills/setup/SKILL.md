@@ -15,6 +15,25 @@ machine-wide writes.
 Report the config root, installed version, changed components, preserved
 settings, and whether a new opencode session is required for discovery.
 
+## Upstream provider route
+
+Route the explicit targets `openspec`, `superpowers`, and `tea` (also `bmad tea`)
+here before inspecting or reconciling TH configuration. For a provider-only
+request, complete that route and return without creating TH settings. Continue
+the TH-specific procedure only when TH setup was also requested.
+
+Match provider names as complete words in the requested target, never as
+substrings: `team` and `team-harness` do not select `tea`. TH-only options apply
+only to a separately requested TH operation.
+
+Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
+when the operator names OpenSpec, Superpowers, or TEA. Full setup may report whether a
+provider is installed without installing it implicitly. For an explicit request, use the
+official OpenSpec package/project lifecycle, Superpowers plugin lifecycle, or BMAD TEA
+module lifecycle and native entries. Preserve provider-owned files and configuration;
+report installed capability separately from active session and propose a reload/restart
+only for a documented host limitation or observed stale activation.
+
 ## GitHub identity routes
 
 For a full setup or an explicit `github-accounts` target, use the packaged

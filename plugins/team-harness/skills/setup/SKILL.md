@@ -15,6 +15,26 @@ opencode settings during ordinary operation and never modify their files. MCP
 registrations and credentials are owned by the native runtime and are left
 untouched unless the operator explicitly configures Context7.
 
+## Upstream provider route
+
+Route the explicit targets `openspec`, `superpowers`, and `tea` (also `bmad tea`)
+here before inspecting or reconciling TH configuration. For a provider-only
+request, complete that route and return without creating TH settings. Continue
+the TH-specific procedure only when TH setup was also requested.
+
+Match provider names as complete words in the requested target, never as
+substrings: `team` and `team-harness` do not select `tea`. TH-only options apply
+only to a separately requested TH operation.
+
+Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
+when the operator names OpenSpec, Superpowers, or TEA. Full setup may report provider
+availability without installing anything implicitly. For an explicit provider request,
+use its official mechanism under native permissions: OpenSpec's package manager and
+project `init`/`update`, Superpowers' host-plugin lifecycle, or the official BMAD TEA
+module and upstream test-design, test-review, trace, or runner entry. Preserve provider
+files and configuration, and distinguish installed capability from active session; only
+propose reload/restart for a documented host limitation or observed stale activation.
+
 Resolve all helpers relative to this skill and use them for every managed
 write:
 
@@ -29,7 +49,8 @@ write:
 
 With no targeted intent, run the complete flow. For a targeted request, change
 only that concern and still ensure the native settings document exists.
-Supported targets are `workspace`, `language`, `english-learning`, `context7`,
+Provider targets `openspec`, `superpowers`, and `tea` use the route above and do
+not enter this settings flow. TH settings targets are `workspace`, `language`, `english-learning`, `context7`,
 `agents`, `features`, `github-accounts`, `clickup`, and `obsidian-tasks`.
 
 `lane-autoselect` is legacy migration metadata, not a supported target or an
