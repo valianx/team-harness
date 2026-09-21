@@ -34,6 +34,10 @@ TEA preparation uses BMAD's official module installer (`npx bmad-method install`
 which generates project-local native entries and uses `uv` for shared scripts.
 Its optional CLI runners invoke a supported coding agent. Check each configured
 report destination, including derived paths, against the selected workspace.
+With BMAD 6.12 on Windows, use project-relative settings resolving to that same
+absolute workspace. Inspect remembered configuration before install/update:
+directory creation reads it before `--set` overrides and mishandles absolute
+Windows paths. Correct only affected local path settings, then verify outputs.
 Superpowers is installed as the official plugin for the active
 host, then the required verification skill is selected from that installation.
 
@@ -138,7 +142,7 @@ inputs or restricts them to the project root, use native execution of the instal
 skill with those paths; do not mirror an Obsidian workspace into the repository.
 
 Pass output locations through supported provider configuration or flags. Resolve
-the existing workspace once and give every provider the same absolute destination:
+the existing workspace once and give every provider the same resolved destination:
 the configured local workspace in local mode, or the existing effort folder in
 the configured vault in Obsidian mode. Obsidian mode creates no local mirror.
 
