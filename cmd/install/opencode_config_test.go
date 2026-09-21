@@ -30,6 +30,8 @@ func TestWriteOpencodeTeamHarnessConfig_PreservesUnknownKeys(t *testing.T) {
 	seed := map[string]interface{}{
 		"operator_custom_key": "keep-me-intact",
 		"logs-mode":           "obsidian",
+		"logs-path":           "C:/Users/operator/Obsidian",
+		"logs-subfolder":      "work-logs",
 	}
 	seedBytes, _ := json.Marshal(seed)
 	if err := os.WriteFile(cfgPath, seedBytes, 0o644); err != nil {
@@ -55,9 +57,15 @@ func TestWriteOpencodeTeamHarnessConfig_PreservesUnknownKeys(t *testing.T) {
 		t.Errorf("operator_custom_key was not preserved: got %v", result["operator_custom_key"])
 	}
 
-	// Installer always writes "local" after the trim (AC-1).
-	if result["logs-mode"] != "local" {
-		t.Errorf("logs-mode = %v, want local", result["logs-mode"])
+	// Existing workspace preferences remain operator-owned across re-apply.
+	if result["logs-mode"] != "obsidian" {
+		t.Errorf("logs-mode = %v, want obsidian", result["logs-mode"])
+	}
+	if result["logs-path"] != "C:/Users/operator/Obsidian" {
+		t.Errorf("logs-path = %v, want existing workspace path", result["logs-path"])
+	}
+	if result["logs-subfolder"] != "work-logs" {
+		t.Errorf("logs-subfolder = %v, want existing workspace subfolder", result["logs-subfolder"])
 	}
 }
 
@@ -147,6 +155,9 @@ func TestWriteOpencodeTeamHarnessConfig_InstallerManagedKeysAlwaysSet(t *testing
 	}
 	if result["installed_version"] != version {
 		t.Errorf("installed_version = %v, want %v", result["installed_version"], version)
+	}
+	if result["logs-mode"] != "local" {
+		t.Errorf("fresh logs-mode = %v, want local", result["logs-mode"])
 	}
 	if _, ok := result["updated_at"]; !ok {
 		t.Error("updated_at missing from fresh install")

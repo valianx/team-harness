@@ -95,7 +95,7 @@ if errorlevel 1 (
 )
 
 echo Launching installer...
-"%INSTALLER%" %*
+"%INSTALLER%" %FORWARD_ARGS%
 set EXITCODE=%ERRORLEVEL%
 
 rmdir /s /q "%TMP_DIR%" 1>nul 2>nul
