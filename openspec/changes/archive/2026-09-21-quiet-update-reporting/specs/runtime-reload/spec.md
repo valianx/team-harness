@@ -1,5 +1,22 @@
 ## MODIFIED Requirements
 
+### Requirement: Restart requirements need component evidence
+Reload SHALL prefer supported refreshes and SHALL NOT infer a live restart
+requirement solely from missing controls, unavailable evidence, an old injected
+path, an optional snapshot alias failure or an installation receipt flag. A
+remaining reconnect requirement SHALL identify observed stale activation or a
+changed setting documented as requiring restart in the active runtime, explain
+why supported refreshes cannot apply it, and state its effect and smallest
+reconnect scope. Reload SHALL respect an operator constraint to avoid restarting.
+
+#### Scenario: Windows cannot create an optional snapshot alias
+- **WHEN** the alias is skipped but all other installation domains are current
+- **THEN** update preserves the path and diagnostic without treating the alias as an installation restart requirement, and reload independently assesses live activation; the ordinary update summary remains concise without restart commentary
+
+#### Scenario: A changed runtime setting cannot be refreshed in the active backend
+- **WHEN** a setting changed and the active runtime documents it as session-static with no applicable refresh
+- **THEN** reload completes independent refreshes and reports that specific setting, its deferred effect and the smallest reconnect scope, while preserving a no-restart constraint
+
 ### Requirement: Successful updates attempt session activation separately
 Codex and OpenCode update SHALL invoke reload after a successful installation or
 current-version verification. The installation result SHALL remain authoritative
