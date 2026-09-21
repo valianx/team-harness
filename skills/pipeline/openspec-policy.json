@@ -24,11 +24,13 @@
         "node": ">=22.20.0",
         "uv": "available on PATH for BMAD scripts"
       },
-      "required_native_skills": [
-        "bmad-testarch-test-design",
-        "bmad-testarch-test-review",
-        "bmad-testarch-trace"
-      ],
+      "required_native_skills": {
+        "claude": ["bmad-testarch-test-design", "bmad-testarch-test-review", "bmad-testarch-trace"],
+        "codex": ["bmad-testarch-test-design", "bmad-testarch-test-review", "bmad-testarch-trace"]
+      },
+      "required_command_pointers": {
+        "opencode": ["bmad-testarch-test-design", "bmad-testarch-test-review", "bmad-testarch-trace"]
+      },
       "runtime_targets": ["claude", "codex", "opencode"]
     },
     "superpowers": {

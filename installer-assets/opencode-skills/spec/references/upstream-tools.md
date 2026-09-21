@@ -13,7 +13,10 @@ The capability's algorithm, checklist, templates and scoring remain upstream.
 
 At spec entry or resumption, reuse [workspace](../../workspace/SKILL.md), read the
 [policy](../../pipeline/openspec-policy.json), and resolve OpenSpec, TEA and
-Superpowers for the active host, including each provider's required native skills.
+Superpowers for the active host, including each provider's declared native skills
+or command pointers for that host. TEA requires native skills for Claude/Codex and
+command pointers for OpenCode; verify the selected entry kind without requiring
+another host's integration.
 Selecting spec includes preparing these declared dependencies within that task;
 honor explicit read-only/no-install scope and native permission prompts. Ask only
 when an operation needs authority beyond that preparation, not for each provider.
