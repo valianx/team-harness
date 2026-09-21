@@ -73,7 +73,7 @@ A delegated agent uses the provider as its method for that question; TH does not
 run a second equivalent local method afterward.
 
 Use the runtime's installed entry. OpenSpec's researched entries are Claude
-`/opsx:verify`, Codex `openspec-verify-change`, and OpenCode `/opsx-verify`;
+`/opsx:verify`, Codex `$openspec-verify-change`, and OpenCode `/opsx-verify`;
 they are agent workflows, not a shell command named `openspec verify`.
 Superpowers uses its native plugin skills. TEA uses BMAD-generated native skills
 or pointers; a supported upstream CLI runner may be used when headless execution

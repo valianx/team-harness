@@ -55,7 +55,7 @@ including flat OpenCode opsx commands. Consumer installations remain intact.
    independent review and the shared create-pr flow, reusing applicable evidence.
 
 Claude's researched entry is `/opsx:verify`, Codex's is
-`openspec-verify-change`, and OpenCode's is `/opsx-verify`; resolve the entry
+`$openspec-verify-change`, and OpenCode's is `/opsx-verify`; resolve the entry
 from the installed version. These are agent workflows, not a terminal command
 called `openspec verify`. Structural `openspec validate` is not implementation
 verification.
