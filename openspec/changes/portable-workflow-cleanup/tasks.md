@@ -1,3 +1,0 @@
-- [ ] Remove mandatory Context Harness and memory telemetry scaffolding while preserving explicit KG and Context7.
-- [ ] Align auxiliary flows, installer entrypoints and native settings across Claude Code, Codex and OpenCode.
-- [ ] Bind observational hooks to explicit workspace identity and validate the portable behavior.

@@ -111,6 +111,12 @@ cat > "$WORKDIR/workspaces/test-feature/00-state.md" <<'EOF'
 - status: in_progress
 EOF
 
+# Observational hooks require an explicit absolute workspace binding. Keep the
+# existing start-side cases focused on breadcrumb semantics by binding this
+# fixture directly; workspace selection itself is covered by
+# test_workspace_bound_hooks.mjs.
+export TH_WORKSPACE="$WORKDIR/workspaces/test-feature"
+
 TRACE_FILE="$WORKDIR/workspaces/test-feature/00-subagent-trace.jsonl"
 
 # ---------------------------------------------------------------------------

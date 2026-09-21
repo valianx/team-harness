@@ -222,6 +222,11 @@ def _git_local_exclude_path(repo_root: Path) -> Path:
         "GIT_NO_LAZY_FETCH": "1",
         "GIT_ALLOW_PROTOCOL": "",
     })
+    # Resolve metadata from the explicitly requested repository.  Git honors
+    # these inherited overrides even when -C points at another worktree,
+    # which could otherwise redirect the local exclude write to another repo.
+    env.pop("GIT_DIR", None)
+    env.pop("GIT_COMMON_DIR", None)
     try:
         git_dir_result = subprocess.run(
             ["git", "-C", str(repo_root), "rev-parse", "--git-common-dir"],

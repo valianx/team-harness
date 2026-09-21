@@ -8,69 +8,68 @@ without turning observations or compatibility details into routing controls.
 ## Requirements
 
 ### Requirement: The control plane uses exactly two primitives
-Every current specialist interaction SHALL use exactly two control primitive
-kinds: `capability_lease` for dispatch and `result_envelope` for return. Artifact
-references and observed control-log positions SHALL be fields within those
-objects and MUST NOT create independent authority, ownership, or transition
-currencies. Both primitive schemas SHALL be closed and versioned.
+Current pipelines MUST coordinate through native runtime tasks and ordinary reports. The former lease and envelope primitives MAY be read for compatibility and MUST NOT be prerequisites for new work.
+
+#### Scenario: Native assignment
+- **WHEN** approved pipeline work is ready
+- **THEN** Main assigns an objective, scope, workspace, ownership and relevant references without issuing a TH capability lease.
 
 #### Scenario: Main dispatches approved work
 - **WHEN** a specialist can perform work under existing authority
-- **THEN** Main sends one capability lease containing authority, scope, ownership, immutable inputs, and validity, and receives one result envelope
+- **THEN** Main sends a bounded native assignment with scope, ownership, workspace and relevant inputs, and receives an ordinary useful report.
 
 #### Scenario: A third coordination object is proposed
 - **WHEN** the proposed object independently authorizes work, owns mutable scope, reports completion, or advances state
-- **THEN** it is folded into the applicable primitive or rejected unless it prevents a distinct named safety failure
+- **THEN** Main reuses existing tasks and notes rather than adding another authorization object or redundant completion schema.
 
 ### Requirement: One append-only log owns control state
-One coordinator-owned append-only control log SHALL be the durable source for
-operator authority, capability-lease lifecycle, accepted results, pipeline
-transitions, and mechanical release. `00-state.md`, `01-plan.md`, findings ledgers, counters,
-and other human-readable views SHALL be rebuildable projections or telemetry and
-MUST NOT independently authorize, pause, rotate, or advance work.
+Current pipelines MUST use the shared plan, tasks and evidence to retain progress. Native runtime permissions govern execution; a TH log MUST NOT grant or withhold permission.
+
+#### Scenario: Existing authorization
+- **WHEN** the operator already approved unchanged work
+- **THEN** Main continues without a control event, nonce or duplicate approval.
 
 #### Scenario: Gate 1 is approved
 - **WHEN** the operator answers the current Gate-1 presentation with an allowed approval value
-- **THEN** Main appends one authority event and derives the current state without writing a second authoritative release field
+- **THEN** Main continues the approved work without creating a nonce, authority event or duplicate permission record.
 
 #### Scenario: A projection is stale
 - **WHEN** a projection disagrees with a valid control log
-- **THEN** recovery rebuilds the projection from the log and does not re-present the gate or alter the legal route
+- **THEN** Main reconciles the useful summary against trustworthy current tasks and evidence; no historical log grants current permission.
 
 #### Scenario: An operator plan disagrees with canonical OpenSpec
 - **WHEN** generated `01-plan.md` names a different semantic value or source identity
-- **THEN** it is regenerated from pinned OpenSpec and cannot release Gate 1 as an independent plan
+- **THEN** Main corrects the summary or resolves a real intent discrepancy without treating either artifact as an execution token.
 
 #### Scenario: Required authority is absent
 - **WHEN** the control log lacks a valid event for a protected action
-- **THEN** the pipeline fails closed before that action and requests only the missing live decision or integrity prerequisite
+- **THEN** absence of a log event does not block existing user authorization; Main asks only if actual required user intent is missing.
 
 ### Requirement: Control records are bounded, canonical, and provenance-safe
-Capability leases, result envelopes, and control-log records SHALL reject
-unknown fields, invalid lifecycle transitions, oversized values, unsafe paths,
-symlink escapes, secret-shaped content, forged provenance, stale sequences, and
-non-canonical identities. Appending SHALL be atomic and commit-last. A failed
-append or replay MUST preserve the last valid log prefix and MUST NOT authorize
-or project any later record across the failure.
+Compatibility readers MUST preserve validation of existing records and distinguish corrupt or incomplete history from verified evidence. New work MUST NOT require a new control journal.
+
+#### Scenario: Historical evidence
+- **WHEN** an old log has an invalid suffix
+- **THEN** the reader reports its limits and Main uses verified task evidence without fabricating a prior result.
 
 #### Scenario: A forged result names a valid lease
 - **WHEN** the result provenance, immutable input identity, changed path, or observed log sequence does not match that lease
-- **THEN** Main rejects the result before appending acceptance or changing a projection
+- **THEN** the historical validator rejects the mismatched record; Main does not use unverified claims as evidence or require a new lease for current work.
 
 #### Scenario: Log append is interrupted
 - **WHEN** persistence fails before the next canonical record commits completely
-- **THEN** replay returns the prior valid sequence and no partial record changes authority or state
+- **THEN** the legacy reader returns the valid prefix and reports the incomplete suffix without inventing a completed result.
 
 #### Scenario: A diagnostic contains secret-shaped material
 - **WHEN** a lease, result, or control event would persist credentials, tokens, or an unbounded diagnostic
-- **THEN** validation rejects or safely bounds the record without writing the sensitive value to the log
+- **THEN** retained compatibility validation rejects or bounds unsafe persistence; current reports also avoid exposing credentials.
 
 ### Requirement: Routing controls protect a concrete safety floor
-A rule MAY block, pause, rotate, authorize, or advance the pipeline only when an
-executable check protects live authority, exclusive mutable ownership,
-immutable-input integrity, independent acceptance/security evidence, or native
-permission/security enforcement. Rules without a named protected failure and
-bounded recovery SHALL be advisory or telemetry.
+Workflow selection MUST follow the operator's objective and chosen working method. Security impact and review findings inform coordination and MUST NOT automatically force a lane or extra TH authorization.
+
+#### Scenario: Sensitive scoped work
+- **WHEN** approved spec work touches a security-related file
+- **THEN** Main selects useful checks and continues under native permissions without forcing pipeline activation.
 
 #### Scenario: An unenforced mandatory marker remains in prose
 - **WHEN** no executable current-path consumer uses that marker to protect a retained safety floor
@@ -81,30 +80,23 @@ bounded recovery SHALL be advisory or telemetry.
 - **THEN** it may trigger diagnostics or handoff preparation but does not change authority or the recovery route
 
 ### Requirement: Causal evidence routes recovery
-After non-success, Main SHALL preserve valid progress, establish safe mutable
-ownership, classify the observable cause, and compare immutable recovery
-evidence. Main SHALL diagnose operational blockers and attempt a verifiable
-authorized repair before pausing. This obligation applies in direct, spec and
-pipeline work: contract-format errors, stale paths, missing declared tools or
-libraries, and recoverable transport failures do not require another approval
-when repairs preserve the approved deliverable, acceptance meaning and authority.
-Main SHALL verify the repaired condition and continue under unchanged authority
-when a safe action is available and its causal identity differs from the failed
-action. Native permissions remain binding; Main SHALL NOT invent evidence, weaken
-validation or silently change shipped dependencies or approved intent to repair
-the execution environment. Ordinals MUST NOT authorize, deny, pause, or close work.
+Recovery MUST use the observed failure and preserve valid progress. Counts, time or absent legacy bookkeeping MUST NOT independently stop authorized work.
+
+#### Scenario: Recoverable failure
+- **WHEN** a tool or specialist fails
+- **THEN** Main diagnoses the cause, repairs or changes approach, and reports a genuine unresolved dependency.
 
 #### Scenario: The cause is repaired inside approved scope
 - **WHEN** evidence supports a different safe action and authority, scope, acceptance meaning, and security floor remain unchanged
-- **THEN** Main continues without a live correction decision
+- **THEN** Main verifies the repair and continues using existing authorization.
 
 #### Scenario: The same failed action would repeat
 - **WHEN** operational diagnosis finds no verifiable authorized repair and every known safe action would reproduce the same causal identity
-- **THEN** Main pauses with the missing condition and attempted remedies, preserving authority, progress, and evidence
+- **THEN** Main reports the concrete missing condition and attempted remedies, preserving progress.
 
 #### Scenario: Recovery changes approved meaning
 - **WHEN** the proposed action changes intent, scope, acceptance meaning, security authority, or an outward effect
-- **THEN** Main obtains the applicable bounded live decision before dispatch
+- **THEN** Main obtains any missing decision about the changed scope or effect before acting.
 
 #### Scenario: A missing library or incorrect path interrupts direct work
 - **WHEN** Main can restore a declared prerequisite in a permitted isolated environment or resolve the correct installed path without changing the deliverable
@@ -112,31 +104,31 @@ the execution environment. Ordinals MUST NOT authorize, deny, pause, or close wo
 
 #### Scenario: A malformed contract interrupts dispatch
 - **WHEN** canonical inputs establish the missing formatting or derived coordinate without inventing a decision-bearing fact
-- **THEN** Main repairs the owned contract projection, validates it and resumes pending work under existing authority
+- **THEN** Main supplies clear missing context from canonical sources and resumes without inventing an authority fact.
 
 ### Requirement: Legacy control state is converted outside the hot path
-The current runtime SHALL consume only the v5 control contract. A deterministic
-one-shot converter SHALL validate supported v1-v4 state, gates, events,
-bindings, findings, and immutable inputs and produce the v5 control log and
-projections. It MUST NOT infer missing authority, rewrite historical evidence,
-or leave a workspace with mixed writable schemas.
+Existing workspaces MUST remain readable without forced conversion or administrative closure. Compatibility helpers MAY validate historical state but MUST NOT be the authorization path for current work.
+
+#### Scenario: Workspace without a log
+- **WHEN** a retained workspace has plans and evidence but no control log
+- **THEN** Main resumes the approved objective from those artifacts and records uncertainty only where evidence is missing.
 
 #### Scenario: A valid legacy run resumes
 - **WHEN** supported legacy authority and immutable identities validate completely
-- **THEN** the converter creates one v5 representation and current execution proceeds without evaluating legacy routing again
+- **THEN** Main reuses verified progress and the selected workspace without converting control schemas before continuing.
 
 #### Scenario: Legacy authority is ambiguous
 - **WHEN** historical gate and event records disagree or cannot prove the operator decision
-- **THEN** conversion stops before current dispatch and reports the exact authority defect without synthesizing a decision
+- **THEN** Main distinguishes uncertain historical evidence from current user authorization and asks only for a genuinely missing decision.
 
 #### Scenario: One service binding fails legacy validation
 - **WHEN** binding validation returns a bounded task-progress, source, repository, snapshot, or overlay error for one service
-- **THEN** conversion preserves that exact error and service identity, writes no v5 switch, and does not collapse it into an undifferentiated migration failure
+- **THEN** Main preserves the precise service error and recovers trustworthy sources without a mandatory v5 conversion.
 
 #### Scenario: A verified legacy continuation authorizes repaired state
 - **WHEN** the original Gate, continuation certificate identity, repaired aggregate, binding services, repair evidence, and live authority event all verify
-- **THEN** conversion preserves the original Gate plus continuation identity and permits current v5 dispatch without rewriting or synthesizing Gate 1
+- **THEN** Main reuses verified progress under existing user authorization; a continuation certificate is not required for new work.
 
 #### Scenario: Rollback encounters an existing v5 workspace
 - **WHEN** older compatible software starts after a workspace has switched successfully to v5
-- **THEN** it may read or report the v5 state but never overwrites it with a reconstructed v4 representation
+- **THEN** historical inspection preserves its records rather than rewriting them to a different schema.

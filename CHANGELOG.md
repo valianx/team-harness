@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Review consolidation preserves duplicate findings and location evidence; preflight leaves tracked files unchanged.
 - Auxiliary workflows use native tools and the selected workspace; historical pipeline records remain readable.
+- Windows bootstrap forwards supported directory options; update preserves UTF-8 instructions and operator text.
 
 ### Removed
 - Retired Claude installer paths, remote flow telemetry and TH lease, gate-token and security-floor requirements in current workflows.

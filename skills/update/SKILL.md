@@ -131,12 +131,12 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
        return "<!-- th-managed: $name sha256=$h -->`n"
    }
 
-   if (Test-Path $claudeMd) { $original = Get-Content $claudeMd -Raw } else { $original = "" }
+   if (Test-Path $claudeMd) { $original = Get-Content $claudeMd -Raw -Encoding UTF8 } else { $original = "" }
    $content  = $original
    $outcomes = @{}
 
    foreach ($block in @("orchestrator-dispatch-rule", "voice-rule")) {
-       $canonical = (Get-Content "$mbDir\$block.md" -Raw).TrimEnd()
+       $canonical = (Get-Content "$mbDir\$block.md" -Raw -Encoding UTF8).TrimEnd()
        $sm   = "<!-- $block`:start -->"
        $em   = "<!-- $block`:end -->"
        $ch   = Get-CanonHash $canonical
@@ -193,7 +193,7 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
        if ($content.Contains($lsm) -and $content.Contains($lem)) {
            $ls  = $content.IndexOf($lsm)
            $le  = $content.IndexOf($lem, $ls) + $lem.Length
-           $odr = (Get-Content "$mbDir\orchestrator-dispatch-rule.md" -Raw).TrimEnd()
+           $odr = (Get-Content "$mbDir\orchestrator-dispatch-rule.md" -Raw -Encoding UTF8).TrimEnd()
            $content = $content.Substring(0, $ls) + (Make-Stamp "orchestrator-dispatch-rule" (Get-CanonHash $odr)) + $odr + $content.Substring($le)
        }
    }

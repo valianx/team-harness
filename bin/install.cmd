@@ -30,10 +30,10 @@ if /i "%~1"=="--non-interactive" goto :next_arg
 if /i "%~1"=="--yes" goto :next_arg
 if /i "%CURRENT_ARG:~0,10%"=="--runtime=" goto :next_arg
 if /i "%CURRENT_ARG:~0,8%"=="--scope=" goto :next_arg
-if /i "%CURRENT_ARG:~0,14%"=="--opencode-dir=" goto :next_arg
-if /i "%CURRENT_ARG:~0,11%"=="--codex-dir=" goto :next_arg
+if /i "%CURRENT_ARG:~0,15%"=="--opencode-dir=" goto :next_arg
+if /i "%CURRENT_ARG:~0,12%"=="--codex-dir=" goto :next_arg
 if /i "%CURRENT_ARG:~0,13%"=="--memory-url=" goto :next_arg
-if /i "%CURRENT_ARG:~0,15%"=="--opencode-tier=" goto :next_arg
+if /i "%CURRENT_ARG:~0,16%"=="--opencode-tier=" goto :next_arg
 goto :native_notice
 
 :skip_value

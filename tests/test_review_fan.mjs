@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { belowFloor, classifyFloor, findingFiles, gateDecision, headTreeReader, partitionFindings, readSpecRequirements, runReviewFan } from "../skills/verify/scripts/review-fan.mjs";
+import { belowFloor, classifyFloor, findingFiles, findingLocationIssues, gateDecision, headTreeReader, partitionFindings, readSpecRequirements, runReviewFan } from "../skills/verify/scripts/review-fan.mjs";
 
 const run = promisify(execFile);
 const failures = [];
@@ -615,6 +615,22 @@ await check("normalizes contract locations when partitioning findings", () => {
   const split = partitionFindings(delta, [{ severity: "high", locations: ["src/a.js:10"] }]);
   assert.equal(split.blockers.length, 1, "an in-scope location was treated as outside the delta");
   assert.equal(split.concerns.length, 0);
+});
+
+await check("keeps malformed delta locations blocking instead of treating them as out of scope", () => {
+  const delta = pkg({ scope: { kind: "delta", prior_anchor: "abc", paths: ["src/a.js"], range_paths: ["src/a.js"] } });
+  for (const location of ["C:/other/repo/changed.ts:1", "../changed.ts:1", "/tmp/changed.ts:1", "..\\changed.ts:1"]) {
+    const finding = { severity: "high", locations: [location] };
+    assert.equal(findingLocationIssues(finding).length, 1, location);
+    const split = partitionFindings(delta, [finding]);
+    assert.equal(split.blockers.length, 1, location);
+    assert.equal(split.concerns.length, 0, location);
+  }
+  const decision = gateDecision(delta, [{ ...ret("qa"), findings: [{ severity: "high", locations: ["C:/other/repo/changed.ts:1"] }] }]);
+  assert.equal(decision.ready, false, "a malformed high-severity location must hold the gate");
+  assert.ok(decision.reasons.some((reason) => reason.includes("blocker(s)")));
+  const legitimateOutside = partitionFindings(delta, [{ severity: "high", locations: ["src/unrelated.js:1"] }]);
+  assert.equal(legitimateOutside.concerns.length, 1, "a valid repository-relative out-of-scope finding remains a concern");
 });
 
 await check("holds the ship when a severity is absent or unrecognized", () => {

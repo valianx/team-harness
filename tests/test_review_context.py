@@ -833,6 +833,32 @@ class ReviewContextTests(unittest.TestCase):
             ], capture_output=True)
             self.assertEqual(ignored.returncode, 0)
 
+    def test_workspace_ignore_ignores_inherited_git_metadata_overrides(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "root"
+            external = Path(directory) / "external"
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            subprocess.run(["git", "init", "-q", str(external)], check=True)
+            external_exclude = external / ".git" / "info" / "exclude"
+            with patch.dict(
+                os.environ,
+                {
+                    "GIT_DIR": str(external / ".git"),
+                    "GIT_COMMON_DIR": str(external / ".git"),
+                },
+                clear=False,
+            ):
+                MODULE.ensure_workspaces_ignored(root)
+
+            self.assertIn(
+                "/workspaces/\n",
+                (root / ".git" / "info" / "exclude").read_text(encoding="utf-8"),
+            )
+            self.assertNotIn(
+                "/workspaces/\n",
+                external_exclude.read_text(encoding="utf-8"),
+            )
+
     def test_workspace_ignore_update_is_atomic_and_rejects_symlink(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

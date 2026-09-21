@@ -575,11 +575,36 @@ function locationPath(location) {
   return (match ? match[1] : location).trim() || null;
 }
 
+/**
+ * Findings name repository locations, not paths from the reviewer's machine. Keep the
+ * check independent of the host OS so a Windows absolute path cannot be mistaken for an
+ * out-of-scope repository file when the gate runs on Unix (or the reverse).
+ */
+function isCanonicalRepoRelativePath(file) {
+  if (typeof file !== "string" || file.length === 0) return false;
+  if (file.startsWith("/") || /^[A-Za-z]:/.test(file) || file.includes("\\") || file.includes("\0")) return false;
+  return file.split("/").every((segment) => segment.length > 0 && segment !== "." && segment !== "..");
+}
+
+function rawFindingLocations(entry) {
+  const legacy = Array.isArray(entry?.files)
+    ? entry.files
+    : entry?.file === undefined ? [] : [entry.file];
+  const locations = Array.isArray(entry?.locations) ? entry.locations : [];
+  return [...legacy, ...locations];
+}
+
+/** Return locations that cannot be interpreted as canonical repository-relative paths. */
+export function findingLocationIssues(entry) {
+  return rawFindingLocations(entry).filter((location) => {
+    const file = locationPath(location);
+    return file === null || !isCanonicalRepoRelativePath(file);
+  });
+}
+
 /** Read both the current locations format and older file/files returns. */
 export function findingFiles(entry) {
-  const legacy = Array.isArray(entry?.files) ? entry.files : [entry?.file];
-  const locations = Array.isArray(entry?.locations) ? entry.locations : [];
-  return [...legacy, ...locations]
+  return rawFindingLocations(entry)
     .map(locationPath)
     .filter((file, index, files) => file !== null && files.indexOf(file) === index);
 }
@@ -603,7 +628,8 @@ export function partitionFindings(pkg, findings) {
   const concerns = [];
   for (const entry of findings) {
     const files = findingFiles(entry);
-    const outside = pkg.scope.kind === "delta" && files.length > 0 && files.every((file) => !inScope.has(file));
+    const malformed = findingLocationIssues(entry).length > 0;
+    const outside = !malformed && pkg.scope.kind === "delta" && files.length > 0 && files.every((file) => !inScope.has(file));
     if (outside || belowFloor(entry)) concerns.push(entry);
     else blockers.push(entry);
   }

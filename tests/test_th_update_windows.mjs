@@ -14,6 +14,8 @@ if (process.platform !== "win32") {
 const root = fileURLToPath(new URL("../", import.meta.url));
 const skillPath = path.join(root, "skills", "update", "SKILL.md");
 const skillText = await readFile(skillPath, "utf8");
+const dispatchSource = (await readFile(path.join(root, "skills", "setup", "managed-blocks", "orchestrator-dispatch-rule.md"), "utf8"))
+  .replace(/\r\n/g, "\n").trim();
 
 function extractWindowsBlock(text) {
   const heading = text.indexOf("**Windows (PowerShell)");
@@ -109,7 +111,7 @@ async function runRegression(shell) {
   try {
     const original = Buffer.from(
       [
-        "# operator content before\r\n",
+        "# operator content before — configuración\r\n",
         "<!-- orchestrator-dispatch-rule:start -->\r\n",
         "Old harness content that should be replaced.\r\n",
         "<!-- orchestrator-dispatch-rule:end -->\r\n",
@@ -126,13 +128,15 @@ async function runRegression(shell) {
     const backup = await readFile(fixture.backup);
     const updatedText = updated.toString("utf8");
     assert.deepEqual(backup, original, `${shell.label}: .bak preserves the original bytes`);
-    assert.ok(updatedText.includes("# operator content before\r\n"), `${shell.label}: outside prefix preserved`);
+    assert.ok(updatedText.includes("# operator content before — configuración\r\n"), `${shell.label}: outside UTF-8 prefix preserved`);
     assert.ok(updatedText.includes("# operator content after\r\n"), `${shell.label}: outside suffix preserved`);
     assert.match(updatedText, /<!-- orchestrator-dispatch-rule:start -->/);
     assert.match(updatedText, /<!-- orchestrator-dispatch-rule:end -->/);
     assert.match(updatedText, /<!-- voice-rule:start -->/);
     assert.match(updatedText, /<!-- voice-rule:end -->/);
-    assert.match(updatedText, /## orchestrator dispatch/);
+    const installedDispatch = updatedText.match(/<!-- orchestrator-dispatch-rule:start -->[\s\S]*?<!-- orchestrator-dispatch-rule:end -->/)[0];
+    assert.equal(installedDispatch.replace(/\r\n/g, "\n").trim(), dispatchSource,
+      `${shell.label}: installed managed block matches its canonical source`);
     await assertNoTempFiles(fixture.claudeDir, `${shell.label} existing file`);
 
     // A second invocation must avoid the write path entirely.

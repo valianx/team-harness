@@ -8,18 +8,15 @@ ownership for every canonical worktree.
 ## Requirements
 
 ### Requirement: Every writer uses one capability lease
-A writing specialist SHALL operate under one closed capability lease that binds
-its logical role, live authority, semantic scope, canonical worktree, writable
-paths, immutable inputs, context identity, and lifecycle state. Main SHALL be
-the only lease issuer and SHALL prevent overlapping committing ownership in one
-canonical worktree. Read-only specialists MAY inspect overlapping immutable
-inputs without acquiring mutable ownership. Main SHALL derive the lease just in
-time for one coherent dependency-ready worktree batch and MUST NOT require an
-exhaustive future task graph or Design-authored execution contract.
+Every writer MUST receive a bounded native assignment with ownership, relevant inputs and the shared workspace. Main MUST avoid conflicting edits and preserve unrelated work; no TH lease is required.
+
+#### Scenario: Parallel independent edits
+- **WHEN** two bounded tasks own different files
+- **THEN** Main may delegate both and integrates their results while serializing Git mutations.
 
 #### Scenario: Two writers share one worktree
 - **WHEN** both specialists can mutate files or Git metadata in the same canonical worktree
-- **THEN** Main serializes their ownership even when their planned file lists are disjoint
+- **THEN** Main assigns disjoint ownership for concurrent edits and serializes overlapping writes and Git mutations.
 
 #### Scenario: Two validators inspect one Freeze
 - **WHEN** QA and security need overlapping immutable evidence and neither can mutate it
@@ -27,49 +24,45 @@ exhaustive future task graph or Design-authored execution contract.
 
 #### Scenario: A lease contains an unsafe mutable path
 - **WHEN** a writable path is outside the canonical worktree, resolves through a symlink, overlaps another committing owner, or is absent from approved scope
-- **THEN** dispatch fails before the specialist can mutate files or Git metadata
+- **THEN** legacy validation continues rejecting invalid historical leases; current assignments use native permissions and safe file handling within owned scope.
 
 #### Scenario: Several approved tasks share one worktree and owner
 - **WHEN** dependency-ready OpenSpec tasks can be completed coherently by one implementer without transferring ownership
-- **THEN** Main issues one batch lease instead of one fresh implementer lease per documentary task shard
+- **THEN** Main assigns one coherent batch instead of separate ceremonial handshakes per documentary task.
 
 #### Scenario: Later task details are not yet known
 - **WHEN** a future task has not reached its dependency boundary
-- **THEN** its exact writable files, seams, commands, and evidence coordinates are absent from the current lease and do not block Gate 1 or current work
+- **THEN** Main assigns ready work with enough context and defers details that depend on future evidence.
 
 ### Requirement: Valid same-agent work continues without a new handshake
-Main SHALL reuse the existing specialist session and capability lease when role,
-authority, semantic scope, worktree, immutable inputs, context identity, and
-exclusive ownership remain valid. It SHALL send only changed evidence. Main
-SHALL revoke or replace the lease when an identity changes, ownership transfers,
-the task closes, context integrity is unknown, or an independent validation
-lens is required. Numeric counts alone MUST NOT force rotation.
+Main MUST permit reuse of a useful specialist session with concise delta context when the objective and ownership remain suitable, without a new authorization handshake.
+
+#### Scenario: Continuation
+- **WHEN** a correction concerns the same owned surface
+- **THEN** Main sends the correction without a new authorization handshake.
 
 #### Scenario: An implementer receives in-scope correction evidence
 - **WHEN** the prior implementer remains valid and the correction changes none of the lease identities
-- **THEN** Main continues the same session under the same lease with only delta evidence
+- **THEN** Main continues the useful session with delta context and existing ownership.
 
 #### Scenario: QA evaluates a changed Freeze
 - **WHEN** correction changes the frozen candidate identity
-- **THEN** Main starts a fresh independent verifier bound to that candidate and adds security only when impact requires it
+- **THEN** Main reviews affected changes with suitable independent coverage and reuses valid unaffected evidence.
 
 #### Scenario: Context integrity is lost
 - **WHEN** retained specialist context cannot be verified
-- **THEN** Main revokes the lease and starts a fresh role from immutable inputs without asking the operator to restart the pipeline
+- **THEN** Main starts a suitable native session from trustworthy sources without requiring the operator to restart the workflow.
 
 ### Requirement: Specialists return one result envelope through existing transport
-Every specialist SHALL return one closed, versioned result envelope through the
-runtime's existing terminal-result channel. It SHALL bind the capability lease
-and include status, changed and evidence paths, artifact references, commits
-when applicable, structured findings, closure evidence, bounded diagnostics,
-next-prerequisite facts, and observed control-log position. Main alone SHALL
-validate the result, append its acceptance to the control log, and update
-projections and routing. No role-owned result inbox or receipt handshake SHALL
-be required.
+Specialists MUST report outcome, changed files, checks, findings and material limits through native transport. Main MUST NOT require a separate envelope or event schema to use a clear result.
+
+#### Scenario: Usable result
+- **WHEN** a specialist returns verifiable work in ordinary prose
+- **THEN** Main checks the evidence and incorporates it without ceremonial normalization.
 
 #### Scenario: A specialist completes work
 - **WHEN** its terminal result envelope validates against the active lease and immutable inputs
-- **THEN** Main accepts it once, appends the result event, and derives the next action
+- **THEN** Main checks its actual changes and evidence, incorporates the result once and updates useful progress notes.
 
 #### Scenario: Terminal chat delivery is interrupted
 - **WHEN** the runtime exposes durable terminal status for the same specialist session
@@ -77,29 +70,33 @@ be required.
 
 #### Scenario: A duplicate result is observed
 - **WHEN** Main sees the same validated result identity again
-- **THEN** no projection or routing transition is applied twice
+- **THEN** Main avoids repeating integration while retaining any additional findings and evidence.
 
 #### Scenario: A result reports unbounded or secret diagnostics
 - **WHEN** terminal output includes credential-shaped content or exceeds the result envelope's bounded diagnostic contract
-- **THEN** the envelope is rejected or safely redacted and cannot be accepted into the control log as evidence
+- **THEN** Main avoids persisting or exposing sensitive output and obtains a bounded useful report without a control-log requirement.
 
 ### Requirement: Main remains the only authority and transition owner
-Specialists MAY report immutable artifact identities and dependency facts, but
-MUST NOT grant scope, transfer ownership, choose a phase, approve a gate, alter
-authority, write coordinator projections, or direct another specialist to
-mutate. Main SHALL remain the only operator-facing coordinator and transition
-applier.
+Main MUST coordinate the authorized objective and judge specialist recommendations using full task context. Specialists provide evidence and MUST NOT make their proposed remedies binding.
+
+#### Scenario: Advisory review
+- **WHEN** a reviewer proposes a broader change
+- **THEN** Main accepts, adapts or rejects the recommendation with evidence and continues the authorized scope.
 
 #### Scenario: A specialist discovers an immutable dependency
 - **WHEN** the dependency is already inside the lease and can be identified by hash and path
-- **THEN** it reports that fact without creating another authority exchange
+- **THEN** it reports the relevant dependency without creating a separate authority exchange.
 
 #### Scenario: A dependency requires scope expansion
 - **WHEN** satisfying it would add mutable paths or change approved behavior
 - **THEN** the specialist returns the need to Main and no peer message grants the expansion
 
 ### Requirement: Specialist read manifests name produced artifacts
-Every workspace artifact a specialist contract names as a read SHALL be registered in `tests/fixtures/workspace-artifacts.json` with the contract file that produces it, or SHALL be marked `retired` and absent from every scanned contract. Acceptance intent SHALL be read from the bound OpenSpec change's `specs/**/spec.md` and `tasks.md`; the `01-plan.md` projection supplies scope and decisions only and is never an acceptance source. A missing bound change blocks; a missing projection does not. `tests/test_workspace_artifacts.py` SHALL fail when a scanned contract names an unregistered artifact, names a retired artifact, or names a producer that does not exist or does not mention the artifact.
+Assignments MUST point to existing relevant artifacts, or clearly identify work yet to be produced. Missing optional historical artifacts MUST NOT prevent useful work.
+
+#### Scenario: Minimal context
+- **WHEN** a current task uses OpenSpec and workspace notes without legacy state files
+- **THEN** the specialist reads those sources and reports only genuinely missing inputs.
 
 #### Scenario: A specialist reads a retired plan shard
 - **WHEN** a scanned contract names `plan/tasks/Task-N.md` or another artifact registered as `retired`
@@ -111,4 +108,4 @@ Every workspace artifact a specialist contract names as a read SHALL be register
 
 #### Scenario: The bound change is missing at dispatch
 - **WHEN** `qa` or `implementer` cannot resolve the bound OpenSpec change named by the projection
-- **THEN** it returns `status: blocked`, `failure_kind: artifact-missing` naming the change directory, and never substitutes the projection or a packet summary as the acceptance source
+- **THEN** the specialist reports the missing canonical source and Main repairs the path or obtains the genuinely missing intent.
