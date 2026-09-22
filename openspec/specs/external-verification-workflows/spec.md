@@ -52,7 +52,7 @@ TH SHALL execute installed Superpowers verification-before-completion at the com
 - **THEN** TH accurately describes that behavior and resolves any concrete conflict with the authorized task instead of patching upstream files or claiming an unsupported selective installation
 
 ### Requirement: TEA contributes bounded testing expertise
-TH SHALL execute installed TEA test-design during spec design, test-review after implementation and relevant test execution, and trace before completing the spec change. Outside spec, selection SHALL follow the task or explicit request. Each invocation SHALL share current requirements and test evidence. Native skills SHALL be preferred for interactive work; a supported upstream runner MAY be used where it adds value. TH SHALL NOT enable TEA framework creation or install enforcement hooks merely to review tests.
+TH SHALL execute installed TEA test-design during Spec, test-review after implementation and relevant test execution during Validation, and trace before completing the spec change. The testing strategy SHALL inform selection of upstream ATDD and automation during Implementation, framework or CI setup when that infrastructure is part of the objective, and NFR assessment when relevant non-functional evidence is needed. Selected additional methods SHALL be executed at their corresponding stages without requiring the operator to invoke them individually; the entire TEA catalog SHALL NOT be imposed on every effort. Outside spec, selection SHALL follow the task or explicit request. Each invocation SHALL share current requirements and test evidence. Native skills SHALL be preferred for interactive work; a supported upstream runner MAY be used where it adds value. TH SHALL NOT enable TEA framework creation or install enforcement hooks merely to review tests.
 
 #### Scenario: Spec advances through its stages
 - **WHEN** the effort reaches design, test assessment or completion preparation
@@ -81,6 +81,18 @@ TH SHALL execute installed TEA test-design during spec design, test-review after
 #### Scenario: A provider has a higher runtime prerequisite
 - **WHEN** the resolved TEA package requires a newer Node version than TH's current floor
 - **THEN** TH reports that provider-specific prerequisite and follows authorized upstream provisioning without silently changing the global TH prerequisite
+
+#### Scenario: Implementation needs acceptance tests or expanded automation
+- **WHEN** the test strategy selects ATDD or automation for the authorized change
+- **THEN** Main prepares the installed upstream entry and executes it during implementation with the existing intent, tests and workspace, without creating a competing development plan
+
+#### Scenario: Test infrastructure is already sufficient
+- **WHEN** test-design can use existing test and CI infrastructure
+- **THEN** TH reuses it and does not run framework or CI setup just to fulfill a catalog checklist
+
+#### Scenario: Non-functional behavior needs evidence
+- **WHEN** relevant reliability, performance, security or maintainability requirements select NFR analysis
+- **THEN** Main executes the installed NFR method with actual implementation evidence during validation and retains its limitations and recommendations for coordinator judgment
 
 ### Requirement: Provider work shares the selected workspace
 TH SHALL pass the existing task context and the same resolved absolute local or Obsidian workspace to every provider invocation. Working test designs, coverage analyses, research and verification/review reports SHALL be retained as Markdown there, including a faithful summary when the provider only returns conversational output. Operational formats required by a provider MAY be retained there or in permitted temporary storage with useful links. Provider output SHALL be directed through documented settings or flags, verified at its actual destination, and SHALL NOT become tracked execution debris or a second task plan. Canonical OpenSpec artifacts, product code, maintained tests and durable documentation SHALL remain in their owning repository locations; provider installation metadata SHALL remain upstream-managed.

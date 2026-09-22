@@ -1,5 +1,7 @@
 # Deterministic Quality Runner
 
+## Contents
+
 - [Functional contract](#functional-contract)
 - [Workspace manifest](#workspace-manifest)
 - [CRAP adapter contract](#crap-adapter-contract)
