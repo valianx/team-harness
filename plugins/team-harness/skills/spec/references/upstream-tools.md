@@ -208,6 +208,20 @@ skill. The request carries the objective, relevant spec/tasks, code and test sco
 candidate identity, known findings and absolute local/Obsidian workspace path.
 A delegated agent uses the provider as its method for that question; TH does not
 run a second equivalent local method afterward.
+Include the question, evidence boundary, supported output destinations and the
+installed method's completion outputs in that assignment. Inspect the returned
+artifacts before reporting completion; if a required output is missing, finish
+that step or report it pending while reusing completed analysis. A prose report
+alone does not complete a method that also requires native machine artifacts.
+
+Keep source inspection, controlled examples, executed tests and live-host evidence
+distinct. Apply the installed provider's coverage semantics, not a desired passing
+score: mappings to scenarios are not executed tests. Missing scope,
+counts, snapshot identity or time remain unknown in the provider's supported form.
+Record actual run time when available; never substitute midnight or a base commit
+for an unobserved timestamp or dirty candidate. Preserve original assessments and
+append corrections and Main's disposition instead of silently rewriting a verdict.
+These are evidence handoffs, not TH copies of upstream schemas or scoring logic.
 
 Use the runtime's installed entry. OpenSpec's researched entries are Claude
 `/opsx:verify`, Codex `$openspec-verify-change`, and OpenCode `/opsx-verify`;

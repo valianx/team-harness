@@ -85,6 +85,19 @@ esac
 MOCKCURL
 chmod +x "$MOCKBIN/curl"
 
+# The shell updater intentionally supports Unix/macOS only; make its platform
+# probe deterministic so the pre-check itself is exercised when this test is
+# launched from Git Bash on Windows.
+cat > "$MOCKBIN/uname" <<'MOCKUNAME'
+#!/bin/sh
+case "$1" in
+    -s) printf '%s\n' Linux ;;
+    -m) printf '%s\n' x86_64 ;;
+    *) exit 1 ;;
+esac
+MOCKUNAME
+chmod +x "$MOCKBIN/uname"
+
 FAKE_VERSION="9.9.9"
 CONFIG_DIR="$TMPROOT/config"
 mkdir -p "$CONFIG_DIR/opencode"

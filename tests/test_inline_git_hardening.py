@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -84,8 +85,18 @@ def check_inline_git_hardening() -> None:
         git("init", "-q")
         git("config", "user.email", "inline@example.invalid")
         git("config", "user.name", "Inline Test")
+        # Keep the fixture independent of a user's global autocrlf setting;
+        # the hardened invocation intentionally disables global config.
+        git("config", "core.autocrlf", "false")
         (repo / "normal.txt").write_text("normal\n")
-        (repo / ":(glob)*.txt").write_text("literal\n")
+        # `:(glob)` is a Git pathspec prefix, but the colon is forbidden in
+        # Windows filenames. Use a bracket expression there so the fixture
+        # still proves that --literal-pathspecs disables pathspec matching.
+        literal_name = ":(glob)*.txt" if os.name != "nt" else "[ab].txt"
+        literal_pathspec = literal_name
+        (repo / literal_name).write_text("literal\n")
+        if os.name == "nt":
+            (repo / "a.txt").write_text("glob-match\n")
         git("add", "--all")
         git("commit", "-qm", "first")
         first = git("rev-parse", "HEAD").strip()
@@ -107,12 +118,18 @@ def check_inline_git_hardening() -> None:
 
         hardened_tree = immutable("rev-parse", f"{first}^{{tree}}").stdout.strip()
         require(hardened_tree == first_tree, "replace ref altered hardened revision binding")
-        literal = immutable("show", "--no-ext-diff", "--no-textconv", first, "--", ":(glob)*.txt").stdout
+        literal = immutable("show", "--no-ext-diff", "--no-textconv", first, "--", literal_pathspec).stdout
         require("+literal" in literal and "+normal" not in literal, "pathspec magic was not treated literally")
+        if os.name == "nt":
+            require("+glob-match" not in literal, "Windows literal pathspec matched a bracket expression")
 
         marker = repo / ".git" / "gpg-program-ran"
-        gpg_program = repo / ".git" / "hostile-gpg-program"
-        gpg_program.write_text(f"#!/bin/sh\nprintf invoked > {marker}\nexit 1\n")
+        if os.name == "nt":
+            gpg_program = repo / ".git" / "hostile-gpg-program.cmd"
+            gpg_program.write_text(f"@echo off\r\necho invoked>{marker}\r\nexit /b 1\r\n")
+        else:
+            gpg_program = repo / ".git" / "hostile-gpg-program"
+            gpg_program.write_text(f"#!/bin/sh\nprintf invoked > {marker}\nexit 1\n")
         os.chmod(gpg_program, 0o755)
         signed_content = (
             f"tree {first_tree}\n"
@@ -125,8 +142,12 @@ def check_inline_git_hardening() -> None:
         )
         signed = subprocess.run(
             ("git", "hash-object", "-t", "commit", "-w", "--stdin"), cwd=repo,
-            input=signed_content, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
-        ).stdout.strip()
+            # Pass bytes so Python does not translate LF to CRLF on Windows;
+            # Git's commit parser treats those carriage returns as malformed
+            # object headers.
+            input=signed_content.encode("utf-8"), stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, check=True,
+        ).stdout.decode("ascii").strip()
         git("update-ref", "refs/heads/signed", signed)
         git("config", "log.showSignature", "true")
         git("config", "gpg.program", str(gpg_program))
@@ -137,10 +158,26 @@ def check_inline_git_hardening() -> None:
         require(hardened_log.returncode == 0 and not marker.exists(), "hardened log executed hostile gpg.program")
 
         fsmonitor_marker = repo / ".git" / "fsmonitor-ran"
-        fsmonitor = repo / ".git" / "hostile-fsmonitor"
-        fsmonitor.write_text(f"#!/bin/sh\nprintf invoked > {fsmonitor_marker}\nexit 0\n")
+        if os.name == "nt":
+            # Git for Windows runs the fsmonitor command through sh; use a
+            # Node hook and resolve the marker from the repository cwd so
+            # MSYS path conversion cannot corrupt an absolute argument.
+            fsmonitor = repo / ".git" / "hostile-fsmonitor.cjs"
+            fsmonitor.write_text(
+                'require("fs").writeFileSync(require("path").join(process.cwd(), ".git", "fsmonitor-ran"), "invoked");'
+                ' process.stdout.write("\\n");\n'
+            )
+        else:
+            fsmonitor = repo / ".git" / "hostile-fsmonitor"
+            fsmonitor.write_text(f"#!/bin/sh\nprintf invoked > {fsmonitor_marker}\nexit 0\n")
         os.chmod(fsmonitor, 0o755)
-        git("config", "core.fsmonitor", str(fsmonitor))
+        if os.name == "nt":
+            node = shutil.which("node")
+            require(node is not None, "Windows fsmonitor fixture requires Node.js")
+            fsmonitor_command = f'"{node}" "{fsmonitor}"'
+        else:
+            fsmonitor_command = str(fsmonitor)
+        git("config", "core.fsmonitor", fsmonitor_command)
         git("status", "--porcelain")
         require(fsmonitor_marker.exists(), "fixture did not exercise configured fsmonitor")
         fsmonitor_marker.unlink()

@@ -71,6 +71,13 @@ async function runGit(worktree, argv) {
   }
 }
 
+// Git emits repository roots with `/` on Windows while Node's realpath uses
+// `\\`. Compare canonical paths through the host path module so the lease
+// provenance check remains exact without rejecting an equivalent root.
+function sameCanonicalPath(left, right) {
+  return path.normalize(left) === path.normalize(right);
+}
+
 async function gitPaths(worktree, argv) {
   const output = await runGit(worktree, argv);
   if (output === "") return [];
@@ -92,7 +99,7 @@ async function dirtyPaths(worktree) {
 async function verifyLeaseBaseline(lease) {
   try {
     const root = await canonicalDirectory(lease.worktree, "LEASE_WORKTREE_INVALID");
-    if ((await runGit(root, ["rev-parse", "--show-toplevel"])).trim() !== root) throw new Error();
+    if (!sameCanonicalPath((await runGit(root, ["rev-parse", "--show-toplevel"])).trim(), root)) throw new Error();
     if ((await runGit(root, ["rev-parse", "--verify", "HEAD^{commit}"])).trim() !== lease.baseline_commit) {
       return "LEASE_BASELINE_MISMATCH";
     }
@@ -106,7 +113,7 @@ async function verifyLeaseBaseline(lease) {
 async function verifyResultWorktreeScope(lease, result) {
   try {
     const root = await canonicalDirectory(lease.worktree, "LEASE_WORKTREE_INVALID");
-    if ((await runGit(root, ["rev-parse", "--show-toplevel"])).trim() !== root) throw new Error();
+    if (!sameCanonicalPath((await runGit(root, ["rev-parse", "--show-toplevel"])).trim(), root)) throw new Error();
     await runGit(root, ["merge-base", "--is-ancestor", lease.baseline_commit, "HEAD"]);
     const commitsText = (await runGit(root, ["rev-list", "--reverse", `${lease.baseline_commit}..HEAD`])).trim();
     const commits = commitsText === "" ? [] : commitsText.split("\n");

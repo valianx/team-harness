@@ -33,6 +33,16 @@ A prior corpus of ~46,000 lines violated this and was deleted: seven suites asse
 
 ## Selected test evidence
 
+Select the shell, OS, runtimes and filesystem capabilities from the applicable
+CI job before running its commands. Here, the complete `tests/run-all.sh` job
+runs on Linux; native Windows coverage is listed in
+[test.yml](../.github/workflows/test.yml)'s `windows-hooks` job. Git Bash with
+Windows Node/Python is not a Linux environment. Use a Linux checkout for POSIX
+fixtures and run affected Windows checks natively; a Linux pass proves neither
+Windows execution nor live model behavior. Identify missing capabilities (for
+example symlink permission), retain the failed result and repair test assumptions
+where portable behavior is intended. Do not count a skipped assertion as verified.
+
 Main and test authors distinguish a successful command from execution of the tests
 selected by the approved requirements or live request. Use the runner's available
 native output or report to record the selected check, revision, command, result,

@@ -289,6 +289,10 @@ every `git`/`gh` publication command receives that `GH_CONFIG_DIR`. When absent,
 delivery may select the configured account just in time with `gh auth switch`.
 The latter is a compatibility strategy for an existing multi-account
 `hosts.yml`; never use it concurrently for two GitHub writes in the same host.
+The isolated-directory checks require POSIX permission bits. On native Windows,
+use a route without `config_dir` and the host's scoped credential facilities;
+do not retry `chmod` to manufacture private-directory evidence or add a TH ACL
+manager. Preserve the existing account outside the publication operation.
 
 1. Run `python3 scripts/manage_github_identities.py --runtime claude show` and
    show only the current paths, hosts, and account names.

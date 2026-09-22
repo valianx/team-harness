@@ -122,7 +122,7 @@ For each multi-site invariant, list **every** site where it must hold. Fence sit
 | {name of invariant} | {site label} | `{path}` | `{section heading or field name}` |
 | {name of invariant} | {site label — fenced: MUST NOT change} | `{path}` | `{section heading or field name}` |
 
-**Why this block exists:** the implementer uses this table to update every declared site atomically, and the coordinator's implementation assembly verifies the final MATCH set before Freeze. A site absent from this table is invisible to that check. See `agents/_shared/implementation-assembly.md § 1` for the version-literal example.
+**Why this block exists:** the implementer uses this table to update every declared site atomically, and the coordinator's implementation assembly verifies the final MATCH set before Freeze. A site absent from this table is invisible to that check. See `docs/cost-and-caching.md § How Claude Code caches` for the version-literal example.
 
 <!-- file: plan/architecture.md -->
 # Architecture
@@ -553,7 +553,7 @@ token) must hold at N ≥ 2 locations: enumerate the full site-set (an omitted
 site is invisible to the implementation-assembly MATCH check), fence sites
 that MUST NOT change in `plan/invariants.md`, and require the implementer to
 edit every named site in the same concern commit. Worked example:
-`agents/_shared/implementation-assembly.md § 1`.
+`docs/cost-and-caching.md § How Claude Code caches`.
 
 **PostgreSQL high-volume time-series tables.** Platform facts (constraints,
 not preferences): `synchronize: true` destroys a partitioned table — use

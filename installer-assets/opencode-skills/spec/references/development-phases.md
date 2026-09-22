@@ -29,6 +29,15 @@ visible as successive work and honor an explicit request to stop earlier.
 
 ## Phase outcomes
 
+At planning/resumption, read the repository's contributor and delivery conventions
+and CI platform commands. Include their required checks in Validation; for an
+agreed PR endpoint, use create-pr preparation for release metadata, generated
+outputs and identity before the final candidate. A locally validated change is
+not automatically PR-ready. Do not add unrelated checks or a second approval.
+Retain the base, candidate head/tree and check environment in existing evidence;
+when assembly changes the candidate, renew affected checks and preserve earlier
+results with their original identity.
+
 | Phase | Inputs and expected work | Outputs and completion evidence |
 | --- | --- | --- |
 | **Spec** | Objective, affected repository and current intent. Author/update OpenSpec; resolve design decisions; execute TEA test-design; select later checks and useful methods. Always use sketch for a data model when changing the database and a wireframe for frontend work; other views remain on demand. | Canonical proposal, requirements, design when useful and tasks; applicable previews presented before Implementation; structural validate result; workspace testing strategy and phase/tool plan. Planning completion is not implementation completion. |
