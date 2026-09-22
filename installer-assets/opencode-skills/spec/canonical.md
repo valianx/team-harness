@@ -38,6 +38,10 @@ evidence in the selected workspace without adding pipeline control records.
 
 ## Flow
 
+Read [the four development phases](references/development-phases.md) for expected
+work, tools and evidence. Use the requested endpoint and existing review decision;
+entering or resuming a phase retains the same intent, workspace and valid evidence.
+
 At entry or resumption, first verify and prepare the declared OpenSpec, TEA and
 Superpowers capabilities for the active host using [the shared dependency preparation
 guidance](references/upstream-tools.md#spec-dependency-preparation). At entry,
@@ -62,59 +66,74 @@ or inspect its commit status. An uncertain outcome never authorizes replay; reus
 existing approval only for the same authorized effect and seek a decision for a
 new effect.
 
-1. **Author.** Write `proposal.md` and `tasks.md` under a new or existing kebab-case
-   `openspec/changes/<change>/`, following the installed upstream OpenSpec propose/update skill.
-   For a new capability, add a `specs/**/spec.md` delta with an `ADDED` requirement. For an
-   existing capability, use `MODIFIED` or `REMOVED` as appropriate. Add `design.md` only when
-   the implementation has a meaningful design decision; a purely mechanical repository chore
-   needs no change directory. During design, execute installed TEA test-design
-   with the current intent and existing tests; retain its working design in the
-   selected workspace and use it to guide the existing task plan.
-2. **Validate.** Run the pinned `openspec validate <change> --strict` CLI. A failure returns to
-   authoring; there is no separate repair mode. Write or refresh the operator plan below.
-3. **Confirm intent.** Link the plan and reuse the user's existing authorization.
-   Ask only about missing scope or a material decision. An unambiguous continuation
-   suffices; no exact phrase or second approval ritual is required.
-4. **Implement.** Work on a feature branch, delegating useful independent tasks
-   with explicit ownership and checking off each `tasks.md` item as it lands,
-   monotonically. Refresh the plan's progress from those tasks; create no state file or event trace.
-   Apply `docs/testing.md § Selected test evidence`: required omitted tests leave their scenario
-   unverified even after exit zero; unrelated optional skips do not erase sufficient evidence.
-   For a bug fix, optionally use [before/after evidence](references/author-review.md#optional-fix-evidence)
-   when it adds useful proof without a new runner or mandatory review.
-   After implementation and relevant tests, execute installed TEA test-review
-   and trace, then Superpowers verification-before-completion with their shared
-   evidence. Apply the shared upstream-tool reference for outputs and reuse, and resolve
-   actual completion defects. Execute upstream OpenSpec implementation verify
-   before archive; structural validate and optional TH review do not replace it.
-   Once these stages are complete, use [create-pr](../create-pr/SKILL.md)'s
-   preparation checkpoint when PR delivery is agreed; otherwise apply the [shared
-   lifecycle](references/lifecycle.md) directly. Prepare archive before committing the final
-   review candidate, including the living specs and archived change with the implementation.
-5. **Classify and validate.** Use [verify](../verify/SKILL.md) to build the committed
-   candidate package and bind the authored requirements, including the exact archived
-   change reference when applicable. Apply the live review choice and completion rules
-   in [author review](references/author-review.md); let any risk signal inform Main's
-   explicit lens choice. Reuse the review decision already given for this
-   delivery rather than offering it again. Main evaluates findings, performs authorized
-   repairs and records their evidence-backed closure under that shared contract. Keep
-   the original reviewed revision and historical review result distinct from a corrected
-   head; do not manufacture a pass or add another full review automatically.
-6. **Deliver.** Preserve the agreed delivery and repository conventions. If no PR
-   is required, complete applicable validation and acceptance, record local delivery,
-   and continue to close. For PR delivery, first satisfy the author-review decision and completion conditions in
-   [author-review.md](references/author-review.md), then use [create-pr](../create-pr/SKILL.md)'s
-   publication checkpoint;
-   a pending offer holds publication. Open the pull request under existing branch, commit and
-   outward-action conventions. The coordinator's
-   publication decision is distinct from the historical review result and is not mechanically enforced
-   by `gh pr create`; follow the selected review and repository publication conditions in
-   [author-review.md](references/author-review.md). Continue already authorized publication once
-   these conditions hold, without an extra permission or review ceremony.
-7. **Close.** Report delivery and any pending archive or reconciliation under
-   [the shared lifecycle](references/lifecycle.md). Work already delivered without
-   archive can receive a recovery offer; preserve declined offers. Upstream apply
-   completion returns to this flow for candidate assembly, validation and closure.
+### 1. Spec
+
+Follow the installed OpenSpec propose/update workflow to author the bounded
+proposal, requirements, useful design and implementation tasks. Execute TEA
+test-design with current intent and existing tests; keep its working strategy
+in the selected workspace and use it to select later methods and checks.
+
+Run `openspec validate <change> --strict` and resolve structural problems in
+the same artifacts. Refresh the operator plan with phase outputs and selected
+capabilities. Link it and reuse the user's existing authorization; ask only
+for a missing scope or material decision. A planning-only endpoint ends here.
+
+### 2. Implementation
+
+Use [implement](../implement/SKILL.md) on the feature branch. Delegate useful
+independent tasks with explicit ownership and preserve other writers' work.
+Check off canonical tasks as their specified work is completed; derive the
+workspace plan's progress from them, without a state file or event trace.
+
+Execute the TEA implementation methods selected by test-design and appropriate
+focused project checks. Apply `docs/testing.md § Selected test evidence`:
+required omitted tests leave their scenario unverified even after exit zero;
+unrelated optional skips do not erase sufficient evidence. For a bug fix, use
+[before/after evidence](references/author-review.md#optional-fix-evidence) when
+useful. Product changes, maintained tests and actual local results are this
+phase's outputs; later assessments remain pending.
+
+### 3. Validation
+
+Use [validate](../validate/SKILL.md) with the plan's selected checks and
+diagnostics, including real CRAP when selected for changed executable functions.
+After implementation and relevant tests, execute TEA test-review and trace,
+selected NFR work, Superpowers verification-before-completion and upstream
+OpenSpec implementation verify. Use the [provider reference](references/upstream-tools.md)
+for inputs, outputs and reuse; structural validate and optional TH review do
+not replace implementation verification.
+
+Resolve actual completion defects. Use [create-pr](../create-pr/SKILL.md)'s
+preparation checkpoint for agreed PR delivery, otherwise the [lifecycle](references/lifecycle.md)
+directly. Prepare completed archive and living specs on the delivery branch
+before committing the final review candidate.
+
+Use [verify](../verify/SKILL.md) for the committed candidate, binding the exact
+archived change when applicable. Reuse the live selection and completion rules
+in [author review](references/author-review.md); risk signals inform Main's
+lens choice. Main judges findings, performs authorized repairs and records
+evidence-backed closure. Preserve the reviewed revision and original outcome
+separately from a corrected head; renew affected checks without automatically
+starting another full review or manufacturing a pass.
+
+### 4. Publication
+
+For local completion, report the result and remaining limits without creating
+a PR. For PR delivery, satisfy the existing [author-review conditions](references/author-review.md)
+and use [create-pr](../create-pr/SKILL.md)'s publication checkpoint. A pending
+review choice or incomplete accepted review retains its existing treatment;
+preparing a PR does not itself authorize publication.
+
+Continue already authorized publication once its real prerequisites hold,
+following repository conventions and native permissions without another
+approval ceremony for unchanged work. The coordinator's publication decision
+is distinct from the historical reviewer verdict and is not enforced by
+`gh pr create`.
+
+Close with delivery, remaining work and any archive/reconciliation pending
+under the [lifecycle](references/lifecycle.md). Preserve declined offers.
+Upstream apply completion returns here for candidate assembly, validation and
+closure; it does not end the effort by itself.
 
 ## Operator plan
 
@@ -129,7 +148,11 @@ for a collision. Do not infer a pipeline or approval from the document's existen
 
 Keep the view short: the intended result, current status, a small table of work steps and their
 results/status, task completion count, next action, and links to canonical proposal/tasks and
-any existing design/specs. Group tasks for readability; derive progress from `tasks.md` and link
+any existing design/specs. Show the four phases and selected capabilities with purpose,
+scope/candidate, actual execution state, outcome/evidence and recovery or next action
+using the shared phase reference. Keep archive/review/publication progress here instead
+of creating future delivery checkboxes that must be completed before archive.
+Group tasks for readability; derive progress from `tasks.md` and link
 the source instead of copying acceptance criteria or creating another editable task list.
 A small Mermaid diagram is optional when dependencies are easier to understand that way.
 

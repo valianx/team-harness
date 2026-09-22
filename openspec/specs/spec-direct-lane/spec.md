@@ -94,7 +94,7 @@ When a concrete bug warrants it within approved scope or the live operator reque
 - **THEN** Main can use the normal relevant evidence without opening another test phase or reporting the proof as performed
 
 ### Requirement: The operator plan remains a lightweight view of canonical work
-The coordinator SHALL present a concise plan in the operator's language with the intended result, current status, work steps and their expected results, progress derived from canonical tasks, next action and links to existing OpenSpec sources. It SHALL use the active runtime's workspace preferences, create no local duplicate in Obsidian mode, preserve unrelated plans and reuse the same source-bound view across later work sessions. It SHALL refresh the view after intent or task changes and at validation and delivery milestones. The plan SHALL NOT introduce independent requirements, task completion or approval authority, and its existence SHALL NOT activate a pipeline.
+The coordinator SHALL present a concise plan in the operator's language with the intended result, current status, work steps and their expected results, progress derived from canonical tasks, next action and links to existing OpenSpec sources. It SHALL expose the four development phases and the selected capabilities' purposes, scopes, execution status, actual outcomes and evidence links, distinguishing future work, missing evidence and explicit omissions from completed checks. It SHALL use the active runtime's workspace preferences, create no local duplicate in Obsidian mode, preserve unrelated plans and reuse the same source-bound view across later work sessions. It SHALL refresh the view after intent or task changes and at phase milestones. The plan SHALL NOT introduce independent requirements, task completion, approval authority or a separate mandatory state schema, and its existence SHALL NOT activate a pipeline.
 
 #### Scenario: The operator uses an Obsidian workspace
 - **WHEN** a validated spec change is ready for presentation and workspace preferences select Obsidian
@@ -111,6 +111,10 @@ The coordinator SHALL present a concise plan in the operator's language with the
 #### Scenario: Scope or lifecycle changes
 - **WHEN** canonical intent changes, validation finishes, delivery advances or an approved archive moves the source
 - **THEN** the view reflects observed progress and current source links while retaining the lane's existing approval requirements and showing remaining work explicitly
+
+#### Scenario: The operator asks which tools ran
+- **WHEN** a phase reaches a reporting milestone
+- **THEN** the same plan distinguishes executed assessments and their actual outcomes, not-applicable capabilities with reasons, pending dependencies, and explicitly declined or deferred work, with links to evidence and the next action
 
 ### Requirement: Dependent repositories stay sequential in the spec lane
 For one bounded objective without a public-contract break, the coordinator SHALL work across repositories in dependency order without requiring pipeline activation solely because of repository count. It SHALL reuse repository-local OpenSpec changes and keep one common dated plan under active runtime workspace preferences, using Obsidian when selected. It SHALL preserve the original plan on expansion and classify, validate and deliver each repository separately under existing authority.

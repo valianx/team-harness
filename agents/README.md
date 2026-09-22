@@ -1,7 +1,9 @@
 # Agents
 
 TH provides specialist skills and workflow guidance to the native general agent.
-The general agent keeps coordination; native permissions control execution.
+The general agent presents development through Spec, Implementation, Validation
+and Publication while keeping coordination; native permissions control
+execution.
 
 ## File convention
 

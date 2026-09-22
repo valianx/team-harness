@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.39.0] - 2026-09-21
+
+### Added
+- Four development phases with expected outputs and visible tool evidence in the existing workspace plan.
+- Real CRAP measurement guidance with candidate identity, partial scope and missing metrics kept explicit.
+
+### Changed
+- Development entries reuse intent and evidence through the requested endpoint across Codex, Claude Code and OpenCode.
+- Implementation continues directly into applicable validation unless the operator explicitly requests an earlier stop.
+- TEA spans design, selected implementation methods and validation through its installed upstream workflows.
+- Phase handoffs preserve advisory reviews, native permissions, archive before final review and clean PR contents.
+
 ## [3.38.1] - 2026-09-21
 
 ### Fixed

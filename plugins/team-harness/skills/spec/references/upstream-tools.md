@@ -127,12 +127,19 @@ host, then the required verification skill is selected from that installation.
 
 ## When each capability is used
 
+Use [the four development phases](development-phases.md) for the shared journey
+and the plan's selection/execution view. This reference owns provider invocation
+and preparation details; TEA supplies testing architecture throughout the work.
+
 | Tool / capability | When TH selects it | How it is applied and what it contributes |
 | --- | --- | --- |
 | OpenSpec author/apply | A bounded development objective needs written intent and tasks; or the user selects spec | Use the upstream workflow to maintain the existing proposal, requirements, design and tasks. This is the development intent shared with the other tools. |
 | OpenSpec implementation verify | Every relevant OpenSpec change reaches completion, before its completed archive | Invoke the installed verify workflow with that change, implementation and test evidence. It examines implementation against intent. Main resolves actual defects before claiming completion. Structural validate remains a separate check. |
 | Superpowers verification-before-completion | At the completion stage of spec; elsewhere when a concrete success claim needs supporting evidence or the user requests it | Load the installed skill with the intended claim, current candidate and available evidence. Follow its current instructions to obtain missing or outdated evidence. Use the existing project commands; do not create a TH verification engine. |
 | TEA test-design | At the design stage of spec; elsewhere when behavior needs a testing strategy or the user requests it | Invoke the installed workflow with requirements, architecture and existing tests. Use its design to guide the existing implementation/testing work, without starting another development plan. |
+| TEA ATDD / automate | During Implementation when test-design or the objective selects acceptance-first tests or expanded automation | Resolve and execute the installed upstream method with the current requirements, tests and workspace; preserve the existing OpenSpec task plan. |
+| TEA framework / CI | During Implementation only when the objective includes missing test or CI infrastructure | Use the installed upstream setup workflow for that bounded infrastructure work. Existing sufficient infrastructure needs no reinstall or scaffold. |
+| TEA NFR | During Validation when relevant non-functional requirements need assessment | Execute the installed method with actual implementation evidence; retain missing evidence and recommendations without treating thresholds as delivery authority. |
 | TEA test-review | After implementation and relevant test execution in spec; elsewhere when tests need quality review or the user requests it | Invoke the installed workflow over the relevant tests and results. Its report supplies that testing-quality lens; another TH agent does not repeat the same review merely because TEA produced it. |
 | TEA trace | Before completing a spec change; elsewhere when requirement coverage needs explanation or the user requests it | Invoke the installed trace workflow with the current requirements and test evidence. Use its coverage analysis to find gaps and feed OpenSpec verify or acceptance review. |
 | Semgrep CE | When `find-bugs` needs rule-based candidates, or `review-pr` has selected a captured-source scan | Run the prepared local executable with explicit rules/configuration and scope. Retain raw JSON/SARIF, version, skipped/error scope and candidate identity; an empty result is not a clean bill. |
@@ -164,17 +171,18 @@ workspace and evidence methods for their selected capabilities; invoking a tool
 does not activate a second top-level workflow. OpenSpec verification remains
 mandatory for relevant completed changes in any entry point.
 
-1. During design, OpenSpec owns intent; execute TEA test-design to establish the
-   testing approach.
-2. During implementation, the implementer/tester uses that context and executes
-   the project's tests. Execute TEA test-review to examine their quality.
-3. Before completing the change, execute TEA trace to examine requirement coverage,
-   then Superpowers verification-before-completion to substantiate completion claims.
-4. For a completed OpenSpec change, execute upstream verify with the accumulated
-   context and evidence, address actual defects and prepare its archive.
-5. Continue the selected independent review and create-pr flow. Reviewers consume
-   applicable evidence and focus on unresolved questions. Corrections renew
-   affected verification; they do not automatically restart every tool.
+1. **Spec:** OpenSpec owns intent; execute TEA test-design to establish the testing
+   strategy and select later methods, commands and expected evidence.
+2. **Implementation:** use that context, execute selected ATDD/automation or
+   infrastructure methods, and produce maintained tests and focused test results.
+3. **Validation:** execute TEA test-review and trace, selected NFR analysis,
+   Superpowers verification-before-completion and upstream OpenSpec verify with
+   applicable evidence. Address actual defects, prepare completed archive and
+   perform the selected independent candidate review. Renew affected evidence
+   after corrections; preserve original results and their dispositions.
+4. **Publication:** create-pr consumes that evidence for artifact hygiene and
+   the authorized preparation/publication endpoint. It does not rerun every
+   provider or imply merge.
 
 Reaching design does not execute future completion stages. A planning-only request
 stops at its authorized scope; it does not need implementation results that do not
@@ -231,6 +239,10 @@ TEA's observed native names are `bmad-testarch-test-design`,
 `bmad-testarch-test-review` and `bmad-testarch-trace`. The official BMAD installer
 generates skills for Claude/Codex and command pointers for OpenCode. TEA 1.27.2
 declares Node >=22.20.0; this provider prerequisite does not change TH's own floor.
+For additional selected work, resolve the installed `bmad-testarch-atdd`,
+`bmad-testarch-automate`, `bmad-testarch-framework`, `bmad-testarch-ci` or
+`bmad-testarch-nfr` entry as applicable. Prepare only selected missing entries
+through the official route; reading the catalog does not select them all.
 Use native skill execution for interactive work. The optional runner's
 `--agent none` only resolves inputs and emits a prompt; it is not a completed
 test review. Check the installed runner's help before selecting its adapter.

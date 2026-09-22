@@ -1,4 +1,8 @@
-# Delivery
+# Publication
+
+Use [the shared Publication phase](../../spec/references/development-phases.md)
+with the existing evidence and requested endpoint. Local delivery and PR
+preparation need no outward publication. Merge remains separately authorized.
 
 Use the installed create-pr skill to prepare and publish authorized work.
 Inspect actual checks and outstanding findings, include completed OpenSpec

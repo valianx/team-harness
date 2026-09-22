@@ -4,6 +4,12 @@ For TH coordinators and contributors: use OpenSpec for written product intent,
 implementation verification and archive, while the native host owns execution
 and permissions. Spec and pipeline use the same repository artifacts.
 
+The [shared four-phase method](../skills/spec/references/development-phases.md)
+places OpenSpec's intent and tasks in Spec, implementation evidence in
+Implementation, verification, selected provider assessments and completed archive
+in Validation, and the authorized delivery action in Publication. OpenSpec remains the
+canonical source; the workspace plan only presents progress and evidence.
+
 ## Canonical artifacts and workspace
 
 OpenSpec owns proposal, requirements, design and tasks under
@@ -47,20 +53,22 @@ including flat OpenCode opsx commands. Consumer installations remain intact.
 
 ## Work through the existing flow
 
-1. Author or reuse canonical OpenSpec intent through the installed upstream skill.
-   Run strict structural validation and maintain the existing workspace plan.
-2. Continue authorized implementation under native coordination. In spec,
-   [upstream stages](../skills/spec/references/upstream-tools.md) execute TEA
-   test-design, test-review and trace, then Superpowers completion verification.
-   Their findings and evidence are shared with the next stage.
-3. Execute the installed OpenSpec implementation-verification workflow against
-   the active change before declaring completion or preparing its completed archive.
-   It checks correspondence with intent; actual project tests remain separate.
-   A declined optional TH review or deferred archive does not waive verify.
-4. Evaluate findings, resolve real completion defects, and prepare authorized
-   archive on the same branch. Include code, living specs and archive in one PR.
-5. Strictly validate the archive and affected living specs. Continue selected
-   independent review and the shared create-pr flow, reusing applicable evidence.
+1. In **Spec**, author or reuse canonical OpenSpec intent through the installed upstream skill.
+   Run strict structural validation and TEA test-design; maintain the existing workspace
+   plan with the testing strategy and selected later checks.
+2. In **Implementation**, continue authorized work under native coordination. Execute
+   selected TEA implementation methods and focused project checks according to that strategy.
+3. In **Validation**, run the agreed project checks and the declared
+   [upstream stages](../skills/spec/references/upstream-tools.md): TEA test-review and trace,
+   Superpowers completion verification, and the installed OpenSpec implementation-verification
+   workflow. OpenSpec checks correspondence with intent; actual project tests remain separate.
+   A declined optional TH review or deferred archive does not waive verify. Evaluate findings,
+   resolve real completion defects, then synchronize and archive completed intent on the same
+   branch. Strictly validate the archive and affected living specs before selected independent
+   review of the final candidate; judge findings and verify any corrections.
+4. In **Publication**, use the shared create-pr flow for the requested PR preparation or
+   publication, reusing applicable evidence. Include code, living specs and archive in one PR.
+   Retain local completion as the endpoint when no PR was requested.
 
 Claude's researched entry is `/opsx:verify`, Codex's is
 `$openspec-verify-change`, and OpenCode's is `/opsx-verify`; resolve the entry

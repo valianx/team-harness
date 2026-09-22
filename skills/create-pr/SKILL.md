@@ -24,6 +24,12 @@ tools and existing repository helpers.
 
 ## Checkpoint 1: prepare the candidate
 
+This is candidate assembly within [the shared development phases](../spec/references/development-phases.md).
+Recover the existing plan, selected capabilities and exact evidence links. Resolve
+missing relevant validation within the authorized scope; do not restart completed
+stages, relabel stale receipts or treat pending accepted review as declined.
+Preparation may occur during Validation; outward publication follows it.
+
 Before final review or publication authorization, resolve the exact repository, working branch,
 base, candidate head, and intended PR scope. Respect repository instructions, project
 branch conventions, PR templates, commit conventions, and native permissions.

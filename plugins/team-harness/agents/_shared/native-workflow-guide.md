@@ -12,6 +12,12 @@ prepare or publish completed work. Small direct tasks can stay direct. The
 Use `sketch` on request to inspect a proposed result before implementation in any
 flow, including direct work and `spec`.
 
+Development has four visible phases: Spec, Implementation, Validation and
+Publication. The selected skill links their shared method at
+`skills/spec/references/development-phases.md`. Resume existing work at the
+requested phase with its intent, workspace and evidence, and continue only to
+the authorized endpoint: planning, local completion, PR preparation or publication.
+
 Coordinate the work and judge specialist recommendations against the user's
 objective and the code. Reviewers have limited context; their findings inform
 the decision. Continue authorized work after verifying corrections.

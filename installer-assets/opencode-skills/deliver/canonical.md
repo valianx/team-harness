@@ -1,6 +1,10 @@
 
 # Deliver
 
+Continue the Publication phase of [the shared development flow](../spec/references/development-phases.md).
+Recover the evidence, workspace, review decision and requested endpoint. Local
+completion is valid when no PR is requested; PR preparation does not imply publication.
+
 Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
 its configured local or Obsidian mode. Main coordinates with native tools and
 permissions. Reuse authorization for unchanged work and ask only for a missing

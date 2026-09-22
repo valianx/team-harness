@@ -10,11 +10,24 @@ source: "{{canonical_change_path}}"
 
 **Status:** {{current_status}} · **Progress:** {{completed_tasks}}/{{total_tasks}} tasks
 
-## Work plan
+## Phases
 
-| Step | Expected result | Status |
+| Phase | Expected result | Status |
 | --- | --- | --- |
-| {{work_step}} | {{step_result}} | {{step_status}} |
+| Spec | Intent, tasks and testing strategy | {{spec_status}} |
+| Implementation | Product changes and focused checks | {{implementation_status}} |
+| Validation | Checks, provider assessments and selected reviews | {{validation_status}} |
+| Publication | Authorized local delivery, PR preparation or publication | {{publication_status}} |
+
+## Tools and evidence
+
+| Phase / capability | Purpose and selection reason | Scope / candidate | Status | Actual outcome / evidence / next action |
+| --- | --- | --- | --- | --- |
+| {{phase_capability}} | {{selection_reason}} | {{scope_or_candidate}} | {{execution_status}} | {{evidence_and_next_action}} |
+
+Use pending, executed, not applicable, declined or deferred with the actual
+outcome or reason. Future work is pending; an executed assessment may have
+findings. Link canonical tasks and provider results instead of duplicating them.
 
 **Next:** {{next_action}}
 

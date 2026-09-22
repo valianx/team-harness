@@ -14,6 +14,12 @@ describes the approach. Update existing requirements instead of copying them
 into parallel specs. Routine tooling, delivery, or repository chores need no
 new OpenSpec change merely because a PR is being prepared.
 
+Keep canonical task checkboxes focused on implementation and its verification.
+Track subsequent archive, final candidate review and publication in the existing
+workspace plan, so a completed archive does not require falsely checking future
+delivery actions. This preserves the delivery work without making it a circular
+prerequisite for archive.
+
 Keep execution logs, reviewer transcripts, captures, scratch scripts, and operator
 projections in the configured workspace or permitted temporary storage, outside
 tracked product files. Preserve reusable tests, fixtures, tools, and deliberate
