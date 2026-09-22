@@ -526,6 +526,45 @@ class ConvergenceFixture(unittest.TestCase):
         self.assertEqual(receipt["failedDomain"], "mcp")
         self.assertEqual(receipt["domains"]["mcp"]["errorCode"], "MCP_LIST_INVALID")
 
+    def test_managed_fallbacks_upgrade_with_backup_then_remain_current(self) -> None:
+        config = self.codex_home / "config.toml"
+        for model, effort in (("gpt-5.6-terra", "medium"), ("gpt-5.6-luna", "max")):
+            with self.subTest(model=model):
+                original = (
+                    'model = "operator-main"\nproject_doc_fallback_filenames = ["CLAUDE.md"]\n'
+                    f'[agents]\ndefault_subagent_model = "{model}"\n'
+                    f'default_subagent_reasoning_effort = "{effort}"\n'
+                ).encode()
+                config.write_bytes(original)
+                receipt = self.converge(FakeCodex())
+                self.assertEqual(receipt["status"], "converged")
+                document = tomllib.loads(config.read_text(encoding="utf-8"))
+                self.assertEqual(document["model"], "operator-main")
+                self.assertEqual(document["agents"]["default_subagent_model"], "gpt-6-luna")
+                self.assertEqual(document["agents"]["default_subagent_reasoning_effort"], "max")
+                self.assertEqual(config.with_name("config.toml.bak").read_bytes(), original)
+                final_bytes = config.read_bytes()
+                repeated = self.converge(FakeCodex())
+                self.assertEqual(repeated["status"], "current")
+                self.assertEqual(config.read_bytes(), final_bytes)
+                self.assertEqual(config.with_name("config.toml.bak").read_bytes(), original)
+
+    def test_other_complete_fallback_pairs_remain_operator_owned(self) -> None:
+        config = self.codex_home / "config.toml"
+        for model, effort in (("gpt-5.6-luna", "high"), ("gpt-6-sol", "xhigh")):
+            with self.subTest(model=model):
+                original = (
+                    'model = "operator-main"\nproject_doc_fallback_filenames = ["CLAUDE.md"]\n'
+                    f'[agents]\ndefault_subagent_model = "{model}"\n'
+                    f'default_subagent_reasoning_effort = "{effort}"\n'
+                ).encode()
+                config.write_bytes(original)
+                receipt = self.converge(FakeCodex())
+                self.assertIn(receipt["status"], ("current", "converged"))
+                self.assertTrue(receipt["domains"]["agents"]["customDefaultsPreserved"])
+                self.assertEqual(config.read_bytes(), original)
+                self.assertFalse(config.with_name("config.toml.bak").exists())
+
     def test_helper_integrity_is_verified_before_import(self) -> None:
         helper = self.plugin / "skills/setup/scripts/manage_agents.py"
         helper.write_text(helper.read_text(encoding="utf-8") + "\n", encoding="utf-8")

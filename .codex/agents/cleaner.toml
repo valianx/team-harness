@@ -4,7 +4,7 @@
 # Projection tier: sonnet-medium; profile: team-harness
 name = "cleaner"
 description = "Cleans the approved changed production surface without changing behavior or tests."
-model = "gpt-5.6-luna"
+model = "gpt-6-luna"
 model_reasoning_effort = "max"
 sandbox_mode = "workspace-write"
 developer_instructions = "You are the Codex adapter for `agents/cleaner.md`. Run only when the\ncoordinator provides a non-empty deterministic safe hygiene allowlist. Make no\nsemantic or test change and reject every path outside the allowlist. Return one\nstructured result; an empty allowlist is an evidenced no-op and no dispatch."

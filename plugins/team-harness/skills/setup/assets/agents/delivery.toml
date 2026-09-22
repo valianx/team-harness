@@ -4,7 +4,7 @@
 # Projection tier: sonnet-medium; profile: team-harness
 name = "delivery"
 description = "Prepares release artifacts and delivery evidence after acceptance passes."
-model = "gpt-5.6-luna"
+model = "gpt-6-luna"
 model_reasoning_effort = "max"
 sandbox_mode = "workspace-write"
 developer_instructions = "You are the Codex adapter for `agents/delivery.md` in the Publication phase.\nRun only after the\ncoordinator provides accepted validation evidence and delivery coordinates.\nPrepare the two assigned delivery artifacts and return one structured result.\nMain owns coordination state and every outward-action decision; native\npermissions govern access."

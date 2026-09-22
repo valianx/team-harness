@@ -56,6 +56,20 @@ is actually adopted.
    pending, no maintainer commitment as of 2026-06-22). If it ships, runtime tiering
    becomes native and the resolver below can be retired.
 
+### Claude Code alias ownership
+
+The Claude Code source alias `model: opus` remains semantic and is not rewritten
+in the canonical agent files. Claude Code 2.1.280 and newer resolve that alias to
+Opus 5.5 for Anthropic API, Bedrock, and Google providers. Microsoft Foundry may
+continue resolving `opus` to Opus 4.6 or a provider-specific override; that
+availability and upgrade decision belongs to the runtime/provider. Team Harness
+only uses the alias as the default tier input and pins the opt-in Anthropic
+opencode projection to `claude-opus-5-5`. Existing concrete model ids remain
+unchanged and pass through as authored. See Claude Code's [model configuration
+reference](https://code.claude.com/docs/en/model-config) and Anthropic's [model
+overview](https://platform.claude.com/docs/en/models/overview) for the
+runtime/provider mappings.
+
 ## How the installer emits it
 
 The CC→opencode transform (`cmd/install/transform.go`, `tools/harness-migrate/migrate.mjs`)
@@ -109,7 +123,7 @@ CLI surface:
 
 ```shell
 install --runtime opencode --opencode-tier anthropic
-# bakes: orchestrator → anthropic/claude-opus-4-6; implementer → anthropic/claude-sonnet-4-6;
+# bakes: orchestrator → anthropic/claude-opus-5-5; implementer → anthropic/claude-sonnet-4-6;
 #        init/researcher → anthropic/claude-haiku-4-5
 ```
 

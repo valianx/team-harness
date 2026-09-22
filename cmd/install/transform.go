@@ -24,7 +24,7 @@ const anthropicPrefix = "anthropic/"
 // re-running the installer re-bakes installed configs against a refreshed pin.
 // Map content must stay byte-identical to ALIAS_TO_CONCRETE_MODEL in migrate.mjs.
 var aliasToConcreteModel = map[string]string{
-	"opus":   "claude-opus-4-6",
+	"opus":   "claude-opus-5-5",
 	"sonnet": "claude-sonnet-4-6",
 	"haiku":  "claude-haiku-4-5",
 }
@@ -75,7 +75,7 @@ var providerTierFamily = map[string]map[string]string{
 // re-running the installer with a refreshed pin re-bakes it.
 var providerTierConcrete = map[string]map[string]string{
 	"anthropic": {
-		"default": "claude-opus-4-6",
+		"default": "claude-opus-5-5",
 		"medium":  "claude-sonnet-4-6",
 		"low":     "claude-haiku-4-5",
 	},

@@ -200,7 +200,7 @@ assert(
 );
 assert(
   "model: alias → resolved concrete provider-prefixed id",
-  toProviderPrefixedModel("opus") === "anthropic/claude-opus-4-6" &&
+  toProviderPrefixedModel("opus") === "anthropic/claude-opus-5-5" &&
     toProviderPrefixedModel("sonnet") === "anthropic/claude-sonnet-4-6" &&
     toProviderPrefixedModel("haiku") === "anthropic/claude-haiku-4-5"
 );
@@ -1005,7 +1005,7 @@ console.log("\n=== Section 15: Ragged-tier resolution (AC-3, #424) ===");
   // ragged provider is added).
   assert("resolveFamilyForTier: anthropic/default", resolveFamilyForTier("anthropic", "default") === "claude-opus");
   assert("resolveConcreteForTier: anthropic/low", resolveConcreteForTier("anthropic", "low") === "claude-haiku-4-5");
-  assert("resolveTieredModel: opus alias bakes anthropic/claude-opus-4-6", resolveTieredModel("anthropic", "opus") === "anthropic/claude-opus-4-6");
+  assert("resolveTieredModel: opus alias bakes anthropic/claude-opus-5-5", resolveTieredModel("anthropic", "opus") === "anthropic/claude-opus-5-5");
   assert("resolveTieredModel: unrecognized alias returns null", resolveTieredModel("anthropic", "claude-opus-4-6") === null);
 }
 
