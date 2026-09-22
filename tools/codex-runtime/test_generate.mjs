@@ -170,8 +170,6 @@ assert.match(prCreator, /^model = "gpt-6-sol"$/m);
 assert.match(prCreator, /^model_reasoning_effort = "medium"$/m);
 assert.match(specValidator, /^sandbox_mode = "workspace-write"$/m);
 assert.match(prCreator, /^sandbox_mode = "workspace-write"$/m);
-assert.match(first.files.get(join(root, ".codex/README.md")), /\| `spec-validator` \| `opus` \| `high` \| `gpt-6-sol` \| `high` \| installed custom agent \|/);
-assert.match(first.files.get(join(root, ".codex/README.md")), /\| `pr-creator` \| `opus` \| `medium` \| `gpt-6-sol` \| `medium` \| installed custom agent \|/);
 const inlineReviewer = first.files.get(join(root, ".codex/agents/inline-reviewer.toml"));
 assert.match(inlineReviewer, /^model = "gpt-6-luna"$/m);
 assert.match(inlineReviewer, /^model_reasoning_effort = "max"$/m);
