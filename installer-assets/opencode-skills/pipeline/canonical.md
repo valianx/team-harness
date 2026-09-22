@@ -23,8 +23,10 @@ pending work rather than restarting them.
   linked plan, and use [sketch](../sketch/SKILL.md) to present a data model for
   database changes and a wireframe for frontend work before Implementation.
   Other previews remain on demand.
-- Implementation: delegate coherent tasks with explicit ownership when useful;
-  serialize overlapping writes and Git mutations.
+- Implementation: group dependency-ready work by shared context and ownership.
+  Delegate when useful, reuse the executor for relevant corrections and let it
+  own ordinary tests. Parallelize independent work; serialize overlapping writes
+  and Git mutations. Main can complete a small step without another handoff.
 - Validation: run relevant checks, use independent reviewers for quality and
   risk, preserve findings and verify corrections.
 - Publication: include completed archive and evidence with the candidate; carry
@@ -35,6 +37,13 @@ phase outputs, tool selection and evidence states, including real CRAP diagnosti
 Use that view in the existing plan. Retain spec's declared provider stages when
 continuing it, and the authorized endpoint and selected review decision throughout.
 
-Reuse useful native sessions and workspace context across phases. Historical
-v5 control helpers inspect older logs and receipts only; they are not required
-for new assignments, results, recovery or permission.
+Use existing specialists for their expertise, not as mandatory stops. Supply
+the objective, owned scope, repository/workspace and relevant sources in the
+native assignment. Accept a clear result with checks, findings and limits;
+no separate packet, fixed report layout or result schema is needed. Reuse
+applicable evidence and renew only what a correction affects. Independent
+reviewers retain their perspective and Main decides how to address findings.
+
+Keep the installed native model settings unless the operator selects a supported
+override. Workflow simplification does not require changing reviewer models.
+Historical helpers remain available for old records, outside current dispatch.

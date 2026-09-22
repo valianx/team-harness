@@ -1,12 +1,6 @@
 
 # Validate
 
-For direct/spec work, Main invokes `spec-validator` through the shared
-[phase-agent handoff](../spec/references/phase-agents.md). Inside that assigned
-agent, execute this method in place rather than dispatching again. An active
-pipeline retains its existing validation specialists. Main receives the result,
-judges recommendations and owns product corrections.
-
 Continue the Validation phase of [the shared development flow](../spec/references/development-phases.md).
 Recover the current candidate, plan and selected capabilities; record actual
 outcomes and gaps there. Assess CRAP for changed executable functions and execute
@@ -27,9 +21,8 @@ the required data model/wireframe and canonical intent from
 expansion and resolve the design mismatch; passing tests alone do not establish
 that additions are needed. Read other agreed sketches when relevant; no
 Claude-only sketch probe is needed.
-Main supplies native testers, QA or security reviewers when their expertise helps
-or was requested; the executor reports missing selected coverage without becoming
-a nested coordinator. Preserve findings and missing coverage. Main judges recommendations,
+Use native testers, QA or security reviewers when their expertise helps or was
+requested. Preserve findings and missing coverage. Main judges recommendations,
 verifies corrections and reuses valid evidence when unaffected.
 This entry does not activate a pipeline or impose a security classifier floor.
 

@@ -72,11 +72,11 @@ async function withMutedStderr(action) {
 
 const first = await render();
 const second = await render();
-assert.equal(first.files.size, 46);
+assert.equal(first.files.size, 42);
 assert.deepEqual([...first.files], [...second.files], "identical inputs must render identical bytes");
 
 const agentOutputs = [...first.files].filter(([path]) => path.includes(`${sep}${join(".codex", "agents")}${sep}`));
-assert.equal(agentOutputs.length, 22);
+assert.equal(agentOutputs.length, 20);
 for (const [path, content] of agentOutputs) {
   assert.match(content, /^name = /m);
   assert.match(content, /^description = /m);
@@ -89,7 +89,7 @@ for (const [path, content] of agentOutputs) {
 
 const packagedAgentOutputs = [...first.files].filter(([path]) =>
   path.includes(`${sep}${join("plugins", "team-harness", "skills", "setup", "assets", "agents")}${sep}`));
-assert.equal(packagedAgentOutputs.length, 22);
+assert.equal(packagedAgentOutputs.length, 20);
 for (const [path, content] of agentOutputs) {
   const name = basename(path);
   assert.equal(
@@ -162,14 +162,6 @@ for (const name of [
   assert.match(content, /^model = "gpt-6-luna"$/m);
   assert.match(content, /^model_reasoning_effort = "max"$/m);
 }
-const specValidator = first.files.get(join(root, ".codex/agents/spec-validator.toml"));
-assert.match(specValidator, /^model = "gpt-6-sol"$/m);
-assert.match(specValidator, /^model_reasoning_effort = "high"$/m);
-const prCreator = first.files.get(join(root, ".codex/agents/pr-creator.toml"));
-assert.match(prCreator, /^model = "gpt-6-sol"$/m);
-assert.match(prCreator, /^model_reasoning_effort = "medium"$/m);
-assert.match(specValidator, /^sandbox_mode = "workspace-write"$/m);
-assert.match(prCreator, /^sandbox_mode = "workspace-write"$/m);
 const inlineReviewer = first.files.get(join(root, ".codex/agents/inline-reviewer.toml"));
 assert.match(inlineReviewer, /^model = "gpt-6-luna"$/m);
 assert.match(inlineReviewer, /^model_reasoning_effort = "max"$/m);
@@ -247,39 +239,6 @@ try {
   await rm(opusOtherFixture, { recursive: true, force: true });
 }
 
-const concreteOverrideFixture = await makeFixture();
-try {
-  const registry = await readRegistry(concreteOverrideFixture);
-  const role = registry.agents.find(agent => agent.name === "spec-validator");
-  role.runtime_override.model = "vendor/custom-concrete";
-  await writeRegistry(concreteOverrideFixture, registry);
-  const projected = await render({ rootDir: concreteOverrideFixture });
-  const output = projected.files.get(join(concreteOverrideFixture, ".codex/agents/spec-validator.toml"));
-  assert.match(output, /^model = "vendor\/custom-concrete"$/m,
-    "a concrete role override is emitted verbatim");
-  assert.match(output, /^model_reasoning_effort = "high"$/m,
-    "a concrete role override retains its validated effort");
-} finally {
-  await rm(concreteOverrideFixture, { recursive: true, force: true });
-}
-
-const inheritedOverrideFixture = await makeFixture();
-try {
-  const registry = await readRegistry(inheritedOverrideFixture);
-  const profile = registry.profiles[registry.default_profile];
-  profile.inherit_parent = true;
-  delete profile.tiers;
-  await writeRegistry(inheritedOverrideFixture, registry);
-  const projected = await render({ rootDir: inheritedOverrideFixture });
-  const output = projected.files.get(join(inheritedOverrideFixture, ".codex/agents/spec-validator.toml"));
-  assert.doesNotMatch(output, /^model = /m,
-    "inherited profiles keep native model selection even for role overrides");
-  assert.doesNotMatch(output, /^model_reasoning_effort = /m,
-    "inherited profiles keep native effort selection even for role overrides");
-} finally {
-  await rm(inheritedOverrideFixture, { recursive: true, force: true });
-}
-
 const haikuFixture = await makeFixture();
 try {
   const source = join(haikuFixture, "agents/init-project.md");
@@ -343,18 +302,6 @@ await expectRegistryFailure(registry => {
 await expectRegistryFailure(registry => {
   registry.profiles["team-harness"].tiers["sonnet-high"].reasoning_effort = "unbounded";
 }, /unsupported runtime reasoning effort/);
-await expectRegistryFailure(registry => {
-  registry.agents.find(agent => agent.name === "pipeline-architect").runtime_override = {
-    model: "gpt-6-sol",
-    reasoning_effort: "high",
-  };
-}, /runtime_override is only valid for direct roles/);
-await expectRegistryFailure(registry => {
-  registry.agents.find(agent => agent.name === "spec-validator").runtime_override.reasoning_effort = "unbounded";
-}, /runtime_override: unsupported runtime reasoning effort/);
-await expectRegistryFailure(registry => {
-  registry.agents.find(agent => agent.name === "spec-validator").runtime_override.extra = "unexpected";
-}, /runtime_override supports only model and reasoning_effort/);
 
 const checkFixture = await makeFixture();
 try {

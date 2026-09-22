@@ -1142,55 +1142,6 @@ Orchestrator body.
   assert("round-trip: inverse does not leak the injected display name", backFm["name"] !== "TH-orchestrator");
 }
 
-{
-  // Exercise the real JS batch wrapper with both phase roles. The first role
-  // uses its canonical Opus alias and receives Sol; the second carries a
-  // concrete provider/model choice and keeps it without a Sol effort field.
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "hm-phase-role-layer-"));
-  try {
-    const agentsDir = path.join(tmpDir, "agents");
-    await fs.mkdir(agentsDir, { recursive: true });
-    await fs.writeFile(path.join(agentsDir, "spec-validator.md"), `---
-name: spec-validator
-description: Validate.
-model: opus
-effort: high
-tools: Read, Bash
----
-
-Validate body.
-`, "utf8");
-    await fs.writeFile(path.join(agentsDir, "pr-creator.md"), `---
-name: pr-creator
-description: Publish.
-model: custom-pr
-effort: medium
-tools: Read, Bash
----
-
-Publish body.
-`, "utf8");
-
-    const manifest = await runTransform(DIRECTION_TO_OPENCODE, tmpDir, { dryRun: false });
-    assert(
-      "phase roles are projected by the actual runTransform wrapper",
-      manifest.filter((entry) => entry.status === "projected").length === 2,
-    );
-
-    const validatorOutput = await fs.readFile(path.join(tmpDir, ".opencode", "agents", "spec-validator.md"), "utf8");
-    const { frontmatter: validatorFm } = parseFrontmatter(validatorOutput);
-    assert("runTransform phase validator uses OpenAI Sol", validatorFm.model === "openai/gpt-6-sol");
-    assert("runTransform phase validator uses high reasoningEffort", validatorFm.reasoningEffort === "high");
-
-    const creatorOutput = await fs.readFile(path.join(tmpDir, ".opencode", "agents", "pr-creator.md"), "utf8");
-    const { frontmatter: creatorFm } = parseFrontmatter(creatorOutput);
-    assert("runTransform preserves custom PR creator model", creatorFm.model === "anthropic/custom-pr");
-    assert("runTransform does not inject Sol effort for custom PR creator model", creatorFm.reasoningEffort === undefined);
-  } finally {
-    await fs.rm(tmpDir, { recursive: true, force: true });
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------

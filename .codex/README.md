@@ -45,7 +45,6 @@ Generated with the `team-harness` profile. This table includes every canonical T
 | `mentor` | `opus` | `high` | `gpt-6-astra` | `xhigh` | not shipped in Codex beta |
 | `orchestrator` | `opus` | `high` | `gpt-6-astra` | `xhigh` | Main via `init` / `pipeline` workflows |
 | `plan-reviewer` | `sonnet` | `medium` | `gpt-6-luna` | `max` | not shipped in Codex beta |
-| `pr-creator` | `opus` | `medium` | `gpt-6-sol` | `medium` | installed custom agent |
 | `pr-review-qa` | `sonnet` | `high` | `gpt-6-luna` | `max` | installed custom agent |
 | `pr-review-security` | `sonnet` | `high` | `gpt-6-luna` | `max` | installed custom agent |
 | `pr-review-verifier` | `opus` | `high` | `gpt-6-astra` | `xhigh` | installed custom agent |
@@ -55,7 +54,6 @@ Generated with the `team-harness` profile. This table includes every canonical T
 | `reviewer-consolidator` | `sonnet` | `medium` | `gpt-6-luna` | `max` | installed custom agent |
 | `reviewer` | `sonnet` | `high` | `gpt-6-luna` | `max` | installed custom agent |
 | `security` | `opus` | `xhigh` | `gpt-6-astra` | `xhigh` | installed custom agent |
-| `spec-validator` | `opus` | `high` | `gpt-6-sol` | `high` | installed custom agent |
 | `tester` | `sonnet` | `high` | `gpt-6-luna` | `max` | installed custom agent |
 | `translator` | `sonnet` | `medium` | `gpt-6-luna` | `max` | not shipped in Codex beta |
 | `ux-reviewer` | `opus` | `high` | `gpt-6-astra` | `xhigh` | not shipped in Codex beta |

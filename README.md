@@ -28,9 +28,11 @@ the inputs, expected work, tools, outputs and completion evidence. It is shared
 by `spec` and the explicitly selected `pipeline`; it does not activate a
 pipeline, add a permission gate or require every available tool.
 
-In `spec`, the current agent retains planning, implementation and decisions.
-It invokes [two native phase agents](skills/spec/references/phase-agents.md)
-for validation and PR preparation/publication, reusing the workspace and evidence.
+`spec` is the lightweight path: the current agent carries planning,
+implementation, validation and PR preparation with independent reviewers.
+`pipeline` coordinates existing specialists when the work benefits from shared
+ownership planning or parallel execution. It groups related work and reuses
+sessions and evidence; each phase does not need a new executor.
 
 Independent specialists contribute findings and recommendations. The coordinator
 judges them against the objective and available evidence, verifies corrections,
@@ -135,8 +137,7 @@ GitHub release; it does not protect against compromise of the release origin.
 
 Use `--scope global` when these agents should be available from your Codex user
 configuration. The roster includes pipeline specialists, the direct read-only
-`inline-reviewer`, immutable PR reviewers, and the `spec-validator`/`pr-creator`
-completion roles; lightweight `init` remains
+`inline-reviewer` and immutable PR reviewers; lightweight `init` remains
 available with the plugin alone.
 
 4. Use `reload` to refresh supported components and check activation in the

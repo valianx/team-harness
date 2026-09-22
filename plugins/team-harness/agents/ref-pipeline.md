@@ -18,7 +18,7 @@ objective and stack; record results, not-applicable reasons, pending
 prerequisites or declined/deferred effects. Specialist output informs Main; it
 does not order corrections or replace the operator.
 
-## Control plane
+## Working context
 
 Retain context in the selected workspace, canonical OpenSpec, task progress and
 evidence. No TH permission ledger, lease, nonce or result schema is required.
@@ -35,11 +35,15 @@ working summary; continue when implementation is authorized.
 
 ## Implementation
 
-Assign dependency-ready tasks with ownership and inputs under
+Group coherent dependency-ready tasks with ownership and inputs under
 `agents/_shared/dispatch-contract.md`. Independent owners may work concurrently;
 serialize overlapping edits and Git mutations. Implementers own tests; extra
 testers or cleaners run when useful. Keep progress in the workspace and verify
 against the diff and checks.
+
+Reuse an executor for corrections to its owned surface. Main can do a small
+step directly; the available roles are expertise, not a required sequence.
+Use installed native model settings and honor supported operator overrides.
 
 ## Validation
 
@@ -62,6 +66,11 @@ check lifecycle artifact hygiene. Use `create-pr` for authorized preparation
 and publication with current checks, findings, pending work and limits. Preserve
 unrelated work. Publication does not imply merge, release or installation;
 those actions follow scope and native permissions.
+
+Main normally publishes. An assigned delivery specialist can perform the same
+checkpoint without a separate acceptance matrix or fixed legacy reports. Recover
+relevant factual context when missing; renew only affected evidence after a
+metadata correction instead of restarting completed validation.
 
 Phase changes do not expire authorization or require a new gate reply for
 unchanged work. Historical Freeze/Gates helpers and checkpoint names remain

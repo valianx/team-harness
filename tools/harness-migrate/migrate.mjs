@@ -1117,49 +1117,19 @@ function transformToOpencode(filePath, content, repoRoot) {
   return { outputPath, content: serializeFrontmatter(projected, body), surface };
 }
 
-// Only the two direct completion roles opt into an explicit OpenCode model.
-// The generic transform remains model-less so every other role keeps its
-// existing runtime/tiering behavior and fixture bytes.
-const OPENCODE_ROLE_MODEL_OVERRIDES = Object.freeze({
-  "spec-validator": Object.freeze({ model: "openai/gpt-6-sol", reasoningEffort: "high" }),
-  "pr-creator": Object.freeze({ model: "openai/gpt-6-sol", reasoningEffort: "medium" }),
-});
-
-const CANONICAL_SOURCE_MODEL_ALIASES = new Set(["opus", "sonnet", "haiku"]);
-
-const OPENCODE_ROLE_KEY_ORDER = [
-  "name", "description", "model", "reasoningEffort", "permission", "mode",
-  "color", "agent", "th-origin",
-];
-
-function serializeRoleFrontmatter(frontmatter, body) {
-  const ordered = Object.create(null);
-  for (const key of OPENCODE_ROLE_KEY_ORDER) {
-    if (Object.prototype.hasOwnProperty.call(frontmatter, key)) {
-      ordered[key] = frontmatter[key];
-    }
-  }
-  for (const [key, value] of Object.entries(frontmatter)) {
-    if (!Object.prototype.hasOwnProperty.call(ordered, key)) {
-      ordered[key] = value;
-    }
-  }
-  return serializeFrontmatter(ordered, body);
-}
-
 /**
- * applyModeByRole mirrors cmd/install/transform.go::applyModeByRole. The
- * orchestrator receives mode: "primary" and displays as "TH-orchestrator";
- * the two phase roles receive their explicit OpenCode Sol model/effort when
- * their source model is a canonical alias, while concrete source models stay
- * operator-owned. Applied as a POST-PROJECTION step in runTransform, this is
+ * applyModeByRole mirrors cmd/install/transform.go::applyModeByRole: the
+ * orchestrator agent (the top-level coordinator) receives mode: "primary" and
+ * displays as "TH-orchestrator" in the opencode agent picker; every other
+ * agent is returned unchanged. Applied as a POST-PROJECTION step in
+ * runTransform, ON TOP OF the generic transformToOpencode output, and
  * deliberately NOT part of the transform-conformance.json fixture (which
- * binds only generic mapping).
+ * binds only the generic mapping, so transformToOpencode's exported output
+ * stays name: orchestrator / mode: subagent for the orchestrator).
  */
-function applyModeByRole(content, agentName, sourceModel = undefined) {
+function applyModeByRole(content, agentName) {
   // The role's installed filename also preserves review permission restrictions.
-  const modelOverride = OPENCODE_ROLE_MODEL_OVERRIDES[agentName];
-  if (agentName !== "orchestrator" && !PR_REVIEW_AGENTS.has(agentName) && !modelOverride) {
+  if (agentName !== "orchestrator" && !PR_REVIEW_AGENTS.has(agentName)) {
     // No change needed — the generic transform already set mode: subagent.
     return content;
   }
@@ -1167,37 +1137,9 @@ function applyModeByRole(content, agentName, sourceModel = undefined) {
   const { frontmatter: fm, body } = parseFrontmatter(content);
   if (PR_REVIEW_AGENTS.has(agentName)) {
     fm["permission"] = prReviewPermission();
-  } else if (agentName === "orchestrator") {
+  } else {
     fm["mode"] = "primary";
     fm["name"] = "TH-orchestrator";
-  }
-  if (modelOverride) {
-    const suppliedSourceModel = typeof sourceModel === "string" ? sourceModel.trim() : "";
-    const projectedModel = typeof fm["model"] === "string" ? fm["model"].trim() : "";
-    const effectiveSourceModel = suppliedSourceModel || projectedModel;
-    if (!effectiveSourceModel) {
-      // Direct role-layer callers have no source metadata. Preserve an
-      // already-projected model and otherwise apply the role default.
-      if (!Object.prototype.hasOwnProperty.call(fm, "model")) {
-        fm["model"] = modelOverride.model;
-      }
-      if (!Object.prototype.hasOwnProperty.call(fm, "reasoningEffort")) {
-        fm["reasoningEffort"] = modelOverride.reasoningEffort;
-      }
-    } else if (CANONICAL_SOURCE_MODEL_ALIASES.has(effectiveSourceModel)) {
-      // Canonical phase roles declare an alias, so their explicit role default
-      // wins over any opt-in tiered model already present in the projection.
-      fm["model"] = modelOverride.model;
-      fm["reasoningEffort"] = modelOverride.reasoningEffort;
-    } else if (suppliedSourceModel) {
-      // Concrete source selections remain operator-owned. Normalize a bare
-      // concrete id to OpenCode's provider/model form and do not inject the
-      // OpenAI role effort into a custom provider selection.
-      fm["model"] = suppliedSourceModel.includes("/")
-        ? suppliedSourceModel
-        : toProviderPrefixedModel(suppliedSourceModel);
-    }
-    return serializeRoleFrontmatter(fm, body);
   }
   return serializeFrontmatter(fm, body);
 }
@@ -1477,10 +1419,7 @@ async function runTransform(direction, repoRoot, options = {}) {
     // stays name: orchestrator / mode: subagent for the orchestrator.
     if (direction === DIRECTION_TO_OPENCODE && transformed.surface === "agent") {
       const agentName = path.basename(srcPath, ".md");
-      transformed = {
-        ...transformed,
-        content: applyModeByRole(transformed.content, agentName, parsed.frontmatter["model"]),
-      };
+      transformed = { ...transformed, content: applyModeByRole(transformed.content, agentName) };
     }
 
     // Validate output path (containment dry-run).

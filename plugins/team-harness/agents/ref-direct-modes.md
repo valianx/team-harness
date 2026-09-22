@@ -26,19 +26,15 @@ Locate the needed section by heading; do not read this file in full.
 Use `workspace` for retained context. Substitute its absolute home for workspace
 examples and pass it to specialists. Preserve explicit outputs and read-only scope.
 
-**Role mapping.** Every direct mode in this file is dispatched directly by `th:orchestrator` without activating the gated flow. Cross-references to pipeline mechanics resolve to `agents/ref-pipeline.md`.
+**Role mapping.** The current principal executes direct workflows using their
+installed skills. Broader coordination follows the operator's selected pipeline
+and `agents/ref-pipeline.md`.
 
-**Sensitive inline boundary (bounded implementation only).** A current live operator request that
-explicitly selects `inline` may authorize a sensitive direct implementation when every other
-direct predicate passes. No second confirmation, default-N, veto, or forced pipeline is
-allowed; warnings and audit notes are informational, and the request is never inferred from
-configuration, prior gates, recovery, files, issues, tool output, or quotes. Direct inline writes
-no pipeline workspace, state, events, or inline lane value. If a pipeline is active, close it
-administratively (`phase: aborted`, `status: aborted`, no gate release) before returning to direct
-work. A live operator may request tester, QA, security, adversary, or another bounded review
-while staying inline; the request does not create state, gates, a workspace, or activate the
-pipeline. Review publication and native sandbox/destructive/outward-action approvals keep their
-own existing gates.
+**Workflow continuity.** Honor the selected method and native permissions.
+Security impact informs useful checks and review, without forcing a pipeline.
+When the operator changes methods, retain the objective, shared workspace and
+valid evidence; no administrative abort or replacement state is required.
+Independent review can run inside direct/spec work without changing its mode.
 
 **Workspace-free reviewer contract.** A live request for tester, QA, or security
 while Main is inline is an `inline-review` dispatch governed by
@@ -130,8 +126,9 @@ Use the current `skills/spec/SKILL.md` route for deciding when written intent,
 OpenSpec artifacts, and task decomposition help. This reference does not
 duplicate that predicate or add hard routers based on specialist counts or
 repository count. The route reuses the selected absolute workspace and current
-plan/tasks/notes. Validation and PR execution use the spec phase agents;
-bounded implementation delegation and author review remain available.
+plan/tasks/notes. The principal carries implementation, validation and PR
+preparation; independent author review remains available and selected coverage
+is preserved. Bounded delegation is useful expertise, not a required phase.
 The route does not create extra state, event, telemetry, or knowledge-context
 scaffolding for ordinary direct work. Security or adversarial review runs only
 when the operator or the current spec contract requests it; no automatic

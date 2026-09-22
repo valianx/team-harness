@@ -1,10 +1,11 @@
 
-# Spec Lane (direct mode)
+# Spec: lightweight development
 
 Use OpenSpec for a bounded objective that benefits from durable written intent
-and tasks. Main keeps planning, implementation and decisions in the chat;
-Validation and PR execution use the [native phase agents](references/phase-agents.md)
-in the same workspace, without activating a pipeline.
+and tasks. The current principal carries Spec, Implementation, Validation and
+Publication in the shared workspace, with selected independent reviewers.
+Phase changes do not require another executor. Use the pipeline when the
+operator wants broader coordination; a useful bounded delegation can stay here.
 
 When PR preparation or publication is relevant, use [create-pr](../create-pr/SKILL.md)
 automatically; selecting it does not activate the pipeline.
@@ -83,8 +84,9 @@ for a missing scope or material decision. A planning-only endpoint ends here.
 
 ### 2. Implementation
 
-Use [implement](../implement/SKILL.md) on the feature branch. Delegate useful
-independent tasks with explicit ownership and preserve other writers' work.
+Use [implement](../implement/SKILL.md) on the feature branch. Main implements
+and continues into validation. Delegate independent work only when useful,
+with explicit ownership and preservation of other writers' work.
 Check off canonical tasks as their specified work is completed; derive the
 workspace plan's progress from them, without a state file or event trace.
 
@@ -98,20 +100,18 @@ phase's outputs; later assessments remain pending.
 
 ### 3. Validation
 
-Invoke `spec-validator` through [phase agents](references/phase-agents.md) to
-execute [validate](../validate/SKILL.md) with the plan's selected checks and
+Use [validate](../validate/SKILL.md) with the plan's selected checks and
 diagnostics, including real CRAP when selected for changed executable functions.
-After implementation and relevant tests, the agent executes TEA test-review and trace,
+After implementation and relevant tests, execute TEA test-review and trace,
 selected NFR work, Superpowers verification-before-completion and upstream
 OpenSpec implementation verify. Use the [provider reference](references/upstream-tools.md)
 for inputs, outputs and reuse; structural validate and optional TH review do
 not replace implementation verification.
 
-Main judges the returned evidence and resolves actual completion defects.
-Invoke `pr-creator` for [create-pr](../create-pr/SKILL.md)'s preparation checkpoint
-for agreed PR delivery, otherwise use the [lifecycle](references/lifecycle.md)
+Resolve actual completion defects. Use [create-pr](../create-pr/SKILL.md)'s
+preparation checkpoint for agreed PR delivery, otherwise the [lifecycle](references/lifecycle.md)
 directly. Prepare completed archive and living specs on the delivery branch
-before committing the final review candidate; renew affected evidence only.
+before committing the final review candidate.
 
 Use [verify](../verify/SKILL.md) for the committed candidate, binding the exact
 archived change when applicable. Reuse the live selection and completion rules
@@ -125,7 +125,7 @@ starting another full review or manufacturing a pass.
 
 For local completion, report the result and remaining limits without creating
 a PR. For PR delivery, satisfy the existing [author-review conditions](references/author-review.md)
-and resume `pr-creator` for [create-pr](../create-pr/SKILL.md)'s publication checkpoint. A pending
+and use [create-pr](../create-pr/SKILL.md)'s publication checkpoint. A pending
 review choice or incomplete accepted review retains its existing treatment;
 preparing a PR does not itself authorize publication.
 

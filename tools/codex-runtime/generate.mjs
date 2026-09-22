@@ -112,34 +112,6 @@ function validateProfile(contract, profileName, usedProjectionTiers, allowedRunt
   return profile;
 }
 
-// A role may opt into a concrete Codex model/effort pair when its native
-// execution contract differs from the source-model projection tier. This is
-// deliberately a small direct-role override: aliases (including pipeline-*
-// identities) must continue to accept their caller's explicit spawn pair.
-function validateRuntimeOverride(agent, modelPolicy, allowedRuntimeReasoningEfforts) {
-  if (agent.runtime_override === undefined) return null;
-  if (modelPolicy === "spawn") {
-    fail(`${agent.name}: runtime_override is only valid for direct roles`);
-  }
-  const override = agent.runtime_override;
-  if (!override || typeof override !== "object" || Array.isArray(override)) {
-    fail(`${agent.name}.runtime_override must be an object`);
-  }
-  const keys = Object.keys(override).sort();
-  if (keys.some(key => !["model", "reasoning_effort"].includes(key))) {
-    fail(`${agent.name}.runtime_override supports only model and reasoning_effort`);
-  }
-  assertNonEmptyString(override.model, `${agent.name}.runtime_override.model`);
-  assertNonEmptyString(override.reasoning_effort, `${agent.name}.runtime_override.reasoning_effort`);
-  if (!allowedRuntimeReasoningEfforts.has(override.reasoning_effort)) {
-    fail(`${agent.name}.runtime_override: unsupported runtime reasoning effort ${override.reasoning_effort}`);
-  }
-  return {
-    model: override.model,
-    reasoningEffort: override.reasoning_effort,
-  };
-}
-
 export async function render({ rootDir = repositoryRoot, profileName } = {}) {
   rootDir = resolve(rootDir);
   const contractPath = join(rootDir, "runtime/schema/codex-agents.json");
@@ -227,7 +199,6 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     if (role !== agent.name && modelPolicy !== "spawn") {
       fail(`${agent.name}: aliased roles must use spawn model policy`);
     }
-    const runtimeOverride = validateRuntimeOverride(agent, modelPolicy, allowedRuntimeReasoningEfforts);
     const expectedSemanticSource = `agents/${role}.md`;
     if (agent.semantic_source !== expectedSemanticSource) fail(`${agent.name}: semantic_source must be ${expectedSemanticSource}`);
     const semanticPath = repositoryPath(rootDir, agent.semantic_source, `${agent.name}.semantic_source`);
@@ -262,8 +233,7 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
       capabilityProfile,
       projectionTier: matches[0].name,
       sourceModel,
-      sourceEffort,
-      runtimeOverride,
+      sourceEffort
     });
   }
 
@@ -344,8 +314,8 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
       `name = ${JSON.stringify(agent.name)}`,
       `description = ${JSON.stringify(agent.description)}`,
       ...(profile.inherit_parent || agent.modelPolicy === "spawn" ? [] : [
-        `model = ${JSON.stringify(agent.runtimeOverride?.model ?? profile.tiers[agent.projectionTier].model)}`,
-        `model_reasoning_effort = ${JSON.stringify(agent.runtimeOverride?.reasoningEffort ?? profile.tiers[agent.projectionTier].reasoning_effort)}`
+        `model = ${JSON.stringify(profile.tiers[agent.projectionTier].model)}`,
+        `model_reasoning_effort = ${JSON.stringify(profile.tiers[agent.projectionTier].reasoning_effort)}`
       ]),
       `sandbox_mode = ${JSON.stringify(agent.sandbox_mode)}`,
       `developer_instructions = ${JSON.stringify(instructions)}`,
@@ -374,12 +344,9 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
   files.set(join(rootDir, ".codex/config.toml"), config);
 
   const rosterRows = semanticRoster.map(agent => {
-    const runtimeOverride = validatedAgents.find(candidate => candidate.name === agent.name)?.runtimeOverride;
     const mapping = profile.inherit_parent
       ? { model: "inherits parent", reasoning_effort: "inherits parent" }
-      : runtimeOverride
-        ? { model: runtimeOverride.model, reasoning_effort: runtimeOverride.reasoningEffort }
-        : profile.tiers[agent.projectionTier];
+      : profile.tiers[agent.projectionTier];
     const codexSurface = names.has(agent.name)
       ? "installed custom agent"
       : agent.name === "orchestrator"

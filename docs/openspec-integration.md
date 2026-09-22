@@ -58,7 +58,7 @@ including flat OpenCode opsx commands. Consumer installations remain intact.
    plan with the testing strategy and selected later checks.
 2. In **Implementation**, continue authorized work under native coordination. Execute
    selected TEA implementation methods and focused project checks according to that strategy.
-3. In **Validation**, Main invokes `spec-validator` to run the agreed project checks and the declared
+3. In **Validation**, run the agreed project checks and the declared
    [upstream stages](../skills/spec/references/upstream-tools.md): TEA test-review and trace,
    Superpowers completion verification, and the installed OpenSpec implementation-verification
    workflow. OpenSpec checks correspondence with intent; actual project tests remain separate.
@@ -66,15 +66,9 @@ including flat OpenCode opsx commands. Consumer installations remain intact.
    resolve real completion defects, then synchronize and archive completed intent on the same
    branch. Strictly validate the archive and affected living specs before selected independent
    review of the final candidate; judge findings and verify any corrections.
-4. In **Publication**, Main resumes `pr-creator` using the shared create-pr flow for the requested PR preparation or
+4. In **Publication**, use the shared create-pr flow for the requested PR preparation or
    publication, reusing applicable evidence. Include code, living specs and archive in one PR.
    Retain local completion as the endpoint when no PR was requested.
-
-Spec and direct completion use these two native agents with GPT-6 Sol on Codex
-and OpenCode, and Opus on Claude Code. Main keeps intent, implementation and
-decisions; the pipeline keeps its existing specialists. See the bounded
-[phase handoff](../skills/spec/references/phase-agents.md) for model effort,
-context reuse, unavailable dispatch and preparation/publication boundaries.
 
 Claude's researched entry is `/opsx:verify`, Codex's is
 `$openspec-verify-change`, and OpenCode's is `/opsx-verify`; resolve the entry

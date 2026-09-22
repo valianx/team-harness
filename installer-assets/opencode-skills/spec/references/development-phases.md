@@ -14,6 +14,12 @@ the existing objective, canonical tasks, candidate, review choice and absolute
 later phase recovers these inputs and completes real gaps; it does not recreate
 planning or activate a pipeline.
 
+Spec keeps execution with the principal and uses independent reviewers for the
+selected questions. Pipeline adds coordination of useful specialists: group
+coherent work, reuse an owner for corrections and parallelize independent tasks.
+The four phases describe outcomes; they do not prescribe four agent handoffs.
+Both methods use the same applicable tools and evidence below.
+
 Continue to the requested endpoint: planning, local completion, PR preparation
 or PR publication. An authorized continuation needs no separate prompt for each
 selected tool or phase. Resolve only missing material decisions. Review choices
@@ -26,11 +32,6 @@ Existing PR review still uses [review-pr](../../review-pr/SKILL.md).
 An implementation request includes applicable Validation: continue directly after
 implementation without waiting for another operator message. Keep the phases
 visible as successive work and honor an explicit request to stop earlier.
-
-In spec/direct work, Main invokes the [completion phase agents](phase-agents.md)
-for Validation and PR execution. Main retains Spec, implementation and decisions;
-the existing pipeline specialists remain unchanged. The assigned executor runs
-its skill in place, reuses current evidence and returns results to Main.
 
 ## Phase outcomes
 

@@ -305,17 +305,19 @@ func insertModelLine(transformed []byte, concrete string) []byte {
 	return out
 }
 
-// applyModeByRole applies installer-specific role overrides on top of the
-// generic transform. The orchestrator receives mode: primary and displays as
-// "TH-orchestrator"; the two phase roles receive their explicit OpenCode Sol
-// model/effort when their source model is a canonical alias. Concrete source
-// model selections remain unchanged. This is NOT part of the
-// transform-conformance.json fixture, which binds only the generic mapping.
-func applyModeByRole(src []byte, agentName string, sourceModels ...string) ([]byte, error) {
+// applyModeByRole applies the installer-specific mode-by-role override: the
+// orchestrator agent (the top-level coordinator) receives mode: primary and
+// displays as "TH-orchestrator" in the opencode agent picker; every other
+// agent remains subagent with its name unchanged. This is layered ON TOP of
+// the generic transform output and is NOT part of the transform-conformance.json
+// fixture (which binds only the generic mapping). The CC-canonical source
+// keeps frontmatter name: orchestrator — the display rename lives only in
+// this installer-layer projection, so it never reaches the Claude Code
+// output.
+func applyModeByRole(src []byte, agentName string) ([]byte, error) {
 	// Review permissions also follow the installed filename, independently of
 	// source frontmatter metadata.
-	_, hasRoleModelOverride := opencodeRoleModelOverrides[agentName]
-	if agentName != "orchestrator" && !isPRReviewAgent(agentName) && !hasRoleModelOverride {
+	if agentName != "orchestrator" && !isPRReviewAgent(agentName) {
 		// No change needed — generic transform already set mode: subagent.
 		return src, nil
 	}
@@ -326,65 +328,11 @@ func applyModeByRole(src []byte, agentName string, sourceModels ...string) ([]by
 	}
 	if isPRReviewAgent(agentName) {
 		fm["permission"] = prReviewPermission()
-	} else if agentName == "orchestrator" {
+	} else {
 		fm["mode"] = "primary"
 		fm["name"] = "TH-orchestrator"
 	}
-	if override, ok := opencodeRoleModelOverrides[agentName]; ok {
-		sourceModel := ""
-		sourceModelSupplied := false
-		if len(sourceModels) > 0 {
-			sourceModel = strings.TrimSpace(sourceModels[0])
-			sourceModelSupplied = sourceModel != ""
-		}
-		if sourceModel == "" {
-			if projectedModel, exists := fm["model"].(string); exists {
-				sourceModel = strings.TrimSpace(projectedModel)
-			}
-		}
-		if sourceModel == "" {
-			// Direct role-layer callers have no source metadata. Preserve an
-			// already-projected model and otherwise apply the role default.
-			if _, exists := fm["model"]; !exists {
-				fm["model"] = override.model
-			}
-			if _, exists := fm["reasoningEffort"]; !exists {
-				fm["reasoningEffort"] = override.reasoningEffort
-			}
-		} else if isCanonicalSourceModelAlias(sourceModel) {
-			// Canonical phase roles declare an alias (opus/sonnet/haiku), so
-			// their explicit role default wins over any opt-in tiered model.
-			fm["model"] = override.model
-			fm["reasoningEffort"] = override.reasoningEffort
-		} else if sourceModelSupplied {
-			// Concrete source selections remain operator-owned. Normalize a
-			// bare concrete id to OpenCode's provider/model form and do not add
-			// the OpenAI role effort to a custom provider selection.
-			fm["model"] = toProviderPrefixedModel(sourceModel)
-		}
-	}
 	return serializeFrontmatterYAML(fm, body), nil
-}
-
-// opencodeRoleModelOverrides is intentionally limited to the two direct
-// completion roles. The generic transform remains model-less and every other
-// role keeps its existing projection/tiering behavior. Values mirror the
-// native OpenCode fields used by the Codex role overrides.
-var opencodeRoleModelOverrides = map[string]struct {
-	model           string
-	reasoningEffort string
-}{
-	"spec-validator": {model: "openai/gpt-6-sol", reasoningEffort: "high"},
-	"pr-creator":     {model: "openai/gpt-6-sol", reasoningEffort: "medium"},
-}
-
-func isCanonicalSourceModelAlias(model string) bool {
-	switch strings.TrimSpace(model) {
-	case "opus", "sonnet", "haiku":
-		return true
-	default:
-		return false
-	}
 }
 
 // ---------------------------------------------------------------------------
@@ -882,7 +830,7 @@ func unquoteYAML(s string) string {
 func serializeFrontmatterYAML(fm map[string]interface{}, body string) []byte {
 	// Deterministic key order (matches migrate.mjs's named-key projection order).
 	keyOrder := []string{
-		"name", "description", "model", "reasoningEffort", "permission", "mode",
+		"name", "description", "model", "permission", "mode",
 		"color", "agent", "th-origin",
 	}
 
