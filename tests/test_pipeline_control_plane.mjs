@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { link, mkdtemp, mkdir, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { link, mkdtemp, mkdir, readFile, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -45,7 +45,7 @@ const git = (repository, ...args) => execFileSync("git", args, { cwd: repository
 const linkDirectory = (target, destination) => process.platform === "win32"
   ? symlink(target, destination, "junction")
   : symlink(target, destination);
-const temporary = await mkdtemp(path.join(tmpdir(), "th-control-plane-"));
+const temporary = await realpath(await mkdtemp(path.join(tmpdir(), "th-control-plane-")));
 
 try {
   const worktree = path.join(temporary, "worktree");
