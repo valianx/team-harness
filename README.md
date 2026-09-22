@@ -1,8 +1,9 @@
 # Team Harness — Shared Development Workflows
 
 Team Harness contributes a shared way of working to **Claude Code**, **Codex**,
-and **OpenCode**: clarify the objective, record useful intent, implement, verify,
-review independently, and deliver a reviewable change.
+and **OpenCode** through four visible phases: Spec, Implementation, Validation
+and Publication. The native general agent coordinates the work, while the
+selected skills provide the methods and evidence for each phase.
 
 TH's role is workflow guidance. The native harness owns agent execution,
 permissions, sandboxing, approvals, and session controls. TH uses those
@@ -22,6 +23,11 @@ The current general agent selects and reads the relevant skill:
 | Prepare or publish a completed change | [`create-pr`](skills/create-pr/SKILL.md) |
 | Keep useful context across tasks, flows and sessions | [`workspace`](skills/workspace/SKILL.md) |
 
+The [four-phase method](skills/spec/references/development-phases.md) explains
+the inputs, expected work, tools, outputs and completion evidence. It is shared
+by `spec` and the explicitly selected `pipeline`; it does not activate a
+pipeline, add a permission gate or require every available tool.
+
 Independent specialists contribute findings and recommendations. The coordinator
 judges them against the objective and available evidence, verifies corrections,
 and continues the authorized work. Workspace and Obsidian support preserve
@@ -39,8 +45,9 @@ for brief conversations and read-only status requests.
 
 [OpenSpec](./docs/openspec-integration.md) owns proposal, spec, design, and task
 artifacts for work that needs written intent. Completed changes are archived in
-the implementation PR. The broader pipeline is an explicitly selected workflow;
-it uses native tasks and permissions without its own gate tokens or control journal.
+the implementation PR. The four phases describe the shared journey; the broader
+pipeline remains an explicitly selected workflow and uses native tasks and
+permissions without its own gate tokens or control journal.
 
 ---
 
@@ -149,7 +156,8 @@ opencode. Runtime adapters translate native paths, tools, permissions, and
 delegation without maintaining separate feature lists.
 
 The native general agent selects the current skill. `init` helps frame the task;
-`spec` retains written intent and tasks; `pipeline` supplies broader coordination.
+`spec` retains written intent and tasks across the four phases when authorized;
+`pipeline` supplies broader coordination for the same phase handoffs.
 Independent reviewers inspect an anchored candidate through native read-only
 capabilities. Main preserves findings and limits, judges recommendations and
 verifies corrections. A PR reference identifies the target; the requested action
@@ -341,7 +349,7 @@ Full contract: docs/dev-mode.md.
 | [Roadmap](./docs/roadmap.md) | What we are building next — the sequenced path toward the vision |
 | [How it works](./docs/how-it-works.md) | Pipeline walkthrough, why a harness, what ships |
 | [Dual-runtime lifecycle](./docs/lifecycle.md) | How a change reaches Claude Code and opencode — author, build, test, release, install, update, activate, deprecate |
-| [Pipelines reference](./docs/pipelines.md) | All 8+ pipelines, tier classification, phase tables, gate semantics |
+| [Pipelines reference](./docs/pipelines.md) | Flow entry points, four-phase handoffs and historical compatibility |
 | [Migration guide](./docs/plugin-migration.md) | Migrating from the Go installer to the plugin |
 | [Agents reference](./agents/README.md) | Full agent roster, model/effort matrix, low-cost mode |
 | [Agent tree](./docs/agent-tree.md) | How `th:orchestrator` and the leaf specialists relate at runtime |

@@ -11,12 +11,24 @@ Read the currently installed skill. Use `spec` for written intent and tasks,
 existing PR and `create-pr` for preparation/publication. A PR URL alone does
 not distinguish reviewing, resolving comments or merging; the request does.
 
-## The pipeline
+## The four development phases
 
-Design → implementation → validation → delivery is a working sequence, not
-a second permission system. Reuse approved decisions. Clarify only missing
-choices or changed effects. Main may delegate independent tasks with explicit
-ownership and integrate their results.
+Spec → Implementation → Validation → Publication is the shared way to present
+development work. Read the [phase reference](../skills/spec/references/development-phases.md)
+for the expected inputs, selected tools, outputs and evidence. Existing skills
+perform the work; the phases do not add a second permission system or force the
+`pipeline` workflow.
+
+Spec records intent, tasks, testing strategy and the workspace plan. Implementation
+produces the product changes and maintained tests. Validation runs the selected
+checks, provider assessments and reviews, preserving their scope and limits.
+Publication prepares the archive and artifact hygiene, then performs the
+authorized `create-pr` action. The coordinator can stop at a requested endpoint
+or resume a later phase from the existing workspace and canonical tasks.
+
+The broader pipeline is one way to coordinate this sequence. Reuse approved
+decisions, clarify only missing choices or changed effects, and delegate
+independent tasks with explicit ownership when that improves the work.
 
 ## Other pipelines
 

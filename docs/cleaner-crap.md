@@ -1,12 +1,31 @@
-# Cleaner Checkpoint
+# Cleaner and CRAP helpers
 
-The cleaner checkpoint is a behavior-preserving cleanup pass inside the
-existing `implementation` phase. It runs once per repository candidate with an
-eligible changed production surface, after implementation closes and before
-Freeze. A multi-repository pipeline launches one isolated cleaner per
-repository, each with its own worktree, allowlist, baseline anchor, candidate
-identity, and quality manifest; one cleaner never receives several projects. It
-adds no phase, gate, or architecture review.
+The current four-phase workflow treats cleanup as an optional implementation
+activity and CRAP as a measure-only validation diagnostic. Neither creates a
+phase, a lease, a Freeze gate or an automatic delivery decision. When cleanup
+changes the candidate, the coordinator reruns the affected validation checks;
+when the candidate and selected inputs are unchanged, the existing receipt may
+be cited after its identities are compared. See the maintained
+[quality-runner reference](../skills/spec/references/quality-runner.md) for the
+consumer-facing invocation.
+
+The remainder of this file preserves the older cleaner helper contract for
+compatibility with existing manifests, fixtures and low-level integrations. It
+is not a current orchestration requirement and does not grant an agent
+authority to dispatch cleanup or approve a publication.
+
+## Current four-phase use
+
+During Implementation, Main may select a bounded cleanup task when the
+objective calls for it. During Validation, Main may select the CRAP runner when
+the changed executable surface has a project collector and matched coverage.
+The runner records `not_applied` in measure mode; missing collectors or
+ambiguous function identity remain pending and are reported to the operator.
+Temporary adapters, manifests, raw metrics and receipts stay in the selected
+local or Obsidian workspace and are not committed unless the objective requires
+a durable example or test.
+
+## Legacy helper contract (compatibility reference)
 
 ## Applicability
 

@@ -3,6 +3,24 @@
 The current installed skill is the source for each flow. TH supplies a working
 method to the native general agent; it does not duplicate execution permissions.
 
+## Four development phases
+
+The shared development path is **Spec → Implementation → Validation →
+Publication**. The [phase reference](../skills/spec/references/development-phases.md)
+is the source for each phase's inputs, tool selection, outputs and completion
+evidence; this page only maps the existing entry points to that method.
+
+| Phase | Existing entry points | Main result |
+| --- | --- | --- |
+| Spec | `spec`, `design`, `sketch`, `define-ac` | OpenSpec intent and tasks, testing strategy and workspace plan |
+| Implementation | `spec` continuation, `pipeline`, `implement`, `test` | Product changes, maintained tests and task progress |
+| Validation | `validate`, `verify`, `test-pipeline`, `audit`, `find-bugs` | Focused checks, selected provider evidence, findings and limits |
+| Publication | `create-pr`, `deliver`; `review-pr` for an existing PR | Archive and hygiene checks, then the authorized PR action |
+
+The coordinator may stop at the requested endpoint or resume a later phase from
+the existing workspace and canonical tasks. Tool outputs are recommendations
+and evidence; Main decides how to proceed. Publication does not imply merge.
+
 | Objective | Entry | Supporting source |
 | --- | --- | --- |
 | Written intent, tasks and implementation | `spec` | `skills/spec/SKILL.md` |

@@ -1,7 +1,9 @@
 # Knowledge Base
 <!-- Project knowledge that agents read before working -->
 
-## Current v5 contract (read this section first)
+## Current workflow guidance
+
+- [pattern] Development follows Spec, Implementation, Validation and Publication, preserving selected tools and evidence in one workspace plan. → `skills/spec/references/development-phases.md`
 
 - [pattern] Spec invokes upstream TEA, Superpowers and OpenSpec verification at their stages; working reports share the configured workspace and provider methods remain external. → `skills/spec/references/upstream-tools.md`
 
@@ -12,6 +14,12 @@
 - [constraint] PR review artifacts use handle-relative Windows filesystem operations or POSIX directory descriptors; platform compatibility must preserve no-follow and pinned-file identity checks.
 
 - [decision] PR regression probes provide bounded assertion observations; the existing verifier owns causality judgment, and Main repairs operational blockers within unchanged deliverables and authority. → `skills/review-pr/references/regression-probes.md`, `agents/_shared/coordinator-recovery.md`
+
+## Historical v5 decisions
+
+These retained decisions explain old helpers and records. For new work, use the
+current skills and `agents/ref-pipeline.md`; historical gates, leases and mandatory
+role rounds below are not the current coordination method.
 
 - [decision] Team Harness has exactly two postures: `inline` and `pipeline`. Inline is the direct
   default; sensitive inline work is allowed when the current live operator explicitly selects it,

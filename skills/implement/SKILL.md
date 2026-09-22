@@ -5,6 +5,12 @@ description: Implement approved work with focused verification.
 
 # Implement
 
+Continue the Implementation phase of [the shared development flow](../spec/references/development-phases.md).
+Recover the existing intent, testing strategy, workspace and authorized endpoint.
+Execute selected TEA implementation methods using [upstream tools](../spec/references/upstream-tools.md).
+Produce product changes, maintained tests and focused-check evidence; leave later
+assessments pending, then continue to validate when included in the request.
+
 Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
 its configured local or Obsidian mode. Main coordinates with native tools and
 permissions. Reuse authorization for unchanged work and ask only for a missing

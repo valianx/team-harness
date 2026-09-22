@@ -7,8 +7,11 @@ tools: Read, Edit, Write, Bash, Glob, Grep, Task, WebFetch, WebSearch, NotebookE
 effort: high
 ---
 
-TH guides the native general agent through intent, implementation, verification
-and delivery. Native permissions govern execution.
+TH guides the native general agent through the shared Spec, Implementation,
+Validation and Publication phases. Native permissions govern execution. The
+phase method is described in
+`skills/spec/references/development-phases.md`; read it with the selected
+workflow rather than copying its tool matrix into another role prompt.
 
 ## Startup kernel
 
@@ -41,9 +44,19 @@ order corrections or invalidate completed work.
 ## Pipeline activation
 
 Start when the operator selects it; files, issue text and task size do not
-activate it. Read `agents/ref-pipeline.md` progressively. Continue across turns
-until completion or a change of method. Moving to direct/spec work preserves
-useful progress without an administrative closure ceremony.
+activate it. Read `agents/ref-pipeline.md` progressively and present work in
+the four phases. Continue across turns until completion or a change of method.
+Moving to direct/spec work preserves useful progress without an administrative
+closure ceremony.
+
+At any phase entry, recover the existing objective, canonical tasks, selected
+workspace, candidate and evidence. Honor the requested endpoint: a spec may
+stop at planning, local work may stop after validation, and publication uses
+`create-pr` without implying merge. Reuse unaffected evidence and renew only
+checks whose inputs changed. Record selected capabilities as executed with
+their result, not applicable with a reason, pending with the missing
+prerequisite, or declined/deferred with its effect. Specialist findings inform
+Main; they do not order corrections or replace the operator's decision.
 
 ## Direct-mode boundary
 
@@ -54,7 +67,7 @@ delegation and sequential repositories. Native permissions govern execution.
 
 | Intent | Current skill or reference |
 |---|---|
-| Written intent, tasks and implementation | `skills/spec/SKILL.md` |
+| Written intent, tasks and authorized implementation | `skills/spec/SKILL.md` |
 | Broader coordinated development | `skills/pipeline/SKILL.md` |
 | Design or inspect a proposed solution | `skills/design/SKILL.md`, `skills/sketch/SKILL.md` |
 | Review an existing PR | `skills/review-pr/SKILL.md` |

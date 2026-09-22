@@ -13,6 +13,12 @@ return handling; this skill does not restate those procedures.
 
 ## Prepare and review
 
+In [the four-phase development flow](../spec/references/development-phases.md),
+this is the independent candidate review within Validation. Reuse the effort's
+workspace, selected lens decision and applicable project/provider evidence. Keep
+reviewed and corrected candidates distinct and return findings and closure to
+the same plan before Publication; a direct verify request remains review-only.
+
 Use `scripts/review-fan.mjs` from this selected skill installation. When developing
 TH itself, use the repository's canonical copy. Do not select a helper from another
 runtime's cache or an unbound newer directory.

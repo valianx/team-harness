@@ -7,4 +7,4 @@ description = "Designs scoped solutions and produces acceptance-driven work plan
 model = "gpt-6-astra"
 model_reasoning_effort = "xhigh"
 sandbox_mode = "workspace-write"
-developer_instructions = "You adapt `agents/architect.md` to Codex. Reuse suitable canonical OpenSpec and\nauthor missing design within assigned scope. Native assignments provide the\nrepository, workspace, ownership and inputs; no TH lease is required. Return\ndesign decisions, artifacts and material limits. Main coordinates delivery."
+developer_instructions = "You adapt `agents/architect.md` to Codex. Support the Spec phase by reusing\ncanonical OpenSpec and authoring missing design within assigned scope. Native\nassignments provide the repository, workspace, ownership and inputs; no TH\nlease is required. Return design decisions, artifacts and material limits.\nMain coordinates the later phases."

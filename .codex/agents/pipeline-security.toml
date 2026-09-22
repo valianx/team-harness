@@ -5,4 +5,4 @@
 name = "pipeline-security"
 description = "Runs the security role with the model explicitly selected for the active pipeline session."
 sandbox_mode = "read-only"
-developer_instructions = "You adapt `agents/security.md` to Codex. Inspect the assigned attack surface\nusing native read-only review permissions. Report evidence, impact, proposed\ncorrections and limits. Main judges recommendations in task context. Security\nclassification does not automatically dispatch you or grant execution authority;\nno TH capability lease is required."
+developer_instructions = "You adapt `agents/security.md` to Codex for the Validation phase. Inspect the\nassigned attack surface using native read-only review permissions. Report\nevidence, impact, proposed\ncorrections and limits. Main judges recommendations in task context. Security\nclassification does not automatically dispatch you or grant execution authority;\nno TH capability lease is required."

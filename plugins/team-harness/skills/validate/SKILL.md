@@ -5,6 +5,13 @@ description: Validate delivered behavior with proportionate checks and independe
 
 # Validate
 
+Continue the Validation phase of [the shared development flow](../spec/references/development-phases.md).
+Recover the current candidate, plan and selected capabilities; record actual
+outcomes and gaps there. Assess CRAP for changed executable functions and execute
+selected real measurements through the shared reference. Run selected find-bugs,
+audit or NFR work for their bounded questions, not as an automatic general audit.
+An absent selected provider or metric remains pending with recovery.
+
 Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
 its configured local or Obsidian mode. Main coordinates with native tools and
 permissions. Reuse authorization for unchanged work and ask only for a missing
