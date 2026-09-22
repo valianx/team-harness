@@ -6,5 +6,5 @@
 
 ## 2. Validation
 
-- [ ] 2.1 Regenerate distributed assets and run applicable native, converter and repository checks.
-- [ ] 2.2 Execute upstream test assessments and OpenSpec implementation verification; review cross-runtime handoffs and resolve actual defects.
+- [x] 2.1 Regenerate distributed assets and run applicable native, converter and repository checks.
+- [x] 2.2 Execute upstream test assessments and OpenSpec implementation verification; review cross-runtime handoffs and resolve actual defects.

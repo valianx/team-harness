@@ -94,8 +94,9 @@ $team-harness:setup
 
 The setup skill configures native Team Harness settings, optional MCP servers,
 workspace/language preferences, optional workspace-to-GitHub identity routes,
-and thirteen specialist agents: seven for the coordinated
-pipeline, one direct read-only inline reviewer, and five for immutable PR review. It preserves
+and native agents for the coordinated pipeline, direct read-only review,
+immutable PR review, and spec validation/PR completion. The generated
+[agent roster](.codex/README.md) lists their models and roles. Setup preserves
 Codex's native permission and hook-trust prompts. It can also import every
 missing setting from an existing Claude Code or opencode Team Harness config;
 opaque values are copied directly and never displayed.
@@ -108,13 +109,13 @@ place, preserving the current conversation; no blanket restart is needed.
 Codex uses its native permissions and approvals. Team Harness does not install
 a Codex policy-hook layer, so there is no hook manifest to trust for this
 workflow. Plugin installation and agent installation are separate. The
-plugin provides the Team Harness skills; the thirteen generated agents are installed
+plugin provides the Team Harness skills; the generated agents are installed
 by the setup skill from the marketplace snapshot.
 
 The equivalent manual agent-installation fallback, from the project root, is:
 
-From the root of the project where Team Harness will run, install its thirteen
-   agents (requires Go 1.25.8 or newer):
+From the root of the project where Team Harness will run, install its generated
+agents (requires Go 1.25.8 or newer):
 ```bash
 cd /path/to/your/project
 go run github.com/valianx/team-harness/cmd/install@latest apply --runtime codex --scope project
@@ -132,10 +133,10 @@ chmod +x install-linux-amd64
 The checksum proves that the binary matches the file published in the same
 GitHub release; it does not protect against compromise of the release origin.
 
-Use `--scope global` instead when the thirteen agents should be available from your
-Codex user configuration rather than only this checkout. Seven agents are required
-by the gated `pipeline` workflow, `inline-reviewer` serves direct read-only
-reviews, and five agents are required by `review-pr`; lightweight `init` remains
+Use `--scope global` when these agents should be available from your Codex user
+configuration. The roster includes pipeline specialists, the direct read-only
+`inline-reviewer`, immutable PR reviewers, and the `spec-validator`/`pr-creator`
+completion roles; lightweight `init` remains
 available with the plugin alone.
 
 4. Use `reload` to refresh supported components and check activation in the
