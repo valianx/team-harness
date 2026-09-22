@@ -23,6 +23,8 @@ ROLES = (
     "security",
     "inline-reviewer",
     "delivery",
+    "spec-validator",
+    "pr-creator",
     "pipeline-architect",
     "pipeline-implementer",
     "pipeline-tester",
