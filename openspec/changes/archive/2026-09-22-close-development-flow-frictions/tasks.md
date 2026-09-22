@@ -6,5 +6,5 @@
 
 ## 2. Verification
 
-- [ ] 2.1 Regenerate distributions and verify affected suites in their supported environments.
-- [ ] 2.2 Execute applicable upstream assessments and independent review, resolve concrete findings and verify implementation against the amendment.
+- [x] 2.1 Regenerate distributions and verify affected suites in their supported environments.
+- [x] 2.2 Execute applicable upstream assessments and independent review, resolve concrete findings and verify implementation against the amendment.

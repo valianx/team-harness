@@ -91,6 +91,7 @@ def main() -> int:
         env = {
             **os.environ,
             "HOME": str(home),
+            "USERPROFILE": str(home),
             "CODEX_HOME": str(codex),
             "OPENCODE_CONFIG_DIR": str(opencode),
         }
@@ -110,6 +111,7 @@ def main() -> int:
                 json.dumps(routes),
             )
             require(configured.returncode == 0, configured.stderr)
+            require(Path(json.loads(configured.stdout)["path"]) == target, f"{runtime} escaped temporary config")
             require(json.loads(configured.stdout)["routeCount"] == 2, "route count mismatch")
             document = json.loads(target.read_text(encoding="utf-8"))
             require(document["opaque"]["preserve"] is True, f"{runtime} clobbered opaque config")
