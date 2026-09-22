@@ -34,7 +34,7 @@ func TestProviderTierMaps_AnthropicValues_AC1(t *testing.T) {
 	assertTierMapEquals(t, "providerTierFamily[anthropic]", providerTierFamily["anthropic"], wantFamily)
 
 	wantConcrete := map[string]string{
-		"default": "claude-opus-4-6",
+		"default": "claude-opus-5-5",
 		"medium":  "claude-sonnet-4-6",
 		"low":     "claude-haiku-4-5",
 	}

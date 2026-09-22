@@ -237,8 +237,8 @@
     "surface": "agent",
     "tierProvider": "anthropic",
     "input": "---\nname: architect\ndescription: Software architect\nmodel: opus\ntools: Read, Edit, Bash\n---\nBody text here.\n",
-    "expectedOutput": "---\nname: architect\ndescription: Software architect\nmodel: anthropic/claude-opus-4-6\nmode: subagent\nth-origin: opencode\n---\nBody text here.\n",
-    "note": "#424 AC-9/AC-4: opt-in tiering bakes the pinned concrete id for the agent's CC source tier (opus -> default -> anthropic/claude-opus-4-6) instead of dropping model:."
+    "expectedOutput": "---\nname: architect\ndescription: Software architect\nmodel: anthropic/claude-opus-5-5\nmode: subagent\nth-origin: opencode\n---\nBody text here.\n",
+    "note": "#424 AC-9/AC-4: opt-in tiering bakes the pinned concrete id for the agent's CC source tier (opus -> default -> anthropic/claude-opus-5-5) instead of dropping model:."
   },
   {
     "name": "tiered_sonnet_bakes_anthropic_sonnet",

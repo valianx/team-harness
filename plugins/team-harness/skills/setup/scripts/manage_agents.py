@@ -37,9 +37,9 @@ ROLES = (
     "reviewer-consolidator",
 )
 MANAGED_MARKER = "# Code generated from runtime/schema/codex-agents.json; DO NOT EDIT."
-DEFAULT_SUBAGENT_MODEL = "gpt-5.6-luna"
+DEFAULT_SUBAGENT_MODEL = "gpt-6-luna"
 DEFAULT_SUBAGENT_REASONING_EFFORT = "max"
-LEGACY_SUBAGENT_PAIRS = frozenset({("gpt-5.6-terra", "medium")})
+LEGACY_SUBAGENT_PAIRS = frozenset({("gpt-5.6-terra", "medium"), ("gpt-5.6-luna", "max")})
 PROJECT_DOC_FALLBACK = "CLAUDE.md"
 RUNTIME_KEYS = (
     "default_subagent_model",
@@ -263,7 +263,10 @@ def write_runtime_config(path: Path, content: bytes) -> None:
     fd, temp_name = tempfile.mkstemp(prefix=path.name + ".tmp-", dir=path.parent)
     temp = Path(temp_name)
     try:
-        os.fchmod(fd, 0o600)
+        if hasattr(os, "fchmod"):
+            os.fchmod(fd, 0o600)
+        else:
+            os.chmod(temp, 0o600)
         with os.fdopen(fd, "wb") as stream:
             stream.write(content)
             stream.flush()

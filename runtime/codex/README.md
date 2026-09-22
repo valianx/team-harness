@@ -17,9 +17,9 @@ follows:
 | Canonical source | Codex model | Codex effort |
 |---|---|---|
 | `opus` + any allowed effort | `gpt-6-astra` | `xhigh` |
-| `sonnet` + `high` or `xhigh` | `gpt-5.6-luna` | `max` |
-| `sonnet` + `medium` | `gpt-5.6-luna` | `max` |
-| `haiku` + any allowed effort | `gpt-5.6-luna` | `max` |
+| `sonnet` + `high` or `xhigh` | `gpt-6-luna` | `max` |
+| `sonnet` + `medium` | `gpt-6-luna` | `max` |
+| `haiku` + any allowed effort | `gpt-6-luna` | `max` |
 
 The critical installed roles (`architect`, `qa`, `security`, and
 `pr-review-verifier`) use Astra at `xhigh`, preserving their existing reasoning
@@ -42,7 +42,7 @@ logical role adapters while leaving model and effort unset for explicit live
 dispatch. These files are committed so a trusted checkout works
 without a build step. Do not edit generated files directly.
 
-The generated project config uses `gpt-5.6-luna` at `max` as its generic
+The generated project config uses `gpt-6-luna` at `max` as its generic
 subagent fallback without overriding Main's selected model, adds `CLAUDE.md` as
 an ordered project-instruction fallback when `AGENTS.md` is absent, and enables
 both `multi_agent` and `multi_agent_v2`. It deliberately omits

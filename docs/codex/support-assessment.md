@@ -94,7 +94,7 @@ frontmatter and applies the operator-approved mapping:
 |---|---|
 | `opus` + `xhigh` | `gpt-6-astra` + `xhigh` |
 | other `opus` | `gpt-6-astra` + `xhigh` |
-| non-`opus` | `gpt-5.6-luna` + `max` |
+| non-`opus` | `gpt-6-luna` + `max` |
 
 The generated per-role roster is committed at `.codex/README.md` and checked by
 CI; canonical agent prose does not contain Codex-specific model identifiers.

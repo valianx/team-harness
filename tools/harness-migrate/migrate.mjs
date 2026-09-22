@@ -42,7 +42,7 @@ const ANTHROPIC_PREFIX = "anthropic/";
  * Content must stay byte-identical to aliasToConcreteModel in cmd/install/transform.go.
  */
 const ALIAS_TO_CONCRETE_MODEL = {
-  opus: "claude-opus-4-6",
+  opus: "claude-opus-5-5",
   sonnet: "claude-sonnet-4-6",
   haiku: "claude-haiku-4-5",
 };
@@ -90,7 +90,7 @@ const PROVIDER_TIER_FAMILY = {
  */
 const PROVIDER_TIER_CONCRETE = {
   anthropic: {
-    default: "claude-opus-4-6",
+    default: "claude-opus-5-5",
     medium: "claude-sonnet-4-6",
     low: "claude-haiku-4-5",
   },

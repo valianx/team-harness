@@ -141,7 +141,7 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
   if (!projectDefaults || typeof projectDefaults !== "object" || Array.isArray(projectDefaults)) {
     fail("project_defaults must be an object");
   }
-  if (projectDefaults.default_subagent_model !== "gpt-5.6-luna"
+  if (projectDefaults.default_subagent_model !== "gpt-6-luna"
       || projectDefaults.default_subagent_reasoning_effort !== "max") {
     fail("project_defaults must set the generic Luna/max fallback");
   }
