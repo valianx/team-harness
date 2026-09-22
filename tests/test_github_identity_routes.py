@@ -54,7 +54,9 @@ def main() -> int:
         require(copy.read_bytes() == canonical_bytes, f"generated helper content drifted: {copy}")
 
     with tempfile.TemporaryDirectory() as raw_temp:
-        temp = Path(raw_temp)
+        # Windows runners may expose TEMP through an 8.3 alias or junction.
+        # Use the same canonical root as the runtime config resolver.
+        temp = Path(raw_temp).resolve()
         home = temp / "home"
         codex = temp / "codex"
         opencode = temp / "opencode"
