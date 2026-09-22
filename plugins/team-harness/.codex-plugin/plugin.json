@@ -21,7 +21,7 @@
   "interface": {
     "displayName": "Team Harness",
     "shortDescription": "Shared workflows, diagrams, GCP, and delivery.",
-    "longDescription": "Use the complete shared Team Harness skill catalog in Codex through native runtime adapters, including diagrams, GCP, research, review, setup, updates, lightweight intake, and the explicitly gated delivery pipeline.",
+    "longDescription": "Use Team Harness workflows in Codex with the native general agent: lightweight spec development, coordinated pipeline work, independent review, PR creation, diagrams, GCP, research, setup and updates.",
     "developerName": "Mario Gutierrez",
     "category": "Developer Tools",
     "capabilities": [
@@ -34,7 +34,7 @@
       "@Team-Harness setup: configure Team Harness for Codex.",
       "@Team-Harness update: update the Codex marketplace, plugin, configuration, and installed agents.",
       "@Team-Harness init: help me frame or handle this task without starting the full pipeline.",
-      "@Team-Harness pipeline: explicitly start the full gated workflow for this change in the current Main thread.",
+      "@Team-Harness pipeline: coordinate this change through Spec, Implementation, Validation and Publication in the current task.",
       "Use Team Harness to create an architecture diagram for this repository.",
       "Use Team Harness to inspect GCP infrastructure in read-only plan mode.",
       "Continue implementation of the active approved Team Harness pipeline.",

@@ -96,8 +96,8 @@ $team-harness:setup
 
 The setup skill configures native Team Harness settings, optional MCP servers,
 workspace/language preferences, optional workspace-to-GitHub identity routes,
-and native agents for the coordinated pipeline, direct read-only review,
-immutable PR review, and spec validation/PR completion. The generated
+and native specialists for useful pipeline work and independent local/PR review.
+The principal executes spec validation and create-pr by default. The generated
 [agent roster](.codex/README.md) lists their models and roles. Setup preserves
 Codex's native permission and hook-trust prompts. It can also import every
 missing setting from an existing Claude Code or opencode Team Harness config;

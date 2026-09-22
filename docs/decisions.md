@@ -2,7 +2,7 @@
 
 > Overflow file for CLAUDE.md §8 Architecture Decisions. Most recent entries stay inline in CLAUDE.md; older entries accumulate here.
 
-> Current route authority is `docs/pipeline-lanes.md`: exactly two live postures exist — `inline` (direct default, including explicitly chosen sensitive inline work and live ad-hoc tester/QA/security reviews) and `pipeline` (the canonical full v3 sequence). Legacy lane, express/full, fast/simple, and tier markers are migration history only and never select a route or bypass a gate.
+> Current working methods are described in `docs/pipeline-lanes.md`: direct work, lightweight spec development with Main, and an operator-selected pipeline for useful coordination. The dated gate, Freeze, control-plane and role-routing decisions below are historical; they do not add requirements to current skills.
 
 - **2026-09-01 — Frozen-candidate security replaces the pipeline adversary
   dispatch.** Main derives impact from the canonical type-agnostic classifier
