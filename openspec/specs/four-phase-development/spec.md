@@ -14,8 +14,8 @@ TH SHALL present Spec, Implementation, Validation and Publication as the visible
 - **THEN** the coordinator produces canonical intent and tasks, testing strategy and the workspace plan, reports the next phase, and leaves future implementation, validation and publication work pending
 
 #### Scenario: Development advances to validation
-- **WHEN** implementation and focused tests are available
-- **THEN** the coordinator presents validation as its own phase with the selected checks, provider assessments and independent reviews instead of hiding their execution inside an implementation-complete claim
+- **WHEN** implementation and focused tests are available and the operator has not explicitly requested an earlier stop
+- **THEN** the coordinator continues directly into validation without waiting for another operator message, presents its selected checks, provider assessments and independent reviews as a distinct phase, and reports their actual execution before claiming completion
 
 #### Scenario: Implementation produces its expected work
 - **WHEN** authorized implementation tasks are performed

@@ -23,6 +23,10 @@ Plain-language requests such as “implement this spec”, “validate this chan
 continue through the PR” select the corresponding work; they are not new commands.
 Existing PR review still uses [review-pr](../../review-pr/SKILL.md).
 
+An implementation request includes applicable Validation: continue directly after
+implementation without waiting for another operator message. Keep the phases
+visible as successive work and honor an explicit request to stop earlier.
+
 ## Phase outcomes
 
 | Phase | Inputs and expected work | Outputs and completion evidence |
