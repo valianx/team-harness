@@ -96,10 +96,14 @@ contracts listed below.
 | `test_openspec_scope.py` | Every active OpenSpec change against the repository-owned rules in `openspec/config.yaml` — a non-empty delta, a declared capability, proposal words, task items and requirement ceiling. A change whose every task is checked but is not archived prints a WARN. Optional benchmark measurements stay in the workspace. |
 | `test_design_oversize_behavioral.sh` | The design requirement-count ceiling — an oversize delta is decided from the canonical delta and `openspec/config.yaml` alone, with no workspace, identity, or gate input or output |
 | `test_retired_phrases.py` | The closed retired-phrase list behind `/th:lint` Check 12 — a contract that restates a helper's flags, decision procedure, or attempt ordinals, plus the shrink-only exemption map |
-| `test_workspace_artifacts.py` | Every workspace artifact a scanned pipeline contract names is registered in `tests/fixtures/workspace-artifacts.json` with a producer that mentions it, or is `retired` and absent from the scan; the oracle behind the v5 specialist read contracts |
 | `test_authoring_budgets.py` | Advisory word/line/contents health signals, plus the shrink-only word ceilings recorded in `tests/fixtures/authoring-baseline.json`. Three things fail: a contents link pointing to no real heading, a ceiling raised above (or an entry dropped from) the fixture at the base ref, and a ceiling violation — a file over its ceiling, or a ceiling left more than 2% above a file's current count |
 
 **Installer, runtime, and tooling.**
+
+The fixed workspace-artifact registry and its prose mention check were retired
+with native assignments. Current evidence may use caller-selected paths; reference
+resolution and independent scenario review cover the guidance, while legacy helper
+behavior remains covered by its executable suites.
 
 | Suite | Covers |
 |---|---|
