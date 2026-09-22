@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.41.0] - 2026-09-22
+
+### Changed
+- Use GPT-6 Luna/max for bounded Codex specialists and the generic fallback, preserving Astra/xhigh and custom model choices.
+- Update OpenCode's Anthropic Opus pin to 5.5 and document native Claude Code alias requirements.
+
+### Fixed
+- Migrate prior managed fallback pairs with backups and idempotence, including native Windows configuration writes.
+
 ## [3.40.0] - 2026-09-22
 
 ### Changed

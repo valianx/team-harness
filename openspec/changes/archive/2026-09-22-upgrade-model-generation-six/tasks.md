@@ -6,5 +6,5 @@
 
 ## 2. Validation and completion
 
-- [ ] 2.1 Regenerate distributions and run focused generation, setup/convergence, converter and documentation checks.
-- [ ] 2.2 Complete upstream assessments, independent review and OpenSpec implementation verification; resolve actual defects and archive the completed change.
+- [x] 2.1 Regenerate distributions and run focused generation, setup/convergence, converter and documentation checks.
+- [x] 2.2 Complete upstream assessments, independent review and OpenSpec implementation verification; resolve actual defects and archive the completed change.
