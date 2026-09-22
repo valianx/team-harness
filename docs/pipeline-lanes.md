@@ -32,6 +32,9 @@ using context and requested coverage.
 Use `spec` when written intent and tasks help one bounded objective. It supports
 independent specialist work and sequential repositories without becoming a
 pipeline. Reuse canonical OpenSpec, workspace, checks and the create-pr skill.
+Main keeps planning, implementation and decisions; the
+[completion phase agents](../skills/spec/references/phase-agents.md) execute
+validation and PR preparation/publication through the native runtime.
 
 ## Legacy route markers (compatibility only)
 

@@ -130,8 +130,8 @@ Use the current `skills/spec/SKILL.md` route for deciding when written intent,
 OpenSpec artifacts, and task decomposition help. This reference does not
 duplicate that predicate or add hard routers based on specialist counts or
 repository count. The route reuses the selected absolute workspace and current
-plan/tasks/notes; optional native bounded delegation and author review are
-available when useful.
+plan/tasks/notes. Validation and PR execution use the spec phase agents;
+bounded implementation delegation and author review remain available.
 The route does not create extra state, event, telemetry, or knowledge-context
 scaffolding for ordinary direct work. Security or adversarial review runs only
 when the operator or the current spec contract requests it; no automatic

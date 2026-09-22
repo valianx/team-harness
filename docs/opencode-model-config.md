@@ -1,8 +1,9 @@
 # opencode model configuration
 
 How team-harness assigns models to opencode agents. The default is the
-**model-less baseline**: opencode agents carry no `model:` field, so the whole harness
-follows the operator's runtime model selection on any provider. An **opt-in,
+**model-less baseline** for ordinary roles: opencode agents inherit the operator's
+runtime model selection. The two completion roles below have explicit Sol defaults.
+An **opt-in,
 additive per-provider cost-tiering layer** (issue #424) sits on top of this baseline —
 see "Per-provider cost tiering (opt-in, shipped)" — and bakes a concrete model id per
 agent for one selected provider when the operator turns it on. This supersedes the
@@ -11,24 +12,37 @@ this file's history.
 
 ## Decision: model-less agents (the v1 baseline)
 
-Every opencode agent th ships — the primary `orchestrator` **and** every subagent —
-is emitted with **no `model:` line**. Consequences (per opencode's own inheritance
+Ordinary opencode agents are emitted with **no `model:` line** unless provider
+tiering is selected. The completion roles are explicit exceptions. Consequences
+for model-less roles (per opencode's own inheritance
 rules, confirmed below):
 
 - **Primary (`orchestrator`):** inherits the **globally selected model** — the
   operator's `/model` pick at runtime.
 - **Subagents:** inherit the **model of the primary that invoked them**.
 
-So picking a provider/model once via `/model` moves the entire harness onto it.
-Switching provider is a single `/model` change — every agent follows. No baked id,
-no provider lock-in, and no `ProviderModelNotFoundError` from an id a given
-provider does not serve.
+Picking a provider/model once moves the model-less roles onto it. Their inherited
+selection has no baked provider id; explicitly configured roles retain theirs.
 
 **The tradeoff — uniform cost.** Because subagents inherit the primary's model,
-**every agent runs at the selected model's tier**. A cheap validation step costs the
+**each model-less agent runs at the selected model's tier**. A model-less validation step costs the
 same as the primary. This is the deliberate v1 baseline: it runs on every
-provider out of the box. Cost differentiation is added later, per provider, as each
-is actually adopted.
+provider out of the box. Explicit role defaults and opt-in tiering differ below.
+
+## Explicit completion roles
+
+Direct/spec `spec-validator` and `pr-creator` use `openai/gpt-6-sol` with
+`reasoningEffort: high` and `medium` respectively. The role transform applies
+these defaults to their canonical Opus sources in both the Go installer and JS
+migration route; it leaves concrete custom model choices and other roles alone.
+These defaults apply even without Anthropic tiering and do not change the main
+agent or existing pipeline roles. The operator must have Sol available through
+the configured OpenAI provider; missing access is reported, not silently replaced.
+
+The [OpenCode agent options](https://opencode.ai/docs/agents/#additional) support
+provider-specific `reasoningEffort`; [model identifiers](https://opencode.ai/docs/models/#set-a-default)
+use `provider/model`. Generated configuration proves the requested mapping, not
+account entitlement or live activation. Claude Code keeps native Opus for both roles.
 
 ## opencode rules we must obey (empirically confirmed)
 
@@ -76,7 +90,8 @@ The CC→opencode transform (`cmd/install/transform.go`, `tools/harness-migrate/
 projects each CC agent/command to opencode frontmatter and **drops the `model:` field
 entirely** — for both the agent and command surfaces. The CC source files under
 `agents/` keep their `model:`/tier (they remain the canonical Claude Code artifacts);
-only the opencode projection is model-less.
+the ordinary opencode projection is model-less. A subsequent role-specific layer
+applies the explicit completion defaults described above.
 
 The cross-language behavior is locked by `cmd/install/testdata/transform-conformance.json`
 (asserted by both the Go and the JS test runners) — the model-drop is encoded there so
@@ -88,7 +103,8 @@ Cost differentiation is added **for one provider at a time**, as each is adopted
 never forced up front. Because opencode requires a static literal (rule 1) and a
 model-less subagent cannot be a lower tier (rule 3), tiering means **baking a concrete
 `provider/model-id` into every agent**, derived from that agent's CC source tier. The
-default (no opt-in) stays model-less, byte-identical to the v1 baseline.
+default (no opt-in) for ordinary roles stays model-less; completion-role defaults
+are applied separately.
 
 **Anthropic is the only launch provider.** The architecture is provider-generic — the
 curated maps are keyed by provider, and the resolver takes a provider argument — so

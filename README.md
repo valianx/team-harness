@@ -28,6 +28,10 @@ the inputs, expected work, tools, outputs and completion evidence. It is shared
 by `spec` and the explicitly selected `pipeline`; it does not activate a
 pipeline, add a permission gate or require every available tool.
 
+In `spec`, the current agent retains planning, implementation and decisions.
+It invokes [two native phase agents](skills/spec/references/phase-agents.md)
+for validation and PR preparation/publication, reusing the workspace and evidence.
+
 Independent specialists contribute findings and recommendations. The coordinator
 judges them against the objective and available evidence, verifies corrections,
 and continues the authorized work. Workspace and Obsidian support preserve

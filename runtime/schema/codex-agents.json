@@ -215,6 +215,41 @@
       "output_path": ".codex/agents/delivery.toml"
     },
     {
+      "name": "spec-validator",
+      "description": "Executes bounded validation and upstream assessments for direct/spec work, returning evidence and recommendations to Main.",
+      "semantic_source": "agents/spec-validator.md",
+      "sandbox_mode": "workspace-write",
+      "capabilities": [
+        "filesystem-read",
+        "filesystem-write",
+        "command-exec"
+      ],
+      "runtime_override": {
+        "model": "gpt-6-sol",
+        "reasoning_effort": "high"
+      },
+      "instruction_source": "runtime/codex/instructions/spec-validator.md",
+      "output_path": ".codex/agents/spec-validator.toml"
+    },
+    {
+      "name": "pr-creator",
+      "description": "Prepares a candidate and executes its authorized PR publication using existing validation evidence and the create-pr skill.",
+      "semantic_source": "agents/pr-creator.md",
+      "sandbox_mode": "workspace-write",
+      "capabilities": [
+        "filesystem-read",
+        "filesystem-write",
+        "command-exec",
+        "external-write"
+      ],
+      "runtime_override": {
+        "model": "gpt-6-sol",
+        "reasoning_effort": "medium"
+      },
+      "instruction_source": "runtime/codex/instructions/pr-creator.md",
+      "output_path": ".codex/agents/pr-creator.toml"
+    },
+    {
       "name": "pipeline-architect",
       "role": "architect",
       "model_policy": "spawn",

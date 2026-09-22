@@ -26,6 +26,14 @@ The critical installed roles (`architect`, `qa`, `security`, and
 effort. Bounded roles and the generic fallback use Luna at `max`. Main keeps
 the model selected in the active chat.
 
+The direct/spec completion roles are explicit exceptions: `spec-validator` uses
+`gpt-6-sol`/`high` and `pr-creator` uses `gpt-6-sol`/`medium`. Their canonical
+Claude roles retain Opus. These role-specific projections do not change the
+generic fallback or existing pipeline role assignments.
+The registry expresses each exception as a `runtime_override` model/effort pair.
+Native inherited profiles still omit explicit model fields, and spawn-policy
+pipeline aliases cannot carry this override.
+
 Every role must match exactly one data-driven tier. The generator rejects an
 unmapped or multiply mapped role, invalid role/source/output paths,
 capabilities, sandbox modes, and profile values.

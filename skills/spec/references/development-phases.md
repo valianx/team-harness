@@ -27,6 +27,11 @@ An implementation request includes applicable Validation: continue directly afte
 implementation without waiting for another operator message. Keep the phases
 visible as successive work and honor an explicit request to stop earlier.
 
+In spec/direct work, Main invokes the [completion phase agents](phase-agents.md)
+for Validation and PR execution. Main retains Spec, implementation and decisions;
+the existing pipeline specialists remain unchanged. The assigned executor runs
+its skill in place, reuses current evidence and returns results to Main.
+
 ## Phase outcomes
 
 At planning/resumption, read the repository's contributor and delivery conventions

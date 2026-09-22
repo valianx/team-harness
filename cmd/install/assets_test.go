@@ -57,6 +57,7 @@ func TestEmbeddedAssets_AllExpectedAgents(t *testing.T) {
 		"gcp-infra", "implementer", "init-project", "inline-reviewer",
 		"likec4-diagrammer", "mentor",
 		"orchestrator", "plan-reviewer", "qa", "research-consolidator",
+		"spec-validator", "pr-creator",
 		"pr-review-qa", "pr-review-security", "pr-review-verifier", "researcher", "reviewer",
 		"reviewer-consolidator", "security", "tester",
 		"translator", "ux-reviewer",

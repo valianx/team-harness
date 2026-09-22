@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.42.0] - 2026-09-22
+
+### Added
+- Delegate spec validation and PR preparation to native Sol/Opus agents while retaining Main decisions and pipeline behavior.
+
 ## [3.41.0] - 2026-09-22
 
 ### Changed

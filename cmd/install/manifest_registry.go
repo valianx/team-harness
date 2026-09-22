@@ -399,8 +399,13 @@ func opencodeRuntimeTransform(src []byte, kind, sourcePath string) ([]byte, erro
 	parts := strings.Split(sourcePath, "/")
 	filename := parts[len(parts)-1]
 	agentName := strings.TrimSuffix(filename, ".md")
+	sourceFrontmatter, _, err := parseFrontmatterYAML(src)
+	if err != nil {
+		return nil, fmt.Errorf("opencodeRuntimeTransform source parse: %v", err)
+	}
+	sourceModel, _ := sourceFrontmatter["model"].(string)
 
-	return applyModeByRole(transformed, agentName)
+	return applyModeByRole(transformed, agentName, sourceModel)
 }
 
 // opencodeRuntimeTransformTiered is opencodeRuntimeTransform's opt-in
@@ -422,6 +427,11 @@ func opencodeRuntimeTransformTiered(src []byte, kind, sourcePath, provider strin
 	parts := strings.Split(sourcePath, "/")
 	filename := parts[len(parts)-1]
 	agentName := strings.TrimSuffix(filename, ".md")
+	sourceFrontmatter, _, err := parseFrontmatterYAML(src)
+	if err != nil {
+		return nil, fmt.Errorf("opencodeRuntimeTransformTiered source parse: %v", err)
+	}
+	sourceModel, _ := sourceFrontmatter["model"].(string)
 
-	return applyModeByRole(transformed, agentName)
+	return applyModeByRole(transformed, agentName, sourceModel)
 }

@@ -17,8 +17,12 @@ activate it. Skill selection itself never grants push, PR, merge, or issue-closi
 
 Do not route review of an existing PR, application of review comments, or a merge-only
 request through this skill; use `review-pr`, `apply-review`, or the repository's merge
-flow. The coordinator owns this workflow. Do not create a nested orchestrator, require
-a specialist by default, or weaken native runtime permissions. Keep the instructions
+flow. For direct/spec work, Main invokes `pr-creator` through the shared
+[phase-agent handoff](../spec/references/phase-agents.md), passing the exact
+preparation/publication endpoint and existing evidence. The assigned agent executes
+these checkpoints in place; it never dispatches itself again. Main owns decisions
+and Git sequencing. An active pipeline retains its existing delivery mechanics.
+Do not create a nested orchestrator or weaken native runtime permissions. Keep the instructions
 portable across Claude Code, Codex, and OpenCode by using the active runtime's native
 tools and existing repository helpers.
 
@@ -29,6 +33,9 @@ Recover the existing plan, selected capabilities and exact evidence links. Resol
 missing relevant validation within the authorized scope; do not restart completed
 stages, relabel stale receipts or treat pending accepted review as declined.
 Preparation may occur during Validation; outward publication follows it.
+Reuse the PR agent's session and prepared artifacts across checkpoints. Return
+missing validation, behavioral repairs or a changed publication candidate to Main
+instead of repeating assessments or substituting a new candidate autonomously.
 
 Before final review or publication authorization, resolve the exact repository, working branch,
 base, candidate head, and intended PR scope. Respect repository instructions, project

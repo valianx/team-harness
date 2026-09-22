@@ -217,8 +217,8 @@ may proceed. Any PR intent, number, or URL routes to `review-pr` for its snapsho
 and review procedure.
 
 Skill activation cannot itself change Main's selected model, reasoning effort,
-sandbox, or approval policy. The projection below applies to the thirteen
-standard installed specialists:
+sandbox, or approval policy. The standard projection follows source tiers,
+with the two direct/spec completion-role exceptions below:
 
 | Claude role metadata | Codex model | Effort |
 |---|---|---|
@@ -226,6 +226,8 @@ standard installed specialists:
 | `sonnet` + `high` or `xhigh` | `gpt-6-luna` | `max` |
 | `sonnet` + `medium` | `gpt-6-luna` | `max` |
 | `haiku` | `gpt-6-luna` | `max` |
+| `spec-validator` (source `opus`) | `gpt-6-sol` | `high` |
+| `pr-creator` (source `opus`) | `gpt-6-sol` | `medium` |
 
 For a coordinated workflow, an unambiguous live request such as “pipeline en
 Luna max” selects one ephemeral model/effort pair for native role assignments.

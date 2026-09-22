@@ -6,8 +6,9 @@ description: Develop through Spec, Implementation, Validation and Publication wi
 # Spec Lane (direct mode)
 
 Use OpenSpec for a bounded objective that benefits from durable written intent
-and tasks. Main coordinates implementation and useful native specialist work in
-the shared workspace, without activating a pipeline.
+and tasks. Main keeps planning, implementation and decisions in the chat;
+Validation and PR execution use the [native phase agents](references/phase-agents.md)
+in the same workspace, without activating a pipeline.
 
 When PR preparation or publication is relevant, use [create-pr](../create-pr/SKILL.md)
 automatically; selecting it does not activate the pipeline.
@@ -101,18 +102,20 @@ phase's outputs; later assessments remain pending.
 
 ### 3. Validation
 
-Use [validate](../validate/SKILL.md) with the plan's selected checks and
+Invoke `spec-validator` through [phase agents](references/phase-agents.md) to
+execute [validate](../validate/SKILL.md) with the plan's selected checks and
 diagnostics, including real CRAP when selected for changed executable functions.
-After implementation and relevant tests, execute TEA test-review and trace,
+After implementation and relevant tests, the agent executes TEA test-review and trace,
 selected NFR work, Superpowers verification-before-completion and upstream
 OpenSpec implementation verify. Use the [provider reference](references/upstream-tools.md)
 for inputs, outputs and reuse; structural validate and optional TH review do
 not replace implementation verification.
 
-Resolve actual completion defects. Use [create-pr](../create-pr/SKILL.md)'s
-preparation checkpoint for agreed PR delivery, otherwise the [lifecycle](references/lifecycle.md)
+Main judges the returned evidence and resolves actual completion defects.
+Invoke `pr-creator` for [create-pr](../create-pr/SKILL.md)'s preparation checkpoint
+for agreed PR delivery, otherwise use the [lifecycle](references/lifecycle.md)
 directly. Prepare completed archive and living specs on the delivery branch
-before committing the final review candidate.
+before committing the final review candidate; renew affected evidence only.
 
 Use [verify](../verify/SKILL.md) for the committed candidate, binding the exact
 archived change when applicable. Reuse the live selection and completion rules
@@ -126,7 +129,7 @@ starting another full review or manufacturing a pass.
 
 For local completion, report the result and remaining limits without creating
 a PR. For PR delivery, satisfy the existing [author-review conditions](references/author-review.md)
-and use [create-pr](../create-pr/SKILL.md)'s publication checkpoint. A pending
+and resume `pr-creator` for [create-pr](../create-pr/SKILL.md)'s publication checkpoint. A pending
 review choice or incomplete accepted review retains its existing treatment;
 preparing a PR does not itself authorize publication.
 

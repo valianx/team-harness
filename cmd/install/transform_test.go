@@ -2,8 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -239,6 +242,142 @@ func TestTransform_ModeByRole_NonOrchestrator(t *testing.T) {
 	}
 	if strings.Contains(string(final), "TH-orchestrator") {
 		t.Error("non-orchestrator agent must never receive the coordinator's TH-orchestrator display name")
+	}
+}
+
+// runNodeRoleTransform exercises the actual JavaScript installer role layer so
+// the Go and JS projections can be compared byte-for-byte. The generic
+// conformance fixture intentionally remains unchanged; this helper covers the
+// separate installer-specific phase-role layer.
+func runNodeRoleTransform(t *testing.T, input, agentName string, tiered bool) []byte {
+	t.Helper()
+	nodeBinary := "node"
+	if _, err := exec.LookPath(nodeBinary); err != nil {
+		t.Skip("Node.js is unavailable for JS/Go role-layer parity")
+	}
+	var projection string
+	if tiered {
+		projection = fmt.Sprintf(
+			`transformToOpencodeTiered("agents/%s.md", input, "/repo", "anthropic")`,
+			agentName,
+		)
+	} else {
+		projection = fmt.Sprintf(
+			`transformToOpencode("agents/%s.md", input, "/repo")`,
+			agentName,
+		)
+	}
+	script := fmt.Sprintf(`
+import { readFileSync } from "node:fs";
+import { applyModeByRole, parseFrontmatter, transformToOpencode, transformToOpencodeTiered } from "./tools/harness-migrate/migrate.mjs";
+const input = readFileSync(0, "utf8");
+const projected = %s;
+process.stdout.write(applyModeByRole(projected.content, %q, parseFrontmatter(input).frontmatter.model));
+`, projection, agentName)
+	cmd := exec.Command(nodeBinary, "--input-type=module", "-e", script)
+	cmd.Dir = filepath.Join("..", "..")
+	cmd.Stdin = strings.NewReader(input)
+	got, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("node role transform failed for %s (tiered=%t): %v\n%s", agentName, tiered, err, got)
+	}
+	return got
+}
+
+func TestTransform_PhaseRoleDefaultsAndJSGoParity(t *testing.T) {
+	cases := []struct {
+		name   string
+		effort string
+	}{
+		{name: "spec-validator", effort: "high"},
+		{name: "pr-creator", effort: "medium"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			input := "---\nname: " + tc.name + "\nmodel: opus\neffort: " + tc.effort + "\ntools: Read, Bash\n---\nBody.\n"
+			got, err := opencodeRuntimeTransform([]byte(input), TransformKindAgent, "agents/"+tc.name+".md")
+			if err != nil {
+				t.Fatalf("role transform error: %v", err)
+			}
+			text := string(got)
+			if !strings.Contains(text, "model: openai/gpt-6-sol\n") {
+				t.Fatalf("missing Sol model in role layer:\n%s", text)
+			}
+			if !strings.Contains(text, "reasoningEffort: "+tc.effort+"\n") {
+				t.Fatalf("missing native reasoningEffort in role layer:\n%s", text)
+			}
+			js := runNodeRoleTransform(t, input, tc.name, false)
+			if string(js) != text {
+				t.Fatalf("JS/Go role-layer mismatch\nGo:\n%s\nJS:\n%s", text, js)
+			}
+		})
+	}
+}
+
+func TestTransform_PhaseRoleCanonicalAliasOverridesTieredModel(t *testing.T) {
+	input := "---\nname: spec-validator\nmodel: opus\neffort: high\ntools: Read, Bash\n---\nBody.\n"
+	got, err := opencodeRuntimeTransformTiered([]byte(input), TransformKindAgent, "agents/spec-validator.md", "anthropic")
+	if err != nil {
+		t.Fatalf("tiered role transform error: %v", err)
+	}
+	text := string(got)
+	if !strings.Contains(text, "model: openai/gpt-6-sol\n") {
+		t.Fatalf("canonical Opus role was not routed to Sol:\n%s", text)
+	}
+	if strings.Contains(text, "model: anthropic/claude-opus") {
+		t.Fatal("tiered Anthropic model was not replaced by the canonical Sol role default")
+	}
+	if !strings.Contains(text, "reasoningEffort: high\n") {
+		t.Fatalf("role effort default missing beside concrete model:\n%s", text)
+	}
+	js := runNodeRoleTransform(t, input, "spec-validator", true)
+	if string(js) != text {
+		t.Fatalf("JS/Go tiered role-layer mismatch\nGo:\n%s\nJS:\n%s", text, js)
+	}
+}
+
+func TestTransform_PhaseRolePreservesCustomConcreteSource(t *testing.T) {
+	input := "---\nname: spec-validator\nmodel: anthropic/custom-validation\neffort: high\ntools: Read, Bash\n---\nBody.\n"
+	got, err := opencodeRuntimeTransformTiered([]byte(input), TransformKindAgent, "agents/spec-validator.md", "anthropic")
+	if err != nil {
+		t.Fatalf("custom concrete role transform error: %v", err)
+	}
+	text := string(got)
+	if !strings.Contains(text, "model: anthropic/custom-validation\n") {
+		t.Fatalf("custom concrete source model was not preserved:\n%s", text)
+	}
+	if strings.Contains(text, "model: openai/gpt-6-sol\n") || strings.Contains(text, "reasoningEffort:") {
+		t.Fatalf("custom concrete source received canonical Sol defaults:\n%s", text)
+	}
+	js := runNodeRoleTransform(t, input, "spec-validator", true)
+	if string(js) != text {
+		t.Fatalf("JS/Go custom concrete role-layer mismatch\nGo:\n%s\nJS:\n%s", text, js)
+	}
+}
+
+func TestTransform_OrdinaryOpusAndPipelineRoleRemainUnchanged(t *testing.T) {
+	input := "---\nname: architect\nmodel: opus\neffort: xhigh\ntools: Read\n---\nBody.\n"
+	got, err := opencodeRuntimeTransform([]byte(input), TransformKindAgent, "agents/architect.md")
+	if err != nil {
+		t.Fatalf("ordinary Opus transform error: %v", err)
+	}
+	text := string(got)
+	if strings.Contains(text, "reasoningEffort:") || strings.Contains(text, "model:") {
+		t.Fatalf("ordinary Opus role unexpectedly received phase defaults:\n%s", text)
+	}
+	if !strings.Contains(text, "mode: subagent\n") || !strings.Contains(text, "name: architect\n") {
+		t.Fatalf("ordinary Opus role changed its existing projection:\n%s", text)
+	}
+
+	// Pipeline aliases are registry-level spawn identities. Their generated
+	// Codex agents are checked separately; this assertion makes the transform
+	// layer's role map explicit: no pipeline alias receives phase defaults.
+	pipeline, err := opencodeRuntimeTransform([]byte(input), TransformKindAgent, "agents/pipeline-architect.md")
+	if err != nil {
+		t.Fatalf("pipeline transform error: %v", err)
+	}
+	if string(pipeline) != text {
+		t.Fatalf("pipeline alias changed ordinary role bytes:\nordinary:\n%s\npipeline:\n%s", text, pipeline)
 	}
 }
 
