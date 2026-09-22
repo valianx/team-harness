@@ -3,7 +3,7 @@
 
 ## Current workflow guidance
 
-- [pattern] Development follows Spec, Implementation, Validation and Publication, preserving selected tools and evidence in one workspace plan. → `skills/spec/references/development-phases.md`
+- [pattern] Development follows Spec, Implementation, Validation and Publication in one workspace; implementation continues directly into applicable validation unless the operator explicitly requests an earlier stop. → `skills/spec/references/development-phases.md`
 
 - [pattern] Spec invokes upstream TEA, Superpowers and OpenSpec verification at their stages; working reports share the configured workspace and provider methods remain external. → `skills/spec/references/upstream-tools.md`
 

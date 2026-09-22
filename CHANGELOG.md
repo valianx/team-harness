@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Development entries reuse intent and evidence through the requested endpoint across Codex, Claude Code and OpenCode.
+- Implementation continues directly into applicable validation unless the operator explicitly requests an earlier stop.
 - TEA spans design, selected implementation methods and validation through its installed upstream workflows.
 - Phase handoffs preserve advisory reviews, native permissions, archive before final review and clean PR contents.
 
