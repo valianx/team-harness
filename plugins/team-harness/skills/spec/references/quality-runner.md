@@ -1,5 +1,12 @@
 # Deterministic Quality Runner
 
+- [Functional contract](#functional-contract)
+- [Workspace manifest](#workspace-manifest)
+- [CRAP adapter contract](#crap-adapter-contract)
+- [CRAP validation workflow](#crap-validation-workflow)
+- [Invocation](#invocation)
+- [Cleaner integration](#cleaner-integration)
+
 The quality runner records deterministic evidence for repository-declared
 quality checks. It executes exact argument arrays against one clean Git
 candidate and emits a closed JSON evidence record. It does not select tools,

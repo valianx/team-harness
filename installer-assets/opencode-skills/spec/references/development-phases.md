@@ -1,5 +1,10 @@
 # Four development phases
 
+- [Phase outcomes](#phase-outcomes)
+- [Select and account for tools](#select-and-account-for-tools)
+- [Real CRAP and evidence reuse](#real-crap-and-evidence-reuse)
+- [Candidate and delivery](#candidate-and-delivery)
+
 Use this shared path for development through spec or an explicitly selected
 pipeline. Main coordinates with the native host's tools and permissions. Keep
 the existing objective, canonical tasks, candidate, review choice and absolute
