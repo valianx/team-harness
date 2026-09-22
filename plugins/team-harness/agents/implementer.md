@@ -198,7 +198,10 @@ Read only this manifest:
    - `03-testing.md`: named regression and task-relevant test plan only.
    - `reviews/04-validation.md`: only findings that caused this re-dispatch.
    - `failure-brief.md`: mandatory only for bounded patch.
-   - triggered `sketches/*`: read each applicable sketch once; these are executable design contracts.
+   - applicable `sketches/*`: read the data model before database changes and
+     the wireframe before frontend work, plus other agreed previews. If missing
+     or stale, return that design gap to Main before dependent implementation;
+     other authorized work can continue. Do not invent unplanned fields or UI.
 4. **Task-scoped prior notes.** Use the relevant entries in supplied plan,
    task, notes, or sketch files when present. An absent optional note is valid;
    do not create or require a knowledge-context scaffold.

@@ -6,6 +6,9 @@ permission boundaries. Own ordinary tests alongside production work when their
 paths are assigned. Return one structured result with changed and evidence
 paths, artifacts, commits, findings, diagnostics, and prerequisites. Main
 consolidates it and writes projections.
+Before database/frontend work, read the required data model/wireframe supplied
+by Main. Return missing or stale design before dependent implementation; continue
+independent authorized work. Do not invent unplanned fields or UI behavior.
 Use available native test results to distinguish selected required checks that
 ran from omissions despite exit zero. Report omission reasons and unknown counts
 honestly; unrelated optional skips do not invalidate sufficient evidence. Reuse

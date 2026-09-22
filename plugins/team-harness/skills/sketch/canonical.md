@@ -8,6 +8,33 @@ this skill does not start a pipeline or require a specialist or another gate.
 Use [workspace](../workspace/SKILL.md) for the effort's configured local or Obsidian
 home. Read the relevant intent, plan and existing sketches. Reuse a sketch when it
 already describes the same decision; create only the views needed for this request.
+Compare a reused preview with current requirements and the affected model or UI;
+use existing plan/decision notes to recover prior presentation and agreement.
+
+## Required before implementation
+
+In every workflow, always create or update and present a data model when the work
+changes the database, and a wireframe when it implements or changes frontend.
+The user does not need to request `sketch` separately. In spec and pipeline,
+deliver these during Spec before Implementation; if both surfaces change, deliver
+both. Direct or resumed implementation fills a missing or stale preview before
+working on that surface. Small fixes reuse an accurate preview and annotate the
+affected portion; size does not remove the design outcome. Other views below
+remain on demand. Work affecting neither surface needs no unrelated sketch.
+
+**Database:** cover structure, persisted data and migrations, including changes
+without added columns. Show the affected current and proposed entities, fields,
+relationships and constraints, with the minimum delta needed for the objective.
+For each new persisted field, state its requirement, producer and consumer, and
+why existing data or a computed value does not suffice. Do not add speculative
+fields for possible future use. Explain migration/backfill effects when relevant;
+for data-only changes, show the affected model and operation even if its structure
+stays the same. Use a diagram or table appropriate to the datastore.
+
+**Frontend:** show the affected screens/components, layout, interactions and
+relevant states, including changes to existing presentation or behavior. Reuse
+existing wireframes where accurate and show the proposed difference. A small
+change needs only the affected view and states, not a full application redesign.
 
 ## Choose a useful view
 
@@ -37,20 +64,30 @@ For an existing type's skeleton, read only its portion of the installed
 `agents/ref-architect-design.md` section **Sketches — triggers and skeletons**.
 From this skill, Claude Code and Codex use `../../agents/ref-architect-design.md`;
 OpenCode uses `../../th-references/agents/ref-architect-design.md`. Its skeletons
-are examples; select the views useful for the current objective.
+are examples; the applicability above governs current work, not historical
+classification booleans or gate instructions in that reference.
 
 ## Review and continue
 
 Present the sketch or a directly usable preview, link its file and identify the
-decisions the user can review. When the request is to see the proposal first,
-present it before implementing the proposed product change. A sketch request
-alone does not approve that implementation.
+decisions the user can review. Present required database/frontend previews before
+implementing the affected product change. Honor an explicit request to review
+first or stop at design. Otherwise continue already-authorized work after
+resolving material design questions; presentation adds no blanket approval step.
+A sketch request alone does not approve implementation.
 
-In [spec](../spec/SKILL.md), link requested sketches from `01-plan.md` and use the
+In [spec](../spec/SKILL.md), link required and requested sketches from `01-plan.md` and use the
 feedback in the existing proposal, design or tasks when it changes intended
 behavior. OpenSpec remains the canonical intent. Reuse the flow's existing approval;
 the sketch adds no second approval step. Implementation and validation consult the
 relevant agreed sketches alongside that intent; reconcile stale sketches visibly.
+During validation compare the actual model/migrations and frontend with those
+decisions. Surface unexplained fields or UI additions and resolve their necessity
+and scope: remove unnecessary additions, or update and present a justified design
+change and reconcile canonical intent before dependent work. Resolve missing
+material scope decisions with the operator; preserve authority already given.
+Passing tests alone do not justify additions. Keep working previews in the
+selected workspace, outside commits unless needed as a durable deliverable.
 
 In every flow, keep sketches as workspace decision aids with their useful formats
 and assigned ownership. They require no fixed set, classification record or

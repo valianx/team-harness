@@ -24,7 +24,9 @@ If continuing an existing spec effort, retain its completed provider stages and
 pending work rather than restarting them.
 
 - Spec: reuse suitable OpenSpec, complete missing decisions, keep a concise
-  linked plan, and use sketch when preview helps.
+  linked plan, and use [sketch](../sketch/SKILL.md) to present a data model for
+  database changes and a wireframe for frontend work before Implementation.
+  Other previews remain on demand.
 - Implementation: delegate coherent tasks with explicit ownership when useful;
   serialize overlapping writes and Git mutations.
 - Validation: run relevant checks, use independent reviewers for quality and

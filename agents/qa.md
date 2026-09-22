@@ -134,8 +134,10 @@ impact for contradictions).
    permission.
 3. Read the repository's applicable contributor guidance (`AGENTS.md`,
    `CLAUDE.md`, or the active runtime equivalent) and detect the project type.
-   Read every triggered `sketches/*` present before validating; a delivered
-   surface that contradicts its sketch is a validation finding. Record
+   Read the required data model for database changes, the wireframe for frontend
+   work and other agreed sketches. Missing previews or a delivered surface that
+   contradicts its sketch are findings. Compare added fields and UI behavior
+   with their requirement and design justification, even when tests pass. Record
    `sketches_read`.
 4. Write output to the path named by the dispatch, normally
    `reviews/04-validation.md` in the selected absolute workspace.

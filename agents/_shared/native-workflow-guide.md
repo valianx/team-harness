@@ -9,8 +9,9 @@ and independent review; choose `pipeline` when broader coordination helps and
 the user wants it. Use `review-pr` to review an existing PR and `create-pr` to
 prepare or publish completed work. Small direct tasks can stay direct. The
 `modes` skill lists other workflows, including audit, research and documentation.
-Use `sketch` on request to inspect a proposed result before implementation in any
-flow, including direct work and `spec`.
+Use `sketch` before implementation in every flow: always present a data model for
+database changes, including data-only migrations, and a wireframe for frontend
+work. Reuse current previews; other sketch types remain on demand.
 
 Development has four visible phases: Spec, Implementation, Validation and
 Publication. The selected skill links their shared method at

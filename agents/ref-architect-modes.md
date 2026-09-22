@@ -304,16 +304,14 @@ holds the mode contract):
 | 3 | Run suite; confirm regression passes, no suite regress | n/a | Verification | Step 2 |
 ```
 
-`01-plan.md` for a bug fix is structurally identical to the design-mode schema
-(`agents/ref-architect-design.md`) with two differences: delivery grouping is
-almost always `all-tasks-one-pr` (a split needs a closed-list reason), and per
-plan-reviewer Rule 8 the regression-test path appears in the task's `TC-N`
-block as `regression test exists at <TBD-Phase-2.0>` until the orchestrator
-mutates that one technical placeholder to the real path — functional ACs
-describe corrected behavior, never test existence. The compact operator plan
-carries no classification block. Return optional design-surface hints for
-sketch selection only; Main derives post-Freeze security impact independently
-from the frozen changed surface. Task entries cover confirming the mechanism,
-applying the correction, and verifying the result — combined into as few tasks
-as the fix genuinely needs;
-`01-plan.md` is always produced for a `type: fix` dispatch.
+Bug-fix `01-plan.md` follows the design-mode schema
+(`agents/ref-architect-design.md`). Delivery normally uses `all-tasks-one-pr`;
+splits need a closed-list reason. Per plan-reviewer Rule 8, the `TC-N` regression
+path remains `regression test exists at <TBD-Phase-2.0>` until Main supplies the
+real path; functional ACs describe corrected behavior, never test existence.
+The compact plan has no classification block. Optional hints inform sketches;
+database fixes still require a model and frontend fixes a wireframe before
+implementation under `skills/sketch/SKILL.md`. Main independently derives
+post-Freeze security impact from the frozen surface. Tasks cover diagnosis,
+correction and verification with only necessary steps. Produce `01-plan.md`
+for each `type: fix` dispatch.

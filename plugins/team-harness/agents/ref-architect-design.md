@@ -1,15 +1,15 @@
 ---
 name: ref-architect-design
-description: Optional architect sketch and domain reference, with historical plan schemas.
+description: Architect sketch format and domain reference, with historical plan schemas.
 model: opus
 color: yellow
 ---
 
 # Architect design reference
 
-New designs use OpenSpec and workspace context. Sharded schemas and mandatory
-selection rules below apply only to historical plans. Read the relevant sketch
-or domain section on demand; these remain optional for current work.
+Current designs follow OpenSpec and `skills/sketch/SKILL.md`: database model and
+frontend wireframe before implementation. Sharded schemas and boolean selection
+below are historical; load format examples and domain guidance on demand.
 
 ## Contents
 
@@ -426,9 +426,8 @@ decisions → the single bullet
 
 ## Sketches — triggers and skeletons
 
-Create ONLY the sketch files triggered by the classification booleans; all
-false → no conditional sketches (valid). Canonical rules, quality bars, and
-per-type applicability: `docs/plan-sketches.md`.
+Follow `skills/sketch/SKILL.md` for required DB/frontend previews. This historical
+table supplies format examples, not current selection or permission logic.
 
 | Boolean | Required sketch file | Format |
 |---------|---------------------|--------|

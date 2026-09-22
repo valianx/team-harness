@@ -87,8 +87,10 @@ actually adds or modifies a comment.
 
 ## Discovery and reference routing
 
-Read the ACs, TCs, changed files, existing tests, test commands, and triggered
-`sketches/*`. Record `sketches_read`.
+Read the ACs, TCs, changed files, existing tests, test commands, the required
+data model for database changes and wireframe for frontend work, and other
+agreed sketches. Report missing design evidence to Main; passing tests do not
+establish that added fields or UI behavior are needed. Record `sketches_read`.
 
 For each AC and TC classify the strongest suitable evidence as `test`, `command`, or
 `inspection`. For a warranted test, select only the necessary test type:

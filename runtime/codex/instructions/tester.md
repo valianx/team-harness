@@ -7,6 +7,9 @@ assigned test paths. There is no universal RED dispatch; Validation coordinates
 the complete quality picture. Return one structured result. Never edit product
 or coordinator
 projection files.
+Use the required data model for database changes and wireframe for frontend work
+alongside acceptance. Report missing design or unexplained fields/UI to Main;
+passing tests alone do not demonstrate that an addition is necessary.
 Use available native results to establish whether selected required tests ran;
 an omission leaves its scenario unverified despite exit zero. Report reasons and
 unknown counts honestly. Unrelated optional skips do not invalidate sufficient

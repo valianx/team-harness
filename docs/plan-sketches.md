@@ -1,7 +1,14 @@
-# Plan Sketches — Canonical Manifest
+# Plan Sketches — Current workflow and historical manifest
 
-This document is the **single source of truth** for the deterministic plan-stage sketches
-system. Three representations reference this document:
+Current applicability and delivery are owned by the
+[sketch skill](../skills/sketch/SKILL.md): always present a data model before
+database changes and a wireframe before frontend implementation in spec, pipeline
+and direct work. Reuse the selected local or Obsidian workspace and existing
+authorization. Other sketch types remain on demand. The classification, fixed
+sets and guard procedures retained below document historical pipelines; they
+do not override this workflow or require guard execution for new work.
+
+Three historical representations reference this manifest:
 
 1. **This file** (`docs/plan-sketches.md`) — canonical definitions, classification schema,
    fidelity ceilings, representation ceilings, per-type applicability, and the
@@ -28,13 +35,14 @@ what fields, what passed) is deterministic.
 **Fidelity ceiling:** inside the canonical pipeline, sketches are LOW-fidelity and
 changed-surface-only. They are throwaway decision aids, not production polish.
 
-Use the [sketch skill](../skills/sketch/SKILL.md) on demand in direct work or
-OpenSpec as well as pipeline work. Outside an active pipeline, select only the
-requested decision aids, keep them in the configured workspace and link them from
-the existing plan. They create no pipeline state, classification record or guard
-invocation. In `spec`, review them before the requested implementation and reflect
-agreed changes in canonical OpenSpec, using the flow's existing approval. The fixed
-sets, classification and gate procedures below apply only to active pipeline Design.
+Use the [sketch skill](../skills/sketch/SKILL.md) for the required database/frontend
+previews and other useful or requested views in every workflow. Keep them in the
+configured workspace and link them from the existing plan. They create no pipeline
+state, classification record or guard invocation. In `spec`, present them during
+Spec before Implementation and record agreed decisions in canonical OpenSpec,
+using the flow's existing approval. A required model explains the minimal delta
+and the requirement, producer and consumer of every new field; a wireframe shows
+affected screens, interactions and states. Validate delivery against these decisions.
 
 **Representation ceiling (global):** token-cheap text that renders in Obsidian with zero
 dependency — Mermaid / ASCII / markdown tables / fenced code. **No verbose machine-JSON
