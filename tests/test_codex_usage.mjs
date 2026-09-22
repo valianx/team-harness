@@ -405,8 +405,15 @@ await check("AC4: pre-read and post-read identity/size/mtime changes fail closed
         async afterRead() {
           if (!changed) {
             changed = true;
-            await copyFile(target, replacement);
-            await rename(replacement, target);
+            if (process.platform === "win32") {
+              // Windows keeps the read handle open until the hook returns,
+              // so replacing the pathname is denied. Mutate the same file in
+              // place; the post-read identity check must still reject it.
+              await appendFile(target, " ");
+            } else {
+              await copyFile(target, replacement);
+              await rename(replacement, target);
+            }
           }
         },
       },
@@ -421,7 +428,14 @@ await check("AC5: symlink escape is rejected before reading", async () => {
     try {
       const target = path.join(outside, "outside.jsonl");
       await copyFile(path.join(fixtures, "baseline-inherited.jsonl"), target);
-      await symlink(target, path.join(root, "escape.jsonl"));
+      if (process.platform === "win32") {
+        // A directory junction does not require the Developer Mode or
+        // SeCreateSymbolicLinkPrivilege that file symlinks need, while
+        // realpath containment still proves the same escape rejection.
+        await symlink(outside, path.join(root, "escape"), "junction");
+      } else {
+        await symlink(target, path.join(root, "escape.jsonl"));
+      }
       assertUnavailable(await collectCodexUsage({ rolloutsRoot: root, rootThreadId: "root-real-id-baseline" }), "FS_UNSAFE");
     } finally {
       await rm(outside, { recursive: true, force: true });

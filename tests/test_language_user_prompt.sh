@@ -67,7 +67,8 @@ make_tmp_home_no_config() {
 #   Returns stdout. Exit code is captured separately when needed.
 run_hook() {
     local fake_home="$1"
-    HOME="$fake_home" node "$HOOK" <<< '{}' 2>/dev/null
+    # Node's os.homedir() uses USERPROFILE on Windows; HOME alone is ignored.
+    HOME="$fake_home" USERPROFILE="$fake_home" node "$HOOK" <<< '{}' 2>/dev/null
 }
 
 # run_hook_with_exit <fake_home>
@@ -76,7 +77,7 @@ run_hook_with_exit() {
     local fake_home="$1"
     local out
     local code
-    out=$(HOME="$fake_home" node "$HOOK" <<< '{}' 2>/dev/null)
+    out=$(HOME="$fake_home" USERPROFILE="$fake_home" node "$HOOK" <<< '{}' 2>/dev/null)
     code=$?
     printf '%s' "$out"
     printf '\nEXIT:%d' "$code"

@@ -33,6 +33,14 @@ Preparation may occur during Validation; outward publication follows it.
 Before final review or publication authorization, resolve the exact repository, working branch,
 base, candidate head, and intended PR scope. Respect repository instructions, project
 branch conventions, PR templates, commit conventions, and native permissions.
+Read those conventions while planning validation, not after declaring PR readiness:
+include required release metadata, generated copies and supported test environments
+in candidate preparation. Reuse a version bump already included in this PR.
+Local completion may precede PR preparation; report that distinction explicitly.
+
+Before committing, resolve native Git authorship and the required commit format.
+Reuse a configured or already established author; do not invent one from an
+unrelated commit or change global settings to repair a local gap.
 
 - Inspect the full base-to-candidate diff and worktree status. Preserve unrelated
   tracked or untracked changes; do not stage, discard, or fold them into the PR.
@@ -77,6 +85,15 @@ uses `../../agents/_shared/delivery-mechanics.md`, and OpenCode uses
 Do not replace that contract with this skill's prose.
 
 ## Checkpoint 2: publish or resume
+
+Recover the GitHub identity already established for this repository/effort and
+resolve any configured route through the installed [setup](../setup/SKILL.md)
+GitHub identity helper for the active runtime. A temporary worktree path or the
+globally active account does not override retained repository identity. Verify
+the selected account and target access before the first write, using native
+credential facilities and the existing isolated route or supported process scope.
+Keep credentials out of output, files and PR bodies; preserve unrelated account
+settings. If identity is genuinely unresolved, ask only for that missing choice.
 
 Publication reuses the completed preparation and its existing authorization. Revalidate
 the exact repository, base, head commit/tree, branch, worktree, body bytes, and applicable

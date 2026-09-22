@@ -18,7 +18,12 @@ its configured local or Obsidian mode. Main coordinates with native tools and
 permissions. Reuse authorization for unchanged work and ask only for a missing
 decision. Specialists provide evidence and recommendations; Main judges them.
 
-Read the existing objective and relevant OpenSpec tasks. Main may implement or
+Read the existing objective and relevant OpenSpec tasks. Before database or
+frontend implementation, use [sketch](../sketch/SKILL.md) to create/update and
+present the applicable model or wireframe, including data-only migrations and
+direct/resumed work. Reuse an already presented preview if it covers this change.
+Carry its decisions into the existing design; reuse authorization and resolve
+only material open questions before dependent work. Main may implement or
 delegate independent bounded tasks with explicit ownership. Preserve other
 writers' edits, serialize overlapping changes and Git mutations, and run
 appropriate checks. Report changes, results and material limits to the shared

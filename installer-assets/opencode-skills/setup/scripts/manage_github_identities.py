@@ -185,7 +185,12 @@ def write_atomic(path: Path, before: dict[str, Any], after: dict[str, Any]) -> b
     fd, temp_name = tempfile.mkstemp(prefix=path.name + ".tmp-", dir=path.parent)
     temp = Path(temp_name)
     try:
-        os.fchmod(fd, 0o600)
+        # Windows does not expose fchmod; chmod the named temporary file
+        # before writing the configuration while preserving the same 0600 intent.
+        if hasattr(os, "fchmod"):
+            os.fchmod(fd, 0o600)
+        else:
+            os.chmod(temp, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as stream:
             json.dump(after, stream, ensure_ascii=False, indent=2, sort_keys=True)
             stream.write("\n")

@@ -1066,16 +1066,15 @@ Artifact verification is defined by each named direct flow and by the gated pipe
 explicit activation. Legacy profile markers do not change verification or create a Stage Gate.
 ## Plan Sketches — Per-Type Applicability
 
-This section defines which task types and tiers derive design-surface hints and
-`sketches/*` files. The canonical reference is
-`docs/plan-sketches.md § 7`.
+Use `skills/sketch/SKILL.md`: DB model/frontend wireframe before implementation,
+other views on demand. The table retains historical pipeline mappings.
 
 | Type / Tier | Classification block? | Always-sketches (collapsed surfaces) | Conditional sketches (`sketches/*`) | sketch-guard.sh invoked? |
 |-------------|----------------------|-------------------------------------|----------------------------------------|--------------------------|
 | `feature` / `refactor` / `enhancement` | Main derives hints from OpenSpec; an invoked architect may return them, never mirror them into `01-plan.md` | Yes — canonical OpenSpec acceptance and design | Per hints: an invoked architect produces every triggered file | Yes, at STAGE-GATE-1 |
 | `fix` Tier 2-4 | Main derives hints from OpenSpec; an invoked architect may return root-cause hints | Yes — canonical OpenSpec acceptance | Rare — only if the fix modifies a contract surface | Yes — no-op pass when no hint applies |
 | `fix` Tier 1 / `hotfix` | No architect; Main derives hints from bound OpenSpec | Yes — canonical OpenSpec acceptance | None when no hint applies | Yes — no-op pass (empty required set) |
-| direct/spec | No pipeline artifacts | n/a | Requested sketches only | Not invoked |
+| direct/spec | No pipeline artifacts | n/a | Required DB model/frontend wireframe; other requested previews | Not invoked |
 | `docs` flow (Tier ≥1) | Architect docs-research mode → coordinator records all-false block (docs do not touch product contracts) | Yes (minimum AC in `§ Task List`) | None | Yes — no-op pass |
 | Research / Spike | No — architect does not produce `01-plan.md` § Task List with per-task AC | n/a | n/a | Not invoked (research/spike have no STAGE-GATE-1) |
 
@@ -1083,8 +1082,8 @@ This section defines which task types and tiers derive design-surface hints and
 for `sketch-guard.sh`. The compact generated `01-plan.md` never carries a
 classification mirror, and no all-false plan block is fabricated.
 
-**Direct/spec:** use `sketch` for requested previews, without an automatic set or
-Stage Gate. Ad hoc review does not activate the pipeline.
+**Direct/spec:** present applicable model/wireframe before implementation; no
+unrelated set, Stage Gate or pipeline activation.
 
 ---
 

@@ -15,7 +15,12 @@ decision. Specialists provide evidence and recommendations; Main judges them.
 
 Compare the actual candidate with the objective and relevant scenarios. Run
 repository-required checks and targeted validation for affected behavior.
-Read agreed sketches when relevant; no Claude-only sketch probe is needed.
+For database/frontend work, compare the delivered model, migrations and UI with
+the required data model/wireframe and canonical intent from
+[sketch](../sketch/SKILL.md). Surface missing previews, unexplained fields or UI
+expansion and resolve the design mismatch; passing tests alone do not establish
+that additions are needed. Read other agreed sketches when relevant; no
+Claude-only sketch probe is needed.
 Use native testers, QA or security reviewers when their expertise helps or was
 requested. Preserve findings and missing coverage. Main judges recommendations,
 verifies corrections and reuses valid evidence when unaffected.

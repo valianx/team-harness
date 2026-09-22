@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.40.0] - 2026-09-22
+
+### Changed
+- Present a data model before database changes and a wireframe before frontend work across development flows.
+- Justify new persisted fields with their requirement, producer, consumer and reuse alternatives before implementation.
+- Compare delivery with agreed previews during validation, preserving local or Obsidian workspaces and existing authorization.
+
+### Fixed
+- Prepare release, platform checks and publication identity before delivery, and report provider coverage and completion accurately.
+- Restore Windows path/configuration parity and isolate portable test fixtures from user settings.
+
 ## [3.39.0] - 2026-09-21
 
 ### Added

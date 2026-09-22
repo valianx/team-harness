@@ -14,7 +14,7 @@ source: "{{canonical_change_path}}"
 
 | Phase | Expected result | Status |
 | --- | --- | --- |
-| Spec | Intent, tasks and testing strategy | {{spec_status}} |
+| Spec | Intent, tasks, testing strategy and presented data model/wireframe for affected DB/frontend | {{spec_status}} |
 | Implementation | Product changes and focused checks | {{implementation_status}} |
 | Validation | Checks, provider assessments and selected reviews | {{validation_status}} |
 | Publication | Authorized local delivery, PR preparation or publication | {{publication_status}} |

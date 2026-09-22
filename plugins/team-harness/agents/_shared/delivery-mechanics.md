@@ -17,8 +17,11 @@ documentation and maintained tests; keep scratch work in the workspace.
 
 ## 3. Push
 
-Inspect branch, remote and existing work. Use the intended account and native
-permissions. Push the requested branch without rewriting shared history.
+Inspect branch, remote and existing work. Follow the installed create-pr skill's
+identity resolution: reuse the repository's account, resolve its setup route and
+verify account/access in the scoped native credential context before writing.
+Keep that context for push and PR operations; preserve unrelated account settings
+and native permissions. Push without rewriting shared history.
 
 ## 4. Create or update the draft PR
 

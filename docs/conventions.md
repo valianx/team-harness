@@ -27,7 +27,7 @@ artifacts and deliverables retain their required formats; notes link to them.
 |-----|------|-----------------|--------|
 | `01-plan.md` | operator-facing | `sharded-v1` operator summary and manifest; no copied architecture or AC prose | architect (content); see `docs/plan-shards.md` |
 | `plan/architecture.md`, `plan/delivery.md`, `plan/invariants.md`, `plan/tasks/*.md` | agentic | Canonical plan shards; one fact in one owning artifact | architect; bounded post-gate writers per consolidation contract |
-| `sketches/*` | operator-facing | Pipeline manifest or requested preview via `sketch` | architect in pipeline / Main on demand |
+| `sketches/*` | operator-facing | Required DB model/frontend wireframe before implementation; other previews on demand via `sketch` | Main or explicitly assigned specialist |
 | `01-root-cause.md` | operator-facing | Strict root-cause template (unchanged); the bug-fix equivalent of the plan, read at STAGE-GATE-1 | architect |
 | `overview.md` (initiative) | operator-facing | `agents/ref-dispatch-machinery.md § "overview.md — you are the sole writer"` (unchanged) | orchestrator (sole writer; derives completion-row coordinates after its own Phase-4 mechanics) |
 | `reviews/01-plan-review.md` | agentic | Fixed skeleton of anchored sections; no `## Review Summary`/`## Technical Detail` split; minimal prose, tables and labels | panel (single-writer-per-section) |

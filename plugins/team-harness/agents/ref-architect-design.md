@@ -1,15 +1,15 @@
 ---
 name: ref-architect-design
-description: Optional architect sketch and domain reference, with historical plan schemas.
+description: Architect sketch format and domain reference, with historical plan schemas.
 model: opus
 color: yellow
 ---
 
 # Architect design reference
 
-New designs use OpenSpec and workspace context. Sharded schemas and mandatory
-selection rules below apply only to historical plans. Read the relevant sketch
-or domain section on demand; these remain optional for current work.
+Current designs follow OpenSpec and `skills/sketch/SKILL.md`: database model and
+frontend wireframe before implementation. Sharded schemas and boolean selection
+below are historical; load format examples and domain guidance on demand.
 
 ## Contents
 
@@ -122,7 +122,7 @@ For each multi-site invariant, list **every** site where it must hold. Fence sit
 | {name of invariant} | {site label} | `{path}` | `{section heading or field name}` |
 | {name of invariant} | {site label — fenced: MUST NOT change} | `{path}` | `{section heading or field name}` |
 
-**Why this block exists:** the implementer uses this table to update every declared site atomically, and the coordinator's implementation assembly verifies the final MATCH set before Freeze. A site absent from this table is invisible to that check. See `agents/_shared/implementation-assembly.md § 1` for the version-literal example.
+**Why this block exists:** the implementer uses this table to update every declared site atomically, and the coordinator's implementation assembly verifies the final MATCH set before Freeze. A site absent from this table is invisible to that check. See `docs/cost-and-caching.md § How Claude Code caches` for the version-literal example.
 
 <!-- file: plan/architecture.md -->
 # Architecture
@@ -426,9 +426,8 @@ decisions → the single bullet
 
 ## Sketches — triggers and skeletons
 
-Create ONLY the sketch files triggered by the classification booleans; all
-false → no conditional sketches (valid). Canonical rules, quality bars, and
-per-type applicability: `docs/plan-sketches.md`.
+Follow `skills/sketch/SKILL.md` for required DB/frontend previews. This historical
+table supplies format examples, not current selection or permission logic.
 
 | Boolean | Required sketch file | Format |
 |---------|---------------------|--------|
@@ -554,7 +553,7 @@ token) must hold at N ≥ 2 locations: enumerate the full site-set (an omitted
 site is invisible to the implementation-assembly MATCH check), fence sites
 that MUST NOT change in `plan/invariants.md`, and require the implementer to
 edit every named site in the same concern commit. Worked example:
-`agents/_shared/implementation-assembly.md § 1`.
+`docs/cost-and-caching.md § How Claude Code caches`.
 
 **PostgreSQL high-volume time-series tables.** Platform facts (constraints,
 not preferences): `synchronize: true` destroys a partitioned table — use

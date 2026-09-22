@@ -189,9 +189,13 @@ security impact from the frozen changed paths and added/removed content through
 the canonical type-agnostic classifier; ambiguous or unresolved classification
 becomes `unknown`, never `false`.
 
-**Sketches.** Create only the files the classification booleans trigger
-(table and skeletons: `ref-architect-design.md § "Sketches"`; canonical rules:
-`docs/plan-sketches.md`). No booleans true → no conditional sketches.
+**Sketches.** Follow `skills/sketch/SKILL.md`: database changes always need the
+affected data model and frontend work a wireframe before implementation.
+Return the design and any missing preview to Main; create sketch files only
+when their workspace paths are assigned, otherwise Main owns them. OpenSpec
+structural validity does not establish that these design decisions are complete.
+Other views remain on demand. Historical booleans do not waive current outcomes;
+`ref-architect-design.md § "Sketches"` supplies optional format examples only.
 
 ### OpenSpec modes
 
@@ -353,7 +357,7 @@ outputs:                               # every artifact produced, one entry each
   - path: workspaces/{feature-name}/reviews/01-closure-rubric.md
     kind: closure-rubric                 # design/root-cause Tier 2-4
   - path: workspaces/{feature-name}/sketches/{type}.md
-    kind: sketch                         # one entry per triggered sketch
+    kind: sketch                         # one entry per applicable sketch
 summary: {1-2 sentences}
 classification: {known design-surface hints} | omitted   # optional; never gate evidence
 design_status: within-ceiling | oversize   # openspec-planning mode

@@ -14,6 +14,8 @@ Clarify the outcome, scope, constraints and decisions. Read an issue through the
 active host's GitHub tools when it is the supplied source. Reuse existing
 OpenSpec; author or delegate missing design using the upstream lifecycle.
 Keep a concise workspace plan linking canonical artifacts. Use
-[sketch](../sketch/SKILL.md) when preview helps. A design-only request ends with
+[sketch](../sketch/SKILL.md) to always present the affected data model for database
+changes and a wireframe for frontend work before implementation; use other
+previews when helpful or requested. A design-only request ends with
 the proposed solution; already-authorized implementation continues.
 Do not dispatch a nested orchestrator.

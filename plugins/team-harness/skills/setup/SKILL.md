@@ -208,6 +208,11 @@ migration, and preserve every unrelated value.
      --routes-json '<validated JSON array>'
    ```
 
+   The isolated-directory checks require POSIX permission bits. On native Windows,
+   use a route without `config_dir` and native process-scoped credentials; do not
+   retry `chmod` or add a TH ACL manager. Preserve the existing account outside
+   the publication operation.
+
    The helper rejects token-shaped input and stores only paths, hosts, and login
    names. It preserves every unrelated native setting. Provisioning an isolated
    directory with `GH_CONFIG_DIR=<dir> gh auth login` remains an operator action;

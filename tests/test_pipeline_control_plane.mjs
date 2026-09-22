@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { link, mkdtemp, mkdir, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { link, mkdtemp, mkdir, readFile, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -42,7 +42,10 @@ import {
 const hash = value => createHash("sha256").update(value).digest("hex");
 const h = value => hash(Buffer.from(value));
 const git = (repository, ...args) => execFileSync("git", args, { cwd: repository, encoding: "utf8" }).trim();
-const temporary = await mkdtemp(path.join(tmpdir(), "th-control-plane-"));
+const linkDirectory = (target, destination) => process.platform === "win32"
+  ? symlink(target, destination, "junction")
+  : symlink(target, destination);
+const temporary = await realpath(await mkdtemp(path.join(tmpdir(), "th-control-plane-")));
 
 try {
   const worktree = path.join(temporary, "worktree");
@@ -104,7 +107,7 @@ try {
   await writeFile(path.join(worktree, "input.md"), "changed\n");
   assert.equal((await validateCapabilityLease(lease)).error_code, "LEASE_INPUT_MISMATCH");
   await writeFile(path.join(worktree, "input.md"), "immutable\n");
-  await symlink(temporary, path.join(worktree, "escape"));
+  await linkDirectory(temporary, path.join(worktree, "escape"));
   assert.equal((await createCapabilityLease({ ...leaseInput, writable_paths: ["escape/file"] })).error_code, "LEASE_PATH_INVALID");
   await rm(path.join(worktree, "escape"));
 
@@ -335,11 +338,17 @@ try {
   assert.equal((await closeWorkspaceWithoutControlLog({ workspace })).error_code, "CONTROL_LOG_PRESENT");
   const linkedWorkspace = path.join(temporary, "linked-workspace");
   await mkdir(linkedWorkspace, { recursive: true });
-  await symlink(path.join(workspace, "control"), path.join(linkedWorkspace, "control"), "dir");
+  await linkDirectory(path.join(workspace, "control"), path.join(linkedWorkspace, "control"));
   assert.equal((await closeWorkspaceWithoutControlLog({ workspace: linkedWorkspace })).error_code, "CONTROL_PATH_SYMLINK");
   const eventsLinkWorkspace = path.join(temporary, "events-link-workspace");
   await mkdir(eventsLinkWorkspace, { recursive: true });
-  await symlink(path.join(orphanWorkspace, "00-execution-events.jsonl"), path.join(eventsLinkWorkspace, "00-execution-events.jsonl"));
+  if (process.platform === "win32") {
+    // Windows cannot create file symlinks without a user privilege. A
+    // hardlink exercises the same path rejection through the nlink=1 guard.
+    await link(path.join(orphanWorkspace, "00-execution-events.jsonl"), path.join(eventsLinkWorkspace, "00-execution-events.jsonl"));
+  } else {
+    await symlink(path.join(orphanWorkspace, "00-execution-events.jsonl"), path.join(eventsLinkWorkspace, "00-execution-events.jsonl"));
+  }
   assert.equal((await closeWorkspaceWithoutControlLog({ workspace: eventsLinkWorkspace })).error_code, "EVENTS_PATH_INVALID");
   const hardLinkWorkspace = path.join(temporary, "hard-link-workspace");
   await mkdir(hardLinkWorkspace, { recursive: true });
@@ -370,7 +379,7 @@ try {
   const removed = await openspecContentIdentity({ change_root: changeRoot });
   assert.equal(removed.ok, true, JSON.stringify(removed));
   assert.notEqual(removed.identity, added.identity);
-  await symlink(path.join(workspace, "control"), path.join(changeRoot, "linked"), "dir");
+  await linkDirectory(path.join(workspace, "control"), path.join(changeRoot, "linked"));
   assert.equal((await openspecContentIdentity({ change_root: changeRoot })).error_code, "CHANGE_PATH_SYMLINK");
   assert.equal((await openspecContentIdentity({ change_root: path.join(temporary, "missing") })).error_code, "CHANGE_ROOT_INVALID");
 

@@ -44,7 +44,7 @@
   commit.
 - **Internal distribution rule of the team-harness repository** — matches the shipped pipeline
   default (the coordinator bumps the project version once per PR; see
-  `agents/_shared/implementation-assembly.md § 1`). Changes touching distributed runtime assets bump
+  `docs/cost-and-caching.md § How Claude Code caches`). Changes touching distributed runtime assets bump
   all four current version sites in the same PR (Codex/installer sites remain optional for
   historical repositories) and write the `## [X.Y.Z]` CHANGELOG section directly.
   **Trade-off:** concurrent PRs touching distributed assets race on the version line

@@ -29,9 +29,18 @@ visible as successive work and honor an explicit request to stop earlier.
 
 ## Phase outcomes
 
+At planning/resumption, read the repository's contributor and delivery conventions
+and CI platform commands. Include their required checks in Validation; for an
+agreed PR endpoint, use create-pr preparation for release metadata, generated
+outputs and identity before the final candidate. A locally validated change is
+not automatically PR-ready. Do not add unrelated checks or a second approval.
+Retain the base, candidate head/tree and check environment in existing evidence;
+when assembly changes the candidate, renew affected checks and preserve earlier
+results with their original identity.
+
 | Phase | Inputs and expected work | Outputs and completion evidence |
 | --- | --- | --- |
-| **Spec** | Objective, affected repository and current intent. Author/update OpenSpec; resolve design decisions; execute TEA test-design; select later checks and useful methods. Use sketch when requested or helpful to inspect the solution. | Canonical proposal, requirements, design when useful and tasks; structural validate result; workspace testing strategy and phase/tool plan. Planning completion is not implementation completion. |
+| **Spec** | Objective, affected repository and current intent. Author/update OpenSpec; resolve design decisions; execute TEA test-design; select later checks and useful methods. Always use sketch for a data model when changing the database and a wireframe for frontend work; other views remain on demand. | Canonical proposal, requirements, design when useful and tasks; applicable previews presented before Implementation; structural validate result; workspace testing strategy and phase/tool plan. Planning completion is not implementation completion. |
 | **Implementation** | Authorized intent, tasks and testing strategy. Apply changes with maintained tests and documentation; execute selected TEA implementation methods and focused project checks. Update intent when behavior changes. | Product changes, task progress and actual focused-check results. Later verification remains pending until executed. |
 | **Validation** | Identified candidate, requirements, tests and selected checks. Run project checks and selected diagnostics; execute spec's TEA test-review/trace, Superpowers completion evidence and OpenSpec implementation verify. Prepare completed archive, then the selected independent candidate review; judge findings and verify corrections. | Current evidence, measured/omitted scope, original assessments and reasoned dispositions in the workspace. Living specs/archive stay in the repository. State what is verified and what remains unknown. |
 | **Publication** | Evaluated candidate, evidence, review decision and authorized destination. Use create-pr for candidate/file hygiene and preparation/publication. | Prepared PR or published URL with observed CI/review state and remaining action. Local completion without a PR is a valid endpoint. Merge is separate. |
@@ -62,7 +71,7 @@ installation or generated files alone do not prove live activation.
 | find-bugs / Semgrep | Select for concrete functional defects and supported rule-based candidates. Retain scope, rules, errors and contextual findings. |
 | audit / dependency-cruiser / Knip | Select for architecture or dependency questions; JS/TS collectors when applicable. A bounded change does not imply a general project audit. |
 | Sentry find-bugs | Optional installed upstream method of the existing general reviewer for captured changes; not another equivalent review. |
-| sketch | Inspect a proposed solution on demand, particularly frontend; feed decisions into the current intent. |
+| sketch | Always present a data model for database changes and a wireframe for frontend work before Implementation; other views on demand. Feed decisions into intent and compare delivery against them. |
 | verify / independent lenses | Local author review of the committed candidate under the existing review choice; distinguish this from review-pr on an existing PR. |
 | create-pr | Candidate preparation and authorized publication, consuming current evidence and artifact hygiene. |
 

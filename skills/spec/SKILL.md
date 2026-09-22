@@ -12,10 +12,12 @@ the shared workspace, without activating a pipeline.
 When PR preparation or publication is relevant, use [create-pr](../create-pr/SKILL.md)
 automatically; selecting it does not activate the pipeline.
 
-When the user wants to inspect the proposed result before implementation, use
-[sketch](../sketch/SKILL.md) in this lane. Link the requested sketches from the
-operator plan and use their feedback in the existing OpenSpec intent and approval.
-They add no pipeline activation, mandatory sketch set or separate gate.
+Use [sketch](../sketch/SKILL.md) during Spec: always present a data model for
+database changes and a wireframe for frontend work before Implementation, even
+without a separate preview request. Link required and requested sketches from
+the operator plan and record agreed decisions in the existing OpenSpec design
+and requirements. Other sketch types remain on demand. Reuse existing approval;
+these design outcomes add no pipeline activation or separate gate.
 
 ## Routing predicate
 

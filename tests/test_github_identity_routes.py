@@ -45,13 +45,18 @@ def config_path(runtime: str, home: Path, codex: Path, opencode: Path) -> Path:
 
 def main() -> int:
     canonical_bytes = CANONICAL.read_bytes()
-    for helper in (CANONICAL, *COPIES):
-        require(stat.S_IMODE(helper.stat().st_mode) == 0o755, f"helper mode drifted: {helper}")
+    if os.name != "nt":
+        for helper in (CANONICAL, *COPIES):
+            require(stat.S_IMODE(helper.stat().st_mode) == 0o755, f"helper mode drifted: {helper}")
+    # NTFS does not expose the POSIX executable bit. Content parity and the
+    # subprocess behavior below remain portable checks on Windows.
     for copy in COPIES:
         require(copy.read_bytes() == canonical_bytes, f"generated helper content drifted: {copy}")
 
     with tempfile.TemporaryDirectory() as raw_temp:
-        temp = Path(raw_temp)
+        # Windows runners may expose TEMP through an 8.3 alias or junction.
+        # Use the same canonical root as the runtime config resolver.
+        temp = Path(raw_temp).resolve()
         home = temp / "home"
         codex = temp / "codex"
         opencode = temp / "opencode"
@@ -69,6 +74,9 @@ def main() -> int:
         hosts = isolated / "hosts.yml"
         hosts.write_text("github.com:\n", encoding="utf-8")
         hosts.chmod(0o600)
+        # Windows does not expose POSIX mode bits through pathlib.stat(). The
+        # isolated-credential route is covered on POSIX; keep the routing
+        # behavior covered on Windows with the same account-switch strategy.
         routes = [
             {
                 "workspace": str(workspace),
@@ -79,12 +87,13 @@ def main() -> int:
                 "workspace": str(nested_workspace),
                 "host": "github.com",
                 "account": "account-b",
-                "config_dir": str(isolated),
+                **({"config_dir": str(isolated)} if os.name != "nt" else {}),
             },
         ]
         env = {
             **os.environ,
             "HOME": str(home),
+            "USERPROFILE": str(home),
             "CODEX_HOME": str(codex),
             "OPENCODE_CONFIG_DIR": str(opencode),
         }
@@ -104,10 +113,12 @@ def main() -> int:
                 json.dumps(routes),
             )
             require(configured.returncode == 0, configured.stderr)
+            require(Path(json.loads(configured.stdout)["path"]) == target, f"{runtime} escaped temporary config")
             require(json.loads(configured.stdout)["routeCount"] == 2, "route count mismatch")
             document = json.loads(target.read_text(encoding="utf-8"))
             require(document["opaque"]["preserve"] is True, f"{runtime} clobbered opaque config")
-            require(stat.S_IMODE(target.stat().st_mode) == 0o600, f"{runtime} config mode is not 0600")
+            if os.name != "nt":
+                require(stat.S_IMODE(target.stat().st_mode) == 0o600, f"{runtime} config mode is not 0600")
 
             parent_match = run(
                 CANONICAL,
@@ -133,8 +144,11 @@ def main() -> int:
             require(nested_match.returncode == 0, nested_match.stderr)
             nested_result = json.loads(nested_match.stdout)
             require(nested_result["account"] == "account-b", "longest prefix did not win")
-            require(nested_result["strategy"] == "isolated-config", "isolated route not selected")
-            require(nested_result["configDir"] == str(isolated), "isolated config path drifted")
+            if os.name != "nt":
+                require(nested_result["strategy"] == "isolated-config", "isolated route not selected")
+                require(nested_result["configDir"] == str(isolated), "isolated config path drifted")
+            else:
+                require(nested_result["strategy"] == "account-switch", "nested account route not selected")
 
             no_match = run(
                 CANONICAL,
@@ -159,6 +173,27 @@ def main() -> int:
             require(repeated.returncode == 0, repeated.stderr)
             require(json.loads(repeated.stdout)["changed"] is False, "repeat configure is not a no-op")
             require(target.stat().st_mtime_ns == before_mtime, "repeat configure rewrote config")
+
+        if os.name == "nt":
+            # Windows cannot expose the POSIX 0600 credential-file contract;
+            # verify the safety check remains fail-closed instead of silently
+            # treating an unverified config_dir as an isolated route.
+            posix_only_route = [{
+                "workspace": str(nested_workspace),
+                "host": "github.com",
+                "account": "account-b",
+                "config_dir": str(isolated),
+            }]
+            rejected = run(
+                CANONICAL,
+                env,
+                "codex",
+                "configure",
+                "--routes-json",
+                json.dumps(posix_only_route),
+            )
+            require(rejected.returncode != 0, "Windows accepted an unverified POSIX config_dir")
+            require("0600" in rejected.stderr, "Windows config_dir rejection lost its safety reason")
 
         invalid_cases = (
             [{"workspace": str(workspace), "account": "account-a", "extra": "reject"}],

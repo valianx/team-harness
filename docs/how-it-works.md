@@ -57,7 +57,8 @@ evidence, verifies corrections and continues the authorized objective.
 
 Skills, role contracts, native adapters, optional observational hooks and
 installation tools. Workspace notes use Markdown in the chosen local or
-Obsidian home. Sketches remain available on demand. Voice/language preferences
+Obsidian home. Database changes always get a data model and frontend work a
+wireframe before implementation; other sketches remain on demand. Voice/language preferences
 remain native settings. Remote memory is optional and is never required by a flow.
 
 ## Native coordination and execution boundaries

@@ -32,6 +32,17 @@ jobs:
       - run: python tests/test_review_context_windows.py
       - run: python tests/test_codex_update_convergence.py
       - run: python tests/test_codex_binary_resolution.py
+      - name: Verify portable workflow regressions on Windows
+        run: python tests/test_inline_git_hardening.py
+      - run: python tests/test_github_identity_routes.py
+      - run: node tests/test_codex_usage.mjs
+      - run: node tests/test_pipeline_control_plane.mjs
+      - name: Verify isolated hook fixtures with Windows Node
+        shell: bash
+        run: |
+          bash tests/test_session_start.sh
+          bash tests/test_language_user_prompt.sh
+          bash tests/test_update_opencode_sh.sh
 
   verify:
     name: run-all (frontmatter and workflow suites)
