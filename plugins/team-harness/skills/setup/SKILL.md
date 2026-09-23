@@ -109,7 +109,15 @@ migration, and preserve every unrelated value.
    from the bounded Team Harness source. For targeted setup, inspect the
    already installed root; do not require a marketplace refresh. For a full
    setup, use a marketplace refresh only when the selected root is not already
-   resolvable locally; a targeted setup never requires network access:
+   resolvable locally; a targeted setup never requires network access. Inspect
+   the installed selection first:
+
+   ```bash
+   codex plugin list --json
+   ```
+
+   Only for full setup when that local selection cannot be resolved, refresh
+   the marketplace and inspect the selection again:
 
    ```bash
    codex plugin marketplace upgrade team-harness --json
@@ -117,7 +125,8 @@ migration, and preserve every unrelated value.
    ```
 
    Resolve the selected plugin root beneath the bounded Team Harness source and
-   validate its regular `.codex-plugin/plugin.json`. Set `SELECTED_VERSION` to
+   validate its regular `.codex-plugin/plugin.json`. Clear any inherited
+   `SELECTED_VERSION` before resolution, then set it only to
    that manifest's `version` field; a marketplace listing or remembered release
    example is not authoritative. If no validated manifest is available, report
    it and do not fabricate a version. When the native file is absent and Claude
@@ -128,12 +137,18 @@ migration, and preserve every unrelated value.
    ```bash
    python3 scripts/manage_config.py inspect-import --from claude
    python3 scripts/manage_config.py inspect-import --from opencode
-   python3 scripts/manage_config.py import --from SOURCE --version "$SELECTED_VERSION"
    ```
 
-   Run the import only after explicit source and manifest selection. When no
-   validated manifest is available, omit `--version` only for an explicitly
-   authorized import and report that version provenance is unavailable.
+   After explicit source selection and import authorization, use the validated
+   version when available; otherwise omit it and report missing provenance:
+
+   ```bash
+   if [ -n "${SELECTED_VERSION:-}" ]; then
+     python3 scripts/manage_config.py import --from SOURCE --version "$SELECTED_VERSION"
+   else
+     python3 scripts/manage_config.py import --from SOURCE
+   fi
+   ```
    The helper deep-fills missing keys, copies opaque values without printing
    them, preserves existing native values, and records provenance. Never merge
    sources silently.
@@ -143,7 +158,11 @@ migration, and preserve every unrelated value.
    installed version without replacing operator values:
 
    ```bash
-   python3 scripts/manage_config.py ensure --version "$SELECTED_VERSION"
+   if [ -n "${SELECTED_VERSION:-}" ]; then
+     python3 scripts/manage_config.py ensure --version "$SELECTED_VERSION"
+   else
+     python3 scripts/manage_config.py ensure
+   fi
    ```
 
    When no validated manifest was available, omit the version argument so

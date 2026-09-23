@@ -74,7 +74,7 @@ permission settings remain operator-owned.
 The default installation leaves agent model metadata unchanged. Choose the model
 and reasoning effort with the active runtime's native controls. OpenCode also
 supports the explicit opt-in provider tier
-`install --runtime opencode --opencode-tier <provider>`;
+`install apply --runtime opencode --opencode-tier <provider>`;
 see [OpenCode model configuration](./opencode-model-config.md). Codex's role
 projection and ephemeral model override are documented in the
 [Codex runtime guide](./codex-runtime.md#roles-and-model-projection). Claude Code

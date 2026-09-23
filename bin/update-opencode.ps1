@@ -114,7 +114,7 @@ try {
 
 if ($InstalledVersion -ne '' -and $LatestVersion -ne '') {
     if ($InstalledVersion -eq $LatestVersion) {
-        Write-Host "th update — already current"
+        Write-Host "th update - already current"
         Write-Host "  installed version   $InstalledVersion"
         Write-Host "  latest version      $LatestVersion"
         Write-Host "No action required."
@@ -141,7 +141,7 @@ if ($InstalledVersion -ne '' -and $LatestVersion -ne '') {
 
     $cmp = Compare-SemVer $InstalledVersion $LatestVersion
     if ($cmp -gt 0) {
-        Write-Host "th update — installed ahead"
+        Write-Host "th update - installed ahead"
         Write-Host "  installed version   $InstalledVersion"
         Write-Host "  latest version      $LatestVersion"
         Write-Host "The installed version is newer than the latest release."

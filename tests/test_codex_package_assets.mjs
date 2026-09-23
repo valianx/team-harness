@@ -1,14 +1,38 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { access, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { access, lstat, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { syncClaudePackageAssets } from "../tools/codex-runtime/sync-skills.mjs";
 
 const rootDir = await mkdtemp(join(tmpdir(), "th-package-assets-"));
 const shipped = ["ts/dist/session-start.cjs", "ts/entry/session-start.cc.ts"];
 const scratch = ["ts/dist/opencode-plugin.cjs", "ts/dist/session-enforcement.opencode.cjs"];
+
+async function assertCheckReportsEach(rootDir, relativePaths) {
+  const writes = [];
+  const originalWrite = process.stderr.write;
+  process.stderr.write = (chunk) => {
+    writes.push(String(chunk));
+    return true;
+  };
+  try {
+    await assert.rejects(syncClaudePackageAssets({ rootDir, check: true }), /assets are stale/);
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+  const output = writes.join("");
+  for (const relativePath of relativePaths) {
+    const platformPath = relativePath.split("/").join(sep);
+    assert.equal(
+      output.includes(`plugins${sep}team-harness${sep}${platformPath}`),
+      true,
+      `check mode must report the specific stale asset: ${relativePath}`,
+    );
+  }
+}
+
 try {
   for (const directory of [".claude-plugin", "agents", "docs", "hooks/ts/dist", "hooks/ts/entry"]) {
     await mkdir(join(rootDir, directory), { recursive: true });
@@ -45,16 +69,13 @@ try {
   const unownedDoc = join(rootDir, "plugins/team-harness/docs/operator.md");
   await writeFile(unownedPlugin, "preserve operator plugin file\n");
   await writeFile(unownedDoc, "preserve operator doc file\n");
-  for (const relativePath of [
+  const retiredAssets = [
     ".claude-plugin/plugin.json",
     "agents/retired-agent.md",
     "docs/agent-authoring.md",
-  ]) {
-    await assert.rejects(
-      syncClaudePackageAssets({ rootDir, check: true }),
-      /assets are stale/,
-      `check mode must report retired generated asset: ${relativePath}`,
-    );
+  ];
+  await assertCheckReportsEach(rootDir, retiredAssets);
+  for (const relativePath of retiredAssets) {
     assert.equal(
       await access(join(rootDir, "plugins/team-harness", relativePath)).then(() => true, () => false),
       true,
@@ -71,6 +92,41 @@ try {
   }
   assert.equal(await readFile(unownedPlugin, "utf8"), "preserve operator plugin file\n");
   assert.equal(await readFile(unownedDoc, "utf8"), "preserve operator doc file\n");
+  await syncClaudePackageAssets({ rootDir, check: true });
+
+  // An unowned link in an allowlisted projection is opaque to the walker and
+  // survives both modes without exposing or mutating its external sentinel.
+  const unownedLinkTarget = join(rootDir, "external-unowned");
+  const unownedLinkSentinel = join(unownedLinkTarget, "sentinel.txt");
+  const unownedLink = join(rootDir, "plugins/team-harness/docs/operator-link.md");
+  await mkdir(unownedLinkTarget, { recursive: true });
+  await writeFile(unownedLinkSentinel, "preserve external sentinel\n");
+  await symlink(unownedLinkTarget, unownedLink, process.platform === "win32" ? "junction" : "dir");
+  for (const check of [true, false]) {
+    await syncClaudePackageAssets({ rootDir, check });
+    assert.equal((await lstat(unownedLink)).isSymbolicLink(), true, "unowned link must remain in place");
+    assert.equal(await readFile(unownedLinkSentinel, "utf8"), "preserve external sentinel\n");
+  }
+
+  // A stale owned agent link is reportable in check mode and write mode removes
+  // only the link, leaving the linked target untouched.
+  const staleAgentSource = join(rootDir, "agents/retired-agent.md");
+  const staleAgentTarget = join(rootDir, "plugins/team-harness/agents/retired-agent.md");
+  const staleAgentExternal = join(rootDir, "external-agent");
+  const staleAgentSentinel = join(staleAgentExternal, "sentinel.txt");
+  await writeFile(staleAgentSource, "owned stale agent\n");
+  await syncClaudePackageAssets({ rootDir, check: false });
+  await rm(staleAgentSource);
+  await rm(staleAgentTarget);
+  await mkdir(staleAgentExternal, { recursive: true });
+  await writeFile(staleAgentSentinel, "preserve stale-agent target\n");
+  await symlink(staleAgentExternal, staleAgentTarget, process.platform === "win32" ? "junction" : "dir");
+  await assertCheckReportsEach(rootDir, ["agents/retired-agent.md"]);
+  assert.equal((await lstat(staleAgentTarget)).isSymbolicLink(), true, "check mode must retain stale link");
+  assert.equal(await readFile(staleAgentSentinel, "utf8"), "preserve stale-agent target\n");
+  await syncClaudePackageAssets({ rootDir, check: false });
+  await assert.rejects(lstat(staleAgentTarget), { code: "ENOENT" });
+  assert.equal(await readFile(staleAgentSentinel, "utf8"), "preserve stale-agent target\n");
   await syncClaudePackageAssets({ rootDir, check: true });
 
   const leftover = join(rootDir, "plugins/team-harness/hooks/ts/dist/retired-hook.opencode.cjs");
@@ -111,7 +167,7 @@ try {
   await rm(nestedTarget, { recursive: true });
   await symlink(nestedUnrelated, nestedTarget, process.platform === "win32" ? "junction" : "dir");
   for (const check of [true, false]) {
-    await assert.rejects(syncClaudePackageAssets({ rootDir, check }), /symbolic link/);
+    await assert.rejects(syncClaudePackageAssets({ rootDir, check }), /symbolic[- ]link/);
     assert.equal(await readFile(nestedSentinel, "utf8"), "preserve nested unrelated file\n");
   }
 

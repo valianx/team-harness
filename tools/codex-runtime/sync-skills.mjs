@@ -225,7 +225,7 @@ function renderOpenAI(name, canonical) {
 ${canonical.explicitOnly ? "policy:\n  allow_implicit_invocation: false\n" : ""}`;
 }
 
-async function walkFiles(base, current = base) {
+async function walkFiles(base, current = base, { symbolicLinks = "reject" } = {}) {
   const result = new Map();
   let entries;
   try {
@@ -239,10 +239,21 @@ async function walkFiles(base, current = base) {
     const absolute = join(current, entry.name);
     const rel = relative(base, absolute).split(sep).join("/");
     const stat = await lstat(absolute);
-    if (stat.isSymbolicLink()) throw new Error(`refusing symbolic link: ${absolute}`);
+    if (stat.isSymbolicLink()) {
+      if (symbolicLinks === "include") {
+        // Keep the link as an entry for ownership classification, but never
+        // follow it. Source trees and guarded destinations still use the
+        // default rejection mode.
+        result.set(rel, null);
+        continue;
+      }
+      throw new Error(`refusing symbolic link: ${absolute}`);
+    }
     if (stat.isDirectory()) {
       if (entry.name === "__pycache__" || entry.name === "node_modules" || entry.name === ".venv") continue;
-      for (const [child, bytes] of await walkFiles(base, absolute)) result.set(child, bytes);
+      for (const [child, bytes] of await walkFiles(base, absolute, { symbolicLinks })) {
+        result.set(child, bytes);
+      }
     } else if (stat.isFile() && !entry.name.endsWith(".pyc")) {
       result.set(rel, await readFile(absolute));
     }
@@ -398,6 +409,22 @@ function isOpenCodeScratchBundle(relativePath) {
   return /^ts\/dist\/(?:opencode-plugin|[^/]+\.opencode)\.cjs$/.test(relativePath);
 }
 
+function isProjectedSourcePath(relativePath, files, allowlist, excluded = () => false) {
+  const prefix = `${relativePath}/`;
+  for (const sourcePath of files.keys()) {
+    if (allowlist !== null && !allowlist.has(sourcePath)) continue;
+    if (excluded(sourcePath)) continue;
+    if (sourcePath === relativePath || sourcePath.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
+async function assertSafeLinkRemoval(rootDir, target) {
+  await assertSafeDestinationPath(rootDir, dirname(target), "directory");
+  const stat = await lstat(target);
+  if (!stat.isSymbolicLink()) throw new Error(`refusing to remove non-symbolic-link package asset: ${target}`);
+}
+
 /** Synchronize curated Claude assets; check mode reports drift without writing. */
 export async function syncClaudePackageAssets({ check, rootDir }) {
   const projections = [
@@ -414,12 +441,23 @@ export async function syncClaudePackageAssets({ check, rootDir }) {
     // before either stale removal or synchronization can touch it.
     await assertSafeDestinationPath(rootDir, targetRoot, "directory");
     const files = await walkFiles(sourceRoot);
-    for (const relativePath of (await walkFiles(targetRoot)).keys()) {
+    for (const [relativePath, targetBytes] of await walkFiles(targetRoot, targetRoot, { symbolicLinks: "include" })) {
       const generatedPath = allowlist === null || allowlist.has(relativePath);
       const scratchPath = hooks && isOpenCodeScratchBundle(relativePath);
       // A projection with an allowlist owns only those entries. Preserve
       // unrelated operator files that happen to share its package directory.
       if (!generatedPath && !scratchPath) continue;
+      const symbolicLink = targetBytes === null;
+      if (symbolicLink && isProjectedSourcePath(
+        relativePath,
+        files,
+        allowlist,
+        hooks ? isOpenCodeScratchBundle : undefined,
+      )) {
+        // A current projection must never be allowed to redirect reads or
+        // writes, including when the link is a directory ancestor.
+        await assertSafeDestinationPath(rootDir, join(targetRoot, relativePath), "file");
+      }
       const presentInSource = files.has(relativePath) && generatedPath && !scratchPath;
       if (presentInSource) continue;
       stale = true;
@@ -431,7 +469,8 @@ export async function syncClaudePackageAssets({ check, rootDir }) {
         process.stderr.write(`${reason}: ${relative(rootDir, target)}\n`);
         continue;
       }
-      await assertSafeDestinationPath(rootDir, target, "file");
+      if (symbolicLink) await assertSafeLinkRemoval(rootDir, target);
+      else await assertSafeDestinationPath(rootDir, target, "file");
       await rm(target);
     }
     for (const [relativePath, expected] of files) {

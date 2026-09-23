@@ -4,6 +4,7 @@
 import base64
 import binascii
 import hashlib
+import json
 import os
 from pathlib import Path
 import shutil
@@ -88,6 +89,46 @@ class BootstrapRoutingTests(unittest.TestCase):
                 result = self.run_bootstrap(*args)
                 self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
                 self.assertIn("TH_TEST_UNSUPPORTED", result.stderr)
+
+    def test_update_precheck_with_windows1252_fallback(self):
+        """Exercise both no-download exits with PS5.1's legacy decoding."""
+        command = r'''
+function Invoke-WebRequest {
+    param($Uri, [switch]$UseBasicParsing, $TimeoutSec, $ErrorAction)
+    if ($Uri -notlike '*/VERSION') { throw 'Unexpected download' }
+    [pscustomobject]@{ Content = '3.41.2' }
+}
+$bytes = [System.IO.File]::ReadAllBytes($env:TH_BOOTSTRAP_SCRIPT)
+$encoding = [System.Text.Encoding]::GetEncoding(1252)
+if ($bytes.Length -ge 3 -and $bytes[0] -eq 239 -and $bytes[1] -eq 187 -and $bytes[2] -eq 191) {
+    $encoding = [System.Text.Encoding]::UTF8
+}
+& ([scriptblock]::Create($encoding.GetString($bytes)))
+'''
+        repo_root = Path(__file__).resolve().parents[1]
+        temp_root = Path(os.environ.get("TH_BOOTSTRAP_TEST_TMPDIR") or tempfile.gettempdir())
+        directory = temp_root / f"th-precheck-{uuid.uuid4().hex}"
+        (directory / "opencode").mkdir(parents=True)
+        try:
+            for version, status in (("3.41.2", "already current"), ("9.0.0", "installed ahead")):
+                with self.subTest(version=version):
+                    (directory / "opencode" / ".team-harness.json").write_text(
+                        json.dumps({"installed_version": version}), encoding="utf-8",
+                    )
+                    env = os.environ.copy()
+                    env.update({"APPDATA": str(directory), "PROCESSOR_ARCHITECTURE": "AMD64",
+                                "TH_BOOTSTRAP_SCRIPT": str(repo_root / "bin" / "update-opencode.ps1"),
+                                "PSModulePath": self._powershell51_module_path()})
+                    result = subprocess.run(
+                        [self.powershell51, "-NoProfile", "-Command", command],
+                        env=env, capture_output=True, text=True, timeout=10,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertIn(status, result.stdout)
+                    self.assertIn(f"installed version   {version}", result.stdout)
+                    self.assertNotIn("Write-Host", result.stdout)
+        finally:
+            shutil.rmtree(directory)
 
     def _compile_child_fixture(self, directory):
         """Build a local native child that records argv and returns 37."""

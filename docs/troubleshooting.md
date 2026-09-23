@@ -122,10 +122,11 @@ a second coordinator solely from this symptom.
 **Cause:** Files from the binary installer remain in `~/.claude/agents/`, `~/.claude/skills/`, and `~/.claude/commands/` while the plugin also registers the same agents.
 
 **Fix:** Inspect the retired installer's ownership ledger and preview each
-legacy path. Remove only files explicitly recorded as Team Harness-owned and
-still present. If ownership is absent or unclear, preserve the path and use
-the plugin's reload guidance. Never use wildcard or recursive removal against
-the commands, agents or skills directories.
+legacy path. Remove a file only when its recorded Team Harness ownership and
+contents both match trusted installer stock, following the
+[migration procedure](./plugin-migration.md). Preserve modified files and any
+path whose ownership or stock contents cannot be verified. Never use wildcard
+or recursive removal against the commands, agents or skills directories.
 
 Do not remove arbitrary user hooks or settings entries. Preserve native
 permission configuration and any context/observation integration that is not
