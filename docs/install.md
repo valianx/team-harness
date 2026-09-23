@@ -9,14 +9,13 @@ codex plugin marketplace add valianx/team-harness
 codex plugin add team-harness@team-harness
 ```
 
-Review and explicitly trust the plugin hooks, then start a new thread. Plugin
-installation is separate from the thirteen-agent placement required by delegated
-pipeline and PR-review workflows; use `install apply --runtime codex --scope project` for the thirteen
-generated TOML agents before delegation. Start from a clean `Main` thread and
-invoke `@Team-Harness init <task>` for lightweight intake without state or
-subagents. Invoke `@Team-Harness pipeline <task>` only for the full gated flow.
-No seventh coordinator is installed or selected through `/agent`. Plugin-only skills can still
-be used without the agents. See
+Plugin installation is separate from generated-agent placement for pipeline
+specialists and independent reviewers. Use `install apply --runtime codex --scope project`
+when installing those TOML agents. The current principal can use `init` for
+lightweight intake, `spec` for development with written intent and independent
+review, or `pipeline` for broader coordination. Plugin-only skills can run
+without additional executors. Use `reload` to refresh supported components and
+report any actual activation gap. See
 [`codex-runtime.md`](./codex-runtime.md) for the trusted-checkout contributor
 flow, upgrade, and removal.
 

@@ -78,11 +78,10 @@ candidate; reference a partially resolved issue without auto-closing it. Keep th
 candidate reviewable and report the files inspected, prepared, or retained with the
 rationale for any scope decision.
 
-For an active pipeline, follow its existing delivery mechanics and accepted preview.
-From this skill directory, Codex uses `../pipeline/references/delivery.md`, Claude Code
-uses `../../agents/_shared/delivery-mechanics.md`, and OpenCode uses
-`../../th-references/agents/_shared/delivery-mechanics.md` in the selected installation.
-Do not replace that contract with this skill's prose.
+This preparation/publication method is shared by direct, spec and pipeline work.
+Main normally executes it. A pipeline delivery specialist can perform the assigned
+checkpoint with the same evidence and endpoint; it does not need a second acceptance
+matrix or legacy report layout. Main retains decisions and coordinates Git writes.
 
 ## Checkpoint 2: publish or resume
 
@@ -100,15 +99,15 @@ the exact repository, base, head commit/tree, branch, worktree, body bytes, and 
 candidate review or authorization evidence before an outward write. A direct/spec ordinary in-scope repair
 may advance the head or revise its body after this diff check while reusing existing
 authority; ask only for a decision when scope, acceptance, security authority, or another
-real prerequisite is new. An active pipeline keeps the delivery contract's accepted candidate,
-review and preview identities; a mismatch returns to validation and rechecks authorization.
+real prerequisite is new. Pipeline work follows the same rule: distinguish the
+reviewed and corrected candidates, renew affected evidence, and reuse the existing
+authority when its scope still applies. Metadata repairs do not restart unrelated
+validation or create another approval step.
 
-An active pipeline publishes its accepted candidate through the existing delivery
-mechanics. Once the candidate and its authorization are handed to publication, perform no
-edits, tests, commits, rebases, or re-review; validation runs before authorization is accepted. Direct
-and spec publication follows their already-satisfied completion and author-review
-conditions without inventing a second gate. A native permission prompt remains a
-technical boundary; it is not silently answered by this skill.
+Publish the prepared candidate once applicable completion and author-review
+conditions are satisfied. If preparation changes the candidate, verify the changed
+surface before the outward write. A native permission prompt remains a technical
+boundary; it is not silently answered by this skill.
 
 Make the operation idempotent: first inspect for a PR in the exact repository with the
 exact head and base. If a network or transport result is uncertain, inspect that exact

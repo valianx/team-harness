@@ -14,6 +14,12 @@ the existing objective, canonical tasks, candidate, review choice and absolute
 later phase recovers these inputs and completes real gaps; it does not recreate
 planning or activate a pipeline.
 
+Spec keeps execution with the principal and uses independent reviewers for the
+selected questions. Pipeline adds coordination of useful specialists: group
+coherent work, reuse an owner for corrections and parallelize independent tasks.
+The four phases describe outcomes; they do not prescribe four agent handoffs.
+Both methods use the same applicable tools and evidence below.
+
 Continue to the requested endpoint: planning, local completion, PR preparation
 or PR publication. An authorized continuation needs no separate prompt for each
 selected tool or phase. Resolve only missing material decisions. Review choices

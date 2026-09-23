@@ -36,7 +36,7 @@
     "ceiling": 430
   },
   "agents/ref-pipeline.md": {
-    "ceiling": 491,
+    "ceiling": 436,
     "reason": "Current workflow uses native coordination and retained Markdown context"
   },
   "agents/ref-special-flows.md": {

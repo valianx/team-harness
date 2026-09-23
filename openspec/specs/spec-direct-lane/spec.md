@@ -5,25 +5,6 @@ Give short tasks durable written intent without activating a pipeline. `/th:spec
 
 ## Requirements
 
-### Requirement: The direct lane runs without pipeline activation or specialist dispatches
-The spec workflow MUST support bounded written intent, implementation and proportionate native specialist delegation without activating the pipeline. Main retains coordination and the shared workspace.
-
-#### Scenario: Independent tasks
-- **WHEN** approved spec work has disjoint implementation tasks
-- **THEN** Main may delegate useful bounded work while keeping the same objective and OpenSpec change.
-
-#### Scenario: A short task worth written intent arrives
-- **WHEN** the operator routes a single-repo, roughly day-sized task through `/th:spec`
-- **THEN** Main uses OpenSpec and the shared workspace, implements or delegates useful bounded work, verifies it and prepares completed archive for authorized delivery.
-
-#### Scenario: The operator asks for a review inside the lane
-- **WHEN** the operator requests a QA or security look on the lane's diff
-- **THEN** Main obtains the requested independent read-only advice, preserves findings and verifies necessary corrections without changing workflow.
-
-#### Scenario: The lane documents when publication is blocked
-- **WHEN** the lane's own text describes what holds a change back from publication
-- **THEN** it names the control that actually produces that outcome, so a reader cannot mistake coordinator discipline for an enforced gate
-
 ### Requirement: Routing is predicated and escalation is explicit
 Workflow routing MUST use user intent and concrete task needs rather than file counts, sensitivity flags or a mandatory lane-choice menu. Broader planning MAY be proposed when it helps; existing authorization MUST be reused.
 
@@ -181,3 +162,42 @@ Authors MAY use independent local review before publication. Main MUST preserve 
 #### Scenario: The operator requests review of an existing PR
 - **WHEN** a separate live request targets a PR number or URL for review
 - **THEN** the existing review-pr workflow retains exclusive routing and this author-review offer does not replace it
+
+### Requirement: The direct lane keeps execution with Main and independent review
+The spec workflow MUST keep written intent, implementation, validation and PR preparation/publication with the current principal by default. It SHALL retain applicable OpenSpec, testing, sketch, workspace and independent-review capabilities. A phase transition SHALL NOT require a separate executor or pipeline activation. Main SHALL judge findings and own corrections under existing authorization; bounded delegation remains available for genuinely independent work or an explicit request.
+
+#### Scenario: Independent tasks
+- **WHEN** approved spec work includes a useful independent task
+- **THEN** Main may delegate that bounded task while retaining the same objective, OpenSpec and workspace, without turning each phase into another mandatory agent.
+
+#### Scenario: A short task worth written intent arrives
+- **WHEN** the operator selects spec for a bounded objective
+- **THEN** Main proceeds through the authorized phases with written intent and applicable quality tools, preserving continuity in the current conversation.
+
+#### Scenario: The operator asks for a review inside the lane
+- **WHEN** QA, security or another independent lens is selected
+- **THEN** Main obtains that review, evaluates the findings and verifies corrections while preserving applicable existing provider evidence.
+
+#### Scenario: Implementation reaches validation
+- **WHEN** authorized implementation finishes
+- **THEN** Main continues into applicable checks and upstream verification without requiring spec-validator or another phase executor.
+
+#### Scenario: A PR is prepared and published
+- **WHEN** the endpoint includes an authorized PR
+- **THEN** Main uses create-pr, current evidence and the completed archive without requiring pr-creator, repeating unaffected assessments or implying merge authority.
+
+#### Scenario: A phase is outside the endpoint
+- **WHEN** the request stops at planning or local completion
+- **THEN** Main stops at that endpoint without executing excluded phases or claiming their completion.
+
+#### Scenario: Native dispatch is unavailable
+- **WHEN** no selected independent review requires an unavailable native capability
+- **THEN** Main can continue the authorized spec work itself; missing optional executors do not create a workflow blocker.
+
+#### Scenario: An existing phase assessment remains applicable
+- **WHEN** work resumes with current checks, review results or prepared PR artifacts
+- **THEN** Main reuses them and renews affected evidence after corrections, preserving original findings and reasoned dispositions.
+
+#### Scenario: The lane documents when publication is blocked
+- **WHEN** required coverage, scope or native permission remains unresolved
+- **THEN** Main reports that concrete limitation rather than claiming a historical verdict or phase token controls publication.

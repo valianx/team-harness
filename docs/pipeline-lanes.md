@@ -31,7 +31,15 @@ using context and requested coverage.
 
 Use `spec` when written intent and tasks help one bounded objective. It supports
 independent specialist work and sequential repositories without becoming a
-pipeline. Reuse canonical OpenSpec, workspace, checks and the create-pr skill.
+pipeline. The principal carries implementation, checks and PR preparation with
+independent reviewers; phase changes do not require another executor. Reuse
+canonical OpenSpec, workspace, checks and the create-pr skill.
+
+Pipeline adds dependency-aware coordination of existing specialists. Group work
+that shares context and ownership, parallelize genuinely independent tasks, and
+reuse useful sessions for corrections. Main can complete small steps directly;
+the roster does not prescribe a chain of mandatory roles. Both methods retain
+the same applicable quality tools and independent review.
 
 ## Legacy route markers (compatibility only)
 

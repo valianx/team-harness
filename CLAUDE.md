@@ -86,7 +86,7 @@ team-harness/
 
 | Layer | Choice |
 |---|---|
-| Installer | Go 1.25.8+, cross-compiled to GH Release assets. It manages opencode assets and the thirteen generated Codex agent TOMLs (`--runtime codex`), but never installs either marketplace plugin. Claude Code remains marketplace-only. Full lifecycle detail: `docs/lifecycle.md`. |
+| Installer | Go 1.25.8+, cross-compiled to GH Release assets. It manages opencode assets and the generated Codex agent TOMLs (`--runtime codex`), but never installs either marketplace plugin. Claude Code remains marketplace-only. Full lifecycle detail: `docs/lifecycle.md`. |
 | Bootstrap scripts | Bash/PowerShell/cmd.exe entry points download the released agent-installer binary. Codex plugin install/update/remove remains a separate marketplace lifecycle. |
 | Agents / skills | Markdown with YAML frontmatter |
 | Complex skills | Markdown + referenced scripts (Python/Node via `uv run` or CLIs) |
@@ -191,25 +191,23 @@ See `docs/voice-guide.md` for the full Bad/Good example and extended rationale.
 
 > Full table and extended examples: see `docs/voice-guide.md § Internal Chatter — IN/OUT table (§7.1.1 full)`.
 
-**Rule:** Config load, MCP verify, and Initialization / boot sequence are **SILENT** on success (log `operation.*` event only); one-line error + suggestion on failure. Phase-transition status blocks and all decisions, results, and STOP blocks are **PERMITTED** and always operator-facing. Tool errors always surface a one-line summary + next-step (never a raw dump). When uncertain: output that answers what the operator asked is operator-facing; output that narrates internal mechanics is **Internal chatter**.
+Keep routine successful initialization quiet. Report meaningful progress, decisions,
+results and failures with the next useful action. No coordination event or fixed
+status block is required.
 
 ### 7.2 Vocabulary — dev-natural verbs at the operator surface
 
-The three things a developer already knows how to ask for — a work plan, an implementation, a PR — map cleanly onto the pipeline states. The operator need not learn implementation checkpoints; the state machine remains named and recoverable for contributors.
+Describe progress using the work the operator requested. Spec keeps execution with
+the principal; pipeline adds useful coordination through the same four phases.
 
-| Operator asks for | Maps to | Internal mechanics (operator never sees) |
-|---|---|---|
-| "give me the work plan" / "design X" | `design` → `waiting_gate1` | Discover / Specify / architect / Gate 1 |
-| "implement it" | `implementation` → `validation` | implementer / tester / QA / security floor |
-| "open the PR" / "ship it" | `waiting_gate3` → `delivery` → `complete` | Gate 3 / delivery prose / coordinator publication mechanics |
+| Operator asks for | Work |
+|---|---|
+| "give me the work plan" / "design X" | Spec: written intent, design and relevant previews |
+| "implement it" | Implementation followed directly by applicable Validation |
+| "open the PR" / "ship it" | Publication through create-pr with current evidence |
 
-**Rule:** operator-visible status blocks, STOP-block templates, install prompts, error messages, and skill help text use dev-natural verbs (`plan`, `implement`, `validate`, `review`, `recover`, `ship`). Phase numbers and gate identifiers appear only in contributor surfaces (this `CLAUDE.md`, `agents/*.md` instructional sections, workspace doc templates internal to the pipeline state machine).
-
-**Permitted exceptions:**
-
-- **STAGE-GATE-{1,2,3} identifiers in STOP-block headers.** The identifier is a durable label referenced by `00-state.md`, the JSONL trace, the test suite, and the hook payloads. The label stays in the header line; the surrounding prose uses dev-natural verbs.
-- **`/th:pipelines` output.** When the operator explicitly invokes `/th:pipelines`, surfacing the `Stage` / `Phase` columns is appropriate — the operator is asking about pipeline mechanics.
-- **`/trace` output.** Same rule as `/th:pipelines`.
+Historical gate labels belong to retained records, not current instructions or
+new approval steps. Use plain verbs such as plan, implement, validate and publish.
 
 ### 7.3 Language — English-only repo content
 
@@ -221,15 +219,16 @@ Every committed artefact is in English. Workspace docs split by tier: operator-f
 
 ## 7b. Document Hygiene
 
-CLAUDE.md is a quick-reference surface — it points to `docs/`, not duplicates it. Any planned edit must keep it below **40 KB**; above **35 KB**, the editing scope must include offloading the largest non-structural section to `docs/` before Phase 2.8 Freeze.
+CLAUDE.md is a quick-reference surface — it points to `docs/`, not duplicates it. Keep it below **40 KB**; above **35 KB**, offload the largest non-structural section to its canonical document before publication.
 
 See `docs/document-hygiene.md` for section-size rules, overflow targets, and what-belongs-where tables.
 
 ---
 
 ## 8. Architecture Decisions
-<!-- Updated in the reviewed implementation tree when a feature establishes a durable decision. Empty at init. -->
-> Full history: see `docs/decisions.md`. Recent entries below.
+Current workflow guidance is in §5 and the selected skill. The dated entries below
+record historical decisions, not prerequisites for new work. See `docs/decisions.md`
+for the full history.
 - **2026-08-03** — Pipeline planning is one architect-only pass. Acceptance criteria describe
   observable behavior in Given/When/Then form; mandatory implementation mechanisms live in
   separate `TC-N` technical constraints. Automatic plan reviewers and the security design-review
@@ -258,7 +257,9 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 
 ## 9. Patterns & Conventions
 <!-- Updated in the reviewed implementation tree when a feature establishes a durable pattern. Empty at init. -->
-> Full history: see `docs/patterns.md`. Recent entries below.
+Current delivery uses create-pr with relevant existing evidence. The ledger,
+shared-file and publish-only patterns below describe historical runs and do not
+require new artifacts or approval steps. Full history: `docs/patterns.md`.
 - **Suite-run evidence ledger** (#532): append-only `docs/suite-evidence.md`-defined per-feature registry, one row per verification-command run; `tree_anchor` reused literally from `docs/verification-packet.md § 1a`; strict full-tree-anchor equality (never a "relevant files" heuristic) decides skip-vs-rerun; closed writer list. → `docs/suite-evidence.md`, `agents/ref-pipeline.md`
 - **Shared-review-file write discipline** (#527): on a review file several agents write, use `Edit` rather than `Write` once it exists and anchor `old_string` to your own section. The `tools:` grant is the only enforcement; the header-survival check a prior revision named was never defined. → `agents/_shared/plan-consolidation.md`
 - **Publish-only delivery**: `agents/_shared/implementation-assembly.md` owns version/changelog and the complete pre-Freeze commit; `agents/delivery.md` prepares PR prose; `agents/_shared/delivery-mechanics.md` verifies the validated commit/tree, pushes, and creates the draft PR without tests or branch mutation. → `agents/_shared/delivery-mechanics.md`
@@ -268,7 +269,7 @@ See `docs/document-hygiene.md` for section-size rules, overflow targets, and wha
 ## 10. Known Constraints
 <!-- Updated in the reviewed implementation tree when a feature establishes a durable constraint. Empty at init. -->
 - **`VERSION` pre-check best-effort**: unsigned; MITM can suppress an update (binary SHA256 is the floor). (SEC-OC-U-01, Low)
-- **opencode needs restart for asset changes**: hot-reload is experimental-only (issues #10899/#8751).
+- Use the selected update/reload workflow to verify native activation; report an observed host limitation without assuming a restart.
 
 ## 11. Testing Conventions
 

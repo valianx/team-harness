@@ -3,11 +3,13 @@ name: spec
 description: Develop through Spec, Implementation, Validation and Publication with OpenSpec, a shared workspace and selected independent review; stop at the requested endpoint.
 ---
 
-# Spec Lane (direct mode)
+# Spec: lightweight development
 
 Use OpenSpec for a bounded objective that benefits from durable written intent
-and tasks. Main coordinates implementation and useful native specialist work in
-the shared workspace, without activating a pipeline.
+and tasks. The current principal carries Spec, Implementation, Validation and
+Publication in the shared workspace, with selected independent reviewers.
+Phase changes do not require another executor. Use the pipeline when the
+operator wants broader coordination; a useful bounded delegation can stay here.
 
 When PR preparation or publication is relevant, use [create-pr](../create-pr/SKILL.md)
 automatically; selecting it does not activate the pipeline.
@@ -86,8 +88,9 @@ for a missing scope or material decision. A planning-only endpoint ends here.
 
 ### 2. Implementation
 
-Use [implement](../implement/SKILL.md) on the feature branch. Delegate useful
-independent tasks with explicit ownership and preserve other writers' work.
+Use [implement](../implement/SKILL.md) on the feature branch. Main implements
+and continues into validation. Delegate independent work only when useful,
+with explicit ownership and preservation of other writers' work.
 Check off canonical tasks as their specified work is completed; derive the
 workspace plan's progress from them, without a state file or event trace.
 

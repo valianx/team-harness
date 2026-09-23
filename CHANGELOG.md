@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.41.1] - 2026-09-22
+
+### Changed
+- Keep spec lightweight with principal execution and independent reviewers; group useful pipeline work and reuse native sessions and evidence.
+
+### Fixed
+- Remove obsolete specialist contracts and report prerequisites; align test ownership and delivery with shared skills.
+
 ## [3.41.0] - 2026-09-22
 
 ### Changed
