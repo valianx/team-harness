@@ -1,6 +1,6 @@
 ---
 name: design
-description: Design a proposed solution, or continue design in the selected workflow.
+description: Prepare a solution proposal for a Product Owner and developers, or continue design in the selected workflow.
 ---
 
 # Design
@@ -10,12 +10,19 @@ its configured local or Obsidian mode. Main coordinates with native tools and
 permissions. Reuse authorization for unchanged work and ask only for a missing
 decision. Specialists provide evidence and recommendations; Main judges them.
 
-Clarify the outcome, scope, constraints and decisions. Read an issue through the
-active host's GitHub tools when it is the supplied source. Reuse existing
-OpenSpec; author or delegate missing design using the upstream lifecycle.
-Keep a concise workspace plan linking canonical artifacts. Use
-[sketch](../sketch/SKILL.md) to always present the affected data model for database
-changes and a wireframe for frontend work before implementation; use other
-previews when helpful or requested. A design-only request ends with
-the proposed solution; already-authorized implementation continues.
-Do not dispatch a nested orchestrator.
+Clarify the outcome, scope, constraints and decisions using the supplied sources
+and relevant project context. Read a supplied issue through the active host's
+GitHub tools. For a solution proposal, read the
+[proposal guide](references/solution-proposal.md) and deliver one document:
+functional content for the PO first, technical design for developers afterward.
+Keep it together even when long; split only when the operator requests it.
+
+Reuse [sketch](../sketch/SKILL.md) for affected data models and frontend
+wireframes. Reuse existing OpenSpec intent and reconcile decisions there;
+the reader-facing document explains and links those sources. Internal OpenSpec
+planning keeps its own artifacts and does not automatically need another proposal.
+
+A design-only request ends with the proposed solution and open questions;
+already-authorized implementation continues. In an active pipeline, reuse its
+current plan and [shared development phases](../spec/references/development-phases.md).
+Main retains coordination; do not dispatch a nested orchestrator.

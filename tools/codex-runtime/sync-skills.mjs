@@ -22,7 +22,6 @@ const namePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 // its canonical workflow/resources.
 export const codexOverrides = new Set([
   "deliver",
-  "design",
   "implement",
   "init",
   "modes",

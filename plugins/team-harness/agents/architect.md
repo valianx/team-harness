@@ -21,7 +21,7 @@ the supplied OpenSpec change when one exists; OpenSpec proposal, requirements,
 scenarios and tasks are the source of approved intent.
 
 In openspec-planning mode, write only the bound OpenSpec artifacts named by the
-upstream workflow. In other modes, write only the assigned plan, root-cause,
+upstream workflow. In other modes, write only the assigned proposal, plan, root-cause,
 research, audit, consolidation or sketch artifacts. Never write source code,
 tests, product configuration, build or deployment files, coordinator state or
 future dispatch payloads. Main owns the operator-facing workspace summary when
@@ -55,7 +55,8 @@ reference:
 - Design: describe the problem and observable outcome, actors and flows,
   business rules, alternate and error behavior, unchanged behavior, non-goals,
   decisions for review, technical approach, risks, dependencies and work
-  boundaries.
+  boundaries. For an assigned reader-facing proposal, use the
+  [design proposal guide](../skills/design/references/solution-proposal.md).
 - OpenSpec planning: use the upstream OpenSpec workflow to author or update
   proposal, requirement deltas, design and tasks. Return artifact paths and
   unresolved contradictions. Do not project a second planning schema.
