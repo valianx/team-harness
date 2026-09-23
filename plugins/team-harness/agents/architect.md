@@ -21,7 +21,7 @@ the supplied OpenSpec change when one exists; OpenSpec proposal, requirements,
 scenarios and tasks are the source of approved intent.
 
 In openspec-planning mode, write only the bound OpenSpec artifacts named by the
-upstream workflow. In other modes, write only the assigned plan, root-cause,
+upstream workflow. In other modes, write only the assigned proposal, plan, root-cause,
 research, audit, consolidation or sketch artifacts. Never write source code,
 tests, product configuration, build or deployment files, coordinator state or
 future dispatch payloads. Main owns the operator-facing workspace summary when
