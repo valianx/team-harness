@@ -135,8 +135,12 @@ function loadWorkspaceMode(config: Record<string, unknown>): string | null {
       ? (config["logs-subfolder"] as string)
       : "work-logs";
 
+  if (CONTROL_CHAR_RE.test(logsSub) || logsSub.includes("\\") || /^[A-Za-z]:/.test(logsSub)
+    || Buffer.byteLength(logsSub, "utf8") > 1024
+    || logsSub.split("/").some(part => !part || part === "." || part === ".." || /[*?[\]{}]/.test(part))) return null;
+
   // SEC-DR-B: only validated/derived tokens interpolated.
-  return `Team Harness workspace mode: obsidian is configured. The current coordinator MUST write pipeline workspaces to the resolved obsidian base, not local ./workspaces/. The base-path pattern is: ${logsPath}/${logsSub}/{repo}/{YYYY-MM-DD}_{feature}/. Compose the full path by substituting {repo} with the current repository name (basename of the working directory) and {YYYY-MM-DD}_{feature} with today's date and the feature slug, following the current pipeline workspace rules.`;
+  return `Team Harness workspace mode: obsidian is configured. Use the current workspace skill across workflows to reuse the task's existing workspace or resolve a new one under ${logsPath}/${logsSub}/{repo}/{YYYY-MM-DD}_{feature}/. Preserve its original date and association when resuming. Native runtime permissions govern writes.`;
 }
 
 // ---------------------------------------------------------------------------

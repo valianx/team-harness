@@ -7,6 +7,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { writeWorkspaceOutput } from "./workspace-output.js";
 import { inboundCC, ShimRejectError } from "../shim/shim.js";
 import {
   evaluatePrecompactSnapshot,
@@ -48,7 +49,7 @@ function makeWriter(): PrecompactWriter {
 
     writeFile(filePath: string, content: string): string | null {
       try {
-        fs.writeFileSync(filePath, content, "utf8");
+        writeWorkspaceOutput(process.env["TH_WORKSPACE"]!, filePath, content, false);
         return null;
       } catch (err: unknown) {
         return `writeFile failed: ${err instanceof Error ? err.message : String(err)}`;
@@ -57,7 +58,7 @@ function makeWriter(): PrecompactWriter {
 
     appendLine(filePath: string, jsonLine: string): string | null {
       try {
-        fs.appendFileSync(filePath, jsonLine + "\n", "utf8");
+        writeWorkspaceOutput(process.env["TH_WORKSPACE"]!, filePath, jsonLine + "\n", true);
         return null;
       } catch (err: unknown) {
         return `appendLine failed: ${err instanceof Error ? err.message : String(err)}`;

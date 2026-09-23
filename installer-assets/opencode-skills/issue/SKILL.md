@@ -1,6 +1,6 @@
 ---
 name: issue
-description: "Fetch a GitHub issue and explicitly activate the gated pipeline."
+description: "Fetch a GitHub issue and pass verified context to the current coordinator for proportionate workflow selection."
 metadata:
   opencode/autoinvoke: "false"
 ---

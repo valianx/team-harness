@@ -21,7 +21,8 @@ function contained(root, target, allowEqual = false) {
 }
 
 function normalizeSubfolder(value) {
-  if (!safeString(value, 1024) || path.isAbsolute(value) || value.includes("\\")) throw new Error("logs-subfolder invalid");
+  if (!safeString(value, 1024) || path.isAbsolute(value) || value.includes("\\")
+    || /[\x00-\x1f\x7f]/.test(value) || /^[A-Za-z]:/.test(value)) throw new Error("logs-subfolder invalid");
   const parts = value.split("/");
   if (parts.some(part => part === "" || part === "." || part === ".." || /[*?[\]{}]/.test(part))) {
     throw new Error("logs-subfolder invalid");

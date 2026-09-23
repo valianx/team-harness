@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.41.2] - 2026-09-23
+
+### Fixed
+- Preserve Windows installer arguments and custom MCP headers; derive setup metadata from the selected plugin version.
+- Remove retired generated assets and confine retained hook outputs while recognizing native Claude completion events.
+- Report failed quality probes accurately and align active setup and workflow guidance with native advisory coordination.
+
 ## [3.41.1] - 2026-09-22
 
 ### Changed

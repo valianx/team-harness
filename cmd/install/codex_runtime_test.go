@@ -131,7 +131,7 @@ func TestParseCodexDirAndSelectPlacer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Runtime() != "codex" || p.ConfigRoot() != root {
+	if p.Runtime() != "codex" || p.ConfigRoot() != filepath.Clean(root) {
 		t.Fatalf("placer=%s root=%q", p.Runtime(), p.ConfigRoot())
 	}
 }

@@ -33,6 +33,11 @@ A prior corpus of ~46,000 lines violated this and was deleted: seven suites asse
 
 ## Selected test evidence
 
+`node tests/test_hook_outputs.mjs` exercises retained hook outputs with actual
+regular files, hard links, symbolic links and native Claude event payloads. It
+runs in Linux's full suite and the Windows job; Windows link-privilege omissions
+remain explicit and require the Linux lane for symbolic-link coverage.
+
 Select the shell, OS, runtimes and filesystem capabilities from the applicable
 CI job before running its commands. Here, the complete `tests/run-all.sh` job
 runs on Linux; native Windows coverage is listed in

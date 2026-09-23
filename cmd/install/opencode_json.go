@@ -344,9 +344,7 @@ func opencodeEntryMatches(existing json.RawMessage, desired map[string]interface
 		if !ok {
 			return false
 		}
-		a, _ := json.Marshal(v)
-		b, _ := json.Marshal(ev)
-		if string(a) != string(b) {
+		if !jsonValueContains(ev, v) {
 			return false
 		}
 	}

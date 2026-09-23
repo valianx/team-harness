@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -1085,6 +1086,95 @@ func TestRegisterMCPServers_NoWriteWhenBearerUnchanged(t *testing.T) {
 	backup := registerMCPServers("", mc)
 	if backup != "" {
 		t.Errorf("expected no backup when nothing changes, got %s", backup)
+	}
+}
+
+// TestRegisterMCPServers_NoWriteWhenCustomNestedHeader verifies recursive
+// desired-subset matching. An operator-owned header must not turn a matching
+// entry into a false update (and therefore must not create a backup or rewrite
+// the file).
+func TestRegisterMCPServers_NoWriteWhenCustomNestedHeader(t *testing.T) {
+	_, cleanup := testEnv(t)
+	defer cleanup()
+
+	url := "https://prod.example.com/mcp"
+	bearer := "stable-jwt"
+	writeClaudeJSON(t, map[string]interface{}{
+		"mcpServers": map[string]interface{}{
+			"memory": map[string]interface{}{
+				"type": "http", "url": url,
+				"headers": map[string]interface{}{
+					"Authorization": "Bearer " + bearer,
+					"X-Custom":      "operator-owned",
+				},
+			},
+		},
+	})
+	before, err := os.ReadFile(claudeJSON)
+	if err != nil {
+		t.Fatalf("read before: %v", err)
+	}
+
+	backup := registerMCPServers("", memChoiceWithBearer(url, bearer, true))
+	if backup != "" {
+		t.Fatalf("matching nested header map created a backup: %s", backup)
+	}
+	after, err := os.ReadFile(claudeJSON)
+	if err != nil {
+		t.Fatalf("read after: %v", err)
+	}
+	if !bytes.Equal(after, before) {
+		t.Fatal("matching nested header map rewrote ~/.claude.json")
+	}
+	result := readClaudeJSON(t)
+	headers := result["mcpServers"].(map[string]interface{})["memory"].(map[string]interface{})["headers"].(map[string]interface{})
+	if headers["X-Custom"] != "operator-owned" {
+		t.Fatalf("custom nested header changed: %v", headers["X-Custom"])
+	}
+}
+
+func TestJSONValueContains_RecursesObjectsButKeepsArraysExact(t *testing.T) {
+	tests := []struct {
+		name     string
+		existing interface{}
+		desired  interface{}
+		want     bool
+	}{
+		{
+			name: "nested object allows operator member",
+			existing: map[string]interface{}{
+				"headers": map[string]interface{}{"Authorization": "env", "X-Custom": "operator"},
+			},
+			desired: map[string]interface{}{
+				"headers": map[string]interface{}{"Authorization": "env"},
+			},
+			want: true,
+		},
+		{
+			name:     "scalar mismatch is false",
+			existing: map[string]interface{}{"enabled": true},
+			desired:  map[string]interface{}{"enabled": false},
+			want:     false,
+		},
+		{
+			name:     "array equality is exact",
+			existing: map[string]interface{}{"args": []interface{}{"one", "two"}},
+			desired:  map[string]interface{}{"args": []interface{}{"one", "two"}},
+			want:     true,
+		},
+		{
+			name:     "array extra member is false",
+			existing: map[string]interface{}{"args": []interface{}{"one", "two", "operator"}},
+			desired:  map[string]interface{}{"args": []interface{}{"one", "two"}},
+			want:     false,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := jsonValueContains(tc.existing, tc.desired); got != tc.want {
+				t.Fatalf("jsonValueContains() = %t, want %t", got, tc.want)
+			}
+		})
 	}
 }
 

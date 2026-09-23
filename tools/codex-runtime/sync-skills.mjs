@@ -409,25 +409,30 @@ export async function syncClaudePackageAssets({ check, rootDir }) {
   let stale = false;
   for (const [sourceRoot, targetRoot, allowlist] of projections) {
     const hooks = sourceRoot === join(rootDir, "hooks");
-    if (hooks) {
-      await assertSafeDestinationPath(rootDir, targetRoot, "directory");
-    }
+    // These are repository-owned package projections. The explicit boundary
+    // keeps cleanup inside each generated tree and rejects a redirected target
+    // before either stale removal or synchronization can touch it.
+    await assertSafeDestinationPath(rootDir, targetRoot, "directory");
     const files = await walkFiles(sourceRoot);
-    if (hooks) {
-      for (const relativePath of (await walkFiles(targetRoot)).keys()) {
-        if (!isOpenCodeScratchBundle(relativePath) && files.has(relativePath)) continue;
-        stale = true;
-        const target = join(targetRoot, relativePath);
-        const reason = isOpenCodeScratchBundle(relativePath)
-          ? "packaged local scratch bundle"
-          : "stale Claude package asset missing canonical source";
-        if (check) {
-          process.stderr.write(`${reason}: ${relative(rootDir, target)}\n`);
-          continue;
-        }
-        await assertSafeDestinationPath(rootDir, target, "file");
-        await rm(target);
+    for (const relativePath of (await walkFiles(targetRoot)).keys()) {
+      const generatedPath = allowlist === null || allowlist.has(relativePath);
+      const scratchPath = hooks && isOpenCodeScratchBundle(relativePath);
+      // A projection with an allowlist owns only those entries. Preserve
+      // unrelated operator files that happen to share its package directory.
+      if (!generatedPath && !scratchPath) continue;
+      const presentInSource = files.has(relativePath) && generatedPath && !scratchPath;
+      if (presentInSource) continue;
+      stale = true;
+      const target = join(targetRoot, relativePath);
+      const reason = scratchPath
+        ? "packaged local scratch bundle"
+        : "stale Claude package asset missing canonical source";
+      if (check) {
+        process.stderr.write(`${reason}: ${relative(rootDir, target)}\n`);
+        continue;
       }
+      await assertSafeDestinationPath(rootDir, target, "file");
+      await rm(target);
     }
     for (const [relativePath, expected] of files) {
       if (allowlist !== null && !allowlist.has(relativePath)) continue;
@@ -450,6 +455,7 @@ export async function syncClaudePackageAssets({ check, rootDir }) {
         process.stderr.write(`stale Claude package asset: ${relative(rootDir, target)}\n`);
         continue;
       }
+      await assertSafeDestinationPath(rootDir, target, "file");
       await mkdir(dirname(target), { recursive: true });
       await writeFile(target, expected, { mode: sourceMode });
       await chmod(target, sourceMode);

@@ -7,6 +7,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { writeWorkspaceOutput } from "./workspace-output.js";
 import { inboundCC, ShimRejectError } from "../shim/shim.js";
 import { evaluateSubagentTrace, type SubagentTraceWriter } from "../bodies/subagent-trace.js";
 
@@ -39,7 +40,7 @@ function makeWriter(): SubagentTraceWriter {
       const jsonLine = encodedLine.slice(sep + 1);
       const filePath = path.join(workspacePath, filename);
       try {
-        fs.appendFileSync(filePath, jsonLine + "\n", "utf8");
+        writeWorkspaceOutput(workspacePath, filePath, jsonLine + "\n", true);
         return null;
       } catch (err: unknown) {
         return `subagent-trace: append failed: ${err instanceof Error ? err.message : String(err)}`;

@@ -13,6 +13,7 @@ package main
 //  AC-13 [automated]: stdout capture during env-ref "No" disclosure does NOT contain secret values.
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -583,6 +584,71 @@ func TestRegisterOpencodeMCP_IdempotentReRun_ReturnsAlreadyConfigured(t *testing
 	}
 	if outcome.Context7 != MCPStatusAlreadyConfigured {
 		t.Errorf("Context7 outcome = %q, want %q on idempotent re-run (fix: real per-run MCP state)", outcome.Context7, MCPStatusAlreadyConfigured)
+	}
+}
+
+// TestRegisterOpencodeMCP_CustomNestedHeadersAreIdempotent verifies that
+// operator-owned nested headers do not cause a false update, backup, or write.
+func TestRegisterOpencodeMCP_CustomNestedHeadersAreIdempotent(t *testing.T) {
+	dir := t.TempDir()
+	docPath := filepath.Join(dir, "opencode.json")
+	memURL := "https://mcp.example.com/mcp"
+	contextURL := "https://mcp.context7.com/mcp"
+
+	if _, err := registerOpencodeMCP(memURL, contextURL, docPath, tokenModeEnvRef, opencodeMCPSecrets{}); err != nil {
+		t.Fatalf("first registerOpencodeMCP: %v", err)
+	}
+
+	data, err := os.ReadFile(docPath)
+	if err != nil {
+		t.Fatalf("read initial opencode.json: %v", err)
+	}
+	var config map[string]interface{}
+	if err := json.Unmarshal(data, &config); err != nil {
+		t.Fatalf("unmarshal initial opencode.json: %v", err)
+	}
+	mcp := config["mcp"].(map[string]interface{})
+	for name, header := range map[string]string{
+		"memory":   "X-Memory-Custom",
+		"context7": "X-Context7-Custom",
+	} {
+		entry := mcp[name].(map[string]interface{})
+		headers := entry["headers"].(map[string]interface{})
+		headers[header] = "operator-owned"
+	}
+	mutated, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal custom-header fixture: %v", err)
+	}
+	mutated = append(mutated, '\n')
+	if err := os.WriteFile(docPath, mutated, 0o600); err != nil {
+		t.Fatalf("write custom-header fixture: %v", err)
+	}
+	before, err := os.ReadFile(docPath)
+	if err != nil {
+		t.Fatalf("read before rerun: %v", err)
+	}
+
+	outcome, err := registerOpencodeMCP(memURL, contextURL, docPath, tokenModeEnvRef, opencodeMCPSecrets{})
+	if err != nil {
+		t.Fatalf("second registerOpencodeMCP: %v", err)
+	}
+	if outcome.Memory != MCPStatusAlreadyConfigured || outcome.Context7 != MCPStatusAlreadyConfigured {
+		t.Fatalf("custom nested headers caused an update: memory=%q context7=%q", outcome.Memory, outcome.Context7)
+	}
+	after, err := os.ReadFile(docPath)
+	if err != nil {
+		t.Fatalf("read after rerun: %v", err)
+	}
+	if !bytes.Equal(after, before) {
+		t.Fatal("matching nested header maps rewrote opencode.json")
+	}
+	backups, err := filepath.Glob(docPath + ".bak-*")
+	if err != nil {
+		t.Fatalf("glob backups: %v", err)
+	}
+	if len(backups) != 0 {
+		t.Fatalf("matching nested header maps created backups: %v", backups)
 	}
 }
 

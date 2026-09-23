@@ -56,6 +56,12 @@ try {
     () => resolveWorkspaceIdentity({ logsMode: "obsidian", logsPath: vault, logsSubfolder: "../escape", repositories: bindings, initiative: "payment-flow", date: "2026-08-24" }),
     /logs-subfolder invalid/,
   );
+  for (const logsSubfolder of ["bad\ncontext", "bad\u007fcontext", "C:outside"]) {
+    await assert.rejects(
+      () => resolveWorkspaceIdentity({ logsMode: "obsidian", logsPath: vault, logsSubfolder, repositories: bindings, initiative: "payment-flow", date: "2026-08-24" }),
+      /logs-subfolder invalid/,
+    );
+  }
   await assert.rejects(
     () => resolveWorkspaceIdentity({ logsMode: "local", repositories: [bindings[0], { ...bindings[1], root: path.join(root, "elsewhere", "service") }], initiative: "split", date: "2026-08-24" }),
   );

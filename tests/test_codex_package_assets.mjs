@@ -16,6 +16,10 @@ try {
   for (const file of [...shipped, ...scratch]) {
     await writeFile(join(rootDir, "hooks", file), `fixture:${file}\n`);
   }
+  await writeFile(join(rootDir, ".claude-plugin", "plugin.json"), "retired plugin fixture\n");
+  await writeFile(join(rootDir, ".claude-plugin", "hooks.json"), "active hooks fixture\n");
+  await writeFile(join(rootDir, "agents", "retired-agent.md"), "retired agent fixture\n");
+  await writeFile(join(rootDir, "docs", "agent-authoring.md"), "retired doc fixture\n");
 
   await syncClaudePackageAssets({ rootDir, check: false });
   for (const file of shipped) {
@@ -30,6 +34,43 @@ try {
     assert.equal(await readFile(join(rootDir, "hooks", file), "utf8"), `fixture:${file}\n`);
     await writeFile(join(rootDir, "hooks", file), "new local scratch output\n");
   }
+  await syncClaudePackageAssets({ rootDir, check: true });
+
+  // Every generated projection must report and remove a retired owned asset,
+  // while unowned files sharing an allowlisted projection root remain intact.
+  await rm(join(rootDir, ".claude-plugin", "plugin.json"));
+  await rm(join(rootDir, "agents", "retired-agent.md"));
+  await rm(join(rootDir, "docs", "agent-authoring.md"));
+  const unownedPlugin = join(rootDir, "plugins/team-harness/.claude-plugin/operator.json");
+  const unownedDoc = join(rootDir, "plugins/team-harness/docs/operator.md");
+  await writeFile(unownedPlugin, "preserve operator plugin file\n");
+  await writeFile(unownedDoc, "preserve operator doc file\n");
+  for (const relativePath of [
+    ".claude-plugin/plugin.json",
+    "agents/retired-agent.md",
+    "docs/agent-authoring.md",
+  ]) {
+    await assert.rejects(
+      syncClaudePackageAssets({ rootDir, check: true }),
+      /assets are stale/,
+      `check mode must report retired generated asset: ${relativePath}`,
+    );
+    assert.equal(
+      await access(join(rootDir, "plugins/team-harness", relativePath)).then(() => true, () => false),
+      true,
+      `check mode must not remove retired generated asset: ${relativePath}`,
+    );
+  }
+  await syncClaudePackageAssets({ rootDir, check: false });
+  for (const relativePath of [
+    ".claude-plugin/plugin.json",
+    "agents/retired-agent.md",
+    "docs/agent-authoring.md",
+  ]) {
+    await assert.rejects(access(join(rootDir, "plugins/team-harness", relativePath)), { code: "ENOENT" });
+  }
+  assert.equal(await readFile(unownedPlugin, "utf8"), "preserve operator plugin file\n");
+  assert.equal(await readFile(unownedDoc, "utf8"), "preserve operator doc file\n");
   await syncClaudePackageAssets({ rootDir, check: true });
 
   const leftover = join(rootDir, "plugins/team-harness/hooks/ts/dist/retired-hook.opencode.cjs");

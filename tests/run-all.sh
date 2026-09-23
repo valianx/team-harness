@@ -235,7 +235,7 @@ echo
 echo "############################################################"
 echo "# Suite 12: security self-scan (5-check MVP)"
 echo "############################################################"
-if python3 "$TESTS_DIR/test_security_scan.py"; then
+if [ -n "$PY" ] && $PY "$TESTS_DIR/test_security_scan.py"; then
     echo "security-scan: PASS"
 else
     echo "security-scan: FAIL"
@@ -484,6 +484,7 @@ echo "# Suite 24b: hooks/ts explicit workspace binding"
 echo "# Requires: node. Skipped when absent."
 echo "############################################################"
 run_node_suite "workspace-bound-hooks" "test_workspace_bound_hooks.mjs" "node not found — install Node.js to run this suite"
+run_node_suite "hook-output-ownership" "test_hook_outputs.mjs" "node not found — install Node.js to run this suite"
 
 echo
 echo "############################################################"

@@ -51,9 +51,12 @@ name: test-pipeline
 
 ## Important
 
-- Always invoke the `orchestrator` agent --- do NOT invoke agents directly
-- The orchestrator will analyze the service, decompose into modules, and dispatch tester agents in parallel
-- Output: `{workspace}/00-pipeline-summary.md` (final quality report)
-- Coverage gate: **80% branch coverage service-wide is mandatory** --- iterate
-  with a materially changed causal approach until met, or return the exact
-  unreachable branch/blocker when no verifiable repair remains
+- Route the task through the `orchestrator` path; the runtime adapter executes
+  that decision in the current Main thread. Do not create a nested coordinator.
+- The current coordinator analyzes the service, decomposes modules when useful,
+  and dispatches bounded tester or review work according to the request.
+- Output: `{workspace}/00-pipeline-summary.md` when a workspace is selected and
+  a consolidated report is useful.
+- Treat coverage as evidence against the repository's declared targets and the
+  selected workflow. There is no universal 80% branch-coverage gate; report
+  the measured result, missing configuration and any unreachable blocker.
