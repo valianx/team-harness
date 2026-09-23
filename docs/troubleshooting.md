@@ -79,23 +79,39 @@ Then retry `/plugin install th`.
 
 ---
 
-## Pipeline runs inline instead of dispatching specialists
+## Selected pipeline remains inline instead of dispatching specialists
 
-**Symptom:** When you ask Claude to do a task, it plans and implements inline in chat instead of creating a workspace and dispatching specialist agents via `Task`.
+**Symptom:** After explicitly selecting `/th:pipeline`, the native general agent
+continues the whole task inline instead of creating the configured workspace or
+dispatching a bounded specialist that the request needs.
 
-**Cause:** The dispatch rule is missing from `~/.claude/CLAUDE.md`. This rule states that the top-level agent IS the orchestrator, and that it dispatches specialists via `Task` rather than executing a specialist's role inline.
+**Cause:** The dispatch rule may be missing from `~/.claude/CLAUDE.md`, or the
+selected workflow may not require specialist work. Direct conversation and
+small reversible changes are intentionally inline; the rule applies only after
+the operator selects a workflow that needs coordination.
 
-**Fix:** Run `/th:setup` — it writes the dispatch rule automatically. The managed block (`<!-- orchestrator-dispatch-rule:start -->` … `<!-- orchestrator-dispatch-rule:end -->`) is defined once, canonically, at `skills/setup/managed-blocks/orchestrator-dispatch-rule.md` — reproduce it from that file rather than a copy pasted here, so this page cannot drift from what `/th:setup` actually writes.
+**Fix:** Run `/th:setup` to reconcile the managed dispatch block, then reload
+the plugin when the host supports it. Read the canonical block from
+skills/setup/managed-blocks/orchestrator-dispatch-rule.md; do not add a
+nested coordinator or a separate permission layer. If the selected workflow
+does not need a specialist, continuing inline is the expected result.
 
 ---
 
-## A specialist loses `Task` one level deep
+## A specialist loses tools in a nested context
 
-**Symptom:** a specialist leaf agent dispatched by `th:orchestrator` (or invoked one level deep from a skill wrapper or an `@`-mention inside an ongoing session) cannot itself use tools its own contract grants.
+**Symptom:** A bounded specialist cannot use a tool its own contract grants
+after the native host dispatches it.
 
-**Cause:** Claude Code's subagent-nesting depth is configurable, not a permanent cap, via the `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` environment variable in `~/.claude/settings.json`. It defaults to unset, in which case a subagent one level deep does not retain the tools its own contract grants.
+**Cause:** Tool access is controlled by the active native runtime and the
+current session context. Team Harness setup and update do not provision a
+machine-wide nesting-depth setting.
 
-**Fix:** Run `/th:setup` (or `/th:update` on an already-installed machine) — both provision `env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: "2"` after an explicit confirmation. Restart the session (or start a new one) only because this native setting resolves at session start and does not take effect mid-session. This is depth headroom for a specialist leaf agent, not a coordinator-dispatch fallback: `th:orchestrator` is always the top-level session agent and never itself runs nested, so there is no second-coordinator handoff to relay. Full mechanism: `docs/setup-update-model.md § Architecture prerequisite: subagent nesting depth`; `docs/subagent-orchestration.md § "Nested-context dispatch — RETIRED protocol, retained provisioning"`.
+**Fix:** Confirm that the selected workflow and specialist contract match the
+active host, then inspect the host's native permission/session diagnostics.
+Use the plugin reload path only when the host reports stale installed assets.
+Do not add `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`, restart a session, or create
+a second coordinator solely from this symptom.
 
 ---
 
@@ -105,15 +121,12 @@ Then retry `/plugin install th`.
 
 **Cause:** Files from the binary installer remain in `~/.claude/agents/`, `~/.claude/skills/`, and `~/.claude/commands/` while the plugin also registers the same agents.
 
-**Fix:** Remove the binary installer files before using the plugin:
-
-```bash
-rm -rf ~/.claude/agents/
-rm -rf ~/.claude/commands/
-rm -rf ~/.claude/skills/
-# Remove only files explicitly recorded as Team Harness-owned legacy assets;
-# preserve unrelated user hooks and configuration.
-```
+**Fix:** Inspect the retired installer's ownership ledger and preview each
+legacy path. Remove a file only when its recorded Team Harness ownership and
+contents both match trusted installer stock, following the
+[migration procedure](./plugin-migration.md). Preserve modified files and any
+path whose ownership or stock contents cannot be verified. Never use wildcard
+or recursive removal against the commands, agents or skills directories.
 
 Do not remove arbitrary user hooks or settings entries. Preserve native
 permission configuration and any context/observation integration that is not
@@ -128,9 +141,14 @@ The files that must be preserved (they hold your configuration):
 
 ## MCP servers not connecting
 
-**Symptom:** Memory or context7 MCP server shows errors or is unavailable.
+**Symptom:** Memory or Context7 MCP server shows errors or is unavailable.
 
-**Fix:** Run `/th:setup` to reconfigure. It will ask for your MCP URL and API key, write them to `~/.claude.json`, and verify connectivity.
+**Fix:** Inspect the native runtime's MCP registration first. Run
+`/th:setup` only when you want to configure Context7 explicitly; it preserves
+existing Memory and Context Harness entries and does not request or copy their
+credentials. Repair a Memory or Context Harness entry through the runtime's
+native MCP mechanism. Reconnect only when the host reports that activation
+requires it.
 
 ---
 

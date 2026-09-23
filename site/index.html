@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Team Harness — Spec-Driven Development for Claude Code</title>
+  <title>Team Harness — Shared workflows for Claude Code, Codex, and OpenCode</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -436,9 +436,10 @@
     <div class="container">
       <div class="hero-name">team-harness</div>
       <p class="hero-tagline">
-        An agent harness for Claude Code. Turns the chat into a Spec-Driven
-        Development pipeline with mandatory human gates and full state captured
-        as files so any session can resume from where the last one left off.
+        An agent harness for Claude Code, Codex, and OpenCode. The native general
+        agent coordinates four visible phases — Spec, Implementation, Validation
+        and Publication — while selected workflows and workspaces retain useful
+        context across sessions.
       </p>
       <div class="hero-badges">
         <span class="badge badge-version">{{VERSION}}</span>
@@ -480,9 +481,11 @@
       </div>
       <p class="prose" style="margin-top:16px;">
         Run these three commands inside Claude Code. <span class="inline-code">/th:setup</span>
-        configures the Memory MCP server, context7 API key, and logs mode, then writes
-        everything into <span class="inline-code">~/.claude/</span>.
-        Restart Claude Code after install.
+        configures native Team Harness preferences, optional Context7, and the selected
+        workspace output; existing MCP registrations remain operator-owned. Reload the
+        plugin when the host supports it, and reconnect only when the host reports a
+        component that cannot activate in place. Codex and OpenCode use their native
+        installer paths in the full guide.
         Full reference in <a href="https://github.com/valianx/team-harness/blob/main/docs/install.md" style="color:var(--accent);">docs/install.md</a>.
       </p>
     </div>
@@ -493,11 +496,11 @@
     <div class="container">
       <h2>What you get</h2>
       <p class="prose">
-        After install, 17 specialized agents and 32 slash commands are registered
-        in your <span class="inline-code">~/.claude/</span>. The system runs a full
-        Spec-Driven Development pipeline: intake, architecture design, implementation,
-        tester/QA verification, security review, and delivery —
-        all coordinated through workspaces files that persist across sessions.
+        After install, 30 canonical invocable roles are available to Claude Code;
+        Codex projects 20 generated TOML agents from that source. The native general
+        agent coordinates the selected workflow across Spec, Implementation,
+        Validation and Publication, with bounded specialists and workspace evidence
+        when the request and runtime configuration call for them.
       </p>
       <p class="prose" style="margin-top:12px;">
         Your native general agent coordinates the TH workflow you select. For development
@@ -511,7 +514,7 @@
       </div>
       <p class="prose" style="margin-top:14px;">
         Choose <span class="inline-code">/th:pipeline &lt;description&gt;</span> when you want
-        broader coordination and its stage gates. Use <span class="inline-code">/th:review-pr</span>
+        broader coordination and its shared phase workflow. Use <span class="inline-code">/th:review-pr</span>
         to review an existing PR and <span class="inline-code">/th:create-pr</span> to prepare
         and publish completed work.
       </p>
@@ -526,32 +529,31 @@
 
         <div class="stage-card">
           <div class="stage-verb">plan it</div>
-          <div class="stage-subtitle">Stage 1 — Analysis</div>
+          <div class="stage-subtitle">Spec and planning</div>
           <p class="stage-desc">
-            Architect designs the solution, QA defines acceptance criteria, plan-reviewer
-            audits shape. A STAGE-GATE stops the pipeline for human review before any
-            code is written.
+            Clarify intent, acceptance criteria and architecture when the selected
+            workflow needs them. Bounded reviewers inspect the plan and report evidence
+            for the native general agent to judge before implementation.
           </p>
         </div>
 
         <div class="stage-card">
           <div class="stage-verb">implement it</div>
-          <div class="stage-subtitle">Stage 2 — Implementation</div>
+          <div class="stage-subtitle">Implementation and validation</div>
           <p class="stage-desc">
-            Implementer writes production code. Tester, QA, and security agents verify
-            in parallel. An adversarial reviewer runs a pre-delivery audit when
-            the security floor applies. Iteration loops run automatically until all
-            gates pass.
+            Implementer writes production code. Tester, QA, security and adversarial
+            reviewers contribute only when the request selects those checks, using
+            measured evidence to guide any iteration.
           </p>
         </div>
 
         <div class="stage-card">
           <div class="stage-verb">ship it</div>
-          <div class="stage-subtitle">Stage 3 — Delivery</div>
+          <div class="stage-subtitle">Publication</div>
           <p class="stage-desc">
-            Delivery agent writes the changelog, bumps the version, commits, and opens
-            the PR. A final STAGE-GATE asks for push approval. State is captured in the
-            Knowledge Graph for future tasks.
+            Delivery prepares the authorized publication work. Native permissions and
+            approvals remain the action boundary, and workspace evidence persists when
+            the operator has selected a local or Obsidian destination.
           </p>
         </div>
 
@@ -570,7 +572,7 @@
             <span class="agent-name">th:orchestrator</span>
             <span class="agent-pill" style="background:var(--role-cyan);color:var(--role-cyan-t);">hub</span>
           </div>
-          <p class="agent-desc">Central hub for all development workflows. Routes tasks through the full pipeline (architect → implementer → verify → delivery) with parallel test+validate and iteration loops. Also handles direct modes from standalone skills. Manages workspaces as the shared board between agents.</p>
+          <p class="agent-desc">Native general-agent guidance for selected development workflows. It routes the request through the current phase method, dispatches bounded specialists when useful, and handles direct modes from standalone skills. It manages the selected local or Obsidian workspace as shared context.</p>
         </div>
 
         <div class="agent-card">
@@ -618,7 +620,7 @@
             <span class="agent-name">plan-reviewer</span>
             <span class="agent-pill" style="background:var(--role-magenta);color:var(--role-magenta-t);">validation</span>
           </div>
-          <p class="agent-desc">Read-only auditor of Stage 1 analysis artifacts. Enforces plan-shape rules: audits the Delivery Grouping (default all-tasks-one-PR, or temporal-prod-reasoned groups), per-task acceptance criteria in Given/When/Then format, consolidated documents, cross-references, and service-identity coherence. Emits pass/concerns/fail verdict before STAGE-GATE-1.</p>
+          <p class="agent-desc">Read-only auditor of planning artifacts when selected. Audits delivery grouping, per-task acceptance criteria, consolidated documents, cross-references and service-identity coherence, then reports pass/concerns/fail evidence for the native general agent.</p>
         </div>
 
         <div class="agent-card">
@@ -783,19 +785,17 @@
           Install at <a href="https://cli.github.com/">cli.github.com</a>.
         </li>
         <li>
-          <strong>context7 API key</strong> — for library docs retrieval.
-          The installer prompts for it or reads <span class="inline-code">CONTEXT7_API_KEY</span>
-          from the environment. Get one at
+          <strong>Context7 integration</strong> (optional) — for library docs retrieval when explicitly configured.
+          Native setup can use <span class="inline-code">CONTEXT7_API_KEY</span>
+          from the environment. Get a key at
           <a href="https://context7.com/">context7.com</a>.
         </li>
         <li>
-          <strong>Memory MCP URL</strong> — public URL of a running MCP-compatible server
-          (e.g., <a href="https://github.com/valianx/context-harness-mcp">context-harness-mcp</a>
-          deployed to Railway, Render, Fly, or Docker). The installer prompts for it
-          or reads <span class="inline-code">MEMORY_MCP_URL</span> from the environment.
-          No default — empty input is rejected. See
+          <strong>Existing MCP configuration</strong> — remains owned by the native runtime.
+          Team Harness does not require or provision Memory MCP; setup preserves existing
+          entries and configures only explicitly selected integrations. See
           <a href="https://github.com/valianx/team-harness/blob/main/docs/install.md">docs/install.md</a>
-          for details.
+          for runtime-specific details.
         </li>
       </ul>
     </div>
@@ -816,8 +816,8 @@
             <td class="doc-desc">Modes, env vars, --force, from source, updating</td>
           </tr>
           <tr>
-            <td><a href="https://github.com/valianx/team-harness/blob/main/agents/README.md">Agents &amp; low-cost matrix</a></td>
-            <td class="doc-desc">Full agent roster, model/effort matrix, low-cost mode</td>
+            <td><a href="https://github.com/valianx/team-harness/blob/main/agents/README.md">Agents and runtime projections</a></td>
+            <td class="doc-desc">Canonical role roster and native runtime projections</td>
           </tr>
           <tr>
             <td><a href="https://github.com/valianx/team-harness/blob/main/CLAUDE.md">Configuration reference</a></td>

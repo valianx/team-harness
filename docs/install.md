@@ -71,11 +71,15 @@ permission settings remain operator-owned.
 
 ### Native model selection
 
-Team Harness does not select an installation tier or rewrite agent model metadata.
-Choose the model and reasoning effort with the active runtime's native controls;
-Codex's role projection and ephemeral model override are documented in the
+The default installation leaves agent model metadata unchanged. Choose the model
+and reasoning effort with the active runtime's native controls. OpenCode also
+supports the explicit opt-in provider tier
+`install apply --runtime opencode --opencode-tier <provider>`;
+see [OpenCode model configuration](./opencode-model-config.md). Codex's role
+projection and ephemeral model override are documented in the
 [Codex runtime guide](./codex-runtime.md#roles-and-model-projection). Claude Code
-and OpenCode continue to use their own native model and approval settings.
+and OpenCode continue to use their own native approval settings when no tier is
+selected.
 
 ### Non-interactive install (CI / scripts)
 
@@ -132,14 +136,19 @@ After install, the native general agent discovers TH skills and coordinates the 
 
 | Command | Equivalent to |
 |---|---|
-| `/th:pipeline <request>` | Activates the gated pipeline and loads its contract progressively |
+| `/th:pipeline <request>` | Selects the broader four-phase workflow and loads its current contract progressively |
 | `/issue #N` | Starts from the fetched GitHub issue body |
 | `/design <feature>` | Routes to design direct mode |
 | `/deliver` | Routes to delivery direct mode |
 | `/recover <feature>` | Resumes an interrupted pipeline |
 | `/th:pipelines` | Shows current pipeline state |
 
-**No nested-coordinator dispatch exists to trip an anti-recursion limit.** The orchestrator has `Task` from the start of the session and dispatches every specialist (`architect`, `implementer`, `tester`, `cleaner`, `qa`, `security`, and the rest) directly, as a leaf agent — never another coordinator, never itself. There is no second coordinator to hand off to and no dispatch-handoff round-trip on this path (`docs/subagent-orchestration.md`).
+**No nested-coordinator dispatch exists to trip an anti-recursion limit.** The native
+general agent remains the coordinator; an orchestrator instruction is translated
+to that current Main thread by the runtime adapter. It may dispatch bounded
+specialists when the selected workflow needs them, using native permissions and
+proportionate review. There is no second coordinator or TH gate handoff
+(docs/subagent-orchestration.md).
 
 ---
 

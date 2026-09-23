@@ -154,10 +154,15 @@ func TestRunCodexUpdate_ReportsRealStateWithoutRestartAdvice(t *testing.T) {
 	nonInteractiveFlag = true
 	placer := newCodexPlacerAt(filepath.Join(isolatedUpdateHome(t), "codex"))
 	configureLedger(placer)
+	skipCodexLedgerWhenAncestorOwnershipUnavailable(t, placer.ConfigRoot())
 
 	firstOutput := captureUpdateStdout(t, func() {
 		if err := runCodexUpdate(placer); err != nil {
-			t.Fatalf("first Codex update: %v", err)
+			diff, planErr := computeUpdatePlan(placer)
+			if planErr != nil {
+				t.Fatalf("first Codex update: %v (diagnostic plan: %v; config root=%q; ledger root=%q)", err, planErr, placer.ConfigRoot(), activeLedgerRoot)
+			}
+			t.Fatalf("first Codex update: %v (diagnostic ledger errors=%v; config root=%q; ledger root=%q)", err, diff.LedgerErrors, placer.ConfigRoot(), activeLedgerRoot)
 		}
 	})
 	if !strings.Contains(firstOutput, "Codex agent files updated.") {
@@ -532,6 +537,20 @@ func TestRefreshManagedConfigKeys_BackupFailure_ReturnsError(t *testing.T) {
 // so the test fails if the write path regresses — not merely reconstructing the
 // production decision logic as a local variable.
 func TestAlreadyCurrent_ZeroWrites_Decision(t *testing.T) {
+	// This test exercises the update write boundary directly. Keep every
+	// data-home lookup inside the disposable test environment even if a future
+	// apply path starts consulting installer state.
+	clearDataHomeEnv(t)
+	ResetDataHomeCache()
+	t.Cleanup(ResetDataHomeCache)
+
+	// This unit test drives the write boundary directly. Force the same
+	// non-interactive mode used by headless update runs so an interactive test
+	// process does not block in confirmApply waiting on the operator's TTY.
+	previousNonInteractive := nonInteractiveFlag
+	nonInteractiveFlag = true
+	t.Cleanup(func() { nonInteractiveFlag = previousNonInteractive })
+
 	// Part A — decision gate.
 	if compareSemver(version, version) != 0 {
 		t.Fatalf("compareSemver(version, version) must be 0 (already-current gate); got %d", compareSemver(version, version))

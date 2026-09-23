@@ -195,6 +195,17 @@ function parseCCPayload(raw: string): Record<string, unknown> {
   const toolName = obj["tool_name"];
   const toolInput = obj["tool_input"];
 
+  if (obj["hook_event_name"] === "SubagentStop") {
+    return {
+      event: "SubagentStop",
+      tool: { name: "SubagentStop", input: {
+        agent_type: obj["agent_type"], agent_id: obj["agent_id"], stop_reason: obj["stop_reason"],
+      } },
+      workspace: obj["workspace"] ?? null,
+      dataHome: obj["dataHome"] ?? null,
+    };
+  }
+
   // Build normalized representation merging CC format into normalized-v1 shape.
   const normalized: Record<string, unknown> = {
     event: "PreToolUse", // CC hook event for this payload shape

@@ -23,8 +23,35 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 
 // entry/subagent-start.cc.ts
+var fs2 = __toESM(require("node:fs"), 1);
+var path2 = __toESM(require("node:path"), 1);
+
+// entry/workspace-output.ts
 var fs = __toESM(require("node:fs"), 1);
 var path = __toESM(require("node:path"), 1);
+function writeWorkspaceOutput(workspace, target, content, append) {
+  const parent = fs.realpathSync(workspace);
+  if (fs.realpathSync(path.dirname(target)) !== parent) throw new Error("output outside workspace");
+  let previous;
+  try {
+    previous = fs.lstatSync(target);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  if (previous && (!previous.isFile() || previous.nlink !== 1)) throw new Error("output is linked or non-regular");
+  const flags = fs.constants.O_WRONLY | (fs.constants.O_NOFOLLOW ?? 0) | (previous ? 0 : fs.constants.O_CREAT | fs.constants.O_EXCL) | (append ? fs.constants.O_APPEND : 0);
+  const descriptor = fs.openSync(target, flags, 384);
+  try {
+    const opened = fs.fstatSync(descriptor);
+    if (!opened.isFile() || opened.nlink !== 1 || previous && (opened.dev !== previous.dev || opened.ino !== previous.ino)) {
+      throw new Error("output changed or is linked");
+    }
+    if (!append) fs.ftruncateSync(descriptor, 0);
+    fs.writeFileSync(descriptor, content, "utf8");
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
 
 // shim/normalized-v1.ts
 var MAX_PAYLOAD_BYTES = 1048576;
@@ -146,6 +173,18 @@ function parseCCPayload(raw) {
   rejectPollutionKeys(obj);
   const toolName = obj["tool_name"];
   const toolInput = obj["tool_input"];
+  if (obj["hook_event_name"] === "SubagentStop") {
+    return {
+      event: "SubagentStop",
+      tool: { name: "SubagentStop", input: {
+        agent_type: obj["agent_type"],
+        agent_id: obj["agent_id"],
+        stop_reason: obj["stop_reason"]
+      } },
+      workspace: obj["workspace"] ?? null,
+      dataHome: obj["dataHome"] ?? null
+    };
+  }
   const normalized = {
     event: "PreToolUse",
     // CC hook event for this payload shape
@@ -224,10 +263,10 @@ function evaluateSubagentStart(input, writer) {
 // entry/subagent-start.cc.ts
 function findWorkspace(_cwd) {
   const envWs = process.env["TH_WORKSPACE"];
-  if (!envWs || !path.isAbsolute(envWs)) return null;
+  if (!envWs || !path2.isAbsolute(envWs)) return null;
   try {
-    if (!fs.statSync(envWs).isDirectory()) return null;
-    if (!fs.statSync(path.join(envWs, "00-state.md")).isFile()) return null;
+    if (!fs2.statSync(envWs).isDirectory()) return null;
+    if (!fs2.statSync(path2.join(envWs, "00-state.md")).isFile()) return null;
     return envWs;
   } catch {
     return null;
@@ -240,9 +279,9 @@ function makeWriter() {
       if (sep < 0) return "subagent-start: invalid encodedLine format";
       const filename = encodedLine.slice(0, sep);
       const jsonLine = encodedLine.slice(sep + 1);
-      const filePath = path.join(workspacePath, filename);
+      const filePath = path2.join(workspacePath, filename);
       try {
-        fs.appendFileSync(filePath, jsonLine + "\n", "utf8");
+        writeWorkspaceOutput(workspacePath, filePath, jsonLine + "\n", true);
         return null;
       } catch (err) {
         return `subagent-start: append failed: ${err instanceof Error ? err.message : String(err)}`;

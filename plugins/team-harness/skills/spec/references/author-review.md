@@ -24,16 +24,23 @@ Collect all returns and run `review-fan.mjs summary` (`gate` remains a compatibi
 disagreements and coverage limits. The summary is factual evidence; it does not decide closure or publication. Reviewers do not edit files or publish anything. Main writes
 `reviews/pre-pr-review.md` in the existing common workspace and links it from `01-plan.md`; in Obsidian mode both remain there, without a repository-local duplicate.
 
-An accepted review with dispatched lenses requires complete, trusted, correctly anchored returns
-for every selected lens. Failed or unavailable execution, malformed or stale-at-review or
-stale-at-consolidation returns, incomplete coverage, unresolved blocking disagreement and
-validation failure never become review success through patches. The `fully_verified: true`
-checker-only path reports checker evidence without empty dispatch. Explicit refusal skips only
-the optional review.
+Before declaring a selected reviewer unavailable, check the selected native role and scope and
+try a supported native read-only execution path, including a separate native CLI invocation when
+available. Preserve the immutable target and selected reviewer instructions; do not replace native
+isolation with a writable agent told not to edit, broaden permissions, or require a restart without
+an established host need. An unsuccessful recovery remains unavailable with its precise cause.
 
-Publication can proceed when Main has complete, trusted, correctly anchored returns and closes
-all actual blockers, even if a lens returned concerns or fail. A non-pass unexplained by closed
-findings or residual nonblocking concerns, or caused by missing coverage, still holds publication.
+A complete review requires trusted, correctly anchored returns for every selected lens. Failed,
+unavailable, malformed, stale or incomplete returns never become a pass through patches or a
+publication decision. Preserve their coverage limits and original outcomes. The `fully_verified:
+true` checker-only path reports checker evidence without empty dispatch.
+
+Main decides publication from confirmed defects, relevant validation and explicit coverage limits
+under the operator's existing authorization. An unavailable lens or non-pass verdict alone does
+not revoke that authorization or require another choice between publishing and keeping work local.
+An explicit operator condition such as "publish only after the review completes" remains binding;
+if recovery cannot satisfy it, ask only for that missing decision. Actual unresolved blockers and
+native permission limits remain applicable to the affected action.
 A scoped repair advancing the head does not make the original review stale. Bind `reviewed_head`
 and `corrected_head`, inspect their entire diff, and hold publication if it contains unrelated
 changes; only verified repairs and authorized spec amendments are in scope. Record each finding's
@@ -43,8 +50,8 @@ PR. The helper summary is evidence for Main's decision, not a separate publicati
 
 Security and adversary findings are evaluated like other selected lens findings. Main may choose
 those lenses when the operator requests them or when a concrete risk signal makes their evidence
-useful; the signal itself never holds publication. Actual blockers, missing selected coverage and
-native permission limits still hold publication until Main closes or explains them.
+useful; the signal itself never holds publication. Missing selected coverage must be explained
+in the report and delivery summary, never silently treated as reviewed or declined.
 
 The report names each repository and reviewed base/head, lens outcomes, coverage/limitations, findings with severity and file/line evidence, and their dispositions. Show the concise result in
 chat before repairs. Keep original findings and append closure evidence and corrected commit references; never relabel a newer commit as reviewed by agents that inspected the old one.
@@ -89,9 +96,10 @@ reviewer finding nor the workspace report grants scope authority.
 Repair dependencies first and then consumers, updating canonical tasks and the common plan.
 Preserve original lens verdicts and the helper summary as evidence: deterministic closure does
 not manufacture a reviewer pass or rewrite an unchanged return; it can support Main's closure
-decision above when the review was complete and trusted. Record concerns, per-finding
+decision above without changing the review's recorded completeness. Record concerns, per-finding
 dispositions, targeted checks, suite results and final commit references before resuming authorized
-publication. An unresolved blocker or missing evidence holds the affected PR. Do not automatically
+publication. An unresolved actual blocker or unmet explicit operator condition holds the affected
+action; advisory coverage limits follow Main's publication decision above. Do not automatically
 dispatch another full review after fixes. Use finding-specific checks for closure; a reviewed delta
 requires a new live request and the prior review anchor. No step here writes a review or comment to
 GitHub.

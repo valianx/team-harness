@@ -124,10 +124,10 @@ starting another full review or manufacturing a pass.
 ### 4. Publication
 
 For local completion, report the result and remaining limits without creating
-a PR. For PR delivery, satisfy the existing [author-review conditions](references/author-review.md)
-and use [create-pr](../create-pr/SKILL.md)'s publication checkpoint. A pending
-review choice or incomplete accepted review retains its existing treatment;
-preparing a PR does not itself authorize publication.
+a PR. For PR delivery, apply the existing [author-review conditions](references/author-review.md)
+and use [create-pr](../create-pr/SKILL.md)'s publication checkpoint. Keep incomplete
+review coverage explicit; Main decides delivery under existing authorization and any
+explicit operator prerequisites. Preparing a PR does not itself authorize publication.
 
 Continue already authorized publication once its real prerequisites hold,
 following repository conventions and native permissions without another

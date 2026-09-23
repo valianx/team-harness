@@ -6,6 +6,41 @@
 # See bin/README.md for details.
 $ErrorActionPreference = "Stop"
 
+# A script loaded with `irm | iex` runs in the caller's session.  Preserve the
+# child status there without terminating that session; a script invoked from a
+# file still returns the native exit code to its PowerShell host.
+$script:ThBootstrapInvokedFromFile =
+    -not [string]::IsNullOrEmpty($MyInvocation.MyCommand.Path) -and
+    $MyInvocation.InvocationName -ne "."
+
+function ConvertTo-NativeArgument {
+    param([AllowNull()][AllowEmptyString()][string]$Value)
+
+    if ($null -eq $Value) { $Value = "" }
+    if ($Value.Length -gt 0 -and $Value -notmatch '[\s"]') { return $Value }
+
+    # ProcessStartInfo.ArgumentList is unavailable on Windows PowerShell 5.1.
+    # This is the CommandLineToArgvW quoting rule used by the fallback below:
+    # backslashes before quotes are doubled, and trailing backslashes inside a
+    # quoted argument are doubled so the closing quote remains literal.
+    $quoted = '"'
+    $backslashes = 0
+    foreach ($character in $Value.ToCharArray()) {
+        if ($character -eq [char]92) {
+            $backslashes++
+            continue
+        }
+        if ($character -eq [char]34) {
+            $quoted += [string]::new([char]92, ($backslashes * 2) + 1) + '"'
+            $backslashes = 0
+            continue
+        }
+        $quoted += [string]::new([char]92, $backslashes) + $character
+        $backslashes = 0
+    }
+    return $quoted + [string]::new([char]92, $backslashes * 2) + '"'
+}
+
 # Claude Code is installed from its native marketplace. Download the binary
 # only when a native-engine subcommand was requested explicitly. The manifest
 # dispatcher accepts supported flags before the subcommand, for example
@@ -110,15 +145,22 @@ try {
     $psi.FileName = $InstallerPath
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $false
-    if ($args.Count -gt 0) {
-        $psi.Arguments = ($args -join ' ')
+    $childArgs = @($args | ForEach-Object { [string]$_ })
+    if ($null -ne $psi.GetType().GetProperty("ArgumentList")) {
+        foreach ($argument in $childArgs) {
+            [void]$psi.ArgumentList.Add([string]$argument)
+        }
+    } else {
+        $psi.Arguments = (($childArgs | ForEach-Object {
+            ConvertTo-NativeArgument ([string]$_)
+        }) -join " ")
     }
 
     $proc = [System.Diagnostics.Process]::Start($psi)
     $proc.WaitForExit()
-    # Do NOT call 'exit' here — it closes the terminal window when run via
-    # 'irm | iex'. Letting the script end naturally returns to the prompt.
-    $LASTEXITCODE = $proc.ExitCode
+    $code = [int]$proc.ExitCode
+    $global:LASTEXITCODE = $code
+    if ($script:ThBootstrapInvokedFromFile) { exit $code }
 } finally {
     Remove-Item -Recurse -Force $TmpDir -ErrorAction SilentlyContinue
 }

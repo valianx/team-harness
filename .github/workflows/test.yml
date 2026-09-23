@@ -22,10 +22,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Verify installer paths on native Windows
+        run: go test ./cmd/install/ -count=1 -timeout=120s
       - name: Verify native hook registration and Windows filesystem
         run: node tests/test_hook_registration.mjs
       - run: node tests/test_openspec_launcher.mjs
       - run: node tests/test_sync_skills_platform.mjs
+      - run: node tests/test_hook_outputs.mjs
       - run: node tests/test_th_update_windows.mjs
       - run: python tests/test_install_bootstrap_windows.py
       - run: python tests/test_windows_artifact_fs.py
@@ -62,8 +68,8 @@ jobs:
       # leave this required check permanently "pending" for a diff that
       # matches it, blocking merge. Instead the job always runs (satisfying
       # the required-check contract) and each heavy step below is skipped
-      # via `if:` when the diff is release-only (version sites + CHANGELOG +
-      # changelog.d/ only — e.g. a per-PR version bump with no other changes).
+      # via `if:` for changelog-only changes. Version sites also contain
+      # executable/configuration behavior, so they always run the full suite.
       # Any diff outside that narrow allowlist, or any failure to compute the
       # diff, defaults to running the full suite (fail-closed toward more
       # verification, never less).
@@ -81,7 +87,7 @@ jobs:
               while IFS= read -r f; do
                 [ -z "$f" ] && continue
                 case "$f" in
-                  .claude-plugin/plugin.json|.claude-plugin/marketplace.json|plugins/team-harness/.codex-plugin/plugin.json|cmd/install/main.go|CHANGELOG.md|changelog.d/*.md)
+                  CHANGELOG.md|changelog.d/*.md)
                     ;;
                   *)
                     is_release_only=false
@@ -190,7 +196,7 @@ jobs:
 
       - name: Release-only diff — heavier suites skipped
         if: steps.release-only.outputs.is_release_only == 'true'
-        run: echo "Diff is limited to version sites + CHANGELOG.md + changelog.d/ (a per-PR version bump) — skipping the heavier frontmatter (uv/PyYAML) and behavioral suites. This check still ran and reports success; it is not a paths-ignore trigger skip."
+        run: echo "Diff is limited to CHANGELOG.md + changelog.d/ — skipping the heavier suites. Version/configuration changes always run them."
 
   go-test:
     name: go test (installer)

@@ -1,14 +1,67 @@
 #!/usr/bin/env python3
 """Exercise native CMD bootstrap routing without allowing a download."""
 
+import base64
+import binascii
+import hashlib
+import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
+import tempfile
 import unittest
+import uuid
 
 
 @unittest.skipUnless(os.name == "nt", "native Windows CMD bootstrap")
 class BootstrapRoutingTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.powershell51 = shutil.which("powershell.exe")
+        cls.powershell7 = cls._resolve_powershell7(cls.powershell51)
+        if not cls.powershell51:
+            raise unittest.SkipTest("Windows PowerShell 5.1 is unavailable")
+
+    @staticmethod
+    def _resolve_powershell7(powershell51):
+        """Find pwsh even when WindowsApps aliases are absent from PATH."""
+        candidates = []
+        found = shutil.which("pwsh.exe")
+        if found:
+            candidates.append(found)
+        program_files = os.environ.get("ProgramFiles")
+        if program_files:
+            candidates.append(str(Path(program_files) / "PowerShell" / "7" / "pwsh.exe"))
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            candidates.append(str(Path(local_app_data) / "Microsoft" / "WindowsApps" / "pwsh.exe"))
+        if powershell51:
+            result = subprocess.run(
+                [powershell51, "-NoProfile", "-Command",
+                 "(Get-Command pwsh.exe -ErrorAction SilentlyContinue).Source"],
+                capture_output=True, text=True, timeout=10,
+            )
+            candidates.extend(line.strip() for line in result.stdout.splitlines() if line.strip())
+        for candidate in candidates:
+            path = Path(candidate)
+            if path.is_file():
+                return str(path)
+        return None
+
+    @staticmethod
+    def _powershell51_module_path():
+        """Keep PS5.1 from importing incompatible PS7 bundled modules."""
+        user_profile = os.environ.get("USERPROFILE") or os.environ.get("HOME", "")
+        program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+        windir = os.environ.get("WINDIR", r"C:\Windows")
+        return ";".join((
+            str(Path(user_profile) / "Documents" / "WindowsPowerShell" / "Modules"),
+            str(Path(program_files) / "WindowsPowerShell" / "Modules"),
+            str(Path(windir) / "System32" / "WindowsPowerShell" / "v1.0" / "Modules"),
+        ))
+
     def run_bootstrap(self, *args):
         env = {key: value for key, value in os.environ.items() if key.upper() != "ARCH"}
         env["PROCESSOR_ARCHITECTURE"] = "TH_TEST_UNSUPPORTED"
@@ -36,6 +89,208 @@ class BootstrapRoutingTests(unittest.TestCase):
                 result = self.run_bootstrap(*args)
                 self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
                 self.assertIn("TH_TEST_UNSUPPORTED", result.stderr)
+
+    def test_update_precheck_with_windows1252_fallback(self):
+        """Exercise both no-download exits with PS5.1's legacy decoding."""
+        command = r'''
+function Invoke-WebRequest {
+    param($Uri, [switch]$UseBasicParsing, $TimeoutSec, $ErrorAction)
+    if ($Uri -notlike '*/VERSION') { throw 'Unexpected download' }
+    [pscustomobject]@{ Content = '3.41.2' }
+}
+$bytes = [System.IO.File]::ReadAllBytes($env:TH_BOOTSTRAP_SCRIPT)
+$encoding = [System.Text.Encoding]::GetEncoding(1252)
+if ($bytes.Length -ge 3 -and $bytes[0] -eq 239 -and $bytes[1] -eq 187 -and $bytes[2] -eq 191) {
+    $encoding = [System.Text.Encoding]::UTF8
+}
+& ([scriptblock]::Create($encoding.GetString($bytes)))
+'''
+        repo_root = Path(__file__).resolve().parents[1]
+        temp_root = Path(os.environ.get("TH_BOOTSTRAP_TEST_TMPDIR") or tempfile.gettempdir())
+        directory = temp_root / f"th-precheck-{uuid.uuid4().hex}"
+        (directory / "opencode").mkdir(parents=True)
+        try:
+            for version, status in (("3.41.2", "already current"), ("9.0.0", "installed ahead")):
+                with self.subTest(version=version):
+                    (directory / "opencode" / ".team-harness.json").write_text(
+                        json.dumps({"installed_version": version}), encoding="utf-8",
+                    )
+                    env = os.environ.copy()
+                    env.update({"APPDATA": str(directory), "PROCESSOR_ARCHITECTURE": "AMD64",
+                                "TH_BOOTSTRAP_SCRIPT": str(repo_root / "bin" / "update-opencode.ps1"),
+                                "PSModulePath": self._powershell51_module_path()})
+                    result = subprocess.run(
+                        [self.powershell51, "-NoProfile", "-Command", command],
+                        env=env, capture_output=True, text=True, timeout=10,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertIn(status, result.stdout)
+                    self.assertIn(f"installed version   {version}", result.stdout)
+                    self.assertNotIn("Write-Host", result.stdout)
+        finally:
+            shutil.rmtree(directory)
+
+    def _compile_child_fixture(self, directory):
+        """Build a local native child that records argv and returns 37."""
+        compiler = directory / "compile-probe.ps1"
+        compiler.write_text(
+            r'''param([string]$Output)
+$source = @'
+using System;
+using System.IO;
+using System.Text;
+public static class ArgvProbe {
+    public static int Main(string[] args) {
+        var encoded = new StringBuilder();
+        for (var i = 0; i < args.Length; i++) {
+            if (i > 0) encoded.Append('\n');
+            encoded.Append(Convert.ToBase64String(Encoding.UTF8.GetBytes(args[i] ?? "")));
+        }
+        File.WriteAllText(Environment.GetEnvironmentVariable("TH_ARGV_OUT"), encoded.ToString());
+        return 37;
+    }
+}
+'@
+Add-Type -TypeDefinition $source -OutputAssembly $Output -OutputType ConsoleApplication
+if (-not (Test-Path -LiteralPath $Output)) { exit 1 }
+''',
+            encoding="utf-8",
+        )
+        child = directory / "argv-probe.exe"
+        result = subprocess.run(
+            [self.powershell51, "-NoProfile", "-File", str(compiler), str(child)],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode != 0 or not child.exists():
+            self.skipTest(
+                "could not compile native argv fixture: "
+                f"{result.stdout}\n{result.stderr}"
+            )
+        return child
+
+    @staticmethod
+    def _write_launcher_wrapper(launcher, wrapper):
+        """Mock release downloads while retaining the launcher source verbatim."""
+        preamble = r'''function Invoke-WebRequest {
+    [CmdletBinding()]
+    param([string]$Uri, [string]$OutFile, [switch]$UseBasicParsing, [int]$TimeoutSec)
+    if ($OutFile) {
+        if ($Uri -like "*/SHA256SUMS") {
+            # The Python harness supplies the probe hash so this mock never
+            # reaches the network or depends on PowerShell hash cmdlets.
+            $hash = $env:TH_BOOTSTRAP_HASH
+            $asset = $env:TH_BOOTSTRAP_ASSET
+            [System.IO.File]::WriteAllText($OutFile, "$hash  $asset")
+        } else {
+            [System.IO.File]::Copy($env:TH_BOOTSTRAP_PROBE, $OutFile, $true)
+        }
+        return
+    }
+    [pscustomobject]@{ Content = "3.41.2" }
+}
+function Unblock-File { param([string]$Path) }
+'''
+        wrapper.write_text(preamble + "\n" + launcher.read_text(encoding="utf-8"), encoding="utf-8")
+
+    @staticmethod
+    def _read_argv(path):
+        encoded = path.read_text(encoding="utf-8")
+        if not encoded:
+            return []
+        lines = encoded.split("\n")
+        try:
+            return [base64.b64decode(line, validate=True).decode("utf-8") for line in lines]
+        except (ValueError, binascii.Error):
+            # Allow a precompiled local probe supplied by a constrained runner;
+            # the maintained fixture above uses base64 so empty arguments stay
+            # unambiguous, while older probes record one raw value per line.
+            return lines
+
+    def test_real_powershell_forwarding_and_exit_status(self):
+        """Run every PS bootstrap through a local child on PS5.1 and PS7."""
+        shells = [("powershell-5.1", self.powershell51)]
+        if self.powershell7:
+            shells.append(("powershell-7", self.powershell7))
+
+        repo_root = Path(__file__).resolve().parents[1]
+        path_with_spaces = "C:\\fixture space\\"
+        quote_value = 'quote"inside'
+        trailing_value = "C:\\trailing\\"
+        memory_url = "https://memory.example/mcp?value=with space"
+
+        # The managed Windows runner may deny writes below the profile's
+        # system TEMP. Allow an explicit writable test root without placing
+        # disposable fixtures in the product checkout.
+        temp_root = Path(os.environ.get("TH_BOOTSTRAP_TEST_TMPDIR") or tempfile.gettempdir())
+        directory = temp_root / f"th-bootstrap-{uuid.uuid4().hex}"
+        # tempfile.TemporaryDirectory applies a restrictive chmod on Windows
+        # in this managed runner, leaving the fixture unreadable to PowerShell.
+        # Path.mkdir inherits the selected temporary root's ACL.
+        directory.mkdir()
+        try:
+            probe_override = os.environ.get("TH_BOOTSTRAP_TEST_PROBE")
+            if probe_override:
+                child = Path(probe_override)
+                self.assertTrue(child.is_file(), f"TH_BOOTSTRAP_TEST_PROBE is not a file: {child}")
+            else:
+                child = self._compile_child_fixture(directory)
+            probe_hash = hashlib.sha256(child.read_bytes()).hexdigest()
+            launchers = (
+                (
+                    "install-opencode.ps1",
+                    ["apply", "--opencode-dir", path_with_spaces, "", quote_value, trailing_value],
+                    ["apply", "--runtime", "opencode", "--scope", "global", "--memory-url", memory_url,
+                     "apply", "--opencode-dir", path_with_spaces, "", quote_value, trailing_value],
+                    memory_url,
+                ),
+                (
+                    "update-opencode.ps1",
+                    ["--opencode-dir", path_with_spaces, "", quote_value, trailing_value],
+                    ["update", "--runtime", "opencode", "--scope", "global", "--opencode-dir",
+                     path_with_spaces, "", quote_value, trailing_value],
+                    "",
+                ),
+                (
+                    "install.ps1",
+                    ["--runtime", "codex", "apply", "--codex-dir", path_with_spaces, "", quote_value,
+                     trailing_value],
+                    ["--runtime", "codex", "apply", "--codex-dir", path_with_spaces, "", quote_value,
+                     trailing_value],
+                    "",
+                ),
+            )
+            for shell_name, shell in shells:
+                for launcher_name, args, expected, memory in launchers:
+                    with self.subTest(shell=shell_name, launcher=launcher_name):
+                        output = directory / f"{shell_name}-{launcher_name}.argv"
+                        wrapper = directory / f"{shell_name}-{launcher_name}.ps1"
+                        self._write_launcher_wrapper(repo_root / "bin" / launcher_name, wrapper)
+                        env = os.environ.copy()
+                        env.update({
+                            "PROCESSOR_ARCHITECTURE": "AMD64",
+                            "TEMP": str(directory),
+                            "TMP": str(directory),
+                            "TH_BOOTSTRAP_PROBE": str(child),
+                            "TH_BOOTSTRAP_HASH": probe_hash,
+                            "TH_BOOTSTRAP_ASSET": "install-windows-amd64.exe",
+                            "TH_ARGV_OUT": str(output),
+                            "MEMORY_MCP_URL": memory,
+                        })
+                        if shell_name == "powershell-5.1":
+                            env["PSModulePath"] = self._powershell51_module_path()
+                        result = subprocess.run(
+                            [shell, "-NoProfile", "-File", str(wrapper), *args],
+                            env=env, capture_output=True, text=True, timeout=45,
+                        )
+                        self.assertEqual(
+                            result.returncode, 37,
+                            f"{shell_name}/{launcher_name} did not preserve child exit:\n"
+                            f"stdout={result.stdout}\nstderr={result.stderr}",
+                        )
+                        self.assertTrue(output.exists(), f"{shell_name}/{launcher_name} child did not run")
+                        self.assertEqual(self._read_argv(output), expected)
+        finally:
+            shutil.rmtree(directory, ignore_errors=True)
 
 
 if __name__ == "__main__":

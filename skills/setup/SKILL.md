@@ -367,9 +367,10 @@ verbatim between the `<!-- orchestrator-dispatch-rule:start -->` and
 
 The general agent uses its native coding instructions and discovers TH workflows
 through the managed guide and session context. Do not install an output style.
-For an existing installation, follow
-[the bounded style migration](../../docs/dev-mode.md#retire-an-existing-developer-mode-selection), preserving
-customized styles and unrelated settings and reporting any unresolved selection.
+For an existing installation, follow the retained bounded style-migration guide
+in [`docs/dev-mode.md`](../../docs/dev-mode.md#retire-an-existing-developer-mode-selection),
+preserving customized styles and unrelated settings and reporting any unresolved
+selection.
 Keep the voice rule below and the configured language/workspace context.
 
 ### 4c. Write voice-rule block
@@ -467,7 +468,7 @@ Install python3 now for full skill coverage? [Y/n]
 
 **Post-install re-probe:** after a consented install, run `command -v python3` again.
 - If python3 is now on PATH: report `python3 installed — full skill coverage now active.`
-- If python3 is still absent (re-probe fails): **Windows caveat** — a winget-installed python3 may not appear on PATH in the current Git Bash session. When the re-probe fails immediately after a reported-successful winget install, report `python3 installed — restart the terminal for PATH refresh` (not an error). On other platforms: report the degraded-mode advisory and continue.
+- If python3 is still absent (re-probe fails): **Windows caveat** — a winget-installed python3 may not appear on PATH in the current Git Bash process. When the re-probe fails immediately after a reported-successful winget install, report `python3 installed, but this process cannot resolve the updated PATH; the current setup run remains degraded. Resolve the installed executable from the OS install location or retry from a process with refreshed PATH.` Do not claim full coverage until the probe succeeds. On other platforms: report the degraded-mode advisory and continue.
 
 **Failed install, absent manager, or elevated command declined:** fall back to the degraded-mode advisory printed above. Native runtime permissions and approvals remain the action boundary; only the python3-dependent skills remain in degraded/unavailable mode.
 
@@ -494,10 +495,10 @@ Team Harness setup complete.
 
   context7:    connected (API key: ****...abcd) | not configured | unchanged
   Workspaces:  obsidian (D:\vault\Work\work-logs)
-  Agents:      22 registered
-  Skills:      38 available
+  Agents:      installed catalog reported by the host
+  Skills:      installed catalog reported by the host
 
-  Entry point: talk to Claude directly (th:orchestrator), or invoke a /th: skill
+  Entry point: talk to the native general agent, or invoke a /th: skill
   Reconfigure: /th:setup
 ```
 

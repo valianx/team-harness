@@ -15,6 +15,15 @@ machine-wide writes.
 Report the config root, installed version, changed components, preserved
 settings, and whether a new opencode session is required for discovery.
 
+The native installer keeps the model-less baseline by default and leaves the
+active provider/model to opencode. Apply `--opencode-tier <provider>` only when
+the operator explicitly requests a curated provider projection; the option is
+provider-scoped and is not a setup default. Non-interactive installation uses
+local logs by default and does not offer an Obsidian selector; configure a
+workspace destination explicitly through the selected runtime. Preserve
+existing MCP entries and configure Context7 only when selected. Team Harness
+does not provision Memory or Context Harness credentials.
+
 ## Upstream provider route
 
 Route the explicit targets `openspec`, `superpowers`, `tea`, `semgrep`,

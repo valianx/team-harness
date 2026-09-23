@@ -15,6 +15,41 @@
 # AC-10: SHA256 verification mirrors install-opencode.ps1 byte-for-byte.
 $ErrorActionPreference = "Stop"
 
+# A script loaded with `iwr | iex` runs in the caller's session.  Preserve the
+# child status there without terminating that session; a script invoked from a
+# file still returns the native exit code to its PowerShell host.
+$script:ThBootstrapInvokedFromFile =
+    -not [string]::IsNullOrEmpty($MyInvocation.MyCommand.Path) -and
+    $MyInvocation.InvocationName -ne "."
+
+function ConvertTo-NativeArgument {
+    param([AllowNull()][AllowEmptyString()][string]$Value)
+
+    if ($null -eq $Value) { $Value = "" }
+    if ($Value.Length -gt 0 -and $Value -notmatch '[\s"]') { return $Value }
+
+    # ProcessStartInfo.ArgumentList is unavailable on Windows PowerShell 5.1.
+    # This is the CommandLineToArgvW quoting rule used by the fallback below:
+    # backslashes before quotes are doubled, and trailing backslashes inside a
+    # quoted argument are doubled so the closing quote remains literal.
+    $quoted = '"'
+    $backslashes = 0
+    foreach ($character in $Value.ToCharArray()) {
+        if ($character -eq [char]92) {
+            $backslashes++
+            continue
+        }
+        if ($character -eq [char]34) {
+            $quoted += [string]::new([char]92, ($backslashes * 2) + 1) + '"'
+            $backslashes = 0
+            continue
+        }
+        $quoted += [string]::new([char]92, $backslashes) + $character
+        $backslashes = 0
+    }
+    return $quoted + [string]::new([char]92, $backslashes * 2) + '"'
+}
+
 $Repo    = "valianx/team-harness"
 $BaseUrl = "https://github.com/$Repo/releases/latest/download"
 
@@ -79,7 +114,7 @@ try {
 
 if ($InstalledVersion -ne '' -and $LatestVersion -ne '') {
     if ($InstalledVersion -eq $LatestVersion) {
-        Write-Host "th update — already current"
+        Write-Host "th update - already current"
         Write-Host "  installed version   $InstalledVersion"
         Write-Host "  latest version      $LatestVersion"
         Write-Host "No action required."
@@ -106,7 +141,7 @@ if ($InstalledVersion -ne '' -and $LatestVersion -ne '') {
 
     $cmp = Compare-SemVer $InstalledVersion $LatestVersion
     if ($cmp -gt 0) {
-        Write-Host "th update — installed ahead"
+        Write-Host "th update - installed ahead"
         Write-Host "  installed version   $InstalledVersion"
         Write-Host "  latest version      $LatestVersion"
         Write-Host "The installed version is newer than the latest release."
@@ -195,23 +230,33 @@ try {
     # ── Run the verified binary directly (not piped) ───────────────────────────
     Write-Host "Running updater..."
 
-    $ArgList = "update --runtime opencode --scope global"
+    # Build argv as individual values. ArgumentList preserves these values on
+    # PowerShell 7; the serializer below preserves them on PowerShell 5.1.
+    $childArgs = @("update", "--runtime", "opencode", "--scope", "global")
     # Forward any extra positional args the operator passed to this script.
     if ($args.Count -gt 0) {
-        $ArgList += " $($args -join ' ')"
+        $childArgs += @($args | ForEach-Object { [string]$_ })
     }
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $UpdaterPath
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $false
-    $psi.Arguments = $ArgList
+    if ($null -ne $psi.GetType().GetProperty("ArgumentList")) {
+        foreach ($argument in $childArgs) {
+            [void]$psi.ArgumentList.Add([string]$argument)
+        }
+    } else {
+        $psi.Arguments = (($childArgs | ForEach-Object {
+            ConvertTo-NativeArgument ([string]$_)
+        }) -join " ")
+    }
 
     $proc = [System.Diagnostics.Process]::Start($psi)
     $proc.WaitForExit()
-    # Do NOT call 'exit' here — it closes the terminal window when run via
-    # 'iwr | iex'. Letting the script end naturally returns to the prompt.
-    $LASTEXITCODE = $proc.ExitCode
+    $code = [int]$proc.ExitCode
+    $global:LASTEXITCODE = $code
+    if ($script:ThBootstrapInvokedFromFile) { exit $code }
 } finally {
     Remove-Item -Recurse -Force $TmpDir -ErrorAction SilentlyContinue
 }

@@ -131,7 +131,7 @@ func TestParseCodexDirAndSelectPlacer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Runtime() != "codex" || p.ConfigRoot() != root {
+	if p.Runtime() != "codex" || p.ConfigRoot() != filepath.Clean(root) {
 		t.Fatalf("placer=%s root=%q", p.Runtime(), p.ConfigRoot())
 	}
 }
@@ -158,6 +158,10 @@ func TestCodexLifecyclePreservesConfigAndForeignAgents(t *testing.T) {
 	skipCodexLedgerWhenAncestorOwnershipUnavailable(t, root)
 	config := []byte("# operator comment\nmodel = \"operator-model\"\n[agents]\nmax_threads = 9\n")
 	if err := os.WriteFile(filepath.Join(root, "config.toml"), config, 0o640); err != nil {
+		t.Fatal(err)
+	}
+	originalInfo, err := os.Stat(filepath.Join(root, "config.toml"))
+	if err != nil {
 		t.Fatal(err)
 	}
 	foreignPath := filepath.Join(root, "agents", "foreign.toml")
@@ -216,8 +220,8 @@ func TestCodexLifecyclePreservesConfigAndForeignAgents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat config: %v", err)
 	}
-	if info.Mode().Perm() != 0o640 {
-		t.Fatalf("config permissions changed: mode=%v", info.Mode().Perm())
+	if info.Mode().Perm() != originalInfo.Mode().Perm() {
+		t.Fatalf("config permissions changed: before=%v after=%v", originalInfo.Mode().Perm(), info.Mode().Perm())
 	}
 	if _, err := os.Stat(foreignPath); err != nil {
 		t.Fatalf("foreign agent removed: %v", err)

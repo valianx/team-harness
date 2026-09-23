@@ -147,6 +147,18 @@ function parseCCPayload(raw) {
   rejectPollutionKeys(obj);
   const toolName = obj["tool_name"];
   const toolInput = obj["tool_input"];
+  if (obj["hook_event_name"] === "SubagentStop") {
+    return {
+      event: "SubagentStop",
+      tool: { name: "SubagentStop", input: {
+        agent_type: obj["agent_type"],
+        agent_id: obj["agent_id"],
+        stop_reason: obj["stop_reason"]
+      } },
+      workspace: obj["workspace"] ?? null,
+      dataHome: obj["dataHome"] ?? null
+    };
+  }
   const normalized = {
     event: "PreToolUse",
     // CC hook event for this payload shape
@@ -217,7 +229,8 @@ function loadWorkspaceMode(config) {
   if (!logsPath) return null;
   if (CONTROL_CHAR_RE.test(logsPath)) return null;
   const logsSub = typeof config["logs-subfolder"] === "string" && config["logs-subfolder"] ? config["logs-subfolder"] : "work-logs";
-  return `Team Harness workspace mode: obsidian is configured. The current coordinator MUST write pipeline workspaces to the resolved obsidian base, not local ./workspaces/. The base-path pattern is: ${logsPath}/${logsSub}/{repo}/{YYYY-MM-DD}_{feature}/. Compose the full path by substituting {repo} with the current repository name (basename of the working directory) and {YYYY-MM-DD}_{feature} with today's date and the feature slug, following the current pipeline workspace rules.`;
+  if (CONTROL_CHAR_RE.test(logsSub) || logsSub.includes("\\") || /^[A-Za-z]:/.test(logsSub) || Buffer.byteLength(logsSub, "utf8") > 1024 || logsSub.split("/").some((part) => !part || part === "." || part === ".." || /[*?[\]{}]/.test(part))) return null;
+  return `Team Harness workspace mode: obsidian is configured. Use the current workspace skill across workflows to reuse the task's existing workspace or resolve a new one under ${logsPath}/${logsSub}/{repo}/{YYYY-MM-DD}_{feature}/. Preserve its original date and association when resuming. Native runtime permissions govern writes.`;
 }
 function composeSessionDirectives(config) {
   const directives = [];

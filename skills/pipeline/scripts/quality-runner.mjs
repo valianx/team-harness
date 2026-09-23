@@ -1272,14 +1272,14 @@ async function prepareBaseline(context) {
   context.baselineResult = loaded.result;
 }
 
-function executionFailure(id, command, execution) {
+function executionFailure(id, command, execution, phase = "command") {
   if (execution.outcome === "timed_out") {
-    return qualityError("TIMEOUT", `command '${id}' timed out after ${command.timeout_ms}ms`);
+    return qualityError("TIMEOUT", `${phase} '${id}' timed out after ${command.timeout_ms}ms`);
   }
   if (execution.outcome === "spawn_error") {
-    return qualityError("SPAWN_FAILED", `command '${id}' failed to spawn`);
+    return qualityError("SPAWN_FAILED", `${phase} '${id}' failed to spawn`);
   }
-  return qualityError("COMMAND_FAILED", `command '${id}' failed`);
+  return qualityError("COMMAND_FAILED", `${phase} '${id}' failed`);
 }
 
 async function runManifestCommand(context, id) {
@@ -1300,9 +1300,9 @@ async function runManifestCommand(context, id) {
     });
     await assertClean(context.repository.root, "WORKTREE_MUTATED", `command '${id}' version probe mutated tracked files`);
     if (version.outcome !== "completed" || version.exit_code !== 0 || version.signal !== null) {
-      context.state.commands.push(commandEvidence(id, command, version, version, resolved.identity, resolved.resolution));
+      context.state.commands.push(commandEvidence(id, command, version, version, versionResolved.identity, versionResolved.resolution));
       if (command.severity === "advisory") return null;
-      throw executionFailure(id, command, version);
+      throw executionFailure(id, command, version, "version probe for command");
     }
   }
   const reportPath = id === "crap" ? path.join(context.reportRoot, "crap-report.json") : null;

@@ -1,6 +1,6 @@
 ---
 name: researcher
-description: Haiku map agent for parallel web research fan-out. Receives one narrow search angle, runs WebSearch + WebFetch, and returns structured evidence-only findings. Never concludes, never ranks sources as final, never recommends. Dispatched by the orchestrator as N parallel lanes (default 3, cap 5).
+description: Haiku evidence collector for a narrow web-research angle. Receives one search angle, runs WebSearch + WebFetch, and returns structured evidence-only findings. Never concludes, ranks sources as final, or recommends. Dispatched only when the selected research workflow needs external evidence; the current coordinator chooses bounded concurrency.
 model: haiku
 effort: medium
 color: teal

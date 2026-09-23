@@ -40,39 +40,42 @@ Skills now use the directory format. Each skill lives at `skills/<name>/SKILL.md
 
 ## What stays the same
 
-- **Agents** — all 19 agents in `agents/` are unchanged. Names, models, and contracts are identical.
-- **Pipeline behavior** — all pipelines (feature, fix, hotfix, research, docs, review) run identically.
-- **orchestrator as entry point** — `@th:orchestrator` in chat still routes to the same coordinator.
-- **Workspaces** — pipeline workspaces (local `./workspaces/` or Obsidian vault) work identically.
-- **Low-cost mode** — available only where the selected native engine supports the installer transform; Claude Code uses the plugin's native model settings.
-- **`.team-harness.json` manifest** — config file location and format unchanged.
+- **Canonical roles** — the snapshot has 30 invocable canonical role files. Codex
+  projects 20 generated TOML agents from that source; see the runtime roster for
+  the projection and its separate scope.
+- **Workflow coordination** — the native general agent coordinates the selected
+  workflow. Pipeline use is explicit, specialists are bounded and optional, and
+  current coordination has no TH gate records.
+- **orchestrator as entry point** — `@th:orchestrator` remains a routing
+  instruction; runtime adapters execute it in the current Main thread.
+- **Workspaces** — local and Obsidian destinations remain supported where the
+  active runtime has configured or selected them; migration does not assume one
+  host's preferences transfer automatically to another.
+- **Model selection** — native defaults remain operator-owned. OpenCode's
+  provider tier is an explicit opt-in installer option; it is not a migration
+  default.
+- **`.team-harness.json` manifest** — the config document remains merge-owned
+  by the active runtime and unrelated values stay preserved.
 
 ---
 
 ## Step-by-step migration
 
-### 1. Uninstall old installer files
+### 1. Review old installer files
 
-The installer wrote files to `~/.claude/`. Remove them to avoid duplicate skills appearing as both `/skill-name` and `/th:skill-name`:
+The retired installer wrote files to `~/.claude/`. To avoid duplicate skills,
+inspect its ownership ledger and preview each legacy path before removal. The
+ledger is necessary but not sufficient: compare each candidate's bytes or
+digest with trusted installer stock (or the matching current plugin file) and
+remove only when both the recorded ownership and content match. Preserve a
+modified file, an unrecorded path, or any path without trusted stock; this
+includes custom commands even when their names overlap a Team Harness skill.
 
-```bash
-# Remove installer-managed skill files
-rm ~/.claude/commands/*.md
-
-# Remove installer-managed agent files (if you have no custom agents)
-rm ~/.claude/agents/*.md
-
-# Do not remove arbitrary user hooks. Remove only legacy files recorded as
-# Team Harness-owned by the installer ledger, if they are still present.
-```
-
-On Windows (PowerShell):
-
-```powershell
-Remove-Item "$env:USERPROFILE\.claude\commands\*.md"
-Remove-Item "$env:USERPROFILE\.claude\agents\*.md"
-# Preserve unrelated user hooks and native permission settings.
-```
+If the ledger is absent, malformed or does not identify a path, leave that path
+in place and continue with plugin installation and host reload. Do not use
+wildcards or recursive removal against `~/.claude/commands/`,
+`~/.claude/agents/` or `~/.claude/skills/`. Apply the same rule in Bash and
+PowerShell.
 
 ### 2. Install the plugin
 
@@ -109,7 +112,9 @@ The pipeline should start normally. If agents are missing, run `/reload-plugins`
 
 ### Duplicate skills appearing (`/design` AND `/th:design`)
 
-Old installer files and plugin files coexist. Run step 1 above to remove the installer files, then activate the plugin through the host's reload command.
+Old installer files and plugin files coexist. Follow step 1's ownership-ledger
+procedure, preserve any unverified file, then activate the plugin through the
+host's reload command.
 
 ### MCP not connecting after migration
 
@@ -124,10 +129,15 @@ Run `/reload-plugins`. Reconnect only when the host reports that reload cannot a
 
 ### Orphan cleanup for old flat skill files
 
-If the Go installer left behind flat `.md` files under `~/.claude/commands/` that have no plugin equivalent, run `/th:update` which includes a legacy orphan cleanup step for directory-format migrations.
+If flat `.md` files remain under `~/.claude/commands/`, compare each path with
+the ownership ledger and the plugin's current skill tree. Remove only a
+verified Team Harness-owned legacy file; preserve custom or unverified files.
+`/th:update` refreshes the plugin and managed blocks but is not a generic
+directory cleanup command.
 
 ### Low-cost mode
 
-Use the selected native runtime's model configuration. The compatibility
-bootstrap scripts do not install Claude Code files; with no subcommand they
-only print the native marketplace path.
+Use the selected native runtime's model configuration. Claude Code keeps its
+native settings; OpenCode tiering is explicit and provider-scoped. The
+compatibility bootstrap scripts do not install Claude Code files; with no
+subcommand they only print the native marketplace path.

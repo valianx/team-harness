@@ -54,19 +54,18 @@ const BREADCRUMB_FILE = "00-precompact.jsonl";
 // Returns true if safe, false if the resolved path escapes.
 // ---------------------------------------------------------------------------
 
-function symlinkSafe(writer: PrecompactWriter, workspace: string, targetPath: string): boolean {
+function symlinkSafe(writer: PrecompactWriter, workspace: string, filename: string): boolean {
   const real = writer.realpath(workspace);
   if (real === null) return false; // cannot verify workspace → block
 
-  const resolvedTarget = writer.realpath(targetPath);
+  const resolvedTarget = writer.realpath(writer.join(workspace, filename));
   if (resolvedTarget === null) {
     // Target doesn't exist yet (new file). The workspace itself must be safe.
     // We can only check that the workspace is real.
     return true; // no symlink to follow on a non-existent target
   }
 
-  // The resolved target must start with the real workspace path.
-  return resolvedTarget.startsWith(real);
+  return resolvedTarget === writer.join(real, filename);
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +100,7 @@ export function evaluatePrecompactSnapshot(
     }
 
     // Symlink guard on the snapshot destination.
-    if (!symlinkSafe(writer, workspace, snapshotPath)) {
+    if (!symlinkSafe(writer, workspace, SNAPSHOT_FILE)) {
       return "precompact-snapshot: symlink guard triggered — snapshot destination escapes workspace (precompact-snapshot.ts)";
     }
 
@@ -119,6 +118,7 @@ export function evaluatePrecompactSnapshot(
       snapshot: snapshotPath,
     };
     const jsonLine = JSON.stringify(record);
+    if (!symlinkSafe(writer, workspace, BREADCRUMB_FILE)) return null;
     const appendErr = writer.appendLine(breadcrumbPath, jsonLine);
     if (appendErr !== null) {
       // Breadcrumb failure is non-fatal — snapshot already written.

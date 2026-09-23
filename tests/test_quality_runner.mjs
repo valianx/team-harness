@@ -182,6 +182,20 @@ function assertClosedResult(result) {
 
 console.log("=== Deterministic quality runner ===");
 
+await check("failed version probes identify their executed argv and never run the main check", async () => {
+  const probe = command("require('node:fs').writeFileSync('main-ran', 'unexpected')");
+  probe.version_argv = [node, "-e", "process.exit(7)"];
+  await temporaryRepository({ manifest: baseManifest({ test: probe }) }, async ({ repo, base }) => {
+    const result = await runQualityChecks(options(repo, base, ["test"]));
+    assertClosedResult(result);
+    assert.equal(result.error_code, "COMMAND_FAILED");
+    assert.equal(result.commands[0].execution.exit_code, 7);
+    assert.equal(result.commands[0].execution_argv_sha256, createHash("sha256").update(JSON.stringify(probe.version_argv)).digest("hex"));
+    assert.match(result.detail, /version probe/);
+    await assert.rejects(readFile(path.join(repo, "main-ran")), { code: "ENOENT" });
+  });
+});
+
 await check("Git helpers ignore a parent's unrelated repository selection", async () => {
   await temporaryRepository({ manifest: baseManifest({ test: command() }) }, async ({ repo, workspace, candidate }) => {
     const unrelated = path.join(workspace, "unrelated");

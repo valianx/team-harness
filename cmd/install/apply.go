@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 )
 
 // ApplyPlan executes the diff produced by ComputePlan:
@@ -127,17 +128,22 @@ func componentInstallEntries(files []PlannedFile, op string, placer Placer) []Le
 func templatedFilePaths(item OwnedItem, placer Placer) []string {
 	// The OwnedItem.Files already contains concrete paths; we need to recover
 	// the {config_root}-templated form for the ledger (SEC-05 requires the token).
-	// We reverse-resolve by stripping the configRoot prefix.
-	configRoot := placer.ConfigRoot()
+	// Use filepath.Rel rather than a string prefix: Windows paths can differ in
+	// separator and drive-root spelling while still naming the same tree.
+	configRoot := filepath.Clean(placer.ConfigRoot())
 	result := make([]string, 0, len(item.Files))
 	for _, f := range item.Files {
-		rel := f
-		if len(f) > len(configRoot) && f[:len(configRoot)] == configRoot {
+		rel, err := filepath.Rel(configRoot, filepath.Clean(f))
+		if err == nil && rel != "." && !filepath.IsAbs(rel) && rel != ".." &&
+			!strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 			// Ledger paths use the portable manifest separator even when the
 			// concrete placer is running on Windows.
-			rel = "{config_root}" + filepath.ToSlash(f[len(configRoot):])
+			result = append(result, "{config_root}/"+filepath.ToSlash(rel))
+			continue
 		}
-		result = append(result, rel)
+		// Preserve an out-of-root path so the ledger structural gate rejects it
+		// rather than accidentally granting ownership to an unrelated file.
+		result = append(result, f)
 	}
 	return result
 }

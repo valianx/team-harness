@@ -23,8 +23,35 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 
 // entry/precompact-snapshot.cc.ts
+var fs2 = __toESM(require("node:fs"), 1);
+var path2 = __toESM(require("node:path"), 1);
+
+// entry/workspace-output.ts
 var fs = __toESM(require("node:fs"), 1);
 var path = __toESM(require("node:path"), 1);
+function writeWorkspaceOutput(workspace, target, content, append) {
+  const parent = fs.realpathSync(workspace);
+  if (fs.realpathSync(path.dirname(target)) !== parent) throw new Error("output outside workspace");
+  let previous;
+  try {
+    previous = fs.lstatSync(target);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  if (previous && (!previous.isFile() || previous.nlink !== 1)) throw new Error("output is linked or non-regular");
+  const flags = fs.constants.O_WRONLY | (fs.constants.O_NOFOLLOW ?? 0) | (previous ? 0 : fs.constants.O_CREAT | fs.constants.O_EXCL) | (append ? fs.constants.O_APPEND : 0);
+  const descriptor = fs.openSync(target, flags, 384);
+  try {
+    const opened = fs.fstatSync(descriptor);
+    if (!opened.isFile() || opened.nlink !== 1 || previous && (opened.dev !== previous.dev || opened.ino !== previous.ino)) {
+      throw new Error("output changed or is linked");
+    }
+    if (!append) fs.ftruncateSync(descriptor, 0);
+    fs.writeFileSync(descriptor, content, "utf8");
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
 
 // shim/normalized-v1.ts
 var MAX_PAYLOAD_BYTES = 1048576;
@@ -146,6 +173,18 @@ function parseCCPayload(raw) {
   rejectPollutionKeys(obj);
   const toolName = obj["tool_name"];
   const toolInput = obj["tool_input"];
+  if (obj["hook_event_name"] === "SubagentStop") {
+    return {
+      event: "SubagentStop",
+      tool: { name: "SubagentStop", input: {
+        agent_type: obj["agent_type"],
+        agent_id: obj["agent_id"],
+        stop_reason: obj["stop_reason"]
+      } },
+      workspace: obj["workspace"] ?? null,
+      dataHome: obj["dataHome"] ?? null
+    };
+  }
   const normalized = {
     event: "PreToolUse",
     // CC hook event for this payload shape
@@ -188,14 +227,14 @@ function observabilityEnabled(cls) {
 var STATE_FILE = "00-state.md";
 var SNAPSHOT_FILE = "00-state.precompact-snapshot.md";
 var BREADCRUMB_FILE = "00-precompact.jsonl";
-function symlinkSafe(writer, workspace, targetPath) {
+function symlinkSafe(writer, workspace, filename) {
   const real = writer.realpath(workspace);
   if (real === null) return false;
-  const resolvedTarget = writer.realpath(targetPath);
+  const resolvedTarget = writer.realpath(writer.join(workspace, filename));
   if (resolvedTarget === null) {
     return true;
   }
-  return resolvedTarget.startsWith(real);
+  return resolvedTarget === writer.join(real, filename);
 }
 function evaluatePrecompactSnapshot(_input, writer) {
   try {
@@ -214,7 +253,7 @@ function evaluatePrecompactSnapshot(_input, writer) {
     if (stateContent === null) {
       return null;
     }
-    if (!symlinkSafe(writer, workspace, snapshotPath)) {
+    if (!symlinkSafe(writer, workspace, SNAPSHOT_FILE)) {
       return "precompact-snapshot: symlink guard triggered \u2014 snapshot destination escapes workspace (precompact-snapshot.ts)";
     }
     const writeErr = writer.writeFile(snapshotPath, stateContent);
@@ -228,6 +267,7 @@ function evaluatePrecompactSnapshot(_input, writer) {
       snapshot: snapshotPath
     };
     const jsonLine = JSON.stringify(record);
+    if (!symlinkSafe(writer, workspace, BREADCRUMB_FILE)) return null;
     const appendErr = writer.appendLine(breadcrumbPath, jsonLine);
     if (appendErr !== null) {
       return null;
@@ -242,10 +282,10 @@ function evaluatePrecompactSnapshot(_input, writer) {
 // entry/precompact-snapshot.cc.ts
 function findWorkspace(_cwd) {
   const envWs = process.env["TH_WORKSPACE"];
-  if (!envWs || !path.isAbsolute(envWs)) return null;
+  if (!envWs || !path2.isAbsolute(envWs)) return null;
   try {
-    if (!fs.statSync(envWs).isDirectory()) return null;
-    if (!fs.statSync(path.join(envWs, "00-state.md")).isFile()) return null;
+    if (!fs2.statSync(envWs).isDirectory()) return null;
+    if (!fs2.statSync(path2.join(envWs, "00-state.md")).isFile()) return null;
     return envWs;
   } catch {
     return null;
@@ -258,14 +298,14 @@ function makeWriter() {
     },
     readFile(filePath) {
       try {
-        return fs.readFileSync(filePath, "utf8");
+        return fs2.readFileSync(filePath, "utf8");
       } catch {
         return null;
       }
     },
     writeFile(filePath, content) {
       try {
-        fs.writeFileSync(filePath, content, "utf8");
+        writeWorkspaceOutput(process.env["TH_WORKSPACE"], filePath, content, false);
         return null;
       } catch (err) {
         return `writeFile failed: ${err instanceof Error ? err.message : String(err)}`;
@@ -273,7 +313,7 @@ function makeWriter() {
     },
     appendLine(filePath, jsonLine) {
       try {
-        fs.appendFileSync(filePath, jsonLine + "\n", "utf8");
+        writeWorkspaceOutput(process.env["TH_WORKSPACE"], filePath, jsonLine + "\n", true);
         return null;
       } catch (err) {
         return `appendLine failed: ${err instanceof Error ? err.message : String(err)}`;
@@ -281,13 +321,13 @@ function makeWriter() {
     },
     realpath(filePath) {
       try {
-        return fs.realpathSync(filePath);
+        return fs2.realpathSync(filePath);
       } catch {
         return null;
       }
     },
     join(...parts) {
-      return path.join(...parts);
+      return path2.join(...parts);
     },
     now() {
       return (/* @__PURE__ */ new Date()).toISOString();

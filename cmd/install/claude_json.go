@@ -139,16 +139,42 @@ func rawEntryMatches(existing json.RawMessage, desired map[string]interface{}) b
 	}
 	for k, v := range desired {
 		ev, ok := existingMap[k]
-		if !ok {
-			return false
-		}
-		a, _ := json.Marshal(v)
-		b, _ := json.Marshal(ev)
-		if string(a) != string(b) {
+		if !ok || !jsonValueContains(ev, v) {
 			return false
 		}
 	}
 	return true
+}
+
+// jsonValueContains implements the desired-subset comparison used by MCP
+// reconciliation. JSON objects recurse by key so an operator-owned nested
+// member (for example headers.X-Custom) does not make an otherwise matching
+// entry look changed. Arrays and scalar values remain exact JSON values.
+func jsonValueContains(existing, desired interface{}) bool {
+	desiredObject, isObject := desired.(map[string]interface{})
+	if isObject {
+		existingObject, ok := existing.(map[string]interface{})
+		if !ok {
+			return false
+		}
+		for key, desiredValue := range desiredObject {
+			existingValue, ok := existingObject[key]
+			if !ok || !jsonValueContains(existingValue, desiredValue) {
+				return false
+			}
+		}
+		return true
+	}
+
+	desiredBytes, err := json.Marshal(desired)
+	if err != nil {
+		return false
+	}
+	existingBytes, err := json.Marshal(existing)
+	if err != nil {
+		return false
+	}
+	return string(desiredBytes) == string(existingBytes)
 }
 
 // mergeMCPEntry returns a map that is the existing entry with `desired` keys

@@ -1,6 +1,6 @@
 ---
 name: issue
-description: Fetch a GitHub issue and explicitly activate the gated pipeline.
+description: Fetch a GitHub issue and pass verified context to the current coordinator for proportionate workflow selection.
 disable-model-invocation: true
 ---
 
@@ -23,12 +23,13 @@ name: issue
 1. Extract the issue number
 2. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Detection probe" and § "Tier A — read a single issue". Run the probe to set `has_gh`. When `has_gh=true`, use `gh issue view {number} --json number,title,body,labels,assignees,milestone,projectItems`. When `has_gh=false`, attempt the curl Tier A fallback. If both fail, prompt the operator to paste the issue body using the escape-hatch template.
 3. If issue data cannot be obtained automatically, tell the user: "Issue #{number} could not be fetched automatically. Paste the issue body as text below, or paste the URL and re-run."
-4. **Assess issue quality** before passing to orchestrator:
+4. **Assess issue quality** before passing the context to the current coordinator:
    - `needs-specify: true` — if the issue body is empty, has fewer than 3 lines, has no acceptance criteria, or is vague
    - `needs-specify: false` — if the issue already has structured AC (Given/When/Then or checkboxes) and clear scope
-5. Pass ALL the issue data to the `orchestrator` agent:
+5. Pass ALL the issue data to the `orchestrator` agent. This is an explicit
+   operator invocation; the current Main thread and its runtime adapter decide
+   whether the issue needs direct work, spec or broader pipeline coordination:
    ```
-   Pipeline Activation: explicit
    Activation Source: live operator invocation of /th:issue
 
    GitHub Issue Task:
@@ -52,12 +53,12 @@ name: issue
 1. Extract all issue numbers from the input
 2. **Detection + fallback:** same as Mode 1 — see `agents/_shared/gh-fallback.md` § "Tier A — read a single issue". Use `gh` when available; curl fallback otherwise. Apply per-issue.
 3. If any issue fails to load (both `gh` and curl unavailable), report which ones failed and continue with the rest.
-4. **Assess each issue's quality** before passing to orchestrator:
+4. **Assess each issue's quality** before passing the batch to the current coordinator:
    - `needs-specify: true` — if the issue body is empty, has fewer than 3 lines, has no acceptance criteria, or is vague
    - `needs-specify: false` — if the issue already has structured AC (Given/When/Then or checkboxes) and clear scope
-5. Pass ALL issues as a batch to the `orchestrator` agent:
+5. Pass ALL issues as a batch to the `orchestrator` agent. The invocation is
+   explicit, but no fixed pipeline, gate or specialist team is implied:
    ```
-   Pipeline Activation: explicit
    Activation Source: live operator invocation of /th:issue
 
    GitHub Issue Batch (N tasks):
@@ -142,6 +143,12 @@ name: issue
 ## Important
 
 - **You read/create issues.** The orchestrator does NOT read issues — it receives the data from you.
-- Always invoke the `orchestrator` agent to handle the task — do NOT execute the development pipeline yourself
-- The orchestrator manages the full team: architect → implementer → tester → qa → delivery
-- The orchestrator will handle project board updates (move to "In Progress", comment, move to "In Review") using the issue number you provide
+- Pass the fetched issue context to the `orchestrator` route; the runtime
+  adapter executes that routing decision in the current Main thread.
+- The current coordinator selects proportionate work. An issue invocation does
+  not force the broader pipeline; propose it when the scope benefits from that
+  coordination and let the operator select it. Do not require a fixed architect
+  → implementer → tester → qa → delivery chain, gate record or coverage
+  threshold.
+- Preserve project-board updates when the issue workflow and operator
+  authorization call for them; do not infer delivery from issue text alone.
