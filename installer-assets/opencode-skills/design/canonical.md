@@ -10,7 +10,7 @@ Clarify the outcome, scope, constraints and decisions using the supplied sources
 and relevant project context. Read a supplied issue through the active host's
 GitHub tools. For a solution proposal, read the
 [proposal guide](references/solution-proposal.md) and deliver one document:
-functional content for the PO first, technical design for developers afterward.
+functional content first, technical design afterward.
 Keep it together even when long; split only when the operator requests it.
 
 Reuse [sketch](../sketch/SKILL.md) for affected data models and frontend

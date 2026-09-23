@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.42.1] - 2026-09-23
+
+### Fixed
+- Design presents functional content before technical detail without requiring audience role labels in headings or format explanations.
+
 ## [3.42.0] - 2026-09-23
 
 ### Changed

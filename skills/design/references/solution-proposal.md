@@ -1,10 +1,11 @@
 # Solution proposal
 
-Write for a Product Owner deciding what to build and a developer taking over
-the work. Explain enough context that neither needs the originating chat.
-Use the operator's language, a useful title and the two reading parts below.
-These are content prompts: adapt depth and headings to the solution, without
-inventing requirements to fill a template.
+Explain what to build and how to implement it without requiring the originating
+chat. Put functional content first and technical design afterward. Use the
+operator's language and content-based headings, such as "Functional proposal"
+and "Technical design"; audience roles need not appear in headings or format
+explanations. Adapt depth and headings to the solution without inventing
+requirements to fill a template.
 
 ## Functional proposal
 
@@ -47,7 +48,7 @@ Deliver one Markdown document in the selected workspace, honoring an explicit
 output destination or requested format. Keep long proposals navigable with
 headings and a contents list when useful. Separate narrative documents only
 when the operator asks; length alone is not a reason. Diagrams and editable
-visual sources can remain supporting assets, not additional PO/dev proposals.
+visual sources can remain supporting assets, not additional narrative proposals.
 
 For standalone design, this document holds the solution under discussion. If
 OpenSpec already owns the intent, synthesize its requirements and decisions
@@ -59,9 +60,9 @@ audience deliverables. Reuse the existing proposal on revision.
 Apply workspace artifact guidance: consumer working documents stay outside
 commits unless a necessary durable role or explicit delivery request calls for
 them. A design-only request ends at the proposal; it does not initiate a pipeline
-or implementation. Before handing it over, read the functional part as a PO
-and the full document as a developer, resolving contradictions and exposing
-questions that still prevent a decision or implementation.
+or implementation. Before handing it over, check that the functional part
+supports a decision and the full document supports implementation. Resolve
+contradictions and expose questions that still prevent either.
 
 ## Industry references
 
