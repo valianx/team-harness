@@ -154,6 +154,7 @@ func TestRunCodexUpdate_ReportsRealStateWithoutRestartAdvice(t *testing.T) {
 	nonInteractiveFlag = true
 	placer := newCodexPlacerAt(filepath.Join(isolatedUpdateHome(t), "codex"))
 	configureLedger(placer)
+	skipCodexLedgerWhenAncestorOwnershipUnavailable(t, placer.ConfigRoot())
 
 	firstOutput := captureUpdateStdout(t, func() {
 		if err := runCodexUpdate(placer); err != nil {
