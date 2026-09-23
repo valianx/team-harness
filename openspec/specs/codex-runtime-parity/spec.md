@@ -5,6 +5,13 @@ Codex is a first-class runtime: sandbox failures diagnose to their real cause, d
 
 ## Requirements
 
+### Requirement: Generated package synchronization removes retired owned assets
+Synchronization SHALL remove obsolete files from wholly generated package projections and its check mode SHALL report their presence. Cleanup SHALL remain confined to generated ownership and preserve unrelated operator content.
+
+#### Scenario: A canonical role or reference is removed
+- **WHEN** its previous generated copy remains in the packaged projection
+- **THEN** check mode reports drift and synchronization removes that stale copy.
+
 ### Requirement: Sandbox diagnosis distinguishes shadowing from stale sessions
 When an actual workspace access fails, TH SHALL identify the target and use available native configuration or host evidence to distinguish project configuration, permission refusal and stale activation. It SHALL NOT infer a required policy value or restart solely from missing evidence, a directory's absence or a different operator preference.
 

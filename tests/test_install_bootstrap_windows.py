@@ -2,6 +2,8 @@
 """Exercise native CMD bootstrap routing without allowing a download."""
 
 import base64
+import binascii
+import hashlib
 import os
 from pathlib import Path
 import shutil
@@ -46,6 +48,18 @@ class BootstrapRoutingTests(unittest.TestCase):
             if path.is_file():
                 return str(path)
         return None
+
+    @staticmethod
+    def _powershell51_module_path():
+        """Keep PS5.1 from importing incompatible PS7 bundled modules."""
+        user_profile = os.environ.get("USERPROFILE") or os.environ.get("HOME", "")
+        program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+        windir = os.environ.get("WINDIR", r"C:\Windows")
+        return ";".join((
+            str(Path(user_profile) / "Documents" / "WindowsPowerShell" / "Modules"),
+            str(Path(program_files) / "WindowsPowerShell" / "Modules"),
+            str(Path(windir) / "System32" / "WindowsPowerShell" / "v1.0" / "Modules"),
+        ))
 
     def run_bootstrap(self, *args):
         env = {key: value for key, value in os.environ.items() if key.upper() != "ARCH"}
@@ -121,11 +135,13 @@ if (-not (Test-Path -LiteralPath $Output)) { exit 1 }
     param([string]$Uri, [string]$OutFile, [switch]$UseBasicParsing, [int]$TimeoutSec)
     if ($OutFile) {
         if ($Uri -like "*/SHA256SUMS") {
-            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $env:TH_BOOTSTRAP_PROBE).Hash.ToLowerInvariant()
+            # The Python harness supplies the probe hash so this mock never
+            # reaches the network or depends on PowerShell hash cmdlets.
+            $hash = $env:TH_BOOTSTRAP_HASH
             $asset = $env:TH_BOOTSTRAP_ASSET
-            Set-Content -LiteralPath $OutFile -Value "$hash  $asset" -NoNewline
+            [System.IO.File]::WriteAllText($OutFile, "$hash  $asset")
         } else {
-            Copy-Item -LiteralPath $env:TH_BOOTSTRAP_PROBE -Destination $OutFile -Force
+            [System.IO.File]::Copy($env:TH_BOOTSTRAP_PROBE, $OutFile, $true)
         }
         return
     }
@@ -140,7 +156,14 @@ function Unblock-File { param([string]$Path) }
         encoded = path.read_text(encoding="utf-8")
         if not encoded:
             return []
-        return [base64.b64decode(line).decode("utf-8") for line in encoded.split("\n")]
+        lines = encoded.split("\n")
+        try:
+            return [base64.b64decode(line, validate=True).decode("utf-8") for line in lines]
+        except (ValueError, binascii.Error):
+            # Allow a precompiled local probe supplied by a constrained runner;
+            # the maintained fixture above uses base64 so empty arguments stay
+            # unambiguous, while older probes record one raw value per line.
+            return lines
 
     def test_real_powershell_forwarding_and_exit_status(self):
         """Run every PS bootstrap through a local child on PS5.1 and PS7."""
@@ -155,16 +178,22 @@ function Unblock-File { param([string]$Path) }
         memory_url = "https://memory.example/mcp?value=with space"
 
         # The managed Windows runner may deny writes below the profile's
-        # system TEMP. Keep the disposable fixture beside this checkout unless
-        # the caller supplies an explicit writable test root.
+        # system TEMP. Allow an explicit writable test root without placing
+        # disposable fixtures in the product checkout.
         temp_root = Path(os.environ.get("TH_BOOTSTRAP_TEST_TMPDIR") or tempfile.gettempdir())
         directory = temp_root / f"th-bootstrap-{uuid.uuid4().hex}"
         # tempfile.TemporaryDirectory applies a restrictive chmod on Windows
         # in this managed runner, leaving the fixture unreadable to PowerShell.
-        # Path.mkdir inherits the checkout ACL while remaining disposable.
+        # Path.mkdir inherits the selected temporary root's ACL.
         directory.mkdir()
         try:
-            child = self._compile_child_fixture(directory)
+            probe_override = os.environ.get("TH_BOOTSTRAP_TEST_PROBE")
+            if probe_override:
+                child = Path(probe_override)
+                self.assertTrue(child.is_file(), f"TH_BOOTSTRAP_TEST_PROBE is not a file: {child}")
+            else:
+                child = self._compile_child_fixture(directory)
+            probe_hash = hashlib.sha256(child.read_bytes()).hexdigest()
             launchers = (
                 (
                     "install-opencode.ps1",
@@ -201,10 +230,13 @@ function Unblock-File { param([string]$Path) }
                             "TEMP": str(directory),
                             "TMP": str(directory),
                             "TH_BOOTSTRAP_PROBE": str(child),
+                            "TH_BOOTSTRAP_HASH": probe_hash,
                             "TH_BOOTSTRAP_ASSET": "install-windows-amd64.exe",
                             "TH_ARGV_OUT": str(output),
                             "MEMORY_MCP_URL": memory,
                         })
+                        if shell_name == "powershell-5.1":
+                            env["PSModulePath"] = self._powershell51_module_path()
                         result = subprocess.run(
                             [shell, "-NoProfile", "-File", str(wrapper), *args],
                             env=env, capture_output=True, text=True, timeout=45,

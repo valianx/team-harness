@@ -145,7 +145,11 @@ Use the host's native read-only reviewer role after verifying that installed
 definition. Disk hashes establish installed-file integrity, not loaded bytes.
 No `profile_session` marker or unavailable in-memory attestation is required.
 Report limited activation visibility without inventing evidence or requiring a
-new conversation. An unavailable native read-only role remains `unavailable`.
+new conversation. If that dispatch is unavailable, try a supported native read-only
+invocation with the same verified profile and immutable package, such as a native CLI
+session. Do not substitute prompt-only isolation in a writable agent. If no supported
+path succeeds, preserve `unavailable`; Main records that limitation and applies the
+existing delivery authorization and explicit operator conditions separately.
 Recheck the selected definition and scope before consolidation; a changed or
 untrusted definition requires diagnosis. Use supported reload for observed stale
 activation, and propose reconnect only for a demonstrated need.

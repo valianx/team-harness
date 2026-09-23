@@ -136,12 +136,14 @@ the archived intent and affected verification.
 
 Apply [author review](author-review.md) and [verify](../../verify/SKILL.md) with
 the existing selected lenses. An unanswered choice or incomplete accepted review
-is not a decline or successful review. Close actual findings and missing required
-evidence under that contract. A completed review with concerns can support Main's
-decision after evidence-backed closure; no fabricated new pass is needed.
+is not a decline or successful review. Recover unavailable execution through supported
+native read-only capabilities and preserve any remaining coverage limit. Main decides
+delivery under existing authorization and explicit operator prerequisites; a review
+limitation alone does not require another publication choice. Close actual findings
+with evidence without manufacturing a new reviewer pass.
 
-Candidate and PR-body preparation can continue while a review or an explicit
-wait instruction keeps outward publication pending. Keep that prepared result
+Candidate and PR-body preparation can continue while an explicit wait instruction
+or an unresolved actual blocker keeps outward publication pending. Keep that prepared result
 distinct from a published PR and reuse it when the actual prerequisite is resolved.
 
 [create-pr](../../create-pr/SKILL.md) owns preparation/publication. Reuse applicable
