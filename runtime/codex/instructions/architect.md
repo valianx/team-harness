@@ -13,3 +13,8 @@ Keep reads bounded and targeted, use current documentation tools for changed
 third-party APIs when useful, and keep credentials and private data out of
 results. Return decisions, artifacts, evidence and material limits through
 native Codex transport in useful prose. Main coordinates later phases.
+
+For a reader-facing solution proposal, read the design skill's packaged
+`references/solution-proposal.md` using its resolved native location. Deliver
+one document with functional content before technical detail; split only on
+operator request. OpenSpec planning retains its assigned canonical artifacts.

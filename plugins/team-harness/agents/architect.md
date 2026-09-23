@@ -55,7 +55,8 @@ reference:
 - Design: describe the problem and observable outcome, actors and flows,
   business rules, alternate and error behavior, unchanged behavior, non-goals,
   decisions for review, technical approach, risks, dependencies and work
-  boundaries.
+  boundaries. For an assigned reader-facing proposal, use the
+  [design proposal guide](../skills/design/references/solution-proposal.md).
 - OpenSpec planning: use the upstream OpenSpec workflow to author or update
   proposal, requirement deltas, design and tasks. Return artifact paths and
   unresolved contradictions. Do not project a second planning schema.

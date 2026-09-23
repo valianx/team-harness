@@ -280,3 +280,4 @@ superseded unless a bullet explicitly records the current two-posture contract.
 - [decision] OpenSpec archive readiness is checked during candidate assembly; code, living specs and the archived change enter the same reviewed PR. → `skills/spec/references/lifecycle.md`
 - [decision] Spec prepares declared upstream providers through their installation owners; the dependency policy is agent guidance, not a TH installer. → `skills/spec/references/upstream-tools.md`
 - [decision] Spec keeps execution with Main and selected independent reviewers; pipeline adds useful native delegation without mandatory phase agents, legacy reports or per-task commits. Publication shares create-pr. → `skills/spec/SKILL.md`, `skills/pipeline/SKILL.md`
+- [decision] Design proposals use one document with functional content before technical detail; split only on operator request and reconcile existing OpenSpec intent. → `skills/design/references/solution-proposal.md`

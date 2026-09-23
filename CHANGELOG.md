@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.42.0] - 2026-09-23
+
+### Changed
+- Design delivers one solution proposal for product and development, with functional content first and technical detail afterward.
+
 ## [3.41.2] - 2026-09-23
 
 ### Fixed
