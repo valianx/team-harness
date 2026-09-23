@@ -41,6 +41,8 @@ Run these bounded variants independently as useful, recording which ran:
 
 - One self-contained proposal with functional context before technical detail;
   the long variant stays in one document with useful navigation.
+- Headings describe functional and technical content without requiring audience
+  role labels, even when the request identifies the intended readers.
 - The PO can explain value, scope, business behavior, errors, acceptance and
   unresolved decisions without needing the technical section or original chat.
 - Developers can identify responsibilities, interfaces, justified decisions,

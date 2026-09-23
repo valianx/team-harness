@@ -15,7 +15,7 @@ The current general agent selects and reads the relevant skill:
 | Need | Workflow |
 | --- | --- |
 | Development with written intent and tasks | [`spec`](skills/spec/SKILL.md) |
-| Propose a solution for a Product Owner and developers | [`design`](skills/design/SKILL.md) |
+| Propose a functional and technical solution | [`design`](skills/design/SKILL.md) |
 | Inspect a proposed solution before implementation | [`sketch`](skills/sketch/SKILL.md), on demand in any flow |
 | Broader coordination and recoverable execution | [`pipeline`](skills/pipeline/SKILL.md) |
 | Review an existing pull request | [`review-pr`](skills/review-pr/SKILL.md) |
@@ -29,8 +29,8 @@ the inputs, expected work, tools, outputs and completion evidence. It is shared
 by `spec` and the explicitly selected `pipeline`; it does not activate a
 pipeline, add a permission gate or require every available tool.
 
-`design` delivers one solution proposal: functional content for the PO first,
-then architecture and implementation detail for developers. It includes affected
+`design` delivers one solution proposal: functional content first,
+then architecture and implementation detail. It includes affected
 data models and frontend wireframes, and reuses existing OpenSpec intent.
 The document stays together regardless of length; ask explicitly to split it.
 Design-only work ends with the proposal in the configured local or Obsidian workspace.
