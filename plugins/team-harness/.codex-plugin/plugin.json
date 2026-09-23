@@ -30,15 +30,9 @@
     ],
     "websiteURL": "https://github.com/valianx/team-harness",
     "defaultPrompt": [
-      "@Team-Harness modes: list the available Team Harness skills and explain when to use each one.",
-      "@Team-Harness setup: configure Team Harness for Codex.",
-      "@Team-Harness update: update the Codex marketplace, plugin, configuration, and installed agents.",
-      "@Team-Harness init: help me frame or handle this task without starting the full pipeline.",
+      "@Team-Harness spec: develop this change and use create-pr to prepare its pull request.",
       "@Team-Harness pipeline: coordinate this change through Spec, Implementation, Validation and Publication in the current task.",
-      "Use Team Harness to create an architecture diagram for this repository.",
-      "Use Team Harness to inspect GCP infrastructure in read-only plan mode.",
-      "Continue implementation of the active approved Team Harness pipeline.",
-      "Recover the active Team Harness workspace."
+      "@Team-Harness review-pr: review this pull request and report the findings."
     ],
     "brandColor": "#2563EB"
   }

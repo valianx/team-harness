@@ -141,18 +141,13 @@ an exact SHA-256 byte digest match with the trusted packaged
 field-mismatched, or digest-mismatched definition fails closed as `untrusted`
 or `unavailable`; Main does not dispatch it.
 
-Use the host's native read-only reviewer role after verifying that installed
-definition. Disk hashes establish installed-file integrity, not loaded bytes.
-No `profile_session` marker or unavailable in-memory attestation is required.
-Report limited activation visibility without inventing evidence or requiring a
-new conversation. If that dispatch is unavailable, try a supported native read-only
-invocation with the same verified profile and immutable package, such as a native CLI
-session. Do not substitute prompt-only isolation in a writable agent. If no supported
-path succeeds, preserve `unavailable`; Main records that limitation and applies the
-existing delivery authorization and explicit operator conditions separately.
-Recheck the selected definition and scope before consolidation; a changed or
-untrusted definition requires diagnosis. Use supported reload for observed stale
-activation, and propose reconnect only for a demonstrated need.
+Use the verified native read-only role. Disk hashes prove installed-file integrity,
+not loaded bytes; no `profile_session` marker or in-memory attestation is required.
+If dispatch fails, try supported native read-only CLI execution with the same profile
+and immutable package; never substitute prompt-only isolation. Otherwise record
+`unavailable`; Main separately applies existing delivery authority and operator conditions.
+Recheck definition and scope before consolidation. Diagnose changes, use supported
+reload for observed stale activation, and propose reconnect only for a demonstrated need.
 
 `review-pr` is a separate fenced flow. An intent to review a PR, a PR number,
 or a PR URL is classified to `review-pr` before this contract is considered.
