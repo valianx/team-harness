@@ -71,7 +71,7 @@ permissions without its own gate tokens or control journal.
 /plugin install th
 ```
 
-3. Configure MCP servers and logs mode:
+3. Configure native Team Harness preferences and optional Context7:
 ```
 /th:setup
 ```
@@ -94,7 +94,7 @@ codex plugin add team-harness@team-harness
 $team-harness:setup
 ```
 
-The setup skill configures native Team Harness settings, optional MCP servers,
+The setup skill configures native Team Harness settings, optional Context7,
 workspace/language preferences, optional workspace-to-GitHub identity routes,
 and native specialists for useful pipeline work and independent local/PR review.
 The principal executes spec validation and create-pr by default. The generated
@@ -218,6 +218,12 @@ Or to register only Memory MCP (context7 skipped), set only `MEMORY_MCP_URL` in 
 
 To add or update MCP entries after install, re-run with the desired env vars set.
 
+OpenCode uses the model selected by the native runtime by default. Provider
+tiering is an explicit opt-in: pass `--opencode-tier anthropic` through the
+bootstrap script or run the native binary with that flag to bake the curated
+Anthropic projection. Without the flag, the model-less baseline remains in
+effect; see [OpenCode model configuration](./docs/opencode-model-config.md).
+
 Installation registers a concise TH guide through OpenCode's native `instructions`
 configuration. It preserves the selected general agent and unrelated instructions.
 An existing `TH-orchestrator` selection also remains unchanged; choose another
@@ -235,16 +241,21 @@ The installer writes only the Memory URL literally to `opencode.json`. Both secr
 
 **Security note:** The downloaded binary is verified against the published `SHA256SUMS` before it runs. The checksum file is served over HTTPS from the GitHub release origin but is not cryptographically signed — verification protects against corruption and tampering of the binary relative to the checksum, not against a compromise of the release origin (TOFU over HTTPS).
 
-`/th:setup` configures workspace preferences, optional integrations, and optional workspace-to-GitHub identity routes. The identity
-routes use the same token-free schema in Claude Code, Codex, and opencode; see
-[GitHub identity routing](./docs/github-identities.md).
+OpenCode setup runs through the install apply path above. It writes the native
+assets and `.team-harness.json`, preserves the selected general agent and
+unrelated settings, defaults logs to local, and prompts only for explicitly
+selected MCP integrations such as Context7. The packaged setup skill can
+reconcile explicit provider or workspace identity targets through OpenCode's
+native discovery; the installer does not present an Obsidian selector.
+The identity routes use the same token-free schema in Claude Code, Codex, and
+OpenCode; see [GitHub identity routing](./docs/github-identities.md).
 
 Logs mode controls where pipeline workspaces are stored:
 
 | Mode | Where | When to use |
 |---|---|---|
 | `local` | `./workspaces/` in each project | Default. Simple, no extra config. |
-| `obsidian` | Obsidian vault path you provide | Cross-project visibility. Workspaces appear as searchable notes in your vault. |
+| `obsidian` | Obsidian vault path you explicitly configure | Cross-project visibility. Workspaces appear as searchable notes in your vault. |
 
 ### Update
 
@@ -307,7 +318,7 @@ After install, work with your runtime's native general agent. It discovers Team 
 - `/th:pipeline <request>` — activate the coordinated multi-agent workflow
 - `/th:review-pr <PR>` — review an existing pull request
 - `/th:create-pr` — prepare and publish completed work using existing authorization
-- `/th:setup` — configure logs-mode, vault path, and verify MCP connectivity
+- `/th:setup` — configure native preferences and optional Context7
 - `/th:update` — update to the latest release
 
 ```

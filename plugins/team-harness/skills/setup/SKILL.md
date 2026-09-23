@@ -105,35 +105,56 @@ migration, and preserve every unrelated value.
    ```
 
    Malformed native JSON is blocking; never fall through to another runtime.
-   When the native file is absent and Claude Code or opencode import sources
-   are available, offer a one-time import. This is the sole exception to
-   runtime isolation. Inspect without displaying values:
+   Before any import or versioned write, resolve the selected plugin manifest
+   from the bounded Team Harness source. For targeted setup, inspect the
+   already installed root; do not require a marketplace refresh. For a full
+   setup, use a marketplace refresh only when the selected root is not already
+   resolvable locally; a targeted setup never requires network access:
+
+   ```bash
+   codex plugin marketplace upgrade team-harness --json
+   codex plugin list --json
+   ```
+
+   Resolve the selected plugin root beneath the bounded Team Harness source and
+   validate its regular `.codex-plugin/plugin.json`. Set `SELECTED_VERSION` to
+   that manifest's `version` field; a marketplace listing or remembered release
+   example is not authoritative. If no validated manifest is available, report
+   it and do not fabricate a version. When the native file is absent and Claude
+   Code or opencode import sources are available, offer a one-time import. This
+   is the sole exception to runtime isolation. Inspect sources without
+   displaying values:
 
    ```bash
    python3 scripts/manage_config.py inspect-import --from claude
    python3 scripts/manage_config.py inspect-import --from opencode
+   python3 scripts/manage_config.py import --from SOURCE --version "$SELECTED_VERSION"
    ```
 
-   Show only paths and key names. After explicit selection, copy with
-   `import --from SOURCE --version 3.6.5`. The helper deep-fills missing keys,
-   copies opaque values without printing them, preserves existing native
-   values, and records provenance. Never merge sources silently.
+   Run the import only after explicit source and manifest selection. When no
+   validated manifest is available, omit `--version` only for an explicitly
+   authorized import and report that version provenance is unavailable.
+   The helper deep-fills missing keys, copies opaque values without printing
+   them, preserves existing native values, and records provenance. Never merge
+   sources silently.
 
 2. Create or migrate native configuration on every setup, including targeted
    setup. This adds safe defaults only when keys are absent and stamps the
    installed version without replacing operator values:
 
    ```bash
-   python3 scripts/manage_config.py ensure --version 3.6.5
+   python3 scripts/manage_config.py ensure --version "$SELECTED_VERSION"
    ```
 
-3. For a full setup, refresh marketplace metadata and inspect the installed
-   plugin with `codex plugin marketplace upgrade team-harness --json` and
-   `codex plugin list --json`. If code is stale, run `$team-harness:update`
-   before continuing. After update, read `skills/setup/SKILL.md` from the
-   validated installed root and continue with that version's procedure instead
-   of the remembered setup steps. An unavailable network is non-blocking when
-   the installed snapshot is usable.
+   When no validated manifest was available, omit the version argument so
+   existing metadata remains untouched and report the missing source. The
+   helper's no-version default preserves existing metadata; it does not invent
+   a release value.
+
+3. If code is stale, run `$team-harness:update` before continuing. After
+   update, read `skills/setup/SKILL.md` from the validated installed root and
+   continue with that version's procedure instead of remembered setup steps. An
+   unavailable network is non-blocking when the installed snapshot is usable.
 
 4. Only for a full setup or an explicit `features` target, enable Codex
    multi-agent V2 with Codex's native feature writer; do not hand-rewrite the
