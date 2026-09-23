@@ -157,7 +157,11 @@ func TestRunCodexUpdate_ReportsRealStateWithoutRestartAdvice(t *testing.T) {
 
 	firstOutput := captureUpdateStdout(t, func() {
 		if err := runCodexUpdate(placer); err != nil {
-			t.Fatalf("first Codex update: %v", err)
+			diff, planErr := computeUpdatePlan(placer)
+			if planErr != nil {
+				t.Fatalf("first Codex update: %v (diagnostic plan: %v; config root=%q; ledger root=%q)", err, planErr, placer.ConfigRoot(), activeLedgerRoot)
+			}
+			t.Fatalf("first Codex update: %v (diagnostic ledger errors=%v; config root=%q; ledger root=%q)", err, diff.LedgerErrors, placer.ConfigRoot(), activeLedgerRoot)
 		}
 	})
 	if !strings.Contains(firstOutput, "Codex agent files updated.") {
