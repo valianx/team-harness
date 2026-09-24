@@ -3,8 +3,9 @@
 When Main has selected Semgrep CE, read [external-evidence.md](external-evidence.md) before
 Verify. Main validates the raw report and coordinator note against the captured `head_oid`,
 relevant `base_oid`, `technical_hash`, `context_hash`, rules/configuration and scope, then records
-their paths and hashes in the existing finding ledger. A stale head, base, scope or tool result is
-renewed under the existing drift path; it is never reused for another candidate.
+their paths and hashes in the existing finding ledger. Retain results for their captured inputs
+when the PR changes. Renew only affected evidence when useful to assess a current finding;
+otherwise disclose its captured scope. Never relabel it as evidence for different inputs.
 
 Use the existing `Reproduction Evidence` coordinate in the verifier packet for validated external
 evidence paths and digests. The verifier receives the normalized finding in the existing inline
@@ -42,9 +43,10 @@ it does not fetch moving refs, apply checkout filters, or run repository hooks.
 
 Retain each returned evidence path and SHA-256 outside the execution copies. Validate them
 against the current request and captured context before Verify, resume and publication.
-Changed head, comparison base, probe or command invalidates supplemental evidence. Apply the
-existing drift policy to the code review independently; do not restart all reviewers solely
-because comparison evidence became stale. Reject modified records and disclose the limit.
+Evidence remains valid for its captured head, comparison base, probe and command. A later PR
+update does not discard it; do not attribute it to different compared inputs. Recheck only a
+finding whose current applicability needs that comparison, or disclose its historical scope.
+Reject modified records and disclose the limit without restarting completed reviewers.
 
 Supply validated evidence coordinates and their identities to the verifier as optional input.
 Attach the relevant observation once to its existing finding; add a concise `Regressions:`

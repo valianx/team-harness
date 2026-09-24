@@ -64,6 +64,15 @@ created. Main never recreates these mechanics with `mktemp`, shell promotion cha
 `technical_hash`, `conversation_hash`, `context_hash`, `fetched_at`, `is_cross_repository`, and
 the mergeability values from `$CONTEXT`.
 
+New review directories use normal platform permissions and inheritance; TH does not impose
+owner-only directory access. Updating the helper leaves existing directory permissions intact.
+If an older capture's directories deny access, use the active host's supported scoped recovery
+for the affected review, then verify readability through the reviewer's native read transport.
+Codex on Windows documents `/sandbox-add-read-dir` for an existing absolute directory; use it
+only where the active host exposes that command. Do not reset project ACLs recursively or grant
+access to all workspaces to repair one review. A deleted capture must be prepared again before
+read access can be checked. Keep the review's native read-only permissions throughout recovery.
+
 Write data once and pass paths to agents, never artifact bodies. Every later artifact write uses
 the helper's leaf-safe write and atomic promotion. Do not execute the PR's code or install the
 reviewed project's dependencies; existing CI results are evidence. If the PR body links an issue with `Closes`,
@@ -82,10 +91,20 @@ or whether any one yield exceeds 30 seconds.
 Immediately after any workspace capture and before a selected external scan, capture the core
 snapshot baseline: `git status --untracked-files=all` and `git diff HEAD` for the frozen worktree,
 plus the hashes of all existing review-artifact input leaves under `$ARTIFACTS` (excluding
-`$SNAPSHOT_GIT` and `$WORKTREE`), together with any explicitly read policy leaf outside that
-directory. This baseline covers the captured context, conversation, diff, changed-files, checks,
-policy and captured workspace inputs. A later external report is an intentional new evidence leaf
-and is not silently folded into this initial baseline.
+`$SNAPSHOT_GIT`, `$WORKTREE`, and `pr-review-latest-snapshot-*.git`), together with any explicitly
+read policy leaf outside that directory. This baseline covers the captured context, conversation,
+diff, changed-files, checks, policy and captured workspace inputs. A later external report is an
+intentional new evidence leaf and is not silently folded into this initial baseline.
+
+The captured context, conversation, diff and worktree remain the immutable reviewer input. A
+refresh writes `pr-review-latest-context.json` and `pr-review-latest-conversation.md` alongside a
+new `pr-review-latest-snapshot-<token>.git` for that attempt. The latest context's `snapshot_dir`
+identifies its snapshot. Failed capture or promotion leaves earlier snapshots and the prior pair
+intact; attempt snapshots stay in the owned run until its normal cleanup. These observations are
+for Main only; they remain
+outside the reviewer baseline, never replace the captured context, conversation, or
+`pr-review-snapshot.git`, and are not supplied to specialists. Main uses them to reconcile changed
+claims without presenting old reports as review of a newer commit.
 
 External capture must run against its disposable copy. Before Main promotes its report or note,
 repeat the core status, diff and input-leaf hashes. Any mismatch invalidates the capture and
@@ -117,8 +136,9 @@ reviewer pass and does not create another reviewer or review round.
 Run `cleanup-run` explicitly from the coordinator only after every dispatched reviewer has
 reached a terminal result and every check that consumes the snapshot has completed. Never remove
 the PR parent or a sibling run, never force-remove a dirty worktree, and preserve the run for
-resume when the coordinator is lost early. On every terminal path except explicit `defer`, invoke
-`cleanup_owned_review_run` exactly once.
+resume when the coordinator is lost early. Keep the complete run on `defer`, a failed publication,
+or an uncertain GitHub response. Clean it only after a confirmed successful publication or an
+explicit `cancel`.
 
 ### Optional workspace context
 
@@ -181,8 +201,16 @@ python3 "$REVIEW_CONTEXT_HELPER" refresh-context \
   --artifact-root "$ARTIFACTS" --owner-token "$REVIEW_OWNER_TOKEN"
 ```
 
-- `next_action: continue`: dispatch; a reported `mergeability_changed` is one informational line.
-- `next_action: reconcile-conversation`: only `$CONTEXT` and `$CONVERSATION` were refreshed;
-  rerun same-author/prior-review detection, then dispatch once.
-- `next_action: restart-technical-review`: code or semantic scope drift; rebuild artifacts and
-  restart Gather once. A second movement is an external freshness failure to report.
+- `next_action: continue`: dispatch against the captured snapshot; report mergeability movement
+  only when useful.
+- `next_action: reconcile-conversation`: retain the captured reports; Main checks whether new
+  discussion or review state affects existing findings before continuing.
+- `next_action: reconcile-review`: retain the captured reports; Main compares the latest code
+  observation with existing findings. A version-only change needs no new assessment. Reassess only
+  claims touched by relevant changes; any new code without review coverage is disclosed and uses a
+  historical `COMMENT`.
+- `next_action: recover-context`: preserve the run and recover the intended PR identity or invalid
+  latest observation. If the original captured identity still confirms the intended PR, a
+  historical `COMMENT` remains available. Recover the target only when the original identity or
+  destination itself is uncertain. Never use captured reports for another PR or present them as
+  covering new commits.

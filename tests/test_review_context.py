@@ -7,11 +7,13 @@ import importlib.util
 import io
 import json
 import os
+import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import contextmanager, redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -34,19 +36,97 @@ NEW_HEAD_OID = "d" * 40
 def context(**overrides):
     value = {
         "schema_version": MODULE.SCHEMA_VERSION,
+        "repository": "owner/repo",
         "base_oid": BASE_OID,
         "head_oid": HEAD_OID,
         "merge_base_oid": MERGE_BASE_OID,
-        "pr": {"title": "Title", "body": "Body"},
+        "pr": {"number": 34, "title": "Title", "body": "Body"},
         "commits": [{"oid": HEAD_OID, "subject": "fix: current"}],
         "issue_comments": [],
         "review_comments": [],
         "review_threads": [],
         "reviews": [],
     }
+    overrides = dict(overrides)
+    if "pr" in overrides:
+        value["pr"].update(overrides.pop("pr"))
     value.update(overrides)
     MODULE.finalize_hashes(value)
     return value
+
+
+def seed_review_artifacts(root: Path, original: dict, latest: dict | None = None):
+    """Seed the immutable context pair plus representative completed review work."""
+    MODULE.write_json(root / "pr-review-context.json", original)
+    (root / "pr-review-conversation.md").write_bytes(b"original conversation\n")
+    if latest is not None:
+        MODULE.write_json(root / "pr-review-latest-context.json", latest)
+        (root / "pr-review-latest-conversation.md").write_bytes(b"previous latest conversation\n")
+    (root / "pr-review-final.md").write_bytes(b"draft body\n")
+    (root / "pr-review-inline.json").write_bytes(b"[{\"finding\":\"F-1\"}]\n")
+    (root / "pr-review-ledger.json").write_bytes(b"{\"ledger\":[\"F-1\"]}\n")
+    return {
+        path.name: path.read_bytes()
+        for path in root.iterdir()
+        if path.name.startswith("pr-review-") and path.is_file()
+    }
+
+
+def write_snapshot_markers(snapshot_dir: Path, marker: str) -> None:
+    objects = snapshot_dir / "objects" / "pack"
+    refs = snapshot_dir / "refs" / "heads"
+    objects.mkdir(parents=True, exist_ok=True)
+    refs.mkdir(parents=True, exist_ok=True)
+    (objects / f"{marker}.pack").write_bytes(marker.encode("ascii"))
+    (refs / "reviewed").write_text(marker, encoding="ascii")
+
+
+def snapshot_tree_bytes(snapshot_dir: Path) -> dict[str, bytes]:
+    return {
+        str(path.relative_to(snapshot_dir)): path.read_bytes()
+        for path in snapshot_dir.rglob("*")
+        if path.is_file()
+    }
+
+
+def windows_directory_acl(path: Path) -> dict[str, object]:
+    """Read ACL protection and inherited rules using Windows' native ACL provider."""
+    powershell = shutil.which("pwsh.exe") or shutil.which("powershell.exe")
+    if powershell is None:
+        raise AssertionError("Windows PowerShell is required to inspect native ACLs")
+    script = (
+        "$ErrorActionPreference = 'Stop'; "
+        "$acl = Get-Acl -LiteralPath $env:TH_REVIEW_ACL_PATH; "
+        "[pscustomobject]@{ protected = $acl.AreAccessRulesProtected; "
+        "inherited = @($acl.Access | Where-Object { $_.IsInherited }).Count; "
+        "inheritable = @($acl.Access | Where-Object { "
+        "($_.InheritanceFlags -band [System.Security.AccessControl.InheritanceFlags]::ContainerInherit) -ne 0"
+        "}).Count; sddl = $acl.Sddl } | ConvertTo-Json -Compress"
+    )
+    environment = os.environ.copy()
+    environment.pop("PSModulePath", None)
+    environment["TH_REVIEW_ACL_PATH"] = str(path)
+    completed = subprocess.run(
+        [powershell, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    if completed.returncode:
+        raise AssertionError(f"PowerShell ACL inspection failed: {completed.stderr.strip()}")
+    return json.loads(completed.stdout)
+
+
+@contextmanager
+def native_acl_temp_directory():
+    """Create an OS-default temp directory under the test checkout."""
+    path = ROOT / f".tmp-review-acl-{os.urandom(8).hex()}"
+    path.mkdir()
+    try:
+        yield path
+    finally:
+        shutil.rmtree(path)
 
 
 class ReviewContextTests(unittest.TestCase):
@@ -95,6 +175,20 @@ class ReviewContextTests(unittest.TestCase):
             self.assertEqual(MODULE.safe_read_leaf(root, "diff.bin"), b"diff\x00\r\n")
             self.assertFalse((root / name).exists())
 
+    @unittest.skipUnless(os.name == "posix", "POSIX file mode assertion")
+    def test_write_artifact_leaf_is_owner_only_under_umask_022(self):
+        with native_acl_temp_directory() as root:
+            previous_umask = os.umask(0o022)
+            try:
+                MODULE.write_artifact_leaf(root, "review-artifact.json", b"{}\n")
+            finally:
+                os.umask(previous_umask)
+
+            self.assertEqual(
+                stat.S_IMODE((root / "review-artifact.json").stat().st_mode),
+                0o600,
+            )
+
     def test_directory_replacement_before_open_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
@@ -135,6 +229,63 @@ class ReviewContextTests(unittest.TestCase):
             self.assertFalse(first_root.exists())
             self.assertTrue(second_root.is_dir())
             MODULE.cleanup_review_run(repo, second_root, second["owner_token"])
+
+    @unittest.skipUnless(
+        os.name == "nt" and sys.version_info >= (3, 13),
+        "native Windows Python 3.13 ACL inheritance regression",
+    )
+    def test_new_review_directories_inherit_native_windows_acl_and_preserve_existing_acl(self):
+        with native_acl_temp_directory() as repo:
+            baseline = windows_directory_acl(repo)
+            if not baseline["inheritable"]:
+                self.skipTest("temporary parent ACL has no inheritable directory rules")
+
+            owned = MODULE.create_review_run(repo, 34)
+            run = Path(owned["artifact_root"])
+            review_directories = (
+                repo / "workspaces",
+                repo / "workspaces" / "pr-review-34",
+                run,
+            )
+            for path in review_directories:
+                with self.subTest(directory=path.name):
+                    acl = windows_directory_acl(path)
+                    self.assertFalse(acl["protected"], "directory DACL should remain inheritable")
+                    self.assertGreater(acl["inherited"], 0, "directory should inherit access rules")
+            MODULE.cleanup_review_run(repo, run, owned["owner_token"])
+
+        with native_acl_temp_directory() as repo:
+            workspaces = repo / "workspaces"
+            parent = workspaces / "pr-review-34"
+            parent.mkdir(parents=True)
+            before = {path: windows_directory_acl(path)["sddl"] for path in (workspaces, parent)}
+
+            owned = MODULE.create_review_run(repo, 34)
+
+            for path in (workspaces, parent):
+                with self.subTest(preexisting_directory=path.name):
+                    after_sddl = windows_directory_acl(path)["sddl"]
+                    self.assertTrue(
+                        after_sddl == before[path],
+                        "creating a review run must preserve an existing directory ACL",
+                    )
+            MODULE.cleanup_review_run(repo, Path(owned["artifact_root"]), owned["owner_token"])
+
+    @unittest.skipIf(os.name == "nt", "POSIX umask regression")
+    def test_review_directories_respect_the_process_umask(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            previous_umask = os.umask(0o027)
+            try:
+                owned = MODULE.create_review_run(repo, 34)
+            finally:
+                os.umask(previous_umask)
+
+            run = Path(owned["artifact_root"])
+            for path in (repo / "workspaces", run.parent, run):
+                with self.subTest(directory=path.name):
+                    self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o750)
+            MODULE.cleanup_review_run(repo, run, owned["owner_token"])
 
     def test_resume_selects_only_complete_isolated_run(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1378,9 +1529,10 @@ class ReviewContextTests(unittest.TestCase):
 
         comparison = MODULE.compare_contexts(approved, stale)
 
-        self.assertEqual(comparison["status"], "code-changed")
-        self.assertEqual(comparison["next_action"], "restart-technical-review")
+        self.assertEqual(comparison["status"], "invalid-context")
+        self.assertEqual(comparison["next_action"], "recover-context")
         self.assertFalse(comparison["technical_results_reusable"])
+        self.assertTrue(comparison["context_integrity_changed"])
         self.assertEqual(comparison["changed_fields"], ["head_oid"])
 
     def test_compare_rejects_equal_inconsistent_saved_hashes(self):
@@ -1389,8 +1541,8 @@ class ReviewContextTests(unittest.TestCase):
 
         comparison = MODULE.compare_contexts(corrupt, corrupt)
 
-        self.assertEqual(comparison["status"], "code-changed")
-        self.assertEqual(comparison["next_action"], "restart-technical-review")
+        self.assertEqual(comparison["status"], "invalid-context")
+        self.assertEqual(comparison["next_action"], "recover-context")
         self.assertTrue(comparison["context_integrity_changed"])
         self.assertFalse(comparison["technical_results_reusable"])
 
@@ -1399,7 +1551,8 @@ class ReviewContextTests(unittest.TestCase):
 
         comparison = MODULE.compare_contexts(malformed, malformed)
 
-        self.assertEqual(comparison["status"], "code-changed")
+        self.assertEqual(comparison["status"], "invalid-context")
+        self.assertEqual(comparison["next_action"], "recover-context")
         self.assertTrue(comparison["context_integrity_changed"])
         self.assertFalse(comparison["technical_results_reusable"])
 
@@ -1442,8 +1595,8 @@ class ReviewContextTests(unittest.TestCase):
         )
         semantic_comparison = MODULE.compare_contexts(original, semantic_conversation)
         self.assertEqual(semantic_comparison["conversation_change_kind"], "semantic")
-        self.assertEqual(semantic_comparison["next_action"], "restart-technical-review")
-        self.assertFalse(semantic_comparison["technical_results_reusable"])
+        self.assertEqual(semantic_comparison["next_action"], "reconcile-conversation")
+        self.assertTrue(semantic_comparison["technical_results_reusable"])
 
         discussion_comparison = MODULE.compare_contexts(original, discussion)
         self.assertEqual(discussion_comparison["conversation_change_kind"], "review-state")
@@ -1463,13 +1616,78 @@ class ReviewContextTests(unittest.TestCase):
         )
         self.assertEqual(
             MODULE.compare_contexts(original, moved)["next_action"],
-            "restart-technical-review",
+            "reconcile-review",
         )
+        self.assertTrue(MODULE.compare_contexts(original, moved)["technical_results_reusable"])
         edited_body = context(pr={"title": "Title", "body": "New requirements"})
         self.assertEqual(
             MODULE.compare_contexts(original, edited_body)["status"],
             "conversation-changed",
         )
+
+    def test_compare_reuses_snapshot_results_for_version_base_and_commit_movement(self):
+        original = context()
+        movements = {
+            "version bump": context(
+                head_oid=NEW_HEAD_OID,
+                commits=[{"oid": NEW_HEAD_OID, "subject": "chore: bump version"}],
+            ),
+            "base movement": context(base_oid="e" * 40),
+            "commit movement": context(
+                commits=[
+                    {"oid": NEW_HEAD_OID, "subject": "fix: follow-up"},
+                    {"oid": HEAD_OID, "subject": "fix: current"},
+                ]
+            ),
+        }
+        for label, current in movements.items():
+            with self.subTest(movement=label):
+                comparison = MODULE.compare_contexts(original, current)
+                self.assertEqual(comparison["status"], "code-changed")
+                self.assertEqual(comparison["next_action"], "reconcile-review")
+                self.assertTrue(comparison["technical_results_reusable"])
+
+    def test_compare_rejects_corrupt_hashes_and_changed_target(self):
+        approved = context()
+        corrupt_hashes = dict(approved, code_hash="bad", technical_hash="bad")
+        corrupt_comparison = MODULE.compare_contexts(approved, corrupt_hashes)
+        self.assertEqual(corrupt_comparison["status"], "invalid-context")
+        self.assertEqual(corrupt_comparison["next_action"], "recover-context")
+        self.assertTrue(corrupt_comparison["context_integrity_changed"])
+        self.assertFalse(corrupt_comparison["technical_results_reusable"])
+
+        other_target = context(
+            repository="elsewhere/repo",
+            pr={"number": 35, "title": "Title", "body": "Body"},
+        )
+        target_comparison = MODULE.compare_contexts(approved, other_target)
+        self.assertEqual(target_comparison["status"], "invalid-context")
+        self.assertEqual(target_comparison["next_action"], "recover-context")
+        self.assertTrue(target_comparison["target_changed"])
+        self.assertFalse(target_comparison["technical_results_reusable"])
+
+    def test_compare_cli_returns_zero_for_valid_drift_and_twenty_for_invalid_context(self):
+        with native_acl_temp_directory() as root:
+            expected = root / "expected.json"
+            actual = root / "actual.json"
+            MODULE.write_json(expected, context())
+            MODULE.write_json(actual, context(head_oid=NEW_HEAD_OID))
+            valid = subprocess.run(
+                [sys.executable, str(SCRIPT), "compare", "--expected", str(expected), "--actual", str(actual)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(valid.returncode, 0, valid.stderr)
+            self.assertEqual(json.loads(valid.stdout)["next_action"], "reconcile-review")
+
+            MODULE.write_json(actual, context(base_oid="malformed"))
+            invalid = subprocess.run(
+                [sys.executable, str(SCRIPT), "compare", "--expected", str(expected), "--actual", str(actual)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(invalid.returncode, 20, invalid.stderr)
+            self.assertEqual(json.loads(invalid.stdout)["status"], "invalid-context")
 
     def test_compare_normalizes_legacy_combined_conversation_hash(self):
         current = context()
@@ -1504,9 +1722,8 @@ class ReviewContextTests(unittest.TestCase):
         self.assertEqual(comparison["conversation_change_kind"], "none")
         self.assertEqual(comparison["next_action"], "continue")
 
-    def test_refresh_context_promotes_review_state_without_rebuilding_technical_state(self):
-        with tempfile.TemporaryDirectory() as directory:
-            repo = Path(directory)
+    def test_refresh_context_preserves_original_and_writes_latest_pair_for_conversation_change(self):
+        with native_acl_temp_directory() as repo:
             run = MODULE.create_review_run(repo, 34)
             root = Path(run["artifact_root"])
             original = context()
@@ -1520,6 +1737,70 @@ class ReviewContextTests(unittest.TestCase):
             }])
             MODULE.write_json(root / "pr-review-context.json", original)
             (root / "pr-review-conversation.md").write_text("old\n", encoding="utf-8")
+            (root / "pr-review-final.md").write_bytes(b"draft stays byte-identical\n")
+            (root / "pr-review-inline.json").write_bytes(b"[{\"id\":1}]\n")
+            (root / "pr-review-ledger.json").write_bytes(b"{\"ledger\":[1]}\n")
+            canonical_context = (root / "pr-review-context.json").read_bytes()
+            canonical_conversation = (root / "pr-review-conversation.md").read_bytes()
+            preserved = {
+                name: (root / name).read_bytes()
+                for name in (
+                    "pr-review-final.md",
+                    "pr-review-inline.json",
+                    "pr-review-ledger.json",
+                )
+            }
+
+            def capture_current(**kwargs):
+                MODULE.write_json(kwargs["output"], current)
+                return current
+
+            args = SimpleNamespace(
+                repo_root=repo,
+                repo="owner/repo",
+                pr=34,
+                artifact_root=root,
+                owner_token=run["owner_token"],
+            )
+            output = io.StringIO()
+            with patch.object(MODULE, "capture_to_path", side_effect=capture_current):
+                with redirect_stdout(output):
+                    code = MODULE.command_refresh_context(args)
+            result = json.loads(output.getvalue())
+
+            self.assertEqual(code, 0)
+            self.assertEqual(result["next_action"], "reconcile-conversation")
+            self.assertTrue(result["technical_results_reusable"])
+            self.assertFalse(result["promoted"])
+            self.assertEqual(Path(result["context"]), root / "pr-review-context.json")
+            self.assertEqual(Path(result["conversation"]), root / "pr-review-conversation.md")
+            self.assertEqual(Path(result["latest_context"]), root / "pr-review-latest-context.json")
+            self.assertEqual(Path(result["latest_conversation"]), root / "pr-review-latest-conversation.md")
+            self.assertEqual(
+                MODULE.load_context(root / "pr-review-context.json")["context_hash"],
+                original["context_hash"],
+            )
+            self.assertEqual((root / "pr-review-context.json").read_bytes(), canonical_context)
+            self.assertEqual((root / "pr-review-conversation.md").read_bytes(), canonical_conversation)
+            self.assertEqual(
+                MODULE.load_context(root / "pr-review-latest-context.json")["context_hash"],
+                current["context_hash"],
+            )
+            for name, expected in preserved.items():
+                self.assertEqual((root / name).read_bytes(), expected)
+            MODULE.cleanup_review_run(repo, root, run["owner_token"])
+
+    def test_refresh_context_keeps_original_and_reusable_work_on_semantic_change(self):
+        with native_acl_temp_directory() as repo:
+            run = MODULE.create_review_run(repo, 34)
+            root = Path(run["artifact_root"])
+            original = context()
+            current = context(pr={"title": "Changed scope", "body": "New requirements"})
+            saved = seed_review_artifacts(root, original, original)
+            preserved = {
+                name: data for name, data in saved.items()
+                if name not in {"pr-review-latest-context.json", "pr-review-latest-conversation.md"}
+            }
 
             def capture_current(**kwargs):
                 MODULE.write_json(kwargs["output"], current)
@@ -1532,22 +1813,31 @@ class ReviewContextTests(unittest.TestCase):
 
             self.assertEqual(result["next_action"], "reconcile-conversation")
             self.assertTrue(result["technical_results_reusable"])
-            self.assertTrue(result["promoted"])
+            self.assertFalse(result["promoted"])
             self.assertEqual(
                 MODULE.load_context(root / "pr-review-context.json")["context_hash"],
+                original["context_hash"],
+            )
+            self.assertEqual(
+                MODULE.load_context(root / "pr-review-latest-context.json")["context_hash"],
                 current["context_hash"],
             )
+            for name, expected in preserved.items():
+                self.assertEqual((root / name).read_bytes(), expected)
             MODULE.cleanup_review_run(repo, root, run["owner_token"])
 
-    def test_refresh_context_keeps_old_artifacts_when_semantic_context_changes(self):
-        with tempfile.TemporaryDirectory() as directory:
-            repo = Path(directory)
+    def test_refresh_legacy_context_derives_expected_technical_hash_and_preserves_original_files(self):
+        with native_acl_temp_directory() as repo:
             run = MODULE.create_review_run(repo, 34)
             root = Path(run["artifact_root"])
-            original = context()
-            current = context(pr={"title": "Changed scope", "body": "New requirements"})
-            MODULE.write_json(root / "pr-review-context.json", original)
-            (root / "pr-review-conversation.md").write_text("old\n", encoding="utf-8")
+            legacy = context()
+            legacy.pop("technical_hash")
+            current = context(head_oid=NEW_HEAD_OID)
+            saved = seed_review_artifacts(root, legacy, legacy)
+            preserved = {
+                name: data for name, data in saved.items()
+                if name not in {"pr-review-latest-context.json", "pr-review-latest-conversation.md"}
+            }
 
             def capture_current(**kwargs):
                 MODULE.write_json(kwargs["output"], current)
@@ -1558,18 +1848,308 @@ class ReviewContextTests(unittest.TestCase):
                     repo, "owner/repo", 34, root, run["owner_token"]
                 )
 
-            self.assertEqual(result["next_action"], "restart-technical-review")
-            self.assertFalse(result["technical_results_reusable"])
-            self.assertFalse(result["promoted"])
-            self.assertEqual(
-                MODULE.load_context(root / "pr-review-context.json")["context_hash"],
-                original["context_hash"],
+            expected_technical_hash = MODULE.derived_technical_hash(
+                legacy, MODULE.derived_code_hash(legacy)
             )
+            self.assertEqual(result["expected_technical_hash"], expected_technical_hash)
+            self.assertEqual(result["expected_context_hash"], legacy["context_hash"])
+            self.assertEqual(result["technical_hash"], expected_technical_hash)
+            self.assertEqual(result["actual_technical_hash"], current["technical_hash"])
+            for name, expected in preserved.items():
+                self.assertEqual((root / name).read_bytes(), expected)
+            self.assertNotIn("technical_hash", MODULE.load_context(root / "pr-review-context.json"))
+            MODULE.cleanup_review_run(repo, root, run["owner_token"])
+
+    def test_refresh_context_repeats_code_drift_without_replacing_original_or_review_work(self):
+        with native_acl_temp_directory() as repo:
+            run = MODULE.create_review_run(repo, 34)
+            root = Path(run["artifact_root"])
+            original = context()
+            first = context(
+                head_oid=NEW_HEAD_OID,
+                commits=[{"oid": NEW_HEAD_OID, "subject": "chore: bump version"}],
+            )
+            second = context(
+                head_oid="f" * 40,
+                commits=[{"oid": "f" * 40, "subject": "fix: follow-up"}],
+            )
+            saved = seed_review_artifacts(root, original, original)
+            preserved = {
+                name: data for name, data in saved.items()
+                if name not in {"pr-review-latest-context.json", "pr-review-latest-conversation.md"}
+            }
+            for current in (first, second):
+                def capture_current(**kwargs):
+                    MODULE.write_json(kwargs["output"], current)
+                    return current
+
+                with patch.object(MODULE, "capture_to_path", side_effect=capture_current):
+                    result = MODULE.refresh_review_context(
+                        repo, "owner/repo", 34, root, run["owner_token"]
+                    )
+                self.assertEqual(result["status"], "code-changed")
+                self.assertEqual(result["next_action"], "reconcile-review")
+                self.assertTrue(result["technical_results_reusable"])
+                self.assertFalse(result["promoted"])
+                self.assertEqual(result["context_hash"], original["context_hash"])
+                self.assertEqual(result["technical_hash"], original["technical_hash"])
+                self.assertEqual(result["conversation_hash"], original["conversation_hash"])
+                self.assertEqual(result["actual_context_hash"], current["context_hash"])
+                self.assertEqual(result["actual_technical_hash"], current["technical_hash"])
+                self.assertEqual(
+                    MODULE.load_context(root / "pr-review-context.json")["context_hash"],
+                    original["context_hash"],
+                )
+                self.assertEqual(
+                    MODULE.load_context(root / "pr-review-latest-context.json")["context_hash"],
+                    current["context_hash"],
+                )
+                for name, expected in preserved.items():
+                    self.assertEqual((root / name).read_bytes(), expected)
+            MODULE.cleanup_review_run(repo, root, run["owner_token"])
+
+    def test_refresh_invalid_capture_does_not_promote_or_replace_any_review_artifact(self):
+        with native_acl_temp_directory() as repo:
+            original = context()
+            invalid_contexts = {
+                "changed target": context(
+                    repository="elsewhere/repo",
+                    pr={"number": 35, "title": "Title", "body": "Body"},
+                ),
+                "corrupt hash": dict(original, code_hash="corrupt", technical_hash="corrupt"),
+                "malformed oid": context(base_oid="not-a-git-oid"),
+            }
+            for label, invalid in invalid_contexts.items():
+                with self.subTest(invalidity=label):
+                    run = MODULE.create_review_run(repo, 34)
+                    root = Path(run["artifact_root"])
+                    saved = seed_review_artifacts(root, original, context(head_oid=NEW_HEAD_OID))
+
+                    def capture_invalid(**kwargs):
+                        MODULE.write_json(kwargs["output"], invalid)
+                        return invalid
+
+                    args = SimpleNamespace(
+                        repo_root=repo,
+                        repo="owner/repo",
+                        pr=34,
+                        artifact_root=root,
+                        owner_token=run["owner_token"],
+                    )
+                    output = io.StringIO()
+                    with patch.object(MODULE, "capture_to_path", side_effect=capture_invalid):
+                        with redirect_stdout(output):
+                            code = MODULE.command_refresh_context(args)
+
+                    self.assertEqual(code, 20)
+                    result = json.loads(output.getvalue())
+                    self.assertEqual(result["status"], "invalid-context")
+                    self.assertEqual(result["next_action"], "recover-context")
+                    self.assertFalse(result["technical_results_reusable"])
+                    self.assertIsNone(result["latest_context"])
+                    self.assertIsNone(result["latest_conversation"])
+                    for name, expected in saved.items():
+                        self.assertEqual((root / name).read_bytes(), expected)
+                    MODULE.cleanup_review_run(repo, root, run["owner_token"])
+
+    def test_refresh_captures_into_separate_snapshot_and_preserves_original_git_objects(self):
+        with native_acl_temp_directory() as repo:
+            run = MODULE.create_review_run(repo, 34)
+            root = Path(run["artifact_root"])
+            original = context()
+            current = context(head_oid=NEW_HEAD_OID)
+            seed_review_artifacts(root, original, original)
+            snapshot = root / "pr-review-snapshot.git"
+            old_object = snapshot / "objects" / "pack" / "base-before-force-push.pack"
+            old_object.parent.mkdir(parents=True)
+            old_object.write_bytes(b"captured base object")
+            capture_targets = []
+
+            def capture_current(**kwargs):
+                target = Path(kwargs["snapshot_dir"])
+                capture_targets.append(target)
+                target.mkdir(parents=True, exist_ok=True)
+                (target / "written-by-refresh-capture").write_bytes(b"new snapshot data")
+                MODULE.write_json(kwargs["output"], current)
+                return current
+
+            with patch.object(MODULE, "capture_to_path", side_effect=capture_current):
+                MODULE.refresh_review_context(
+                    repo, "owner/repo", 34, root, run["owner_token"]
+                )
+
+            self.assertEqual(old_object.read_bytes(), b"captured base object")
+            self.assertFalse((snapshot / "written-by-refresh-capture").exists())
+            self.assertEqual(len(capture_targets), 1)
+            self.assertNotEqual(capture_targets[0], snapshot)
+            MODULE.cleanup_review_run(repo, root, run["owner_token"])
+
+    def test_refresh_uses_a_unique_snapshot_per_attempt_and_records_latest_association(self):
+        with native_acl_temp_directory() as repo:
+            run = MODULE.create_review_run(repo, 34)
+            root = Path(run["artifact_root"])
+            original = context()
+            initial_snapshot = root / "pr-review-latest-snapshot-initial.git"
+            write_snapshot_markers(initial_snapshot, "initial")
+            initial_latest = context(snapshot_dir=str(initial_snapshot))
+            saved = seed_review_artifacts(root, original, initial_latest)
+            preserved = {
+                name: data for name, data in saved.items()
+                if name not in {"pr-review-latest-context.json", "pr-review-latest-conversation.md"}
+            }
+            initial_snapshot_bytes = snapshot_tree_bytes(initial_snapshot)
+            capture_targets = []
+
+            def capture(current, marker):
+                def capture_current(**kwargs):
+                    target = Path(kwargs["snapshot_dir"])
+                    capture_targets.append(target)
+                    write_snapshot_markers(target, marker)
+                    MODULE.write_json(kwargs["output"], current)
+                    return current
+
+                with patch.object(MODULE, "capture_to_path", side_effect=capture_current):
+                    return MODULE.refresh_review_context(
+                        repo, "owner/repo", 34, root, run["owner_token"]
+                    )
+
+            first_context = context(head_oid=NEW_HEAD_OID)
+            first_result = capture(first_context, "first")
+            first_snapshot = Path(first_result.get("latest_snapshot") or capture_targets[0])
+            first_snapshot_bytes = snapshot_tree_bytes(first_snapshot)
+            second_context = context(head_oid="f" * 40)
+            second_result = capture(second_context, "second")
+            second_snapshot = Path(second_result.get("latest_snapshot") or capture_targets[1])
+
+            self.assertNotEqual(capture_targets[0], capture_targets[1])
+            self.assertEqual(first_result.get("latest_snapshot"), str(first_snapshot))
+            self.assertEqual(second_result.get("latest_snapshot"), str(second_snapshot))
+            self.assertNotEqual(first_snapshot, second_snapshot)
+            self.assertEqual(snapshot_tree_bytes(initial_snapshot), initial_snapshot_bytes)
+            self.assertEqual(snapshot_tree_bytes(first_snapshot), first_snapshot_bytes)
+            self.assertEqual(
+                MODULE.load_context(root / "pr-review-latest-context.json")["snapshot_dir"],
+                str(second_snapshot),
+            )
+            self.assertEqual(
+                MODULE.load_context(root / "pr-review-latest-context.json")["context_hash"],
+                second_context["context_hash"],
+            )
+            for name, expected in preserved.items():
+                self.assertEqual((root / name).read_bytes(), expected)
+            MODULE.cleanup_review_run(repo, root, run["owner_token"])
+            self.assertFalse(first_snapshot.exists())
+
+    def test_failed_or_invalid_refresh_keeps_latest_pair_and_previous_snapshot_unchanged(self):
+        with native_acl_temp_directory() as repo:
+            run = MODULE.create_review_run(repo, 34)
+            root = Path(run["artifact_root"])
+            original = context()
+            initial_snapshot = root / "pr-review-latest-snapshot-initial.git"
+            write_snapshot_markers(initial_snapshot, "initial")
+            initial_latest = context(snapshot_dir=str(initial_snapshot))
+            seed_review_artifacts(root, original, initial_latest)
+            capture_targets = []
+
+            def capture_snapshot(current, marker, fail_capture=False):
+                def capture_current(**kwargs):
+                    target = Path(kwargs["snapshot_dir"])
+                    capture_targets.append(target)
+                    write_snapshot_markers(target, marker)
+                    if fail_capture:
+                        raise MODULE.ContextError("injected capture failure")
+                    MODULE.write_json(kwargs["output"], current)
+                    return current
+
+                return capture_current
+
+            successful = context(head_oid=NEW_HEAD_OID)
+            with patch.object(
+                MODULE, "capture_to_path", side_effect=capture_snapshot(successful, "success")
+            ):
+                result = MODULE.refresh_review_context(
+                    repo, "owner/repo", 34, root, run["owner_token"]
+                )
+            previous_snapshot = Path(result["latest_snapshot"])
+            previous_snapshot_bytes = snapshot_tree_bytes(previous_snapshot)
+            latest_pair_names = (
+                "pr-review-latest-context.json",
+                "pr-review-latest-conversation.md",
+            )
+            previous_latest_pair = {
+                name: (root / name).read_bytes() for name in latest_pair_names
+            }
+
+            attempts = (
+                ("capture failure", successful, True, False),
+                ("invalid identity", context(repository="other/repo"), False, False),
+                ("promotion failure", context(head_oid="f" * 40), False, True),
+            )
+            for marker, attempted_context, fail_capture, fail_promotion in attempts:
+                with self.subTest(attempt=marker):
+                    capture_current = capture_snapshot(
+                        attempted_context, marker.replace(" ", "-"), fail_capture
+                    )
+                    promote = MODULE.promote_artifact
+                    calls = 0
+
+                    def fail_second_promotion(*args, **kwargs):
+                        nonlocal calls
+                        calls += 1
+                        if calls == 2:
+                            raise MODULE.ContextError("injected promotion failure")
+                        return promote(*args, **kwargs)
+
+                    with patch.object(MODULE, "capture_to_path", side_effect=capture_current):
+                        if fail_capture:
+                            with self.assertRaisesRegex(MODULE.ContextError, "capture failure"):
+                                MODULE.refresh_review_context(
+                                    repo, "owner/repo", 34, root, run["owner_token"]
+                                )
+                        elif fail_promotion:
+                            with patch.object(
+                                MODULE, "promote_artifact", side_effect=fail_second_promotion
+                            ):
+                                with self.assertRaisesRegex(
+                                    MODULE.ContextError, "promotion failure"
+                                ):
+                                    MODULE.refresh_review_context(
+                                        repo, "owner/repo", 34, root, run["owner_token"]
+                                    )
+                        else:
+                            invalid = MODULE.refresh_review_context(
+                                repo, "owner/repo", 34, root, run["owner_token"]
+                            )
+                            self.assertEqual(invalid["next_action"], "recover-context")
+
+                    self.assertNotEqual(capture_targets[-1], previous_snapshot)
+                    self.assertEqual(snapshot_tree_bytes(previous_snapshot), previous_snapshot_bytes)
+                    for name, expected in previous_latest_pair.items():
+                        self.assertEqual((root / name).read_bytes(), expected)
+            MODULE.cleanup_review_run(repo, root, run["owner_token"])
+
+    def test_refresh_capture_failure_keeps_both_context_pairs_and_completed_review_artifacts(self):
+        with native_acl_temp_directory() as repo:
+            run = MODULE.create_review_run(repo, 34)
+            root = Path(run["artifact_root"])
+            original = context()
+            previous_latest = context(head_oid=NEW_HEAD_OID)
+            saved = seed_review_artifacts(root, original, previous_latest)
+
+            with patch.object(
+                MODULE, "capture_to_path", side_effect=MODULE.ContextError("capture failed")
+            ):
+                with self.assertRaisesRegex(MODULE.ContextError, "capture failed"):
+                    MODULE.refresh_review_context(
+                        repo, "owner/repo", 34, root, run["owner_token"]
+                    )
+
+            for name, expected in saved.items():
+                self.assertEqual((root / name).read_bytes(), expected)
             MODULE.cleanup_review_run(repo, root, run["owner_token"])
 
     def test_refresh_context_rolls_back_pair_when_second_promotion_fails(self):
-        with tempfile.TemporaryDirectory() as directory:
-            repo = Path(directory)
+        with native_acl_temp_directory() as repo:
             run = MODULE.create_review_run(repo, 34)
             root = Path(run["artifact_root"])
             original = context()
@@ -1581,11 +2161,7 @@ class ReviewContextTests(unittest.TestCase):
                 "commit_id": "head",
                 "body": "arrived during review",
             }])
-            MODULE.write_json(root / "pr-review-context.json", original)
-            conversation = root / "pr-review-conversation.md"
-            conversation.write_text("old\n", encoding="utf-8")
-            original_context = (root / "pr-review-context.json").read_bytes()
-            original_conversation = conversation.read_bytes()
+            saved = seed_review_artifacts(root, original, context(head_oid=NEW_HEAD_OID))
 
             def capture_current(**kwargs):
                 MODULE.write_json(kwargs["output"], current)
@@ -1614,10 +2190,45 @@ class ReviewContextTests(unittest.TestCase):
                             repo, "owner/repo", 34, root, run["owner_token"]
                         )
 
-            self.assertEqual(
-                (root / "pr-review-context.json").read_bytes(), original_context
-            )
-            self.assertEqual(conversation.read_bytes(), original_conversation)
+            for name, expected in saved.items():
+                self.assertEqual((root / name).read_bytes(), expected)
+            MODULE.cleanup_review_run(repo, root, run["owner_token"])
+
+    def test_first_refresh_rolls_back_partial_latest_pair_when_second_promotion_fails(self):
+        with native_acl_temp_directory() as repo:
+            run = MODULE.create_review_run(repo, 34)
+            root = Path(run["artifact_root"])
+            original = context()
+            current = context(head_oid=NEW_HEAD_OID)
+            saved = seed_review_artifacts(root, original)
+
+            def capture_current(**kwargs):
+                MODULE.write_json(kwargs["output"], current)
+                return current
+
+            real_promote = MODULE.promote_artifact
+            calls = 0
+
+            def fail_second_promotion(*args, **kwargs):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise MODULE.ContextError("injected second promotion failure")
+                return real_promote(*args, **kwargs)
+
+            with patch.object(MODULE, "capture_to_path", side_effect=capture_current):
+                with patch.object(MODULE, "promote_artifact", side_effect=fail_second_promotion):
+                    with self.assertRaisesRegex(
+                        MODULE.ContextError, "injected second promotion failure"
+                    ):
+                        MODULE.refresh_review_context(
+                            repo, "owner/repo", 34, root, run["owner_token"]
+                        )
+
+            self.assertFalse((root / "pr-review-latest-context.json").exists())
+            self.assertFalse((root / "pr-review-latest-conversation.md").exists())
+            for name, expected in saved.items():
+                self.assertEqual((root / name).read_bytes(), expected)
             MODULE.cleanup_review_run(repo, root, run["owner_token"])
 
     def test_latest_same_author_ignores_dismissed_reviews(self):
