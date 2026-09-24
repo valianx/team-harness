@@ -91,14 +91,17 @@ or whether any one yield exceeds 30 seconds.
 Immediately after any workspace capture and before a selected external scan, capture the core
 snapshot baseline: `git status --untracked-files=all` and `git diff HEAD` for the frozen worktree,
 plus the hashes of all existing review-artifact input leaves under `$ARTIFACTS` (excluding
-`$SNAPSHOT_GIT`, `$WORKTREE`, and `pr-review-latest-snapshot.git`), together with any explicitly
+`$SNAPSHOT_GIT`, `$WORKTREE`, and `pr-review-latest-snapshot-*.git`), together with any explicitly
 read policy leaf outside that directory. This baseline covers the captured context, conversation,
 diff, changed-files, checks, policy and captured workspace inputs. A later external report is an
 intentional new evidence leaf and is not silently folded into this initial baseline.
 
 The captured context, conversation, diff and worktree remain the immutable reviewer input. A
 refresh writes `pr-review-latest-context.json` and `pr-review-latest-conversation.md` alongside a
-separate `pr-review-latest-snapshot.git`. These latest observations are for Main only; they remain
+new `pr-review-latest-snapshot-<token>.git` for that attempt. The latest context's `snapshot_dir`
+identifies its snapshot. Failed capture or promotion leaves earlier snapshots and the prior pair
+intact; attempt snapshots stay in the owned run until its normal cleanup. These observations are
+for Main only; they remain
 outside the reviewer baseline, never replace the captured context, conversation, or
 `pr-review-snapshot.git`, and are not supplied to specialists. Main uses them to reconcile changed
 claims without presenting old reports as review of a newer commit.

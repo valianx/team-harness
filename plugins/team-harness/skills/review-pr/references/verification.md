@@ -3,8 +3,9 @@
 When Main has selected Semgrep CE, read [external-evidence.md](external-evidence.md) before
 Verify. Main validates the raw report and coordinator note against the captured `head_oid`,
 relevant `base_oid`, `technical_hash`, `context_hash`, rules/configuration and scope, then records
-their paths and hashes in the existing finding ledger. A stale head, base, scope or tool result is
-renewed under the existing drift path; it is never reused for another candidate.
+their paths and hashes in the existing finding ledger. Retain results for their captured inputs
+when the PR changes. Renew only affected evidence when useful to assess a current finding;
+otherwise disclose its captured scope. Never relabel it as evidence for different inputs.
 
 Use the existing `Reproduction Evidence` coordinate in the verifier packet for validated external
 evidence paths and digests. The verifier receives the normalized finding in the existing inline

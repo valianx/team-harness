@@ -12,6 +12,8 @@ Remove the three explicit directory modes on every platform. Windows inherits it
 
 Existing directories are not rewritten automatically: their ACLs may be operator-managed. Snapshot guidance explains that updating the helper does not repair old ACLs, uses scoped native recovery, and checks readability before resuming reviewers. Hashes, unique runs, ownership markers and cleanup remain workflow integrity mechanisms.
 
+On POSIX, verification output uses the same 0600 file creation mode as the other review artifacts so directory inheritance does not expose its contents to unrelated local users. This does not restore the removed directory mode or set a Windows ACL; file creation keeps native Windows inheritance.
+
 ## Risks / Trade-offs
 
 - Existing owner-only directories remain restricted until scoped recovery; document the distinction from new captures.

@@ -117,9 +117,11 @@ complete new preview.
 
 **`--auto-publish` path.** Keep this explicit opt-in unchanged. It skips the menu and approval; the
 published event is exactly the recommendation and the payload is tied to the captured reviewed
-identity. Disclose the reviewed commit and any newer changes or coverage limits. Remote movement
-alone is not a publication veto. If a GitHub response requires changing the payload, preserve the
-run and resume through the normal preview before another write.
+identity. Before the freshness check, record that event, reviewed identity and the SHA-256 of the
+generated canonical body and inline JSON as the auto-publish baseline. This records the generated
+payload, not operator approval. Disclose the reviewed commit and any newer changes or coverage
+limits. Remote movement alone is not a publication veto. If reconciliation or a GitHub response
+requires changing the payload, preserve the run and use the normal preview before another write.
 
 ## Pre-publish freshness
 
@@ -145,7 +147,8 @@ identity or discard evidence.
   complete preview; it does not discard the review.
 
 Recompute the SHA-256 of the canonical body and inline JSON immediately before the write. If either
-differs from the approved bytes, preserve the review and show the complete new preview. Do not
+differs from the approved bytes (or the recorded baseline on the explicit `--auto-publish` path),
+preserve the review and show the complete new preview. Do not
 require the live context hash or current PR head to equal the reviewed identity. Never describe
 `conflicting` or `indeterminate` mergeability as merge-ready; `clean` describes only the captured
 head/base/time and never asserts current external readiness.

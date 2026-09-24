@@ -2083,7 +2083,7 @@ def write_artifact_leaf(root: Path, name: str, content: bytes) -> None:
     temporary = f"tmp-{secrets.token_hex(8)}-{name}"
     _, directory_fd = _open_directory(root)
     try:
-        leaf_fd = artifact_fs.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW, 0o644, dir_fd=directory_fd)
+        leaf_fd = artifact_fs.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW, 0o600, dir_fd=directory_fd)
         try:
             view = memoryview(content)
             while view:
@@ -2254,7 +2254,8 @@ def refresh_review_context(
     conversation_path = run / "pr-review-conversation.md"
     latest_context = run / "pr-review-latest-context.json"
     latest_conversation = run / "pr-review-latest-conversation.md"
-    snapshot = run / "pr-review-latest-snapshot.git"
+    # Keep earlier observations usable even when a later capture or promotion fails.
+    snapshot = run / f"pr-review-latest-snapshot-{secrets.token_hex(16)}.git"
     safe_read_leaf(run, context_path.name)
     safe_read_leaf(run, conversation_path.name)
     previous = load_context(context_path)
@@ -2272,6 +2273,11 @@ def refresh_review_context(
         comparison = compare_contexts(previous, current)
         captured_latest = comparison["next_action"] != "recover-context"
         if captured_latest:
+            current = {**current, "snapshot_dir": str(snapshot)}
+            _write_existing_leaf(
+                context_tmp,
+                (json.dumps(current, indent=2, ensure_ascii=False) + "\n").encode("utf-8"),
+            )
             conversation_tmp = _temporary_leaf(
                 run, "tmp-pr-review-conversation-refresh"
             )
@@ -2288,7 +2294,7 @@ def refresh_review_context(
         return {
             **comparison,
             "status": comparison["status"],
-            "technical_hash": previous["technical_hash"],
+            "technical_hash": previous.get("technical_hash") or comparison["expected_technical_hash"],
             "conversation_hash": previous["conversation_hash"],
             "context_hash": previous["context_hash"],
             "promoted": False,
@@ -2296,6 +2302,7 @@ def refresh_review_context(
             "conversation": str(conversation_path),
             "latest_context": str(latest_context) if captured_latest else None,
             "latest_conversation": str(latest_conversation) if captured_latest else None,
+            "latest_snapshot": str(snapshot) if captured_latest else None,
         }
     finally:
         _discard_artifact_leaf(run, context_tmp.name)
