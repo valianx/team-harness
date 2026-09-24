@@ -14,7 +14,9 @@ preserving factual coverage. No helper format, model-default or PR-review change
 
 - Main supplies a short brief: review question, canonical changed paths, intent,
   candidate-bound checks and named relevant skips. Reviewers inspect the diff and
-  follow dependencies only to resolve concrete questions. Generated copies use
+  follow dependencies only to resolve concrete in-scope questions. The role stays
+  brief; Main supplies the task-specific directions. Material concerns outside the
+  assigned scope return to Main without autonomous expansion. Generated copies use
   existing parity checks. Avoid a new envelope or evidence ledger.
 - Native roles enforce read-only execution. Keep immutable revisions and safe
   read-only inspection, but remove manual byte attestation and repeated object

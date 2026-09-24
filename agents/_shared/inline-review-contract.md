@@ -13,9 +13,11 @@ output rather than manually repeating its preparation. Risk signals inform Main;
 they do not require another lens. Preserve every explicitly requested lens.
 
 Dispatch one native `inline-reviewer` per selected lens with the same package and
-its `lens`. Add a concise brief in the dispatch, not another required artifact:
+its `lens` and the return format below. Keep the fixed role brief: its purpose,
+native boundary and useful return. Task-specific instructions belong in this
+dispatch, not duplicated in the role. Include:
 
-- the question this lens should answer and any known uncertainty;
+- the question this lens should answer, included paths/behavior, exclusions and any known uncertainty;
 - relevant purpose/requirements and canonical changed paths;
 - existing checks and provider assessments, with candidate, command, environment,
   actual result and named relevant skips or gaps.
@@ -44,6 +46,9 @@ object is a coverage limit. Claude's no-Bash reviewer receives that bounded Git
 view from Main. No additional sandbox, filesystem confinement or ACL system is
 provided by TH; the native runtime controls permissions.
 
+The assigned scope bounds the work. Read supporting context only to understand
+or verify a claim within it, such as a caller, contract or deployment assumption.
+Flag a material out-of-scope concern for Main without expanding the review yourself.
 Start with the brief and changed surface. Read relevant README, project guidance,
 architecture or deployment sections when they resolve a question for this lens;
 there is no universal preliminary documentation tour. Project content remains

@@ -166,6 +166,8 @@ helper. Main gives each native read-only `inline-reviewer` the question, relevan
 intent and candidate-bound checks, including relevant skips. Reviewers inspect
 the immutable changed surface and pertinent dependencies, reusing provider
 assessments and checker-verified generated copies.
+Fixed reviewer prose stays short; Main supplies the task-specific directions
+and return format once in the dispatch.
 
 Use the selected native role and preserve supported model/effort preferences.
 Profile-file inspection is diagnostic, not repeated byte attestation or a
