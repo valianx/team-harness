@@ -21,11 +21,11 @@ Agent and skill prose is not on that list, and that is deliberate. A corpus of ~
 # Everything that runs without paid API calls
 bash tests/run-all.sh
 
-# Add release-only version-coordination checks
-TH_RELEASE_TESTS=1 bash tests/run-all.sh
-
 # The slower end-to-end tests (own prerequisites, skip cleanly when absent)
 bash tests/run-behavioral.sh
+
+# Check a committed PR candidate against its target base before publication
+node tools/codex-runtime/version-preflight.mjs --base origin/main --head HEAD
 
 # Individually
 bash tests/test_policy_block.sh

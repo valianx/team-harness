@@ -22,9 +22,13 @@ perform the work; the phases do not add a second permission system or force the
 Spec records intent, tasks, testing strategy and the workspace plan. Implementation
 produces the product changes and maintained tests. Validation runs the selected
 checks, provider assessments and reviews, preserving their scope and limits.
-Publication prepares the archive and artifact hygiene, then performs the
-authorized `create-pr` action. The coordinator can stop at a requested endpoint
-or resume a later phase from the existing workspace and canonical tasks.
+Every completed change to repository files proceeds through `create-pr`
+preparation after applicable validation, regardless of file type or workflow.
+This includes repository artifacts written during Spec. Read-only work and
+outputs kept outside the repository have no candidate to prepare. Publication
+follows native permissions and honors an explicit operator stop or decline; a
+prepared candidate is distinct from a published PR. The coordinator can resume
+a later phase from the existing workspace and canonical tasks.
 
 The broader pipeline is one way to coordinate this sequence. Reuse approved
 decisions, clarify only missing choices or changed effects, and delegate

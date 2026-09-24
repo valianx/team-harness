@@ -50,7 +50,9 @@ not a second source of truth.
 
 - **Branch naming:** use a task branch, including the native host's `codex/` prefix or the repository's `feat/`, `fix/`, `chore/`, `docs/`, `refactor/` conventions.
 - **Conventional commits:** `feat(area): …`, `fix(area): …`, `docs(area): …`, etc.
-- **Never push to `main`** — every change ships via pull request.
+- **Never push to `main`** — every completed repository change, including
+  documentation, tests and configuration, uses `create-pr` and ships via pull
+  request unless the operator explicitly stops before publication.
 - **Changelog:** write the versioned section in the implementation PR. Fragments
   remain available for explicitly grouped release batches.
 - **Distributed-asset version bump:** if your change touches `agents/`, `skills/`,

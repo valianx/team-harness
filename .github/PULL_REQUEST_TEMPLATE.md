@@ -18,6 +18,8 @@
       distributed asset, no bump is needed.
 - [ ] Used a `changelog.d/{slug}.md` fragment instead of the direct CHANGELOG
       section only when intentionally batching several changes into one cut
+- [ ] Ran `node tools/codex-runtime/version-preflight.mjs --base <base-ref> --head HEAD`
+      on the committed candidate before publication
 - [ ] `bash tests/run-all.sh` passes locally (exits 0)
 - [ ] No secrets, tokens, API keys, `.env` files, or private keys committed
 - [ ] Updated `CLAUDE.md` §3/§4 if the tech stack or golden commands changed

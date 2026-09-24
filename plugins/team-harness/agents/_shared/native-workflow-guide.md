@@ -7,8 +7,12 @@ Discover the installed skills and read the current selected skill before using
 it. Use `spec` for a bounded development objective with written intent, tasks
 and independent review; choose `pipeline` when broader coordination helps and
 the user wants it. Use `review-pr` to review an existing PR and `create-pr` to
-prepare or publish completed work. Small direct tasks can stay direct. The
-`modes` skill lists other workflows, including audit, research and documentation.
+prepare every completed repository-file change, regardless of workflow or file
+type. Small direct tasks can stay direct, but their repository changes still
+reach `create-pr`; read-only work and outputs kept outside the repository have
+no candidate to prepare. Publication follows native permissions and any
+explicit operator stop or decline. The `modes` skill lists other workflows,
+including audit, research and documentation.
 Spec keeps execution with this principal and obtains independent review.
 Pipeline coordinates useful specialists, grouping related work and reusing
 sessions and evidence. Neither method requires another executor at every phase.
@@ -19,8 +23,10 @@ work. Reuse current previews; other sketch types remain on demand.
 Development has four visible phases: Spec, Implementation, Validation and
 Publication. The selected skill links their shared method at
 `skills/spec/references/development-phases.md`. Resume existing work at the
-requested phase with its intent, workspace and evidence, and continue only to
-the authorized endpoint: planning, local completion, PR preparation or publication.
+requested phase with its intent, workspace and evidence. After applicable
+validation, prepare every completed repository change through `create-pr`,
+including repository artifacts written during planning. Publication follows
+native permissions and honors any explicit operator stop or decline.
 
 Coordinate the work and judge specialist recommendations against the user's
 objective and the code. Reviewers have limited context; their findings inform

@@ -20,26 +20,34 @@ coherent work, reuse an owner for corrections and parallelize independent tasks.
 The four phases describe outcomes; they do not prescribe four agent handoffs.
 Both methods use the same applicable tools and evidence below.
 
-Continue to the requested endpoint: planning, local completion, PR preparation
-or PR publication. An authorized continuation needs no separate prompt for each
-selected tool or phase. Resolve only missing material decisions. Review choices
-still follow the existing author-review contract; continuity does
+Continue authorized work through applicable validation and `create-pr`
+preparation for every completed repository-file change, regardless of workflow
+or file type. This includes OpenSpec planning artifacts written inside the
+repository. Read-only work and outputs kept outside the repository have no
+candidate to prepare. An authorized continuation needs no separate prompt for
+each selected tool or phase. Resolve only missing material decisions.
+Publication follows native permissions and honors an explicit operator stop or
+decline; either can leave publication pending without waiving preparation.
+Review choices still follow the existing author-review contract; continuity does
 not answer an unresolved optional-review choice on the operator's behalf.
 Plain-language requests such as “implement this spec”, “validate this change” or “use spec and
 continue through the PR” select the corresponding work; they are not new commands.
 Existing PR review still uses [review-pr](../../review-pr/SKILL.md).
 
-An implementation request includes applicable Validation: continue directly after
-implementation without waiting for another operator message. Keep the phases
-visible as successive work and honor an explicit request to stop earlier.
+An implementation request includes applicable Validation and `create-pr`
+preparation: continue directly after implementation without waiting for another
+operator message. Keep the phases visible as successive work and honor an
+explicit request to stop earlier; if repository files changed, prepare the
+candidate and leave publication pending when stopped.
 
 ## Phase outcomes
 
 At planning/resumption, read the repository's contributor and delivery conventions
-and CI platform commands. Include their required checks in Validation; for an
-agreed PR endpoint, use create-pr preparation for release metadata, generated
-outputs and identity before the final candidate. A locally validated change is
-not automatically PR-ready. Do not add unrelated checks or a second approval.
+and CI platform commands. Include their required checks in Validation; use
+create-pr preparation for release metadata, generated outputs and identity for
+every repository-file change before the final candidate. A locally validated
+change is not automatically PR-ready. Do not add unrelated checks or a second
+approval.
 Retain the base, candidate head/tree and check environment in existing evidence;
 when assembly changes the candidate, renew affected checks and preserve earlier
 results with their original identity.
@@ -49,7 +57,7 @@ results with their original identity.
 | **Spec** | Objective, affected repository and current intent. Author/update OpenSpec; resolve design decisions; execute TEA test-design; select later checks and useful methods. Always use sketch for a data model when changing the database and a wireframe for frontend work; other views remain on demand. | Canonical proposal, requirements, design when useful and tasks; applicable previews presented before Implementation; structural validate result; workspace testing strategy and phase/tool plan. Planning completion is not implementation completion. |
 | **Implementation** | Authorized intent, tasks and testing strategy. Apply changes with maintained tests and documentation; execute selected TEA implementation methods and focused project checks. Update intent when behavior changes. | Product changes, task progress and actual focused-check results. Later verification remains pending until executed. |
 | **Validation** | Identified candidate, requirements, tests and selected checks. Run project checks and selected diagnostics; execute spec's TEA test-review/trace, Superpowers completion evidence and OpenSpec implementation verify. Prepare completed archive, then the selected independent candidate review; judge findings and verify corrections. | Current evidence, measured/omitted scope, original assessments and reasoned dispositions in the workspace. Living specs/archive stay in the repository. State what is verified and what remains unknown. |
-| **Publication** | Evaluated candidate, evidence, review decision and authorized destination. Use create-pr for candidate/file hygiene and preparation/publication. | Prepared PR or published URL with observed CI/review state and remaining action. Local completion without a PR is a valid endpoint. Merge is separate. |
+| **Publication** | Every completed repository-file change reaches create-pr for candidate/file hygiene and preparation, using current evidence; publish when native permissions allow and the operator has not explicitly stopped or declined. | Prepared candidate or published URL with observed CI/review state and remaining action. Read-only work and external workspace outputs have no candidate. Merge is separate. |
 
 Only execute capabilities belonging to reached stages. A planning request needs
 the testing strategy, not fabricated implementation results. Returning from a
@@ -79,7 +87,7 @@ installation or generated files alone do not prove live activation.
 | Sentry find-bugs | Optional installed upstream method of the existing general reviewer for captured changes; not another equivalent review. |
 | sketch | Always present a data model for database changes and a wireframe for frontend work before Implementation; other views on demand. Feed decisions into intent and compare delivery against them. |
 | verify / independent lenses | Local author review of the committed candidate under the existing review choice; distinguish this from review-pr on an existing PR. |
-| create-pr | Candidate preparation and authorized publication, consuming current evidence and artifact hygiene. |
+| create-pr | Required preparation for every completed repository-file change; publication follows native permissions and honors explicit operator stops or declines. |
 
 Keep a short capability table in the existing plan: purpose/selection reason,
 scope or candidate, status, actual outcome/evidence link and next action.
@@ -128,7 +136,10 @@ or a still-open PR is not proof that its evidence remains current.
 
 Use [lifecycle](lifecycle.md) to verify, synchronize and archive completed OpenSpec
 work on the delivery branch before final candidate review. Keep archive and
-implementation in the same PR. Canonical task checkboxes describe implementation
+implementation in the same PR. Every repository-file change, including plan-only
+OpenSpec artifacts or non-code changes, proceeds through create-pr preparation;
+publication remains subject to native permissions and an explicit operator stop
+or decline. Canonical task checkboxes describe implementation
 and its verification; track subsequent archive, final review and publication in
 the workspace plan instead of marking future outward actions done to permit archive.
 Preserve explicit lifecycle decisions and keep review corrections coherent with
@@ -146,11 +157,12 @@ Candidate and PR-body preparation can continue while an explicit wait instructio
 or an unresolved actual blocker keeps outward publication pending. Keep that prepared result
 distinct from a published PR and reuse it when the actual prerequisite is resolved.
 
-[create-pr](../../create-pr/SKILL.md) owns preparation/publication. Reuse applicable
-evidence, inspect the actual diff and keep working reports, checkpoints, logs,
-temporary scripts and provider installations outside commits. Include needed
-product code, maintained tests/tooling, durable documentation and canonical
-OpenSpec. The workspace's mode does not change these ownership rules.
+[create-pr](../../create-pr/SKILL.md) owns preparation/publication for every
+repository candidate. Reuse applicable evidence, inspect the actual diff and
+keep working reports, checkpoints, logs, temporary scripts and provider
+installations outside commits. Include needed product code, maintained
+tests/tooling, durable documentation and canonical OpenSpec. The workspace's
+mode does not change these ownership rules.
 
 Report the observed PR/head and remote CI/reviewer state. Pending or skipped
 remote work is not a completed review. Honor existing wait-before-push requests;

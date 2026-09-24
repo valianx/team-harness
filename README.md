@@ -173,8 +173,11 @@ The native general agent selects the current skill. `init` helps frame the task;
 `pipeline` supplies broader coordination for the same phase handoffs.
 Independent reviewers inspect an anchored candidate through native read-only
 capabilities. Main preserves findings and limits, judges recommendations and
-verifies corrections. A PR reference identifies the target; the requested action
-selects review, comment application, publication or merge.
+verifies corrections. Every completed repository change uses `create-pr` for
+candidate preparation, including documentation and configuration; publication
+follows native permissions and any explicit operator stop. A PR reference
+identifies the target; the requested action selects review, comment application
+or merge.
 
 Use `review-pr --regressions` to investigate concrete suspected defects with the
 same bounded assertion against the captured base and PR head. The existing

@@ -120,7 +120,7 @@ behavior remains covered by its executable suites.
 | `test_github_identity_routes.py` | Cross-runtime GitHub route validation, longest-prefix resolution, isolated/account-switch strategies, config preservation, secret rejection, and generated-helper byte/mode identity |
 | `tools/harness-migrate/test_harness_migrate.mjs`, `test_transform_conformance.mjs` | The bidirectional transform and its cross-language conformance |
 
-**Runners.** `tests/run-all.sh` runs ordinary development verification and exits non-zero if any behavioral or structural check fails; `TH_REQUIRE_RUNTIMES=1` (set in CI) converts a missing-runtime SKIP into a FAIL. `TH_RELEASE_TESTS=1` adds release-only version coordination. `tests/run-behavioral.sh` runs slower end-to-end tests that need environment the default run cannot guarantee.
+**Runners.** `tests/run-all.sh` runs ordinary development verification, including focused tests for the version preflight, and exits non-zero if any behavioral or structural check fails; `TH_REQUIRE_RUNTIMES=1` (set in CI) converts a missing-runtime SKIP into a FAIL. Run `node tools/codex-runtime/version-preflight.mjs --base <base-ref> --head HEAD` on a committed candidate before PR publication; CI runs the same check. `tests/run-behavioral.sh` runs slower end-to-end tests that need environment the default run cannot guarantee.
 
 ## When to add a test
 

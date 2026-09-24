@@ -1,13 +1,12 @@
 # Plan-Structure Gate — Historical Contract and Site Enumeration
 
-> **[SUPERSEDED — canonical v5/two-posture contract]** This document is retained as migration
-> and plan-quality reference material. The automatic `plan_structure` scan, Phase 1.5a state,
-> event, dispatch, bounce loop, and gate authority described below are retired. Current `pipeline`
-> runs use the canonical `design → waiting_gate1 → implementation → validation → waiting_gate3 →
-> delivery → complete` machine; `inline` direct work creates no workspace, state, events, or gates.
-> Current Design uses strict-valid canonical OpenSpec plus a compact generated `01-plan.md`.
-> Explicit `/th:plan-review` uses the surviving `plan-reviewer` only. Nothing in this historical
-> file releases a gate or authorizes a dispatch.
+> **Superseded.** This page is retained for migration and plan-quality history.
+> The `plan_structure` scan, Phase 1.5a state, events, dispatch, bounce loop and
+> gate authority below are retired. Current work follows the selected skill:
+> `skills/spec/SKILL.md` for OpenSpec development or `agents/ref-pipeline.md`
+> for an operator-selected pipeline. A concise workspace plan is a view of
+> canonical intent, not a required sharded manifest or a new gate. Explicit
+> `/th:plan-review` remains available. Nothing here authorizes a dispatch.
 >
 > Historical source for the former Stage-1 deterministic plan-structure contract: the canonical
 > Layer-1 check set, the `plan_structure: pass|fail` verdict, and the enumeration of every
@@ -150,20 +149,19 @@ every other row in the same change is the failure mode this gate exists to preve
 
 ---
 
-## 6. Current non-gating plan-quality and I/O guidance
+## 6. Historical non-gating plan-quality and I/O guidance
 
-The active plan contract is `sharded-v1`: `01-plan.md` is the compact manifest and operator
+The former plan contract was `sharded-v1`: `01-plan.md` was the compact manifest and operator
 summary; architecture, delivery/dependencies, conditional invariants, and task/AC contracts
-live in `plan/architecture.md`, `plan/delivery.md`, `plan/invariants.md`, and
+lived in `plan/architecture.md`, `plan/delivery.md`, `plan/invariants.md`, and
 `plan/tasks/Task-N.md`. Each canonical fact has one owning shard and the manifest indexes every
 task. Use the historical checks above as review inputs without copying canonical prose between
 shards.
 
-Target budgets in `docs/plan-shards.md` and `docs/output-contract-patterns.md` constrain compact
-prose and I/O, not required projects, tasks, ACs, invariants, findings, or controls. When required
-content exceeds a target, preserve it and report a bounded `size_reason: required-items`; never
-omit a required item or block solely on size. Pipeline work keeps the full canonical lifecycle;
-inline work remains workspace-free direct work.
+Those target budgets constrained the former compact prose and I/O, not required
+projects, tasks, ACs, invariants, findings, or controls. Current work follows
+the selected skill and its canonical intent; this historical size rule adds
+no requirement to create shards.
 
 ## 7. Cross-reference (historical)
 

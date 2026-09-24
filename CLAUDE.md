@@ -157,7 +157,11 @@ Run the checks appropriate to changed behavior. After role changes run
 `node tools/codex-runtime/test_generate.mjs`. Sync skills with
 `node tools/codex-runtime/sync-skills.mjs`.
 Follow [working agreements](docs/working-agreements.md) for the changelog and
-version sites. Archive completed OpenSpec with implementation in the same PR.
+version sites. Run the version preflight against the target base before
+publication. Every completed repository change uses `create-pr` for candidate
+preparation and normal PR publication, including docs, tests and configuration;
+honor an explicit operator stop and native permissions. Archive completed
+OpenSpec with implementation in the same PR.
 
 ### 6.4 Governance (when to stop and escalate to a human)
 

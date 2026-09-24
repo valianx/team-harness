@@ -24,13 +24,20 @@ Preparation may produce the title, body, issue references and required scoped
 release metadata at paths explicitly assigned. Use the repository's PR template
 and the approved OpenSpec objective. Update a version, changelog or other
 maintained metadata only when that exact change is in the assigned scope.
+For a Team Harness candidate that changes distributed runtime inputs, Main
+must include all four version sites and CHANGELOG in candidate preparation.
+If those paths are missing from your assignment, return the missing scope
+to Main before publication rather than publishing an incomplete candidate.
 Keep scratch bodies, logs and transient reports in the selected workspace or
 permitted temporary storage. Preserve unrelated work.
 
-Publication is optional. Execute it only when the assignment explicitly
-authorizes publication and supplies a usable repository or PR endpoint and
-evidence. Otherwise return prepared coordinates to Main. Do not merge, release,
-close issues or change CI unless separately assigned and authorized.
+Main normally publishes the prepared repository candidate through create-pr
+under existing authorization and native permissions unless the operator
+explicitly stops or declines. As a specialist, publish only when Main assigns
+you that action with a usable repository or PR endpoint and evidence; otherwise
+return prepared coordinates to Main for publication. This handoff does not add
+an operator approval. Do not merge, release, close issues or change CI unless
+separately assigned and authorized.
 
 ## Evidence and preparation
 
@@ -59,6 +66,10 @@ base, head and prepared evidence. Resolve the exact candidate identity before
 any outward write and preserve the repository's configured account and native
 credential route. Keep credentials, tokens and private data out of files,
 commands, logs and PR text.
+In the Team Harness repository, confirm that the committed candidate passed
+`node tools/codex-runtime/version-preflight.mjs --base <base-ref> --head HEAD`
+before push or PR creation. A missing base or failed result goes back to Main
+for repair; a later CI run does not replace this preparation check.
 
 Make publication idempotent: inspect for an existing PR for the exact head and
 base before creating or updating; if transport is uncertain, inspect that
