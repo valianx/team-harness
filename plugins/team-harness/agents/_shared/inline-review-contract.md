@@ -6,8 +6,10 @@ scope, interpretation, corrections and delivery. Existing PR reviews use
 
 ## Prepare once
 
-Use `skills/verify/scripts/review-fan.mjs package` for the clean committed range,
-selected lenses and exact OpenSpec change when applicable. The helper owns package
+Resolve `scripts/review-fan.mjs` from the selected `verify` skill installation;
+use the repository's canonical helper only when developing TH itself. Run its
+`package` command for the clean committed range, selected lenses and exact OpenSpec
+change when applicable. The helper owns package
 construction, immutable coordinates, criteria and review-surface checks. Use its
 output rather than manually repeating its preparation. Risk signals inform Main;
 they do not require another lens. Preserve every explicitly requested lens.
@@ -82,7 +84,10 @@ coverage:
   checked: [<meaningful coverage>]
   written_intent: [{source, checked: true|false}]
   limits: [<unchecked or unavailable scope>]
-disagreements: []
+disagreements: # use [] when none
+  - claim: <nonempty string>
+    blocking: true|false
+    with: <optional string>
 ```
 
 Keep written-intent coverage distinct from live operator criteria; group entries

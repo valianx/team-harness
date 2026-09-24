@@ -17,4 +17,4 @@ SHALL remain available without recreating completed planning or delivery work.
 
 #### Scenario: A correction invalidates some checks
 - **WHEN** a finding changes implementation or test inputs
-- **THEN** Main renews affected checks and broadens only for a demonstrated dependency, failure or repository requirement, preserving unaffected evidence
+- **THEN** Main renews affected checks and broadens only for a demonstrated dependency, failure, repository requirement or explicit operator request, preserving unaffected evidence
