@@ -67,15 +67,19 @@ Each review lens SHALL declare its severity mapping onto the reviewer's scale, r
 - **THEN** the declared mapping resolves it to the reviewer's two-level scale deterministically
 
 ### Requirement: Preview and publish are integral
-The published body's verdict line SHALL match the chosen event (divergence forces a rewrite or re-preview); the approved draft SHALL be hash-anchored at approval and verified at publish; `--auto-publish` SHALL name its event and freshness bound; the preview presents evidence before recommendation.
+The published body's verdict line SHALL match the chosen event; the coordinator SHALL present changed content or event again before ordinary publication. Approval SHALL bind the event, exact draft bytes and reviewed identity, without requiring the live PR to retain that identity. The normal preview SHALL retain an explicit publish/defer/cancel choice. The explicit `--auto-publish` option SHALL preserve its existing opt-in meaning and disclose reviewed scope without treating PR movement alone as a publication veto.
 
 #### Scenario: The operator overrides the event
 - **WHEN** the operator selects a different event than recommended
-- **THEN** the body's verdict line is rewritten to match (or re-previewed) before publish
+- **THEN** the body's verdict line is rewritten to match and the complete revised review is shown before publication
 
 #### Scenario: The draft changes between preview and publish
-- **WHEN** the publish-time hash differs from the approved hash
-- **THEN** publish fails closed and re-previews
+- **WHEN** the review content differs from what the operator approved
+- **THEN** the revised review is presented for approval while retaining completed review evidence
+
+#### Scenario: Only the remote PR changes after approval
+- **WHEN** the PR advances but the approved review remains accurate for its disclosed reviewed scope
+- **THEN** that movement alone does not invalidate approval or discard the review
 
 ### Requirement: Blocking findings are verified against the frozen worktree before preview
 Subject to the existing repository verification policy, proposed Blocking findings SHALL receive independent read-only verification against the captured diff, frozen worktree and reviewed identity before preview. The verifier SHALL return `confirmed`, `unconfirmed` or `refuted` with cited evidence or an explicit limitation and echo the reviewed identity. It SHALL NOT add findings or execute reproduction probes. Its classification SHALL be advisory: Main SHALL decide each final disposition from the evidence, recording any disagreement and its basis instead of automatically mapping a label to severity or deletion. An unresolved hypothesis SHALL NOT be presented as a proven blocker, and uncertainty or missing evidence SHALL NOT be presented as a clean approval.
@@ -121,7 +125,7 @@ Coverage SHALL retain honest `verified k/n` accounting. An absent verifier SHALL
 ### Requirement: Reviewers read only supplied coordinates and verified worktree leaves
 Reviewer agents SHALL read only supplied review artifacts and project leaves proven before content access to be existing, non-symlink regular files whose resolved paths remain inside the frozen worktree. This includes pertinent dependency and project-rule files discovered within that verified scope. Deleted paths SHALL be examined through the captured diff, not assumed to exist at head. Instruction-source markers, unresolved imports and optional coordinates set to `none` SHALL NOT themselves authorize content reads or operational actions.
 
-The coordinator SHALL distinguish recoverable assignment/return defects from failed evidence integrity. It MAY correct a missing return field or mistaken optional path through bounded same-snapshot follow-up while preserving completed valid reports. If that assessment remains unavailable, the review SHALL disclose its absence and use COMMENT. Missing or mismatched reviewed identity, actual integrity or freshness failure, and an unreadable frozen worktree SHALL continue to fail closed; follow-up SHALL NOT substitute a different snapshot or fabricate findings. Existing preview, live publication approval, approved-draft hash and publish-time freshness SHALL remain unchanged.
+The coordinator SHALL distinguish recoverable assignment/return defects from failed evidence integrity. It MAY correct a missing return field or mistaken optional path through bounded same-snapshot follow-up while preserving completed valid reports. If that assessment remains unavailable, the review SHALL disclose its absence and use COMMENT. Missing or mismatched reviewed identity, actual snapshot-integrity failure and an unreadable frozen worktree SHALL remain unavailable evidence; follow-up SHALL NOT substitute a different snapshot or fabricate findings. Remote PR movement SHALL instead preserve completed work and use scoped reconciliation. Existing preview, live publication approval and exact draft-content checks SHALL remain.
 
 #### Scenario: A reviewer infers an absent project path
 - **WHEN** an optional inferred path is absent from the frozen worktree
@@ -132,8 +136,8 @@ The coordinator SHALL distinguish recoverable assignment/return defects from fai
 - **THEN** Main requests a bounded correction or records the assessment as absent, preserving successful assessments and never treating the omission as proof of verification
 
 #### Scenario: Snapshot identity or freshness fails
-- **WHEN** the returned identity differs or snapshot integrity or freshness actually fails
-- **THEN** the review fails closed without preview or publication, preserving existing drift handling
+- **WHEN** a returned identity differs or the captured snapshot is corrupted
+- **THEN** the affected assessment is not used as trusted evidence and completed valid work is preserved for recovery
 
 ### Requirement: The coordinator consolidates real drafts against code
 The primary coordinator SHALL read every completed lens draft from the captured review workspace and consolidate its findings against the frozen worktree and supplied evidence. A separate consolidator SHALL NOT be required for one or multiple drafts. Disagreement over severity, exploitability or remedy SHALL be resolved with code-grounded reasoning, preserving independently evidenced defects. Neither the number of reviewers agreeing nor a specialist verdict SHALL grant operational authority or replace evidence.

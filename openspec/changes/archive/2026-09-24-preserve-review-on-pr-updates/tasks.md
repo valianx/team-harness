@@ -6,4 +6,4 @@
 ## 2. Continue publication
 
 - [x] 2.1 Replace restart/discard guidance with scoped reconciliation, historical publication fallback and retained evidence on write failures; keep preview and confirmation.
-- [ ] 2.2 Synchronize runtime copies, verify affected tests and walkthroughs, and document evidence and limitations.
+- [x] 2.2 Synchronize runtime copies, verify affected tests and walkthroughs, and document evidence and limitations.

@@ -177,8 +177,10 @@ jq -n \
 Never split the body and inline comments across API calls. If GitHub rejects a historical anchor,
 preserve the complete draft and reports, move the rejected finding(s) into the body with their
 historical location and reviewed commit, then return to Preview for approval of the changed bytes.
-If a write response is uncertain, inspect recent reviews for the same author, reviewed commit, and
-body before retrying; never blindly submit a duplicate. Report definitive errors exactly and retain
+If a write response is uncertain, inspect recent reviews for the same author, reviewed commit,
+event, body and complete inline comment set before retrying; compare historical anchors using
+GitHub's original-line fields when needed. A matching body alone is not proof because different
+findings can produce the same summary. Never blindly submit a duplicate. Report definitive errors exactly and retain
 the run for resume. Clean up only after confirmed success or explicit cancellation.
 
 Final response: `Review on PR #{number} published as {APPROVE | REQUEST CHANGES | COMMENT}.`

@@ -5,26 +5,6 @@ Preserve completed PR-review work when the remote PR changes, reconcile affected
 
 ## Requirements
 
-### Requirement: Lens invalidation keys on code identity only
-Freshness comparison SHALL invalidate captured review work only when `head_oid`, the commit list, or the code hash moved. Mergeability (`mergeStateStatus`) and conversation drift SHALL be reported as informational fields, never folded into code-changed, and SHALL NOT restart Gather or any lens. Base movement (`base_oid`/`merge_base_oid`) remains a reported change that downgrades the verdict line.
-
-The identity the flow binds artifacts, agent dispatches, and the operator's publish approval to SHALL be stable across the same drift: mergeability leaves the composed context hash and survives as a reported field, and the context schema version moves with that composition change. Leaving mergeability inside the bound hash would relocate the discarded work to the approval boundary instead of removing it.
-
-#### Scenario: A CI check completes mid-review
-- **WHEN** `mergeStateStatus` changes between capture rounds while the head SHA and code hash are unchanged
-- **THEN** the review proceeds on the existing captures, the bound context hash is unchanged, and the preview carries an informational drift line
-
-#### Scenario: A new commit is pushed mid-review
-- **WHEN** the head SHA moves between capture rounds
-- **THEN** the flow invalidates and restarts exactly as today
-
-### Requirement: The pre-publish freshness restart is capped
-The pre-publish freshness check SHALL restart the flow at most once (parity with the pre-dispatch cap). A second consecutive drift at pre-publish SHALL surface to the operator with the drift summary instead of looping.
-
-#### Scenario: The PR keeps moving during publish
-- **WHEN** a second pre-publish capture still shows code drift after one restart
-- **THEN** the flow stops and presents the drift to the operator with the drafted review preserved
-
 ### Requirement: The security lens requires a concrete trigger
 `security_required` SHALL be true only on a concrete trigger: a sensitive-token content hit, an executable-suffix change, or an existing explicit or tier trigger (explicit operator request and tier-4 classification are preserved). Configuration suffixes SHALL classify as non-executable by default, and an indeterminate classification SHALL NOT default to required.
 
@@ -41,3 +21,33 @@ The configuration suffixes are the closed set `.json`, `.yaml`, `.yml`, `.toml`,
 #### Scenario: The operator explicitly requests the security lens
 - **WHEN** an explicit trigger or a tier-4 classification is present
 - **THEN** the security lens is required regardless of suffix classification
+
+### Requirement: PR updates preserve captured review work
+Changes to the PR head, base, commit list, code, conversation or mergeability SHALL NOT discard captured evidence, reports, findings or drafts or require a full review restart. The coordinator SHALL retain the original reviewed identity, record the latest observation separately and reconcile only affected claims. Existing assessments SHALL remain reusable for their captured snapshot without implying coverage of unreviewed code. A corrupt identity or different repository/PR SHALL remain distinguishable from ordinary movement and SHALL NOT replace valid retained evidence.
+
+#### Scenario: A version commit arrives during review
+- **WHEN** a new commit changes only release metadata while findings remain applicable
+- **THEN** the existing review proceeds without repeating specialists or discarding the draft
+
+#### Scenario: A change affects a finding
+- **WHEN** later code or discussion changes a finding's relevance
+- **THEN** the coordinator adjusts that finding with evidence while retaining the original assessment and unrelated completed work
+
+#### Scenario: Refresh fails or returns a different target
+- **WHEN** a new observation cannot be captured or validated for the same PR
+- **THEN** the original review artifacts remain intact and the limitation is reported without replacing them with unrelated or invalid evidence
+
+### Requirement: Publication preserves completed review work
+The normal publication path SHALL present the review and ask whether to publish. Remote PR movement alone SHALL NOT revoke approval of unchanged, accurately scoped review content. The flow SHALL offer publication of the retained review with its reviewed commit and coverage limits, using COMMENT when current applicability or new code coverage is unknown. A changed review event or content SHALL be presented again. Failed or uncertain publication SHALL preserve the run for recovery, and an uncertain write SHALL be checked for prior success before retrying.
+
+#### Scenario: The PR keeps moving
+- **WHEN** additional commits arrive before publication
+- **THEN** the coordinator retains the completed review and its publish choice without requiring a stationary PR or a full restart
+
+#### Scenario: An inline anchor is no longer publishable
+- **WHEN** a retained finding cannot be posted at its original inline location
+- **THEN** its claim and historical location are preserved in the review body and the revised review is offered for approval
+
+#### Scenario: Publication fails
+- **WHEN** GitHub rejects a write or its outcome is uncertain
+- **THEN** drafts, reports and the captured snapshot remain available for resume and no duplicate write is attempted without checking the prior outcome

@@ -1827,7 +1827,10 @@ class ReviewContextTests(unittest.TestCase):
                 self.assertTrue(result["technical_results_reusable"])
                 self.assertFalse(result["promoted"])
                 self.assertEqual(result["context_hash"], original["context_hash"])
+                self.assertEqual(result["technical_hash"], original["technical_hash"])
+                self.assertEqual(result["conversation_hash"], original["conversation_hash"])
                 self.assertEqual(result["actual_context_hash"], current["context_hash"])
+                self.assertEqual(result["actual_technical_hash"], current["technical_hash"])
                 self.assertEqual(
                     MODULE.load_context(root / "pr-review-context.json")["context_hash"],
                     original["context_hash"],
