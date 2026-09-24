@@ -6,4 +6,4 @@
 ## 2. Verify and distribute
 
 - [x] 2.1 Regenerate distributed skills and agents, align documentation and release 3.42.3 metadata.
-- [ ] 2.2 Verify already-implemented work, test-evidence reuse, scoped correction and unavailable-reviewer scenarios; run applicable repository suites and upstream implementation verify.
+- [x] 2.2 Verify already-implemented work, test-evidence reuse, scoped correction and unavailable-reviewer scenarios; run applicable repository suites and upstream implementation verify.
