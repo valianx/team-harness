@@ -22,8 +22,8 @@ Analyze `$ARGUMENTS`. Accept a PR number (`45`, `#45`) or URL; remove options be
 
 Existing review maintenance remains available through the same Main-owned run: an `update-body`
 request revises the captured review draft, and a `reply` request drafts a response to a selected
-review thread. Both reuse the immutable snapshot, currentness checks, artifact ownership, and
-publication contract below; they do not start a second Review Mode coordinator. Use
+review thread. Both reuse the immutable snapshot, latest-observation reconciliation, artifact
+ownership, and publication contract below; they do not start a second Review Mode coordinator. Use
 `apply-review` when the request is to evaluate and incorporate reviewer comments into code.
 
 ## Non-negotiable invariants
@@ -31,17 +31,21 @@ publication contract below; they do not start a second Review Mode coordinator. 
 1. Main coordinates through the active runtime's native dispatch tools. PR-review specialists
    advise with scoped read access; they never edit, publish, change coordinator state or delegate.
    Main owns synthesis and evidence-backed decisions. Do not spawn another orchestrator.
-2. Bind technical results to `head_oid` and `technical_hash`; bind conversation-aware drafts,
-   previews, and GitHub writes to the current `context_hash`. Bind selected external evidence to
-   the captured head/base and retain its tool, scope, error, skip and coverage identity.
+2. Bind every assessment and external result to the immutable reviewed `head_oid`, relevant
+   `base_oid`, and `technical_hash`; retain each external tool's scope, error, skip, and coverage
+   identity. Bind publication approval to the exact event, body, comments, and reviewed identity.
+   Keep later PR observations separate; never present old assessments as coverage of newer commits.
 3. Review the detached worktree, never the operator's checkout or a moving branch.
-4. Fail closed when code or semantic conversation freshness cannot be verified.
+4. Keep snapshot corruption, invalid identity, and remote PR movement distinct. Preserve valid
+   work through remote movement and reconcile only affected findings; use a historical `COMMENT`
+   when current applicability or coverage cannot be established.
 5. Never publish without preview and explicit approval unless `--auto-publish` was supplied.
 6. Publish one atomic GitHub review containing `body`, `event`, `commit_id`, and `comments`.
 7. Keep each finding in one public channel:
-   - an anchored finding lives in an inline thread;
+   - an anchored finding lives in an inline thread while GitHub accepts its captured location;
    - a genuinely cross-file finding lives in the review body;
-   - the body may count inline findings but must not repeat them.
+   - if GitHub rejects a historical inline anchor, preserve that finding in the body with its
+     captured path, line, side, and reviewed commit.
 8. Preserve every supported blocking finding. Brevity removes repetition and optional commentary, never blockers.
 9. Every Blocking finding the operator reads has been checked against the frozen code by the
    verifier, or the coverage line says why not.
@@ -49,9 +53,10 @@ publication contract below; they do not start a second Review Mode coordinator. 
     `workspaces/pr-review-{number}/run-{owner-token}/` directory. Never use `.claude/` for review
     state.
 11. Drive the mode to a review outcome. A code blocker becomes a `REQUEST_CHANGES` finding; it
-    never blocks the review workflow. Stop only when a trustworthy review cannot be verified or
-    published because an external prerequisite remains unavailable, or when an already-published
-    review on the same head contains every current finding.
+    never blocks the review workflow. Remote PR movement alone does not discard work or stop
+    publication. Stop only when the intended PR identity or captured evidence is invalid, an
+    external prerequisite prevents publication, or an already-published review already contains
+    every finding for that reviewed commit.
 
 ## Operator-facing communication
 
@@ -68,18 +73,23 @@ blocking finding against the frozen code, unless the repository policy turns ver
 Do not call agents abstract "lenses" in operator-facing prose.
 
 Never emit a message whose only content is tool-status narration; during an extended wait, name
-the active specialists and their surfaces. Expose SHAs or the context hash only when identity
-drift blocks the review or the operator asks. Report whether the Git local exclude was already
-present or added once.
+the active specialists and their surfaces. Identify the reviewed commit briefly in the review body
+and preview. Keep full SHAs, hashes, and capture details internal unless the operator asks. Report
+whether the Git local exclude was already present or added once.
 
 ## Resume
 
-Resolve exactly one complete isolated run with `review_context.py resume-run` (context, non-empty
-body draft, and inline JSON), capture a fresh context, and run `review_context.py compare`.
-`continue` resumes at Preview; `reconcile-conversation` refreshes the conversation, reruns
-same-author/prior-review detection, reconciles the draft once, and returns to Preview without
-rerunning specialists; `restart-technical-review` discards the draft and restarts at Gather. A
-capture failure or missing snapshot identity stops; never publish a stale draft.
+Resolve exactly one complete isolated run with `review_context.py resume-run` (captured context,
+non-empty body draft, and inline JSON), refresh the latest observation, and run
+`review_context.py compare`. `continue` resumes at Preview. `reconcile-conversation` retains the
+captured assessments and lets Main reconcile relevant discussion or review-state changes.
+`reconcile-review` retains the captured assessments and lets Main check the latest code changes
+against existing findings. Neither action restarts all specialists or discards the draft. A
+version-only change does not require another technical review. `recover-context` means the latest
+observation cannot be trusted as current; preserve the run. If the original captured identity still
+confirms the intended PR, a historical `COMMENT` remains available. Recover the target before
+publishing only when the original identity or destination itself is uncertain. Never relabel a
+captured assessment as coverage of a newer commit.
 The resume helper locates a candidate, not proof that its coverage is complete. Before Preview,
 require and read every source coordinate recorded for every selected pass in the ledger, including
 suffixed and zero-finding reports, original verification input, verifier return with its identity
@@ -120,8 +130,9 @@ not these coordinator instructions or other specialists' initial conclusions.
 5. **Preview and publish.** Read [publication.md](references/publication.md). Validate the final
    body, anchors, coverage and all-finding ledger, including any selected external-evidence
    status and limitations, then present the exact review for approval.
-   Recheck freshness and exact approved bytes before a single atomic GitHub review write.
-   Finish the coordinator-owned cleanup described in the snapshot reference.
+   Check the latest PR observation, keep the exact approved bytes and reviewed identity, and make
+   one atomic GitHub review write. Preserve the run on a failed or uncertain write. Clean up only
+   after successful publication or explicit cancellation, as described in the snapshot reference.
 
 If a phase is resumed, read that reference and the retained identity/coverage evidence before
 acting. Do not replace a required integrity check with a summary or an agent's assertion.

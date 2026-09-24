@@ -43,8 +43,9 @@ Capture Semgrep before initial specialist dispatch so its identity and integrity
 not add its candidate conclusions to independent initial packets. After every selected initial
 assessment returns and its identity is validated, Main reconciles the scan candidates with the
 existing findings and supplies only normalized finding/evidence coordinates to the existing
-verifier. A changed head, base, scope, rules/configuration or context invalidates the result; renew
-the affected scan under the existing drift path rather than reusing it for another candidate.
+verifier. Retain the result for its captured head, base, scope, rules/configuration and context
+when the remote PR changes. Do not relabel it as a scan of another candidate; renew only affected
+evidence when useful for a current finding, otherwise disclose its captured scope.
 
 ### Sentry `find-bugs`
 

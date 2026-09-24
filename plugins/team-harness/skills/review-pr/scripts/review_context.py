@@ -488,20 +488,24 @@ def promote_artifact_pair(
     if len(set(names)) != len(names):
         raise ContextError("artifact pair names must be distinct")
 
-    previous = [
-        safe_read_leaf(artifact_root, first_final_name),
-        safe_read_leaf(artifact_root, second_final_name),
-    ]
-    rollback: list[Path] = []
+    previous: list[bytes | None] = []
+    for final in (first_final_name, second_final_name):
+        try:
+            previous.append(safe_read_leaf(artifact_root, final))
+        except ContextError as error:
+            if not isinstance(error.__cause__, FileNotFoundError):
+                raise
+            previous.append(None)
+    rollback: list[Path | None] = []
     try:
-        rollback.append(
-            _temporary_leaf(artifact_root, "tmp-artifact-pair-rollback-first")
-        )
-        rollback.append(
-            _temporary_leaf(artifact_root, "tmp-artifact-pair-rollback-second")
-        )
-        _write_existing_leaf(rollback[0], previous[0])
-        _write_existing_leaf(rollback[1], previous[1])
+        for index, content in enumerate(previous):
+            temporary = (
+                _temporary_leaf(artifact_root, f"tmp-artifact-pair-rollback-{index}")
+                if content is not None else None
+            )
+            rollback.append(temporary)
+            if temporary is not None:
+                _write_existing_leaf(temporary, content)
         try:
             promote_artifact(artifact_root, first_temporary_name, first_final_name)
             promote_artifact(artifact_root, second_temporary_name, second_final_name)
@@ -511,7 +515,10 @@ def promote_artifact_pair(
                 rollback, (first_final_name, second_final_name), strict=True
             ):
                 try:
-                    promote_artifact(artifact_root, temporary.name, final)
+                    if temporary is None:
+                        _discard_artifact_leaf(artifact_root, final)
+                    else:
+                        promote_artifact(artifact_root, temporary.name, final)
                 except Exception as rollback_error:
                     rollback_errors.append(rollback_error)
             if rollback_errors:
@@ -519,7 +526,8 @@ def promote_artifact_pair(
             raise
     finally:
         for temporary in rollback:
-            _discard_artifact_leaf(artifact_root, temporary.name)
+            if temporary is not None:
+                _discard_artifact_leaf(artifact_root, temporary.name)
 
 
 def find_resumable_review_run(repo_root: Path, pr: int) -> dict[str, Any]:
@@ -1408,6 +1416,10 @@ def compare_contexts(expected: dict[str, Any], actual: dict[str, Any]) -> dict[s
         and (actual.get("code_hash") is None or actual.get("code_hash") == actual_code_hash)
         and (actual.get("technical_hash") is None or actual.get("technical_hash") == actual_technical_hash)
     )
+    target_changed = (
+        expected.get("repository") != actual.get("repository")
+        or expected.get("pr", {}).get("number") != actual.get("pr", {}).get("number")
+    )
     commits_changed = expected.get("commits") != actual.get("commits")
     expected_semantic_hash = expected.get("semantic_conversation_hash") or stable_hash(
         semantic_conversation_identity(expected)
@@ -1432,16 +1444,18 @@ def compare_contexts(expected: dict[str, Any], actual: dict[str, Any]) -> dict[s
     ]
     code_changed = bool(changed_fields) or commits_changed or expected_code_hash != actual_code_hash
     context_integrity_changed = not expected_hash_consistent or not actual_hash_consistent
-    code_changed = code_changed or context_integrity_changed
+    invalid_context = context_integrity_changed or target_changed
     return {
         "status": (
-            "code-changed"
-            if code_changed or commits_changed
+            "invalid-context"
+            if invalid_context
+            else "code-changed"
+            if code_changed
             else "conversation-changed"
             if conversation_changed
             else "current"
         ),
-        "code_changed": code_changed or commits_changed,
+        "code_changed": code_changed,
         "conversation_changed": conversation_changed,
         "conversation_change_kind": (
             "semantic"
@@ -1451,16 +1465,18 @@ def compare_contexts(expected: dict[str, Any], actual: dict[str, Any]) -> dict[s
             else "none"
         ),
         "next_action": (
-            "restart-technical-review"
-            if code_changed or commits_changed or semantic_conversation_changed
+            "recover-context"
+            if invalid_context
+            else "reconcile-review"
+            if code_changed
             else "reconcile-conversation"
-            if review_state_changed
+            if conversation_changed
             else "continue"
         ),
-        "technical_results_reusable": not (
-            code_changed or commits_changed or semantic_conversation_changed
-        ),
+        # Reuse describes the captured snapshot, never automatic coverage of a newer head.
+        "technical_results_reusable": not invalid_context,
         "context_integrity_changed": context_integrity_changed,
+        "target_changed": target_changed,
         "mergeability_changed": mergeability_changed,
         "changed_fields": changed_fields,
         "expected_head_oid": expected.get("head_oid"),
@@ -1838,7 +1854,7 @@ def command_materialize(args: argparse.Namespace) -> int:
 def command_compare(args: argparse.Namespace) -> int:
     result = compare_contexts(load_context(args.expected), load_context(args.actual))
     print(json.dumps(result))
-    return {"current": 0, "conversation-changed": 10, "code-changed": 20}[result["status"]]
+    return 20 if result["next_action"] == "recover-context" else 0
 
 
 def command_render(args: argparse.Namespace) -> int:
@@ -2236,7 +2252,9 @@ def refresh_review_context(
     run = validate_owned_review_run(repo_root, artifact_root, owner_token, pr)
     context_path = run / "pr-review-context.json"
     conversation_path = run / "pr-review-conversation.md"
-    snapshot = run / "pr-review-snapshot.git"
+    latest_context = run / "pr-review-latest-context.json"
+    latest_conversation = run / "pr-review-latest-conversation.md"
+    snapshot = run / "pr-review-latest-snapshot.git"
     safe_read_leaf(run, context_path.name)
     safe_read_leaf(run, conversation_path.name)
     previous = load_context(context_path)
@@ -2252,7 +2270,8 @@ def refresh_review_context(
             deadline_epoch=time.time() + COMMAND_TIMEOUT_SECONDS,
         )
         comparison = compare_contexts(previous, current)
-        if comparison["next_action"] != "restart-technical-review":
+        captured_latest = comparison["next_action"] != "recover-context"
+        if captured_latest:
             conversation_tmp = _temporary_leaf(
                 run, "tmp-pr-review-conversation-refresh"
             )
@@ -2262,19 +2281,21 @@ def refresh_review_context(
             promote_artifact_pair(
                 run,
                 conversation_tmp.name,
-                conversation_path.name,
+                latest_conversation.name,
                 context_tmp.name,
-                context_path.name,
+                latest_context.name,
             )
         return {
             **comparison,
             "status": comparison["status"],
-            "technical_hash": current["technical_hash"],
-            "conversation_hash": current["conversation_hash"],
-            "context_hash": current["context_hash"],
-            "promoted": comparison["next_action"] != "restart-technical-review",
+            "technical_hash": previous["technical_hash"],
+            "conversation_hash": previous["conversation_hash"],
+            "context_hash": previous["context_hash"],
+            "promoted": False,
             "context": str(context_path),
             "conversation": str(conversation_path),
+            "latest_context": str(latest_context) if captured_latest else None,
+            "latest_conversation": str(latest_conversation) if captured_latest else None,
         }
     finally:
         _discard_artifact_leaf(run, context_tmp.name)
@@ -2291,11 +2312,7 @@ def command_refresh_context(args: argparse.Namespace) -> int:
         args.owner_token,
     )
     print(json.dumps(result, sort_keys=True))
-    return {
-        "continue": 0,
-        "reconcile-conversation": 10,
-        "restart-technical-review": 20,
-    }[result["next_action"]]
+    return 20 if result["next_action"] == "recover-context" else 0
 
 
 def prepare_review_run(repo_root: Path, repo: str, pr: int) -> dict[str, Any]:

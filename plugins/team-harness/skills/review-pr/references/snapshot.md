@@ -91,10 +91,17 @@ or whether any one yield exceeds 30 seconds.
 Immediately after any workspace capture and before a selected external scan, capture the core
 snapshot baseline: `git status --untracked-files=all` and `git diff HEAD` for the frozen worktree,
 plus the hashes of all existing review-artifact input leaves under `$ARTIFACTS` (excluding
-`$SNAPSHOT_GIT` and `$WORKTREE`), together with any explicitly read policy leaf outside that
-directory. This baseline covers the captured context, conversation, diff, changed-files, checks,
-policy and captured workspace inputs. A later external report is an intentional new evidence leaf
-and is not silently folded into this initial baseline.
+`$SNAPSHOT_GIT`, `$WORKTREE`, and `pr-review-latest-snapshot.git`), together with any explicitly
+read policy leaf outside that directory. This baseline covers the captured context, conversation,
+diff, changed-files, checks, policy and captured workspace inputs. A later external report is an
+intentional new evidence leaf and is not silently folded into this initial baseline.
+
+The captured context, conversation, diff and worktree remain the immutable reviewer input. A
+refresh writes `pr-review-latest-context.json` and `pr-review-latest-conversation.md` alongside a
+separate `pr-review-latest-snapshot.git`. These latest observations are for Main only; they remain
+outside the reviewer baseline, never replace the captured context, conversation, or
+`pr-review-snapshot.git`, and are not supplied to specialists. Main uses them to reconcile changed
+claims without presenting old reports as review of a newer commit.
 
 External capture must run against its disposable copy. Before Main promotes its report or note,
 repeat the core status, diff and input-leaf hashes. Any mismatch invalidates the capture and
@@ -126,8 +133,9 @@ reviewer pass and does not create another reviewer or review round.
 Run `cleanup-run` explicitly from the coordinator only after every dispatched reviewer has
 reached a terminal result and every check that consumes the snapshot has completed. Never remove
 the PR parent or a sibling run, never force-remove a dirty worktree, and preserve the run for
-resume when the coordinator is lost early. On every terminal path except explicit `defer`, invoke
-`cleanup_owned_review_run` exactly once.
+resume when the coordinator is lost early. Keep the complete run on `defer`, a failed publication,
+or an uncertain GitHub response. Clean it only after a confirmed successful publication or an
+explicit `cancel`.
 
 ### Optional workspace context
 
@@ -190,8 +198,16 @@ python3 "$REVIEW_CONTEXT_HELPER" refresh-context \
   --artifact-root "$ARTIFACTS" --owner-token "$REVIEW_OWNER_TOKEN"
 ```
 
-- `next_action: continue`: dispatch; a reported `mergeability_changed` is one informational line.
-- `next_action: reconcile-conversation`: only `$CONTEXT` and `$CONVERSATION` were refreshed;
-  rerun same-author/prior-review detection, then dispatch once.
-- `next_action: restart-technical-review`: code or semantic scope drift; rebuild artifacts and
-  restart Gather once. A second movement is an external freshness failure to report.
+- `next_action: continue`: dispatch against the captured snapshot; report mergeability movement
+  only when useful.
+- `next_action: reconcile-conversation`: retain the captured reports; Main checks whether new
+  discussion or review state affects existing findings before continuing.
+- `next_action: reconcile-review`: retain the captured reports; Main compares the latest code
+  observation with existing findings. A version-only change needs no new assessment. Reassess only
+  claims touched by relevant changes; any new code without review coverage is disclosed and uses a
+  historical `COMMENT`.
+- `next_action: recover-context`: preserve the run and recover the intended PR identity or invalid
+  latest observation. If the original captured identity still confirms the intended PR, a
+  historical `COMMENT` remains available. Recover the target only when the original identity or
+  destination itself is uncertain. Never use captured reports for another PR or present them as
+  covering new commits.

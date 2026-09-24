@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - PR-review directories inherit native filesystem permissions instead of imposing owner-only access that blocks sandbox reviewers on Windows with Python 3.13.
+- PR reviews retain completed findings, drafts and evidence when the PR changes or publication fails; reconciliation stays scoped and the operator still confirms publication.
 
 ## [3.42.1] - 2026-09-23
 

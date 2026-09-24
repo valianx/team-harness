@@ -36,19 +36,40 @@ NEW_HEAD_OID = "d" * 40
 def context(**overrides):
     value = {
         "schema_version": MODULE.SCHEMA_VERSION,
+        "repository": "owner/repo",
         "base_oid": BASE_OID,
         "head_oid": HEAD_OID,
         "merge_base_oid": MERGE_BASE_OID,
-        "pr": {"title": "Title", "body": "Body"},
+        "pr": {"number": 34, "title": "Title", "body": "Body"},
         "commits": [{"oid": HEAD_OID, "subject": "fix: current"}],
         "issue_comments": [],
         "review_comments": [],
         "review_threads": [],
         "reviews": [],
     }
+    overrides = dict(overrides)
+    if "pr" in overrides:
+        value["pr"].update(overrides.pop("pr"))
     value.update(overrides)
     MODULE.finalize_hashes(value)
     return value
+
+
+def seed_review_artifacts(root: Path, original: dict, latest: dict | None = None):
+    """Seed the immutable context pair plus representative completed review work."""
+    MODULE.write_json(root / "pr-review-context.json", original)
+    (root / "pr-review-conversation.md").write_bytes(b"original conversation\n")
+    if latest is not None:
+        MODULE.write_json(root / "pr-review-latest-context.json", latest)
+        (root / "pr-review-latest-conversation.md").write_bytes(b"previous latest conversation\n")
+    (root / "pr-review-final.md").write_bytes(b"draft body\n")
+    (root / "pr-review-inline.json").write_bytes(b"[{\"finding\":\"F-1\"}]\n")
+    (root / "pr-review-ledger.json").write_bytes(b"{\"ledger\":[\"F-1\"]}\n")
+    return {
+        path.name: path.read_bytes()
+        for path in root.iterdir()
+        if path.name.startswith("pr-review-") and path.is_file()
+    }
 
 
 def windows_directory_acl(path: Path) -> dict[str, object]:
@@ -1477,9 +1498,10 @@ class ReviewContextTests(unittest.TestCase):
 
         comparison = MODULE.compare_contexts(approved, stale)
 
-        self.assertEqual(comparison["status"], "code-changed")
-        self.assertEqual(comparison["next_action"], "restart-technical-review")
+        self.assertEqual(comparison["status"], "invalid-context")
+        self.assertEqual(comparison["next_action"], "recover-context")
         self.assertFalse(comparison["technical_results_reusable"])
+        self.assertTrue(comparison["context_integrity_changed"])
         self.assertEqual(comparison["changed_fields"], ["head_oid"])
 
     def test_compare_rejects_equal_inconsistent_saved_hashes(self):
@@ -1488,8 +1510,8 @@ class ReviewContextTests(unittest.TestCase):
 
         comparison = MODULE.compare_contexts(corrupt, corrupt)
 
-        self.assertEqual(comparison["status"], "code-changed")
-        self.assertEqual(comparison["next_action"], "restart-technical-review")
+        self.assertEqual(comparison["status"], "invalid-context")
+        self.assertEqual(comparison["next_action"], "recover-context")
         self.assertTrue(comparison["context_integrity_changed"])
         self.assertFalse(comparison["technical_results_reusable"])
 
@@ -1498,7 +1520,8 @@ class ReviewContextTests(unittest.TestCase):
 
         comparison = MODULE.compare_contexts(malformed, malformed)
 
-        self.assertEqual(comparison["status"], "code-changed")
+        self.assertEqual(comparison["status"], "invalid-context")
+        self.assertEqual(comparison["next_action"], "recover-context")
         self.assertTrue(comparison["context_integrity_changed"])
         self.assertFalse(comparison["technical_results_reusable"])
 
@@ -1541,8 +1564,8 @@ class ReviewContextTests(unittest.TestCase):
         )
         semantic_comparison = MODULE.compare_contexts(original, semantic_conversation)
         self.assertEqual(semantic_comparison["conversation_change_kind"], "semantic")
-        self.assertEqual(semantic_comparison["next_action"], "restart-technical-review")
-        self.assertFalse(semantic_comparison["technical_results_reusable"])
+        self.assertEqual(semantic_comparison["next_action"], "reconcile-conversation")
+        self.assertTrue(semantic_comparison["technical_results_reusable"])
 
         discussion_comparison = MODULE.compare_contexts(original, discussion)
         self.assertEqual(discussion_comparison["conversation_change_kind"], "review-state")
@@ -1562,13 +1585,78 @@ class ReviewContextTests(unittest.TestCase):
         )
         self.assertEqual(
             MODULE.compare_contexts(original, moved)["next_action"],
-            "restart-technical-review",
+            "reconcile-review",
         )
+        self.assertTrue(MODULE.compare_contexts(original, moved)["technical_results_reusable"])
         edited_body = context(pr={"title": "Title", "body": "New requirements"})
         self.assertEqual(
             MODULE.compare_contexts(original, edited_body)["status"],
             "conversation-changed",
         )
+
+    def test_compare_reuses_snapshot_results_for_version_base_and_commit_movement(self):
+        original = context()
+        movements = {
+            "version bump": context(
+                head_oid=NEW_HEAD_OID,
+                commits=[{"oid": NEW_HEAD_OID, "subject": "chore: bump version"}],
+            ),
+            "base movement": context(base_oid="e" * 40),
+            "commit movement": context(
+                commits=[
+                    {"oid": NEW_HEAD_OID, "subject": "fix: follow-up"},
+                    {"oid": HEAD_OID, "subject": "fix: current"},
+                ]
+            ),
+        }
+        for label, current in movements.items():
+            with self.subTest(movement=label):
+                comparison = MODULE.compare_contexts(original, current)
+                self.assertEqual(comparison["status"], "code-changed")
+                self.assertEqual(comparison["next_action"], "reconcile-review")
+                self.assertTrue(comparison["technical_results_reusable"])
+
+    def test_compare_rejects_corrupt_hashes_and_changed_target(self):
+        approved = context()
+        corrupt_hashes = dict(approved, code_hash="bad", technical_hash="bad")
+        corrupt_comparison = MODULE.compare_contexts(approved, corrupt_hashes)
+        self.assertEqual(corrupt_comparison["status"], "invalid-context")
+        self.assertEqual(corrupt_comparison["next_action"], "recover-context")
+        self.assertTrue(corrupt_comparison["context_integrity_changed"])
+        self.assertFalse(corrupt_comparison["technical_results_reusable"])
+
+        other_target = context(
+            repository="elsewhere/repo",
+            pr={"number": 35, "title": "Title", "body": "Body"},
+        )
+        target_comparison = MODULE.compare_contexts(approved, other_target)
+        self.assertEqual(target_comparison["status"], "invalid-context")
+        self.assertEqual(target_comparison["next_action"], "recover-context")
+        self.assertTrue(target_comparison["target_changed"])
+        self.assertFalse(target_comparison["technical_results_reusable"])
+
+    def test_compare_cli_returns_zero_for_valid_drift_and_twenty_for_invalid_context(self):
+        with native_acl_temp_directory() as root:
+            expected = root / "expected.json"
+            actual = root / "actual.json"
+            MODULE.write_json(expected, context())
+            MODULE.write_json(actual, context(head_oid=NEW_HEAD_OID))
+            valid = subprocess.run(
+                [sys.executable, str(SCRIPT), "compare", "--expected", str(expected), "--actual", str(actual)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(valid.returncode, 0, valid.stderr)
+            self.assertEqual(json.loads(valid.stdout)["next_action"], "reconcile-review")
+
+            MODULE.write_json(actual, context(base_oid="malformed"))
+            invalid = subprocess.run(
+                [sys.executable, str(SCRIPT), "compare", "--expected", str(expected), "--actual", str(actual)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(invalid.returncode, 20, invalid.stderr)
+            self.assertEqual(json.loads(invalid.stdout)["status"], "invalid-context")
 
     def test_compare_normalizes_legacy_combined_conversation_hash(self):
         current = context()
@@ -1603,9 +1691,8 @@ class ReviewContextTests(unittest.TestCase):
         self.assertEqual(comparison["conversation_change_kind"], "none")
         self.assertEqual(comparison["next_action"], "continue")
 
-    def test_refresh_context_promotes_review_state_without_rebuilding_technical_state(self):
-        with tempfile.TemporaryDirectory() as directory:
-            repo = Path(directory)
+    def test_refresh_context_preserves_original_and_writes_latest_pair_for_conversation_change(self):
+        with native_acl_temp_directory() as repo:
             run = MODULE.create_review_run(repo, 34)
             root = Path(run["artifact_root"])
             original = context()
@@ -1619,6 +1706,70 @@ class ReviewContextTests(unittest.TestCase):
             }])
             MODULE.write_json(root / "pr-review-context.json", original)
             (root / "pr-review-conversation.md").write_text("old\n", encoding="utf-8")
+            (root / "pr-review-final.md").write_bytes(b"draft stays byte-identical\n")
+            (root / "pr-review-inline.json").write_bytes(b"[{\"id\":1}]\n")
+            (root / "pr-review-ledger.json").write_bytes(b"{\"ledger\":[1]}\n")
+            canonical_context = (root / "pr-review-context.json").read_bytes()
+            canonical_conversation = (root / "pr-review-conversation.md").read_bytes()
+            preserved = {
+                name: (root / name).read_bytes()
+                for name in (
+                    "pr-review-final.md",
+                    "pr-review-inline.json",
+                    "pr-review-ledger.json",
+                )
+            }
+
+            def capture_current(**kwargs):
+                MODULE.write_json(kwargs["output"], current)
+                return current
+
+            args = SimpleNamespace(
+                repo_root=repo,
+                repo="owner/repo",
+                pr=34,
+                artifact_root=root,
+                owner_token=run["owner_token"],
+            )
+            output = io.StringIO()
+            with patch.object(MODULE, "capture_to_path", side_effect=capture_current):
+                with redirect_stdout(output):
+                    code = MODULE.command_refresh_context(args)
+            result = json.loads(output.getvalue())
+
+            self.assertEqual(code, 0)
+            self.assertEqual(result["next_action"], "reconcile-conversation")
+            self.assertTrue(result["technical_results_reusable"])
+            self.assertFalse(result["promoted"])
+            self.assertEqual(Path(result["context"]), root / "pr-review-context.json")
+            self.assertEqual(Path(result["conversation"]), root / "pr-review-conversation.md")
+            self.assertEqual(Path(result["latest_context"]), root / "pr-review-latest-context.json")
+            self.assertEqual(Path(result["latest_conversation"]), root / "pr-review-latest-conversation.md")
+            self.assertEqual(
+                MODULE.load_context(root / "pr-review-context.json")["context_hash"],
+                original["context_hash"],
+            )
+            self.assertEqual((root / "pr-review-context.json").read_bytes(), canonical_context)
+            self.assertEqual((root / "pr-review-conversation.md").read_bytes(), canonical_conversation)
+            self.assertEqual(
+                MODULE.load_context(root / "pr-review-latest-context.json")["context_hash"],
+                current["context_hash"],
+            )
+            for name, expected in preserved.items():
+                self.assertEqual((root / name).read_bytes(), expected)
+            MODULE.cleanup_review_run(repo, root, run["owner_token"])
+
+    def test_refresh_context_keeps_original_and_reusable_work_on_semantic_change(self):
+        with native_acl_temp_directory() as repo:
+            run = MODULE.create_review_run(repo, 34)
+            root = Path(run["artifact_root"])
+            original = context()
+            current = context(pr={"title": "Changed scope", "body": "New requirements"})
+            saved = seed_review_artifacts(root, original, original)
+            preserved = {
+                name: data for name, data in saved.items()
+                if name not in {"pr-review-latest-context.json", "pr-review-latest-conversation.md"}
+            }
 
             def capture_current(**kwargs):
                 MODULE.write_json(kwargs["output"], current)
@@ -1631,44 +1782,162 @@ class ReviewContextTests(unittest.TestCase):
 
             self.assertEqual(result["next_action"], "reconcile-conversation")
             self.assertTrue(result["technical_results_reusable"])
-            self.assertTrue(result["promoted"])
-            self.assertEqual(
-                MODULE.load_context(root / "pr-review-context.json")["context_hash"],
-                current["context_hash"],
-            )
-            MODULE.cleanup_review_run(repo, root, run["owner_token"])
-
-    def test_refresh_context_keeps_old_artifacts_when_semantic_context_changes(self):
-        with tempfile.TemporaryDirectory() as directory:
-            repo = Path(directory)
-            run = MODULE.create_review_run(repo, 34)
-            root = Path(run["artifact_root"])
-            original = context()
-            current = context(pr={"title": "Changed scope", "body": "New requirements"})
-            MODULE.write_json(root / "pr-review-context.json", original)
-            (root / "pr-review-conversation.md").write_text("old\n", encoding="utf-8")
-
-            def capture_current(**kwargs):
-                MODULE.write_json(kwargs["output"], current)
-                return current
-
-            with patch.object(MODULE, "capture_to_path", side_effect=capture_current):
-                result = MODULE.refresh_review_context(
-                    repo, "owner/repo", 34, root, run["owner_token"]
-                )
-
-            self.assertEqual(result["next_action"], "restart-technical-review")
-            self.assertFalse(result["technical_results_reusable"])
             self.assertFalse(result["promoted"])
             self.assertEqual(
                 MODULE.load_context(root / "pr-review-context.json")["context_hash"],
                 original["context_hash"],
             )
+            self.assertEqual(
+                MODULE.load_context(root / "pr-review-latest-context.json")["context_hash"],
+                current["context_hash"],
+            )
+            for name, expected in preserved.items():
+                self.assertEqual((root / name).read_bytes(), expected)
+            MODULE.cleanup_review_run(repo, root, run["owner_token"])
+
+    def test_refresh_context_repeats_code_drift_without_replacing_original_or_review_work(self):
+        with native_acl_temp_directory() as repo:
+            run = MODULE.create_review_run(repo, 34)
+            root = Path(run["artifact_root"])
+            original = context()
+            first = context(
+                head_oid=NEW_HEAD_OID,
+                commits=[{"oid": NEW_HEAD_OID, "subject": "chore: bump version"}],
+            )
+            second = context(
+                head_oid="f" * 40,
+                commits=[{"oid": "f" * 40, "subject": "fix: follow-up"}],
+            )
+            saved = seed_review_artifacts(root, original, original)
+            preserved = {
+                name: data for name, data in saved.items()
+                if name not in {"pr-review-latest-context.json", "pr-review-latest-conversation.md"}
+            }
+            for current in (first, second):
+                def capture_current(**kwargs):
+                    MODULE.write_json(kwargs["output"], current)
+                    return current
+
+                with patch.object(MODULE, "capture_to_path", side_effect=capture_current):
+                    result = MODULE.refresh_review_context(
+                        repo, "owner/repo", 34, root, run["owner_token"]
+                    )
+                self.assertEqual(result["status"], "code-changed")
+                self.assertEqual(result["next_action"], "reconcile-review")
+                self.assertTrue(result["technical_results_reusable"])
+                self.assertFalse(result["promoted"])
+                self.assertEqual(result["context_hash"], original["context_hash"])
+                self.assertEqual(result["actual_context_hash"], current["context_hash"])
+                self.assertEqual(
+                    MODULE.load_context(root / "pr-review-context.json")["context_hash"],
+                    original["context_hash"],
+                )
+                self.assertEqual(
+                    MODULE.load_context(root / "pr-review-latest-context.json")["context_hash"],
+                    current["context_hash"],
+                )
+                for name, expected in preserved.items():
+                    self.assertEqual((root / name).read_bytes(), expected)
+            MODULE.cleanup_review_run(repo, root, run["owner_token"])
+
+    def test_refresh_invalid_capture_does_not_promote_or_replace_any_review_artifact(self):
+        with native_acl_temp_directory() as repo:
+            original = context()
+            invalid_contexts = {
+                "changed target": context(
+                    repository="elsewhere/repo",
+                    pr={"number": 35, "title": "Title", "body": "Body"},
+                ),
+                "corrupt hash": dict(original, code_hash="corrupt", technical_hash="corrupt"),
+                "malformed oid": context(base_oid="not-a-git-oid"),
+            }
+            for label, invalid in invalid_contexts.items():
+                with self.subTest(invalidity=label):
+                    run = MODULE.create_review_run(repo, 34)
+                    root = Path(run["artifact_root"])
+                    saved = seed_review_artifacts(root, original, context(head_oid=NEW_HEAD_OID))
+
+                    def capture_invalid(**kwargs):
+                        MODULE.write_json(kwargs["output"], invalid)
+                        return invalid
+
+                    args = SimpleNamespace(
+                        repo_root=repo,
+                        repo="owner/repo",
+                        pr=34,
+                        artifact_root=root,
+                        owner_token=run["owner_token"],
+                    )
+                    output = io.StringIO()
+                    with patch.object(MODULE, "capture_to_path", side_effect=capture_invalid):
+                        with redirect_stdout(output):
+                            code = MODULE.command_refresh_context(args)
+
+                    self.assertEqual(code, 20)
+                    result = json.loads(output.getvalue())
+                    self.assertEqual(result["status"], "invalid-context")
+                    self.assertEqual(result["next_action"], "recover-context")
+                    self.assertFalse(result["technical_results_reusable"])
+                    self.assertIsNone(result["latest_context"])
+                    self.assertIsNone(result["latest_conversation"])
+                    for name, expected in saved.items():
+                        self.assertEqual((root / name).read_bytes(), expected)
+                    MODULE.cleanup_review_run(repo, root, run["owner_token"])
+
+    def test_refresh_captures_into_separate_snapshot_and_preserves_original_git_objects(self):
+        with native_acl_temp_directory() as repo:
+            run = MODULE.create_review_run(repo, 34)
+            root = Path(run["artifact_root"])
+            original = context()
+            current = context(head_oid=NEW_HEAD_OID)
+            seed_review_artifacts(root, original, original)
+            snapshot = root / "pr-review-snapshot.git"
+            old_object = snapshot / "objects" / "pack" / "base-before-force-push.pack"
+            old_object.parent.mkdir(parents=True)
+            old_object.write_bytes(b"captured base object")
+            capture_targets = []
+
+            def capture_current(**kwargs):
+                target = Path(kwargs["snapshot_dir"])
+                capture_targets.append(target)
+                target.mkdir(parents=True, exist_ok=True)
+                (target / "written-by-refresh-capture").write_bytes(b"new snapshot data")
+                MODULE.write_json(kwargs["output"], current)
+                return current
+
+            with patch.object(MODULE, "capture_to_path", side_effect=capture_current):
+                MODULE.refresh_review_context(
+                    repo, "owner/repo", 34, root, run["owner_token"]
+                )
+
+            self.assertEqual(old_object.read_bytes(), b"captured base object")
+            self.assertFalse((snapshot / "written-by-refresh-capture").exists())
+            self.assertEqual(len(capture_targets), 1)
+            self.assertNotEqual(capture_targets[0], snapshot)
+            MODULE.cleanup_review_run(repo, root, run["owner_token"])
+
+    def test_refresh_capture_failure_keeps_both_context_pairs_and_completed_review_artifacts(self):
+        with native_acl_temp_directory() as repo:
+            run = MODULE.create_review_run(repo, 34)
+            root = Path(run["artifact_root"])
+            original = context()
+            previous_latest = context(head_oid=NEW_HEAD_OID)
+            saved = seed_review_artifacts(root, original, previous_latest)
+
+            with patch.object(
+                MODULE, "capture_to_path", side_effect=MODULE.ContextError("capture failed")
+            ):
+                with self.assertRaisesRegex(MODULE.ContextError, "capture failed"):
+                    MODULE.refresh_review_context(
+                        repo, "owner/repo", 34, root, run["owner_token"]
+                    )
+
+            for name, expected in saved.items():
+                self.assertEqual((root / name).read_bytes(), expected)
             MODULE.cleanup_review_run(repo, root, run["owner_token"])
 
     def test_refresh_context_rolls_back_pair_when_second_promotion_fails(self):
-        with tempfile.TemporaryDirectory() as directory:
-            repo = Path(directory)
+        with native_acl_temp_directory() as repo:
             run = MODULE.create_review_run(repo, 34)
             root = Path(run["artifact_root"])
             original = context()
@@ -1680,11 +1949,7 @@ class ReviewContextTests(unittest.TestCase):
                 "commit_id": "head",
                 "body": "arrived during review",
             }])
-            MODULE.write_json(root / "pr-review-context.json", original)
-            conversation = root / "pr-review-conversation.md"
-            conversation.write_text("old\n", encoding="utf-8")
-            original_context = (root / "pr-review-context.json").read_bytes()
-            original_conversation = conversation.read_bytes()
+            saved = seed_review_artifacts(root, original, context(head_oid=NEW_HEAD_OID))
 
             def capture_current(**kwargs):
                 MODULE.write_json(kwargs["output"], current)
@@ -1713,10 +1978,45 @@ class ReviewContextTests(unittest.TestCase):
                             repo, "owner/repo", 34, root, run["owner_token"]
                         )
 
-            self.assertEqual(
-                (root / "pr-review-context.json").read_bytes(), original_context
-            )
-            self.assertEqual(conversation.read_bytes(), original_conversation)
+            for name, expected in saved.items():
+                self.assertEqual((root / name).read_bytes(), expected)
+            MODULE.cleanup_review_run(repo, root, run["owner_token"])
+
+    def test_first_refresh_rolls_back_partial_latest_pair_when_second_promotion_fails(self):
+        with native_acl_temp_directory() as repo:
+            run = MODULE.create_review_run(repo, 34)
+            root = Path(run["artifact_root"])
+            original = context()
+            current = context(head_oid=NEW_HEAD_OID)
+            saved = seed_review_artifacts(root, original)
+
+            def capture_current(**kwargs):
+                MODULE.write_json(kwargs["output"], current)
+                return current
+
+            real_promote = MODULE.promote_artifact
+            calls = 0
+
+            def fail_second_promotion(*args, **kwargs):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise MODULE.ContextError("injected second promotion failure")
+                return real_promote(*args, **kwargs)
+
+            with patch.object(MODULE, "capture_to_path", side_effect=capture_current):
+                with patch.object(MODULE, "promote_artifact", side_effect=fail_second_promotion):
+                    with self.assertRaisesRegex(
+                        MODULE.ContextError, "injected second promotion failure"
+                    ):
+                        MODULE.refresh_review_context(
+                            repo, "owner/repo", 34, root, run["owner_token"]
+                        )
+
+            self.assertFalse((root / "pr-review-latest-context.json").exists())
+            self.assertFalse((root / "pr-review-latest-conversation.md").exists())
+            for name, expected in saved.items():
+                self.assertEqual((root / name).read_bytes(), expected)
             MODULE.cleanup_review_run(repo, root, run["owner_token"])
 
     def test_latest_same_author_ignores_dismissed_reviews(self):

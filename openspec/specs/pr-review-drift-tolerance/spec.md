@@ -1,7 +1,7 @@
 # pr-review-drift-tolerance Specification
 
 ## Purpose
-Stop `/th:review-pr` from discarding finished review work when nothing reviewable changed. Invalidation keys on code identity; environment drift is reported, not acted on; the security lens fires on evidence instead of on uncertainty.
+Preserve completed PR-review work when the remote PR changes, reconcile affected findings without mandatory restarts, and retain the operator's publication choice with an accurate reviewed scope.
 
 ## Requirements
 
