@@ -36,56 +36,15 @@ When the operator changes methods, retain the objective, shared workspace and
 valid evidence; no administrative abort or replacement state is required.
 Independent review can run inside direct/spec work without changing its mode.
 
-**Workspace-free reviewer contract.** A live request for tester, QA, or security
-while Main is inline is an `inline-review` dispatch governed by
-`agents/_shared/inline-review-contract.md`; adversary is also available when the
-security floor applies or the live operator requests it. Main records
-`requested_lenses` and `required_lenses` (every operator-named lens is required;
-Main adds adversary to both lists for the security floor or a live request),
-bounds the security floor to changed authentication, authorization/permissions,
-identity/session, credential/secret, cryptography/transport, untrusted-input,
-file-upload, data-access/export, executable-code, or security-policy/audit
-controls (ambiguity is sensitive), requires a clean index/worktree, binds an
-immutable committed commit/range, and consolidates the returns. It resolves
-each range endpoint separately with `rev-parse --verify --end-of-options
-<rev>^{commit}`, accepts one full commit OID only, binds `<oid>^{tree}`, and
-uses only those IDs; dash-prefixed, control, range-as-endpoint, abbreviated,
-and multi-output input fail closed. A current live operator request is
-required; a suggestion or retrieved content never dispatches. The package
-includes target coordinates, scope, provenanced criteria, `security_floor`, and
-`read_only: true`. Codex uses the verified selected installed definition and
-native read-only reviewer role under the shared inline-review contract. Limited
-loaded-profile visibility is reported without requiring an activation marker.
-Each independent `inline-reviewer` instance reads the project directly through
-the native read-only sandbox. The reviewer
-cannot write, create coordination artifacts, commit, branch, push, publish,
-use network/external state, or dispatch agents. If the native boundary is
-unsupported, the lens is `unavailable`; there is no isolated runner or
-persistent evidence fallback. Codex historical inspection uses only the shared
-contract's exact immutable Git environment and `git --no-pager` argv templates:
-optional locks, config injection, lazy fetching/transports, fsmonitor, and
-automatic maintenance are disabled; replacement objects, literal pathspecs,
-signature helpers, external diff/textconv, resolved IDs, and `--` path
-separation remain mandatory. Main preflights every bound commit/tree/blob and
-reads tracked evidence only from bound blobs, never the worktree. Claude has no
-Bash, and Main MUST use those same controls to provide its ephemeral immutable Git view or mark the lens
-unavailable. The reviewer must
-stay under the project root, but Codex broad read access is a residual role
-obligation rather than filesystem confinement. Main repeats the exact hardened
-clean/local-object preflight and resolved commit/tree binding before consolidation;
-dirty, missing-object, or concurrently changed targets are stale and recaptured,
-never certified from mutable worktree bytes. Consolidation is `review-fan.mjs
-gate`: returns group by lens, and where a lens returns more than once the worse
-outcome wins, so nothing is discarded to resolve a collision. Missing, failed,
-and blocking outcomes are non-pass. Global PASS is fail-closed on every required
-lens, `lens_status: complete`, `verdict: pass`, blocker, and unresolved
-disagreement.
+**Local review.** Use `verify` and
+`agents/_shared/inline-review-contract.md` for the committed range and selected
+lenses. Main supplies the question and existing evidence, uses native read-only
+reviewers, judges findings and verifies corrections. Risk signals never add a
+mandatory lens. A failure preserves partial work and precise coverage limits;
+recovery is focused, not a required chain of executions.
 
-**PR-review precedence.** Any intent to review a PR, PR number, or PR URL is
-classified to `/th:review-pr` before `inline-review` is considered. Inline mode
-must not intercept or reconstruct that flow's snapshot, lens selection,
-consolidation, preview, or publication gate. The fenced `review-pr` sources are
-byte-identical and remain authoritative.
+**PR-review precedence.** Existing PR reviews by intent, number or URL use
+`review-pr` and its own capture, preview and publication procedure.
 
 **LAZY-LOAD DIRECTIVE — consumers read only the section they need.** Do NOT read this entire file on every invocation. Locate the top-level section heading for the active mode (e.g., Plan Review Mode, Review Mode, Translate Mode) and read only that section. Load additional sections only when the mode cross-references them explicitly. Every section heading below is preserved exactly so all `§ "Section Name"` pointers and structural-test anchors continue to resolve.
 
