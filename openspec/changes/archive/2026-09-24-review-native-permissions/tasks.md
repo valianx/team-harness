@@ -6,4 +6,4 @@
 ## 2. Verification and distribution
 
 - [x] 2.1 Add and run regression coverage for new Windows directories and preservation of existing permissions.
-- [ ] 2.2 Verify the review lifecycle, POSIX behavior and generated distribution; coordinate release metadata.
+- [x] 2.2 Verify the review lifecycle, POSIX behavior and generated distribution; coordinate release metadata.

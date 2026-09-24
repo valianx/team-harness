@@ -27,9 +27,23 @@ SHALL run explicitly only after all dispatched reviewers have joined or after
 an explicit terminal cancel; unexpected coordinator loss SHALL preserve the
 workspace for recovery rather than delete evidence still in use.
 
+Review directories SHALL use normal platform creation permissions, respecting
+inherited Windows ACLs and the POSIX umask, without a TH owner-only directory
+policy. Creation SHALL preserve permissions of existing directories. Native
+runtime permissions govern reviewer access; a previously restricted directory
+requires scoped recovery rather than automatic recursive permission changes.
+
 #### Scenario: Materialization shell ends before reviewers
 - **WHEN** the command process that materialized the snapshot exits or yields for longer than 30 seconds while a reviewer is still reading
 - **THEN** the review workspace remains intact and cleanup does not run until that reviewer and every other dispatched lens reaches a terminal result
+
+#### Scenario: A new review uses native directory permissions
+- **WHEN** a review creates its workspace, PR parent and run directory
+- **THEN** all three retain normal platform permission inheritance and TH adds no owner-only access restriction
+
+#### Scenario: An existing workspace has operator-managed permissions
+- **WHEN** a review reuses an existing workspace or PR parent
+- **THEN** creation preserves those permissions and reports any actual access failure for scoped native recovery
 
 ### Requirement: QA lens cannot pass by silence
 The QA lens schema SHALL report coverage — `acs_evaluated`, non-verifiable ACs, and `lens_status: full|limited|absent` — with an absent or author-controlled-only oracle yielding `limited`, never a clean pass; severity assignment follows a declared rule; a missing coordinate blocks, matching the security lens.
