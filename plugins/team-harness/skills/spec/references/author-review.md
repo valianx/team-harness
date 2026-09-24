@@ -16,19 +16,22 @@ review an existing PR by number or URL still uses `review-pr` and its own approv
 
 ## Review and report
 
-Use `../../verify/SKILL.md` and its canonical inline-review contract to package each repository's clean committed range with its validated OpenSpec change and accepted lens set. Record exact
-base/head and prerequisite references. Reuse an accepted review for the same candidate; multiple lenses form one review. Dispatch one native read-only `inline-reviewer` per explicitly selected lens. Main may add a focused lens when a concrete risk warrants it, but a risk signal never adds a mandatory lens. Preserve profile, immutable-target and currentness checks. An unavailable or failed lens is not a pass; report the precise limitation. If the package
-proves the whole surface checker-verified, report that evidence without dispatching empty work.
+Use `../../verify/SKILL.md` and its shared inline-review guidance to package the
+committed candidate with the exact OpenSpec change and selected lenses. Reuse an
+applicable review and provider assessments. Give each native read-only reviewer
+the specific question, relevant intent and existing test evidence, including named
+relevant skips. Risk signals inform Main's selection without adding a mandatory
+lens. A checker-verified empty surface needs no dispatch; an unavailable reviewer
+is a disclosed limit, never a pass.
 
 Collect all returns and run `review-fan.mjs summary` (`gate` remains a compatibility alias). Main consolidates duplicate findings and checks their supporting evidence against the anchored candidate before changing code. Preserve unresolved
 disagreements and coverage limits. The summary is factual evidence; it does not decide closure or publication. Reviewers do not edit files or publish anything. Main writes
 `reviews/pre-pr-review.md` in the existing common workspace and links it from `01-plan.md`; in Obsidian mode both remain there, without a repository-local duplicate.
 
-Before declaring a selected reviewer unavailable, check the selected native role and scope and
-try a supported native read-only execution path, including a separate native CLI invocation when
-available. Preserve the immutable target and selected reviewer instructions; do not replace native
-isolation with a writable agent told not to edit, broaden permissions, or require a restart without
-an established host need. An unsuccessful recovery remains unavailable with its precise cause.
+For a failed reviewer, diagnose the observed cause and preserve useful work. Use a
+supported focused recovery when likely to help; a separate CLI run is optional.
+Do not restart the same review across execution paths without new evidence. Keep
+native permissions, the original target and precise remaining coverage limits.
 
 A complete review requires trusted, correctly anchored returns for every selected lens. Failed,
 unavailable, malformed, stale or incomplete returns never become a pass through patches or a

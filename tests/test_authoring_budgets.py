@@ -41,7 +41,6 @@ EXEMPT = {
     "agents/mentor.md": {"words"},
     "agents/_shared/apply-review-disposition.md": {"words"},
     "agents/_shared/gh-fallback.md": {"words"},
-    "agents/_shared/inline-review-contract.md": {"words"},
 }
 
 # Reference files over 100 lines that have no contents block today. Same ratchet as

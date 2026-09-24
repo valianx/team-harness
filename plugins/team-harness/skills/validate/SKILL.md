@@ -17,8 +17,13 @@ its configured local or Obsidian mode. Main coordinates with native tools and
 permissions. Reuse authorization for unchanged work and ask only for a missing
 decision. Specialists provide evidence and recommendations; Main judges them.
 
-Compare the actual candidate with the objective and relevant scenarios. Run
-repository-required checks and targeted validation for affected behavior.
+Compare the actual candidate with the objective and relevant scenarios. Reuse
+candidate-bound test results and assessments whose relevant inputs are unchanged.
+Run missing repository-required checks and targeted validation for affected behavior;
+renew evidence after a relevant source/environment change, failure or concrete gap.
+A validation phase or new reviewer alone does not require another suite execution
+or equivalent review of the tests. Give selected reviewers the existing assessment
+and named relevant skips, and ask for the uncovered question.
 For database/frontend work, compare the delivered model, migrations and UI with
 the required data model/wireframe and canonical intent from
 [sketch](../sketch/SKILL.md). Surface missing previews, unexplained fields or UI

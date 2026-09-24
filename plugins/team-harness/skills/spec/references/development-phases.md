@@ -20,6 +20,12 @@ coherent work, reuse an owner for corrections and parallelize independent tasks.
 The four phases describe outcomes; they do not prescribe four agent handoffs.
 Both methods use the same applicable tools and evidence below.
 
+For already implemented work, recover intent and current checks and enter at the
+missing outcome. Main runs routine checks and provider methods; delegate a useful
+independent question, not a phase name or a command such as lint. Reuse one concise
+test-evidence summary across tools and reviewers instead of commissioning the same
+test analysis again at each handoff.
+
 Continue to the requested endpoint: planning, local completion, PR preparation
 or PR publication. An authorized continuation needs no separate prompt for each
 selected tool or phase. Resolve only missing material decisions. Review choices
@@ -123,6 +129,16 @@ runner receipt with a newer base, candidate/tree, manifest or effective invocati
 Obtain a new receipt when those bindings require it. Reuse other checks only
 when their relevant inputs and method permit it. A changed filename for a report
 or a still-open PR is not proof that its evidence remains current.
+
+Keep test execution and test assessment distinct. Test-design selects scenarios;
+test-review evaluates test quality; trace maps coverage; an independent reviewer
+investigates its selected risks. These methods consume the existing results. Run
+a check again when its relevant source, tests, configuration, dependencies or
+environment changed, a failure/gap needs investigation, or the repository/operator
+explicitly requires it. Renew affected checks after a repair, broadening when its
+dependencies warrant it. A phase transition, new report or reviewer alone does
+not invalidate evidence. Include named relevant omissions so reviewers need not
+rediscover which tests ran.
 
 ## Candidate and delivery
 
