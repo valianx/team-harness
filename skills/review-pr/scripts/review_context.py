@@ -323,14 +323,14 @@ def _review_parent(repo_root: Path, pr: int, *, create: bool) -> Path:
     os.close(root_fd)
     workspaces = root / "workspaces"
     if create:
-        workspaces.mkdir(mode=0o700, exist_ok=True)
+        workspaces.mkdir(exist_ok=True)
     workspaces_resolved, workspaces_fd = _open_directory(workspaces)
     os.close(workspaces_fd)
     if workspaces_resolved.parent != root:
         raise ContextError("workspaces must be a direct child of the repository")
     parent = workspaces_resolved / f"pr-review-{pr}"
     if create:
-        parent.mkdir(mode=0o700, exist_ok=True)
+        parent.mkdir(exist_ok=True)
     parent_resolved, parent_fd = _open_directory(parent)
     os.close(parent_fd)
     if parent_resolved.parent != workspaces_resolved:
@@ -382,7 +382,7 @@ def create_review_run(repo_root: Path, pr: int) -> dict[str, Any]:
         token = secrets.token_hex(16)
         artifact_root = parent / f"run-{token}"
         try:
-            artifact_root.mkdir(mode=0o700)
+            artifact_root.mkdir()
         except FileExistsError:
             continue
         marker = json.dumps(_review_owner(pr, token), sort_keys=True).encode("utf-8") + b"\n"

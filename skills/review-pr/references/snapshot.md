@@ -64,6 +64,15 @@ created. Main never recreates these mechanics with `mktemp`, shell promotion cha
 `technical_hash`, `conversation_hash`, `context_hash`, `fetched_at`, `is_cross_repository`, and
 the mergeability values from `$CONTEXT`.
 
+New review directories use normal platform permissions and inheritance; TH does not impose
+owner-only directory access. Updating the helper leaves existing directory permissions intact.
+If an older capture's directories deny access, use the active host's supported scoped recovery
+for the affected review, then verify readability through the reviewer's native read transport.
+Codex on Windows documents `/sandbox-add-read-dir` for an existing absolute directory; use it
+only where the active host exposes that command. Do not reset project ACLs recursively or grant
+access to all workspaces to repair one review. A deleted capture must be prepared again before
+read access can be checked. Keep the review's native read-only permissions throughout recovery.
+
 Write data once and pass paths to agents, never artifact bodies. Every later artifact write uses
 the helper's leaf-safe write and atomic promotion. Do not execute the PR's code or install the
 reviewed project's dependencies; existing CI results are evidence. If the PR body links an issue with `Closes`,

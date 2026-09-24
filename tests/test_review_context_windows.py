@@ -97,6 +97,7 @@ if __name__ == "__main__":
         "test_snapshot_repo_avoids_writes_to_read_only_source_git_dir",
         "test_directory_replacement_before_open_is_rejected",
         "test_review_runs_are_isolated_and_cleanup_is_owner_bound",
+        "test_new_review_directories_inherit_native_windows_acl_and_preserve_existing_acl",
         "test_resume_selects_only_complete_isolated_run",
         "test_prepare_run_owns_capture_materialization_and_paths",
         "test_prepare_run_cleans_its_owned_partial_run_on_capture_failure",

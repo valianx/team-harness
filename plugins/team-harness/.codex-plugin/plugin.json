@@ -1,6 +1,6 @@
 {
   "name": "team-harness",
-  "version": "3.42.1",
+  "version": "3.42.2",
   "description": "Shared development workflows in Codex with native agents, permissions, setup and updates.",
   "author": {
     "name": "Mario Gutierrez",

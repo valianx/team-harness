@@ -7,11 +7,13 @@ import importlib.util
 import io
 import json
 import os
+import shutil
+import stat
 import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import contextmanager, redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -47,6 +49,46 @@ def context(**overrides):
     value.update(overrides)
     MODULE.finalize_hashes(value)
     return value
+
+
+def windows_directory_acl(path: Path) -> dict[str, object]:
+    """Read ACL protection and inherited rules using Windows' native ACL provider."""
+    powershell = shutil.which("pwsh.exe") or shutil.which("powershell.exe")
+    if powershell is None:
+        raise AssertionError("Windows PowerShell is required to inspect native ACLs")
+    script = (
+        "$ErrorActionPreference = 'Stop'; "
+        "$acl = Get-Acl -LiteralPath $env:TH_REVIEW_ACL_PATH; "
+        "[pscustomobject]@{ protected = $acl.AreAccessRulesProtected; "
+        "inherited = @($acl.Access | Where-Object { $_.IsInherited }).Count; "
+        "inheritable = @($acl.Access | Where-Object { "
+        "($_.InheritanceFlags -band [System.Security.AccessControl.InheritanceFlags]::ContainerInherit) -ne 0"
+        "}).Count; sddl = $acl.Sddl } | ConvertTo-Json -Compress"
+    )
+    environment = os.environ.copy()
+    environment.pop("PSModulePath", None)
+    environment["TH_REVIEW_ACL_PATH"] = str(path)
+    completed = subprocess.run(
+        [powershell, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    if completed.returncode:
+        raise AssertionError(f"PowerShell ACL inspection failed: {completed.stderr.strip()}")
+    return json.loads(completed.stdout)
+
+
+@contextmanager
+def native_acl_temp_directory():
+    """Create an OS-default temp directory under the test checkout."""
+    path = ROOT / f".tmp-review-acl-{os.urandom(8).hex()}"
+    path.mkdir()
+    try:
+        yield path
+    finally:
+        shutil.rmtree(path)
 
 
 class ReviewContextTests(unittest.TestCase):
@@ -135,6 +177,63 @@ class ReviewContextTests(unittest.TestCase):
             self.assertFalse(first_root.exists())
             self.assertTrue(second_root.is_dir())
             MODULE.cleanup_review_run(repo, second_root, second["owner_token"])
+
+    @unittest.skipUnless(
+        os.name == "nt" and sys.version_info >= (3, 13),
+        "native Windows Python 3.13 ACL inheritance regression",
+    )
+    def test_new_review_directories_inherit_native_windows_acl_and_preserve_existing_acl(self):
+        with native_acl_temp_directory() as repo:
+            baseline = windows_directory_acl(repo)
+            if not baseline["inheritable"]:
+                self.skipTest("temporary parent ACL has no inheritable directory rules")
+
+            owned = MODULE.create_review_run(repo, 34)
+            run = Path(owned["artifact_root"])
+            review_directories = (
+                repo / "workspaces",
+                repo / "workspaces" / "pr-review-34",
+                run,
+            )
+            for path in review_directories:
+                with self.subTest(directory=path.name):
+                    acl = windows_directory_acl(path)
+                    self.assertFalse(acl["protected"], "directory DACL should remain inheritable")
+                    self.assertGreater(acl["inherited"], 0, "directory should inherit access rules")
+            MODULE.cleanup_review_run(repo, run, owned["owner_token"])
+
+        with native_acl_temp_directory() as repo:
+            workspaces = repo / "workspaces"
+            parent = workspaces / "pr-review-34"
+            parent.mkdir(parents=True)
+            before = {path: windows_directory_acl(path)["sddl"] for path in (workspaces, parent)}
+
+            owned = MODULE.create_review_run(repo, 34)
+
+            for path in (workspaces, parent):
+                with self.subTest(preexisting_directory=path.name):
+                    after_sddl = windows_directory_acl(path)["sddl"]
+                    self.assertTrue(
+                        after_sddl == before[path],
+                        "creating a review run must preserve an existing directory ACL",
+                    )
+            MODULE.cleanup_review_run(repo, Path(owned["artifact_root"]), owned["owner_token"])
+
+    @unittest.skipIf(os.name == "nt", "POSIX umask regression")
+    def test_review_directories_respect_the_process_umask(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            previous_umask = os.umask(0o027)
+            try:
+                owned = MODULE.create_review_run(repo, 34)
+            finally:
+                os.umask(previous_umask)
+
+            run = Path(owned["artifact_root"])
+            for path in (repo / "workspaces", run.parent, run):
+                with self.subTest(directory=path.name):
+                    self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o750)
+            MODULE.cleanup_review_run(repo, run, owned["owner_token"])
 
     def test_resume_selects_only_complete_isolated_run(self):
         with tempfile.TemporaryDirectory() as directory:
