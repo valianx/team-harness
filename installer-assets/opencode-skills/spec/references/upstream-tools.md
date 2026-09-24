@@ -185,8 +185,10 @@ mandatory for relevant completed changes in any entry point.
    provider or imply merge.
 
 Reaching design does not execute future completion stages. A planning-only request
-stops at its authorized scope; it does not need implementation results that do not
-yet exist. A resumed stage reuses its completed applicable assessment. New stages
+does not need implementation results that do not yet exist. If planning writes
+repository artifacts, it still enters `create-pr` preparation while publication
+honors an explicit operator stop or decline. A resumed stage reuses its completed
+applicable assessment. New stages
 consume that evidence and execute their own upstream method, rerunning project
 commands only when required by the current candidate and upstream instructions.
 
