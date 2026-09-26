@@ -131,8 +131,10 @@ The current release uses one version namespace across four sites: the Claude
 plugin manifest, Claude marketplace entry, Codex plugin manifest, and the
 installer's checked-in `var version` fallback. `CLAUDE.md` is contributor
 guidance rather than release metadata and is not a version site.
-CI and the prepublish guard require these sites to be changed together when a
-distributed runtime input changes. Repositories that predate the Codex plugin
+The create-pr prepublish check and CI run
+`tools/codex-runtime/version-preflight.mjs` against the PR base. For
+distributed runtime inputs it requires one increased SemVer across these
+sites and a matching CHANGELOG heading. Repositories that predate the Codex plugin
 or installer path retain optional-site compatibility until that path exists.
 
 The seven spawn-overridable `pipeline-*` identities are optional packaged roles

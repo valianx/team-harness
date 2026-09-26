@@ -89,3 +89,9 @@ name: translate
 - The translator agent modifies source code (replaces hardcoded strings with i18n keys)
 - Source language strings are preserved as-is in the source locale file (validated)
 - Target language (English neutral) becomes the default locale
+- After any translation mode changes repository files, validate the result and
+  continue through `create-pr` preparation, whether it changes code, locale
+  resources, glossary or configuration and whether the flow is direct or pipelined.
+  Workspace outputs kept outside the repository have no candidate to prepare.
+  Publication follows native permissions and honors an explicit operator stop
+  or decline; neither waives preparation.

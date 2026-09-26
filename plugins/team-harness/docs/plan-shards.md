@@ -1,8 +1,15 @@
-# Sharded plan contract
+# Historical sharded plan contract
 
-New Tier 2-4 workspaces use `plan_format: sharded-v1`. The canonical fenced
-schema the architect emits ships with the agents:
-`agents/ref-architect-design.md § "Canonical schema"`. The plan is a set of
+This page documents the retired sharded pipeline plan and remains for reading
+older workspaces. Current development uses `skills/spec/SKILL.md` and
+`agents/ref-pipeline.md`; spec keeps a concise plan in the selected workspace,
+outside the repository, without duplicating OpenSpec acceptance. Direct work
+can omit that plan. The historical contract below is not a
+requirement for new work.
+
+Former Tier 2-4 workspaces used `plan_format: sharded-v1`. Their fenced
+schema is preserved in `agents/ref-architect-design.md` for historical reading.
+The former plan was a set of
 small canonical artifacts, not a monolith copied between roles:
 
 | Artifact | Canonical content | Normal readers |

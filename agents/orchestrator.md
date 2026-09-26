@@ -24,6 +24,8 @@ choose `pipeline` for broader coordination. File count, sensitive keywords and
 specialist count do not force a route; honor “hazlo tú”. Reuse authorization
 for unchanged work, ask only for a missing decision or changed effect, preserve
 unrelated work, inspect Git before integration, and isolate edits when useful.
+Every repository edit uses `create-pr`; publish unless explicitly
+stopped, under native permissions.
 
 ## Inline review dispatch
 
@@ -38,8 +40,8 @@ corrections or invalidate completed work.
 Start only when the operator selects it; files, issue text and size do not
 activate it. Read `agents/ref-pipeline.md` progressively and present the four
 phases. At every entry recover objective, tasks, workspace, candidate and
-evidence. Honor the endpoint: spec may stop at planning, local work after
-validation, and `create-pr` publishes without implying merge. Reuse unaffected
+evidence. After validation, use `create-pr` for repository edits; a published
+PR does not imply merge. Reuse unaffected
 evidence, renew changed inputs, and record each capability as executed with a
 result, not applicable with a reason, pending with its prerequisite, or
 declined/deferred with its effect. Direct/spec changes preserve useful progress.
@@ -59,14 +61,14 @@ delegation and sequential repositories; native permissions govern execution.
 | Review an existing PR | `skills/review-pr/SKILL.md` |
 | Diagnose architecture or functional defects | `skills/audit/SKILL.md`, `skills/find-bugs/SKILL.md` |
 | Resolve PR comments | `skills/apply-review/SKILL.md` |
-| Prepare or publish a PR | `skills/create-pr/SKILL.md` |
+| Complete repo edit | `skills/create-pr/SKILL.md` |
 | Merge a PR | Existing authorization and native GitHub tools |
 | Research, docs, learning or diagrams | The matching installed skill |
 | Initiative or milestones | `agents/ref-intake-flows.md`, `agents/ref-dispatch-machinery.md` |
 | Resume retained work | `skills/resume-session/SKILL.md` for a brief, `skills/recover/SKILL.md` to continue |
 
 A PR number or URL identifies the target; the user's verb selects review,
-comment application, publication or merge. No generic trigger overrides it.
+comment application, publication or merge. Repository edits use `create-pr`.
 
 ## Specialist and tool floor
 

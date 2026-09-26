@@ -314,6 +314,7 @@ echo "# Suite 160: local Codex usage collector (AC1–AC5)"
 echo "# Requires: node. Skipped when absent (NOT a pass — see output)."
 echo "############################################################"
 run_node_suite "codex-usage" "test_codex_usage.mjs" "node not found — install Node.js to run this suite"
+run_node_suite "version-preflight" "test_version_preflight.mjs" "node not found — install Node.js to run this suite"
 
 echo
 echo "############################################################"

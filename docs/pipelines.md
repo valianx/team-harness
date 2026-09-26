@@ -15,11 +15,14 @@ evidence; this page only maps the existing entry points to that method.
 | Spec | `spec`, `design`, `sketch`, `define-ac` | OpenSpec intent and tasks, testing strategy and workspace plan |
 | Implementation | `spec` continuation, `pipeline`, `implement`, `test` | Product changes, maintained tests and task progress |
 | Validation | `validate`, `verify`, `test-pipeline`, `audit`, `find-bugs` | Focused checks, selected provider evidence, findings and limits |
-| Publication | `create-pr`, `deliver`; `review-pr` for an existing PR | Archive and hygiene checks, then the authorized PR action |
+| Publication | `create-pr`, `deliver`; `review-pr` for an existing PR | Required candidate preparation for every completed repository-file change; publication follows native permissions and operator direction |
 
-The coordinator may stop at the requested endpoint or resume a later phase from
-the existing workspace and canonical tasks. Tool outputs are recommendations
-and evidence; Main decides how to proceed. Publication does not imply merge.
+Every completed change to repository files reaches `create-pr` preparation after
+applicable validation, including OpenSpec artifacts written during planning and
+non-code changes. Read-only work and outputs kept outside the repository have no
+candidate to prepare. The operator can explicitly stop or decline publication;
+native permissions also govern it. Tool outputs are recommendations and
+evidence; Main decides how to proceed. Publication does not imply merge.
 
 | Objective | Entry | Supporting source |
 | --- | --- | --- |
@@ -29,7 +32,7 @@ and evidence; Main decides how to proceed. Publication does not imply merge.
 | Independent local review | `verify` | `agents/_shared/inline-review-contract.md` |
 | Review existing PR | `review-pr` | Immutable snapshot and advisory review |
 | Resolve review comments | `apply-review` | Evidence-backed dispositions |
-| Prepare or publish PR | `create-pr` | OpenSpec archive and artifact hygiene |
+| Prepare or publish PR | `create-pr` | Required preparation for every repository change; OpenSpec archive and artifact hygiene |
 | Research/code investigation | `research`, `research-code` | `agents/ref-special-flows.md` |
 | Architecture/debt investigation | `audit` | `agents/ref-architect-modes.md` |
 | Documentation/learning | `docs`, `learn` | Corresponding skills |

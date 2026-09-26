@@ -9,9 +9,11 @@ approvals, and session controls rather than duplicating them.
 
 Use `spec` for development with written intent, tasks and independent review;
 choose `pipeline` when broader coordination helps and the operator wants it.
-Use `review-pr` for existing PR reviews and `create-pr` for preparation and
-publication. Read the current selected skill rather than relying on instructions
-remembered from an older release.
+Use `review-pr` for existing PR reviews. Every completed repository change,
+including docs, tests and configuration, uses `create-pr` for preparation
+and normal PR publication under native permissions unless the operator
+explicitly stops earlier. Read the current selected skill rather than relying
+on instructions remembered from an older release.
 
 The current agent coordinates. Delegate bounded independent tasks with clear
 ownership and use specialist findings as evidence. Reviewers have limited

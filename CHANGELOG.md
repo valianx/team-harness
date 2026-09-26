@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.43.0] - 2026-09-24
+
+### Changed
+- Prepare every completed repository change through `create-pr`, including documentation, tests, configuration and OpenSpec planning artifacts.
+
+### Fixed
+- Check synchronized version metadata and changelog against the PR base before publication and in CI, blocking omitted or unchanged bumps.
+- Clarify optional OpenSpec design status and retire misleading plan-contract claims without adding placeholder artifacts.
+
 ## [3.42.3] - 2026-09-24
 
 ### Changed

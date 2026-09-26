@@ -1,15 +1,15 @@
-# Spec Co-Authoring — Design Input Contract
+# Historical Spec Co-Authoring Contract
 
 > Legacy v5 reference retained for historical records and compatibility helpers.
 > Current workflows use native coordination from `agents/ref-pipeline.md` and
 > the selected skill. They do not require the leases, gate events, state schemas
 > or administrative closure described below.
 
-This document defines the optional spec seed collected during Design, before OpenSpec planning continues. It complements the
-canonical v5 machine in `agents/ref-pipeline.md`; it does not add a state, a gate, or a review
-loop. OpenSpec remains the only semantic planning source. Main is the sole writer of the
-control log and its generated projections. Standalone non-pipeline architect design continues to
-use its own sharded plan contract.
+The retired workflow collected an optional spec seed before OpenSpec planning.
+Current development follows `skills/spec/SKILL.md`, and an operator-selected
+pipeline follows `skills/pipeline/SKILL.md` and `agents/ref-pipeline.md`. New
+work does not create the seed, control log, generated projection or sharded plan
+described below merely to enter a stage.
 
 ## 1. When seeding is offered
 
@@ -80,15 +80,15 @@ seed-specific dissent field is added to `00-state.md` or to the generated projec
 
 ## 4. State fields and ownership
 
-This flow adds no fields to `00-state.md`. The current v5 projection is generated from
+This former flow added no fields to `00-state.md`. Its v5 projection was generated from
 `control/control.jsonl` and has no seed-specific writable fields. Presence of a seed is evidenced
 by the optional `00-spec-seed.md` artifact itself; Main may cite that artifact through the normal
 bounded evidence/result surfaces when applicable. Specialists never edit the seed, control log,
 or any coordinator projection.
 
-## 5. No automatic review or checkpoint
+## 5. Historical review and checkpoint rule
 
-The v5 pipeline has one `design` state followed by `waiting_gate1`. The former
+The v5 pipeline had one `design` state followed by `waiting_gate1`. The former
 `approach_freedom` checkpoint, ratify-plan panel, deterministic plan-structure loop, selective
 Stage-1 panel re-firing, and post-approval review offer are retired. They must not be represented
 as states, checklist rows, events, or automatic dispatches.

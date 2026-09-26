@@ -5,11 +5,15 @@ existing PR to `review-pr`, a request to evaluate or apply its comments to `appl
 merge-only request to the repository's merge flow. Enter this skill only for preparing or
 publishing a PR from completed repository work.
 
-Use this shared skill at two checkpoints in one PR lifecycle. Use it whenever a direct PR
-request or the spec or pipeline flow reaches candidate preparation or publication; no
-explicit skill invocation is needed. A resumed run must reuse its retained preparation
-and authorization. A mere PR mention in unrelated work or a review-only request does not
-activate it. Skill selection itself never grants push, PR, merge, or issue-closing authority.
+Use this shared skill at two checkpoints in one PR lifecycle. Every completed
+repository change enters candidate preparation through create-pr, whether it
+changes code, tests, documentation, configuration or generated assets, and
+whether it began as direct, spec, pipeline or another writing workflow. PR
+publication is the normal completion path under the operator's existing
+authorization and native permissions; honor an explicit earlier stop. A
+resumed run reuses its preparation and authorization. A mere PR mention in
+unrelated work or a review-only request does not activate it. Skill selection
+itself never grants merge or issue-closing authority.
 
 Do not route review of an existing PR, application of review comments, or a merge-only
 request through this skill; use `review-pr`, `apply-review`, or the repository's merge
@@ -32,7 +36,11 @@ branch conventions, PR templates, commit conventions, and native permissions.
 Read those conventions while planning validation, not after declaring PR readiness:
 include required release metadata, generated copies and supported test environments
 in candidate preparation. Reuse a version bump already included in this PR.
-Local completion may precede PR preparation; report that distinction explicitly.
+In the Team Harness repository, distributed runtime input changes require
+the four synchronized version sites and a matching CHANGELOG release heading
+in this candidate. Prepare them before declaring the candidate ready.
+Local implementation and validation precede PR preparation; report their
+completion separately from the prepared or published candidate.
 
 Before committing, resolve native Git authorship and the required commit format.
 Reuse a configured or already established author; do not invent one from an
@@ -104,6 +112,13 @@ Publish the prepared candidate once applicable completion and author-review
 conditions are satisfied. If preparation changes the candidate, verify the changed
 surface before the outward write. A native permission prompt remains a technical
 boundary; it is not silently answered by this skill.
+
+Before push or PR creation in the Team Harness repository, run
+`node tools/codex-runtime/version-preflight.mjs --base <base-ref> --head HEAD`
+on the committed candidate. Use the actual target base ref; do not substitute
+an unavailable ref or skip a failed check. Repair release metadata and rerun
+the check before publication. CI runs the same helper, but its later result
+does not replace this local preflight.
 
 Make the operation idempotent: first inspect for a PR in the exact repository with the
 exact head and base. If a network or transport result is uncertain, inspect that exact

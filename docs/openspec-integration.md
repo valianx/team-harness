@@ -66,9 +66,12 @@ including flat OpenCode opsx commands. Consumer installations remain intact.
    resolve real completion defects, then synchronize and archive completed intent on the same
    branch. Strictly validate the archive and affected living specs before selected independent
    review of the final candidate; judge findings and verify any corrections.
-4. In **Publication**, use the shared create-pr flow for the requested PR preparation or
-   publication, reusing applicable evidence. Include code, living specs and archive in one PR.
-   Retain local completion as the endpoint when no PR was requested.
+4. In **Publication**, use the shared create-pr flow to prepare every completed
+   repository-file change, even when no PR was initially requested. Reuse
+   applicable evidence and include code, living specs and archive in one PR.
+   Publication follows native permissions and honors an explicit operator stop
+   or decline; neither waives candidate preparation. Read-only work and outputs
+   kept outside the repository have no candidate to prepare.
 
 Claude's researched entry is `/opsx:verify`, Codex's is
 `$openspec-verify-change`, and OpenCode's is `/opsx-verify`; resolve the entry

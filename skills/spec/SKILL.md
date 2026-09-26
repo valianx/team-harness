@@ -1,6 +1,6 @@
 ---
 name: spec
-description: Develop through Spec, Implementation, Validation and Publication with OpenSpec, a shared workspace and selected independent review; stop at the requested endpoint.
+description: Develop through Spec, Implementation, Validation and Publication with OpenSpec, a shared workspace and selected independent review; prepare repository changes through create-pr.
 ---
 
 # Spec: lightweight development
@@ -11,8 +11,10 @@ Publication in the shared workspace, with selected independent reviewers.
 Phase changes do not require another executor. Use the pipeline when the
 operator wants broader coordination; a useful bounded delegation can stay here.
 
-When PR preparation or publication is relevant, use [create-pr](../create-pr/SKILL.md)
-automatically; selecting it does not activate the pipeline.
+Every completed repository change uses [create-pr](../create-pr/SKILL.md)
+for candidate preparation, whatever files changed. Publish the PR under
+the existing authorization unless the operator explicitly stops earlier;
+selecting create-pr does not activate the pipeline.
 
 Use [sketch](../sketch/SKILL.md) during Spec: always present a data model for
 database changes and a wireframe for frontend work before Implementation, even
@@ -46,13 +48,15 @@ evidence in the selected workspace without adding pipeline control records.
 
 ## Flow
 
+Read [the four development phases](references/development-phases.md) for expected
+work, tools and evidence. Use any explicit operator stop and existing review decision;
+entering or resuming a phase retains the same intent, workspace and valid evidence.
 Start with the requested endpoint and what already exists: intent, implementation,
-tests, assessments and delivery preparation. Complete real gaps using
-[the four development phases](references/development-phases.md). If spec is requested
-after implementation, record or reconcile the actual change and verify it; do not
-reconstruct earlier work or rerun valid checks to reenact the phase sequence.
-Reuse the workspace and existing review decision. Read delivery conventions early
-so release metadata and generated files join the candidate before final validation.
+tests, assessments and delivery preparation. Complete real gaps using those phases.
+If spec is requested after implementation, record or reconcile the actual change and
+verify it; do not reconstruct earlier work or rerun valid checks to reenact the phase
+sequence. Reuse the workspace and existing review decision. Read delivery conventions
+early so release metadata and generated files join the candidate before final validation.
 
 Resolve the declared OpenSpec, TEA and Superpowers capabilities for the active host
 using [dependency preparation](references/upstream-tools.md#spec-dependency-preparation).
@@ -90,7 +94,15 @@ in the selected workspace and use it to select later methods and checks.
 Run `openspec validate <change> --strict` and resolve structural problems in
 the same artifacts. Refresh the operator plan with phase outputs and selected
 capabilities. Link it and reuse the user's existing authorization; ask only
-for a missing scope or material decision. A planning-only endpoint ends here.
+for a missing scope or material decision. A planning-only request does not
+start implementation; if planning wrote repository artifacts, complete
+`create-pr` preparation for that candidate.
+
+With the pinned spec-driven schema, `openspec status <change>` can report
+`design.md` as pending when TH omits an optional design. That status alone does
+not block TH: do not add a placeholder design or change the schema to clear it.
+Use strict validation for artifact structure and the installed OpenSpec
+implementation-verification workflow to establish implementation completion.
 
 ### 2. Implementation
 
@@ -126,8 +138,8 @@ to repeat the full test analysis or suite. Renew checks for changed relevant inp
 a concrete coverage gap, a failure, or an explicit repository/operator requirement.
 
 Resolve actual completion defects. Use [create-pr](../create-pr/SKILL.md)'s
-preparation checkpoint for agreed PR delivery, otherwise the [lifecycle](references/lifecycle.md)
-directly. Prepare completed archive and living specs on the delivery branch
+preparation checkpoint for the repository change. Prepare completed archive
+and living specs on the delivery branch
 before committing the final review candidate.
 
 Use [verify](../verify/SKILL.md) for the committed candidate, binding the exact
@@ -140,9 +152,10 @@ starting another full review or manufacturing a pass.
 
 ### 4. Publication
 
-For local completion, report the result and remaining limits without creating
-a PR. For PR delivery, apply the existing [author-review conditions](references/author-review.md)
-and use [create-pr](../create-pr/SKILL.md)'s publication checkpoint. Keep incomplete
+Apply the existing [author-review conditions](references/author-review.md)
+and use [create-pr](../create-pr/SKILL.md)'s publication checkpoint for a
+completed repository change unless the operator explicitly requested an
+earlier stop. Keep incomplete
 review coverage explicit; Main decides delivery under existing authorization and any
 explicit operator prerequisites. Preparing a PR does not itself authorize publication.
 

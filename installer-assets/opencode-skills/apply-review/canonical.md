@@ -27,8 +27,9 @@ only a transport optimization; it does not change which threads resolve or add a
 For authorized code corrections, use the PR's author branch or an isolated
 worktree at its current head, preserve unrelated edits, and run checks relevant
 to each correction. Record the original findings and verified dispositions in
-the shared workspace. Continue the requested commit, push or PR update using
-existing authorization and `create-pr` when preparation/publication is needed.
+the shared workspace. Route the corrected repository candidate through
+`create-pr` preparation and update the existing PR under current authorization
+and native permissions, honoring an explicit operator stop or decline.
 Local findings without GitHub threads require no synthetic thread or reply.
 
 The mode can also answer an existing review question or prepare a body/thread reply when the

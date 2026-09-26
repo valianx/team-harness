@@ -5,14 +5,11 @@
 > the selected skill. They do not require the leases, gate events, state schemas
 > or administrative closure described below.
 
-**Current v5 scope.** This document supplies conversational intake guidance and optional context
-for the canonical pipeline. The authoritative entry, lifecycle, recovery, dispatch, lease, and
-projection rules are `plugins/team-harness/skills/pipeline/SKILL.md` and
-`agents/ref-pipeline.md`. Main may frame the request and ask clarifying questions, then follows
-that v5 contract; this document does not create a Discover machine state, extra fields or events,
-an additional gate, or a mandatory advance response. A strict-valid OpenSpec change may proceed
-without an architect only within the requirement ceiling or after the live oversize decision;
-an architect is demand-driven by the canonical OpenSpec planning rules.
+**Current route.** The authoritative entry and lifecycle are the selected skill,
+`skills/spec/SKILL.md` when product intent needs OpenSpec, and
+`agents/ref-pipeline.md` when the operator chooses a pipeline. Main may frame
+the request and ask clarifying questions. This historical page creates no
+Discover state, additional gate, required artifact, or mandatory response.
 
 Sections 1–9 retain the former Discover/survey/checkpoint wording for interpreting legacy
 workspaces. They are historical reference only: their `discover_state`, survey,

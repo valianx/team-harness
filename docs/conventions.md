@@ -12,7 +12,11 @@ identity and state apply only to pipeline work. Agents share useful artifacts an
 the operator uses the workspace as a review surface. Local
 `workspaces/` is always git-ignored; Obsidian mode creates no local duplicate.
 
-Beyond the root-tier docs (`00-state.md`, `01-plan.md`, `02-implementation.md`, `03-testing.md`, etc.), a workspace groups related artifacts under subfolders created implicitly on first `Write`: `plan/` for architecture, delivery, conditional invariants, and per-task shards; `sketches/` for plan-stage sketches; `research/` for research-family artifacts; and `reviews/` for review-family reports. Basenames never change merely because of grouping except where `docs/plan-shards.md` defines the plan layout.
+Create only the context and evidence artifacts the selected flow needs. A concise
+`01-plan.md` can link to canonical OpenSpec intent and progress when continuity
+helps; new work does not require the historical plan shards described in
+`docs/plan-shards.md`. `sketches/`, `research/` and `reviews/` group artifacts
+when their selected workflows produce them.
 
 ## Document classification
 
@@ -22,15 +26,17 @@ this changes detail and language, not the common note format. No universal templ
 or extra frontmatter is required solely by the workspace mode. Preserve metadata
 and anchors consumed by the active flow. Machine-consumed state, events, helper
 artifacts and deliverables retain their required formats; notes link to them.
+The table classifies both current notes and retained legacy artifacts. A row
+does not require a new task to create that file; the selected skill owns writes.
 
 | Doc | Tier | Format contract | Writer |
 |-----|------|-----------------|--------|
-| `01-plan.md` | operator-facing | `sharded-v1` operator summary and manifest; no copied architecture or AC prose | architect (content); see `docs/plan-shards.md` |
-| `plan/architecture.md`, `plan/delivery.md`, `plan/invariants.md`, `plan/tasks/*.md` | agentic | Canonical plan shards; one fact in one owning artifact | architect; bounded post-gate writers per consolidation contract |
+| `01-plan.md` | operator-facing | Optional concise progress view with links to canonical intent; no copied acceptance prose | coordinator |
+| `plan/architecture.md`, `plan/delivery.md`, `plan/invariants.md`, `plan/tasks/*.md` | agentic | Historical plan shards; read only when resuming a workspace that already contains them | historical owner |
 | `sketches/*` | operator-facing | Required DB model/frontend wireframe before implementation; other previews on demand via `sketch` | Main or explicitly assigned specialist |
-| `01-root-cause.md` | operator-facing | Strict root-cause template (unchanged); the bug-fix equivalent of the plan, read at STAGE-GATE-1 | architect |
-| `overview.md` (initiative) | operator-facing | `agents/ref-dispatch-machinery.md § "overview.md — you are the sole writer"` (unchanged) | orchestrator (sole writer; derives completion-row coordinates after its own Phase-4 mechanics) |
-| `reviews/01-plan-review.md` | agentic | Fixed skeleton of anchored sections; no `## Review Summary`/`## Technical Detail` split; minimal prose, tables and labels | panel (single-writer-per-section) |
+| `01-root-cause.md` | operator-facing | On-demand diagnosis when a selected workflow needs one; no universal gate | coordinator or assigned specialist |
+| `overview.md` (initiative) | operator-facing | Optional initiative index with canonical source and progress links | coordinator |
+| `reviews/01-plan-review.md` | agentic | Explicit plan-review evidence when the operator requests that skill | reviewer |
 | `reviews/04-*.md`, `reviews/01-ux-review.md` | agentic | Each agent's current fixed structure; no two-tier obligation | qa / security / adversary / reviewer / ux-reviewer |
 | `02-implementation.md`, `03-testing.md`, `02-regression-test.md`, `02-documentation.md`, `02-gcp-infra.md` | agentic | Each agent's current fixed structure; no two-tier obligation | implementer / tester / documenter / gcp-infra |
 | `00-state.md`, `00-execution-events.*`, `00-pipeline-summary.md`, `00-knowledge-context.md`, `failure-brief.md`, verify packets | agentic | Already agentic (unchanged) | orchestrator / verifiers |

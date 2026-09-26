@@ -13,6 +13,10 @@ decision. Specialists provide evidence and recommendations; Main judges them.
 Apply [the OpenSpec lifecycle](../spec/references/lifecycle.md) at authoring,
 resumption, candidate preparation and completion. Use
 [create-pr](../create-pr/SKILL.md) for PR preparation and authorized publication.
+Every completed repository-file change reaches create-pr preparation, even when
+the operator did not initially request a PR and regardless of file type. Read-only
+work and outputs outside the repository have no candidate to prepare. Publication
+follows native permissions and honors an explicit operator stop or decline.
 Use the shared [upstream-tool reference](../spec/references/upstream-tools.md)
 for selected TEA/Superpowers work and its workspace outputs. Completion of a
 relevant OpenSpec change includes upstream implementation verify before archive.
@@ -29,13 +33,15 @@ pending work rather than restarting them.
   and Git mutations. Main can complete a small step without another handoff.
 - Validation: run relevant checks, use independent reviewers for quality and
   risk, preserve findings and verify corrections.
-- Publication: include completed archive and evidence with the candidate; carry
-  out the requested publication without another approval for unchanged work.
+- Publication: include completed archive and evidence in create-pr preparation
+  for every repository change. Publish when native permissions allow and the
+  operator has not explicitly stopped or declined; no initial PR request is
+  needed for preparation.
 
 Read [the shared development phases](../spec/references/development-phases.md) for
 phase outputs, tool selection and evidence states, including real CRAP diagnostics.
 Use that view in the existing plan. Retain spec's declared provider stages when
-continuing it, and the authorized endpoint and selected review decision throughout.
+continuing it, plus explicit operator stops and the selected review decision.
 
 Use existing specialists for their expertise, not as mandatory stops. Supply
 the objective, owned scope, repository/workspace and relevant sources in the
