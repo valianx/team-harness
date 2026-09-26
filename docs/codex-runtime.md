@@ -161,62 +161,30 @@ when that improves the work. There is no persistent replacement orchestrator,
 TH permission ledger, lease, nonce or control journal. Main returns to ordinary
 native behavior when the selected workflow completes.
 
-### Workspace-free inline review
+### Local inline review
 
-For a non-PR inline review, `Main` records `requested_lenses` and
-`required_lenses` (every operator-named lens is required), resolves the canonical
-repository root, requires a clean index/worktree, and binds the review to a
-committed immutable commit or range; uncommitted inline review is unsupported. It
-dispatches one native `inline-reviewer` instance per lens with the same target,
-scope, criteria, and changed surface. The reviewer reads
-the project directly through `sandbox_mode = "read-only"`; it cannot write
-files, create Team Harness workspace/state/events/gates, make a branch or
-commit, perform delivery or publication, mutate external state, use network
-tools, or dispatch another agent. There is no isolated runner, captured-content
-transport, or evidence-manifest protocol.
+`verify` packages a clean committed target and selected lenses with the existing
+helper. Main gives each native read-only `inline-reviewer` the question, relevant
+intent and candidate-bound checks, including relevant skips. Reviewers inspect
+the immutable changed surface and pertinent dependencies, reusing provider
+assessments and checker-verified generated copies.
+Fixed reviewer prose stays short; Main supplies the task-specific directions
+and return format once in the dispatch.
 
-Before dispatch, Main validates the exact project-or-global agent definition
-selected by Codex against the trusted packaged `inline-reviewer.toml`: it must
-be a regular non-symlink with the packaged model, effort, read-only fields and raw-byte
-SHA-256 digest. That digest establishes installed-file integrity, not bytes loaded
-in memory. Main uses the native read-only reviewer role and reports any activation
-visibility limit; no `profile_session` marker is required. An invalid installed
-definition or unavailable native read-only role still makes the lens unavailable.
-Main rechecks the selected definition and scope before consolidation and diagnoses
-changes. Supported reload addresses observed stale activation; missing loaded-byte
-attestation alone does not require a restart or prevent review.
-No hook layer is used to attest session start or loaded agent bytes. Main resolves
-each range endpoint separately with hardened globals
-and `rev-parse --verify --end-of-options <rev>^{commit}`, accepting one full
-commit OID only, binds `<oid>^{tree}`, and uses only those IDs. It rejects
-dash-prefixed/control/range-as-endpoint/abbreviated/multi-output input. Codex
-uses only the shared contract's exact immutable Git environment and
-`git --no-pager` argv templates: optional locks, config injection, lazy
-fetches/transports, fsmonitor, and automatic maintenance are disabled; replacement
-objects, literal pathspecs, signature helpers, external diff/textconv, resolved
-object IDs, and `--` path separation remain mandatory. Main preflights every
-bound commit/tree/blob locally and reads tracked evidence only from bound blobs,
-never the worktree. Claude Main MUST use those same controls for its no-Bash
-reviewer's ephemeral immutable Git view or mark the lens unavailable. The reviewer is obligated to
-stay under the project root, but that is not filesystem confinement: broad
-read-only exposure remains a documented runtime residual. Main repeats the
-exact hardened clean/local-object preflight and commit/tree binding before
-consolidation; dirty, missing-object, or concurrently changed targets are stale
-and recaptured rather than certified.
+Use the selected native role and preserve supported model/effort preferences.
+Profile-file inspection is diagnostic, not repeated byte attestation or a
+comparison against packaged defaults. Native permissions control execution;
+TH adds no read-only sandbox or filesystem confinement. If the capability is
+unavailable, preserve the limitation and useful findings. A supported focused
+recovery may help; a second CLI execution is not mandatory.
 
-The four lenses are `tester`, `qa`, `security`, and `adversary`. Main selects
-the lenses that fit the changed surface or the operator's request; risk signals
-may inform that choice but never add a mandatory lens or grant execution
-authority. A lens reports its status, verdict, findings, coverage, limits, and
-disagreements as advisory evidence. Main verifies the root and commit/range
-before dispatch and again before consolidation; a moved target is stale and is
-recaptured or reported as unavailable. Consolidation preserves every finding and
-does not let one result hide another. Reviewers remain read-only and cannot
-approve, publish, alter the candidate, or override native permissions. A review
-is complete when the selected lenses return evidence or explicit limits; Main
-decides whether findings require changes and whether an authorized outward action
-may proceed. Any PR intent, number, or URL routes to `review-pr` for its snapshot
-and review procedure.
+The [inline review guidance](../agents/_shared/inline-review-contract.md) owns
+inspection and return handling. Reviewers do not execute project tests or change
+files; Main obtains justified missing evidence. Another lens or phase alone does
+not require another test analysis or run. A changed branch retains the original
+review anchor; Main evaluates the intervening diff and renews affected checks.
+Returns and findings remain evidence for Main's delivery decision.
+Existing PR reviews use `review-pr` with its separate procedure.
 
 Skill activation cannot itself change Main's selected model, reasoning effort,
 sandbox, or approval policy. The projection below applies to the thirteen

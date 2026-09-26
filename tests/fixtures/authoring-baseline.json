@@ -8,7 +8,7 @@
     "target": 1500
   },
   "agents/_shared/inline-review-contract.md": {
-    "ceiling": 1797,
+    "ceiling": 911,
     "target": 1500
   },
   "agents/_shared/kg-write-policy.md": {
@@ -26,7 +26,7 @@
     "ceiling": 1797
   },
   "agents/ref-direct-modes.md": {
-    "ceiling": 6219,
+    "ceiling": 5740,
     "target": 4000
   },
   "agents/ref-dispatch-machinery.md": {

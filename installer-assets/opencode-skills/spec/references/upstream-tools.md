@@ -131,6 +131,14 @@ Use [the four development phases](development-phases.md) for the shared journey
 and the plan's selection/execution view. This reference owns provider invocation
 and preparation details; TEA supplies testing architecture throughout the work.
 
+In spec, Main invokes these methods with the existing intent and evidence. Select
+the provider's supported sequential mode for bounded work; do not map each method
+to a new agent. Preserve its current upstream instructions and useful outputs,
+passing the selected workspace and reusing existing assessments. Test-design,
+test-review and trace answer different questions about the same tests; they do
+not each require another full analysis or test run. When additional expertise is
+useful, give that reviewer the unanswered question and existing results.
+
 | Tool / capability | When TH selects it | How it is applied and what it contributes |
 | --- | --- | --- |
 | OpenSpec author/apply | A bounded development objective needs written intent and tasks; or the user selects spec | Use the upstream workflow to maintain the existing proposal, requirements, design and tasks. This is the development intent shared with the other tools. |

@@ -47,16 +47,24 @@ evidence in the selected workspace without adding pipeline control records.
 Read [the four development phases](references/development-phases.md) for expected
 work, tools and evidence. Use any explicit operator stop and existing review decision;
 entering or resuming a phase retains the same intent, workspace and valid evidence.
+Start with the requested endpoint and what already exists: intent, implementation,
+tests, assessments and delivery preparation. Complete real gaps using those phases.
+If spec is requested after implementation, record or reconcile the actual change and
+verify it; do not reconstruct earlier work or rerun valid checks to reenact the phase
+sequence. Reuse the workspace and existing review decision. Read delivery conventions
+early so release metadata and generated files join the candidate before final validation.
 
-At entry or resumption, first verify and prepare the declared OpenSpec, TEA and
-Superpowers capabilities for the active host using [the shared dependency preparation
-guidance](references/upstream-tools.md#spec-dependency-preparation). At entry,
-resumption, and before changing requirements, apply the [shared OpenSpec
-lifecycle](references/lifecycle.md) to the relevant active changes.
+Resolve the declared OpenSpec, TEA and Superpowers capabilities for the active host
+using [dependency preparation](references/upstream-tools.md#spec-dependency-preparation).
+Reuse verified healthy installations; revisit preparation when a selected entry is
+missing, changed or fails, not on each phase transition. Apply the [OpenSpec
+lifecycle](references/lifecycle.md) to relevant changes before revising intent or closing work.
 Spec executes TEA test-design, test-review and trace, Superpowers
 verification-before-completion, and OpenSpec implementation verification at the
 stages below. Use their current installed instructions, not TH copies of their
-methods. A missing provider leaves its stage pending while independent work continues.
+methods. Main runs these methods with the same relevant inputs; a tool or stage
+does not imply a new agent. Delegate a bounded question only when independent work
+helps. A missing provider leaves its stage pending while independent work continues.
 
 Main repairs operational failures before treating the objective as blocked. A
 wrong path, malformed contract, missing tool/library or recoverable transport
@@ -101,7 +109,8 @@ Check off canonical tasks as their specified work is completed; derive the
 workspace plan's progress from them, without a state file or event trace.
 
 Execute the TEA implementation methods selected by test-design and appropriate
-focused project checks. Apply `docs/testing.md § Selected test evidence`:
+focused project checks. Keep commands, candidate, environment and relevant skips
+with their results for later validation and reviewers. Apply `docs/testing.md § Selected test evidence`:
 required omitted tests leave their scenario unverified even after exit zero;
 unrelated optional skips do not erase sufficient evidence. For a bug fix, use
 [before/after evidence](references/author-review.md#optional-fix-evidence) when
@@ -117,6 +126,12 @@ selected NFR work, Superpowers verification-before-completion and upstream
 OpenSpec implementation verify. Use the [provider reference](references/upstream-tools.md)
 for inputs, outputs and reuse; structural validate and optional TH review do
 not replace implementation verification.
+
+Share the existing evidence: test-review assesses test quality, trace maps coverage,
+and OpenSpec verify compares implementation with intent. An independent reviewer
+answers its selected question using those assessments. None is a reason by itself
+to repeat the full test analysis or suite. Renew checks for changed relevant inputs,
+a concrete coverage gap, a failure, or an explicit repository/operator requirement.
 
 Resolve actual completion defects. Use [create-pr](../create-pr/SKILL.md)'s
 preparation checkpoint for the repository change. Prepare completed archive

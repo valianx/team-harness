@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Check synchronized version metadata and changelog against the PR base before publication and in CI, blocking omitted or unchanged bumps.
 - Clarify optional OpenSpec design status and retire misleading plan-contract claims without adding placeholder artifacts.
 
+## [3.42.3] - 2026-09-24
+
+### Changed
+- Spec resumes existing work and shares test execution and assessments across provider stages, validation and PR preparation; repeated checks need a concrete reason.
+- Local reviewers receive focused questions and existing evidence. Native read-only roles replace repeated profile attestations, broad preliminary context reading and mandatory CLI recovery attempts.
+
 ## [3.42.2] - 2026-09-24
 
 ### Fixed

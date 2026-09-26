@@ -20,16 +20,22 @@ coherent work, reuse an owner for corrections and parallelize independent tasks.
 The four phases describe outcomes; they do not prescribe four agent handoffs.
 Both methods use the same applicable tools and evidence below.
 
-Continue authorized work through applicable validation and `create-pr`
-preparation for every completed repository-file change, regardless of workflow
-or file type. This includes OpenSpec planning artifacts written inside the
-repository. Read-only work and outputs kept outside the repository have no
-candidate to prepare. An authorized continuation needs no separate prompt for
-each selected tool or phase. Resolve only missing material decisions.
-Publication follows native permissions and honors an explicit operator stop or
-decline; either can leave publication pending without waiving preparation.
-Review choices still follow the existing author-review contract; continuity does
-not answer an unresolved optional-review choice on the operator's behalf.
+For already implemented work, recover intent and current checks and enter at the
+missing outcome. Main runs routine checks and provider methods; delegate a useful
+independent question, not a phase name or a command such as lint. Reuse one concise
+test-evidence summary across tools and reviewers instead of commissioning the same
+test analysis again at each handoff.
+
+Continue authorized repository changes through applicable validation and `create-pr`
+preparation for every completed repository-file change, regardless of workflow or file
+type. This includes OpenSpec planning artifacts written inside the repository. Read-only
+work and outputs kept outside the repository have no candidate to prepare. Continue to
+the requested endpoint: planning, local completion, PR preparation or PR publication.
+An authorized continuation needs no separate prompt for each selected tool or phase.
+Resolve only missing material decisions. Publication follows native permissions and
+honors an explicit operator stop or decline; either can leave publication pending without
+waiving preparation. Review choices still follow the existing author-review contract;
+continuity does not answer an unresolved optional-review choice on the operator's behalf.
 Plain-language requests such as “implement this spec”, “validate this change” or “use spec and
 continue through the PR” select the corresponding work; they are not new commands.
 Existing PR review still uses [review-pr](../../review-pr/SKILL.md).
@@ -131,6 +137,16 @@ runner receipt with a newer base, candidate/tree, manifest or effective invocati
 Obtain a new receipt when those bindings require it. Reuse other checks only
 when their relevant inputs and method permit it. A changed filename for a report
 or a still-open PR is not proof that its evidence remains current.
+
+Keep test execution and test assessment distinct. Test-design selects scenarios;
+test-review evaluates test quality; trace maps coverage; an independent reviewer
+investigates its selected risks. These methods consume the existing results. Run
+a check again when its relevant source, tests, configuration, dependencies or
+environment changed, a failure/gap needs investigation, or the repository/operator
+explicitly requires it. Renew affected checks after a repair, broadening when its
+dependencies warrant it. A phase transition, new report or reviewer alone does
+not invalidate evidence. Include named relevant omissions so reviewers need not
+rediscover which tests ran.
 
 ## Candidate and delivery
 

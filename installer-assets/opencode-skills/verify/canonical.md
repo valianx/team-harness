@@ -28,8 +28,9 @@ Main's reviewer selection; they do not add mandatory lenses or grant authority.
 Repair a reported operational prerequisite within the authorized scope; do not
 substitute an unbound manual result for missing evidence.
 
-Use the emitted package for every lens, following the shared contract's selected
-profile and activation checks. A checker-verified empty review surface needs no
+Use the emitted package for every lens with the shared guidance's concise question,
+relevant context and existing checks/assessments. Select the native read-only role;
+diagnose profile or activation issues only when observed. A checker-verified empty review surface needs no
 reviewer dispatch; report the actual checker evidence. Missing selected coverage
 or unavailable native activation is a limitation, never an inferred pass.
 
