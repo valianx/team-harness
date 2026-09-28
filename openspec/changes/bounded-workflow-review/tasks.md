@@ -7,4 +7,4 @@
 ## 2. Distribution and verification
 
 - [ ] 2.1 Update affected documentation and release metadata, regenerate distributed roles/skills and run required checks.
-- [ ] 2.2 Verify scenarios, provider/evidence reuse and implementation against this change; retain independent findings and dispositions in the workspace.
+- [ ] 2.2 Verify scenarios, provider/evidence reuse and implementation against this change; retain results and limitations in the workspace.
