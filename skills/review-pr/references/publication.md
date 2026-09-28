@@ -91,29 +91,35 @@ events in the order `Comment only`, `Request changes`, `Approve` minus the recom
 5 — Cancel
 ```
 
-Accept the number or an unambiguous action phrase. Keep full SHAs, capture time, raw mergeability,
-hashes, and snapshot details hidden by default.
+Explain that selecting a publication action confirms publication of the displayed review with
+that event. Accept its displayed number or an unambiguous action phrase, including approval
+already supplied with the complete preview. This applies equally to `APPROVE`, `REQUEST_CHANGES`
+and `COMMENT`: proceed to publication without asking for another "confirm" or "publish" reply.
+`Defer` and `Cancel` do not publish. Keep full SHAs, capture time, raw mergeability, hashes and
+snapshot details hidden by default.
 
-When the chosen event differs from the preview's `Verdict:`, invalidate any prior approval anchor
-and rewrite that line through the leaf-safe artifact rule. Show the complete rewritten body and
-every inline comment with path, line, and side, retaining the chosen event, and obtain explicit
-approval of that final preview. Showing only the changed verdict line is insufficient. An unchanged
-event requires no additional confirmation.
+If the choice differs from the preview's `Verdict:`, change only that line to the selected event
+through the leaf-safe artifact rule. The choice authorizes this alignment; it does not require
+another preview or approval. Preserve every displayed finding, comment, anchor and destination.
+Respect GitHub's restrictions for the active identity: if it cannot publish the chosen event,
+retain the draft and explain the concrete restriction. Do not ask to confirm the same choice
+again or silently substitute another event or account. Offer a supported alternative as a new
+choice; selecting it authorizes publication on the same terms.
 
-**Approval anchor.** Only after the operator approves the final preview, record its chosen event,
-the SHA-256 of the exact canonical body artifact and inline JSON shown, and the reviewed identity
-(repository, PR, captured head, relevant base/merge base, and `technical_hash`). The approval
-applies to that event, those bytes, and that reviewed identity. A newer remote head or conversation
-does not invalidate it by itself.
-If reconciliation changes the review body, comments, or event, show and approve the complete new
-preview. Never refresh an approval anchor from bytes that the operator has not approved.
+**Approval anchor.** After the choice, retain the displayed review and the operator's selection,
+check that only its authorized verdict alignment changed, then record the chosen event, SHA-256
+of the final canonical body and inline JSON, and reviewed identity (repository, PR, captured head,
+relevant base/merge base and `technical_hash`). Approval covers that selected event and payload.
+A newer remote head or conversation does not invalidate it by itself. If reconciliation changes
+content, destination or event beyond existing authorization, show the complete revised preview and
+ask only for that missing authorization. Never authorize undisclosed changes by refreshing hashes.
 
 `defer` keeps the owned run, frozen snapshot, latest observations, canonical body, inline JSON,
 source reports, original verification input, verifier return and finding ledger for
 `--resume-from-draft`. Preserve supplemental reproduction receipts and captured workspace evidence
 with their hashes. Do not clean the run on defer, failed publication, or uncertain GitHub outcome.
-`cancel` removes the run only after every dispatched reviewer has joined. Operator edits require a
-complete new preview.
+`cancel` removes the run only after every dispatched reviewer has joined. For operator edits,
+reuse explicit publication authority covering those edits; otherwise show the complete new preview.
 
 **`--auto-publish` path.** Keep this explicit opt-in unchanged. It skips the menu and approval; the
 published event is exactly the recommendation and the payload is tied to the captured reviewed
