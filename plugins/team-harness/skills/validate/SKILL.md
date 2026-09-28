@@ -36,10 +36,11 @@ verifies corrections and reuses valid evidence when unaffected.
 This entry does not activate a pipeline or impose a security classifier floor.
 
 Use [upstream tools](../spec/references/upstream-tools.md) for selected testing
-analysis and completion evidence. In a spec effort, finish its pending TEA and
-Superpowers stages; reuse applicable results. For a relevant completed OpenSpec
-change, execute upstream implementation verify before archive under the shared
-[lifecycle](../spec/references/lifecycle.md). Reports stay in the selected workspace.
+analysis and completion evidence. Finish the pending methods from the shared
+phase plan, reusing resolved providers and completed applicable assessments.
+Apply [lifecycle](../spec/references/lifecycle.md) for OpenSpec completion and
+archive readiness. Link actual outcomes in the existing workspace plan; do not
+create another equivalent report or restart preparation at this handoff.
 
 Use Codex's native agent and task tools. Never require a Claude executable or
 configuration. In an active pipeline, read the matching phase reference under

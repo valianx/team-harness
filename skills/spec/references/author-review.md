@@ -24,7 +24,12 @@ relevant skips. Risk signals inform Main's selection without adding a mandatory
 lens. A checker-verified empty surface needs no dispatch; an unavailable reviewer
 is a disclosed limit, never a pass.
 
-Collect all returns and run `review-fan.mjs summary` (`gate` remains a compatibility alias). Main consolidates duplicate findings and checks their supporting evidence against the anchored candidate before changing code. Preserve unresolved
+Preserve reused native assessments with their original target, scope, evidence,
+findings and limits; do not send a formatting-only re-review. For a packaged fan,
+collect its returns and run `review-fan.mjs summary` (`gate` remains a compatibility alias).
+Main accounts for reused and newly requested coverage together in the existing
+report without inventing helper returns or a new reviewer pass.
+Main consolidates duplicate findings and checks their supporting evidence against the anchored candidate before changing code. Preserve unresolved
 disagreements and coverage limits. The summary is factual evidence; it does not decide closure or publication. Reviewers do not edit files or publish anything. Main writes
 `reviews/pre-pr-review.md` in the existing common workspace and links it from `01-plan.md`; in Obsidian mode both remain there, without a repository-local duplicate.
 

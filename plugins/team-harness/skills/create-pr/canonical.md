@@ -74,6 +74,14 @@ candidate; reference a partially resolved issue without auto-closing it. Keep th
 candidate reviewable and report the files inspected, prepared, or retained with the
 rationale for any scope decision.
 
+End every prepared or published PR body with one descriptive risk flag in the
+PR's language: `Risky change: true` / `Risky change: false` in English or
+`Cambio riesgoso: true` / `Cambio riesgoso: false` in Spanish. Main judges the actual impact and available evidence,
+including material uncertainty, and refreshes the flag when the change affects
+that judgment. Keep template content above it. The footer contains only the flag;
+it informs the operator's choice of human checking without adding an approval
+step, classifier or score.
+
 This preparation/publication method is shared by direct, spec and pipeline work.
 Main normally executes it. A pipeline delivery specialist can perform the assigned
 checkpoint with the same evidence and endpoint; it does not need a second acceptance

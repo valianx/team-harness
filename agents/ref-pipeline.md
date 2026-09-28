@@ -42,9 +42,9 @@ supported operator overrides.
 
 ## Validation
 
-Run selected project checks and provider assessments, including real CRAP when
-inputs apply. Use TEA review/trace, OpenSpec verify, Superpowers verification and
-selected independent reviewers. Retain evidence and limitations in the workspace.
+Complete checks and assessments from the shared phase plan.
+Reuse independent coverage at final review; another role or skill need not
+repeat the same assessment. Preserve original results and limits.
 
 After implementation verification, synchronize living specs and prepare the
 completed archive on the delivery branch. Anchor candidate review, honor selected

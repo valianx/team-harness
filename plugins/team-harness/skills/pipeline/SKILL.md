@@ -41,12 +41,15 @@ phase outputs, tool selection and evidence states, including real CRAP diagnosti
 Use that view in the existing plan. Retain spec's declared provider stages when
 continuing it, and the authorized endpoint and selected review decision throughout.
 
-Use existing specialists for their expertise, not as mandatory stops. Supply
-the objective, owned scope, repository/workspace and relevant sources in the
-native assignment. Accept a clear result with checks, findings and limits;
-no separate packet, fixed report layout or result schema is needed. Reuse
-applicable evidence and renew only what a correction affects. Independent
-reviewers retain their perspective and Main decides how to address findings.
+Use specialists for distinct questions, not as mandatory stops. Supply the
+question, candidate, included/excluded scope, repository/workspace, relevant
+acceptance sources and existing checks or assessments. Read additional context
+to answer an in-scope uncertainty, without a preliminary documentation tour.
+Accept useful findings and limits through native transport; no separate packet
+or fixed report layout is needed. Plan final independent coverage once using
+the shared phases: an earlier applicable QA/security/tester assessment is not
+repeated merely because verify or Publication is next. Renew affected evidence,
+retain original outcomes and let Main judge findings and remaining coverage.
 
 Keep the installed native model settings unless the operator selects a supported
 override. Workflow simplification does not require changing reviewer models.

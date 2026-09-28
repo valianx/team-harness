@@ -41,6 +41,13 @@ reuse useful sessions for corrections. Main can complete small steps directly;
 the roster does not prescribe a chain of mandatory roles. Both methods retain
 the same applicable quality tools and independent review.
 
+Both use one shared phase sequence and retain resolved providers and workspace
+evidence across handoffs. Pipeline reviewers receive a distinct question and
+scope; their applicable coverage carries into final validation instead of
+being repeated by another equivalent role. Missing independent coverage and
+changed behavior still need review. Shorter instructions do not establish
+measured latency or cost savings by themselves.
+
 ## Legacy route markers (compatibility only)
 
 Old lane, depth, tier, gate and v5 control fields explain historical runs.

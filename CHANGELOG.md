@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.42.4] - 2026-09-27
+
+### Changed
+- Pipeline QA, security and tester use concise assignments, scoped context and existing evidence; workflow handoffs preserve independent coverage instead of commissioning equivalent reviews.
+- Spec uses shared phase sequencing and reuses provider resolution and workspace results while retaining TEA, Superpowers and OpenSpec verification.
+- PR descriptions end with a single descriptive true/false risk flag in the PR's language, based on the coordinator's judgment.
+
+### Fixed
+- Selecting Approve, Request changes or Comment only confirms publication of the previewed review, including the selected verdict, without a second approval prompt.
+
 ## [3.42.3] - 2026-09-24
 
 ### Changed

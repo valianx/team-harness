@@ -40,6 +40,8 @@ ownership, and publication contract below; they do not start a second Review Mod
    work through remote movement and reconcile only affected findings; use a historical `COMMENT`
    when current applicability or coverage cannot be established.
 5. Never publish without preview and explicit approval unless `--auto-publish` was supplied.
+   Selecting any publication action by number or an unambiguous phrase is that approval;
+   align the verdict to the selected event and publish without another confirmation.
 6. Publish one atomic GitHub review containing `body`, `event`, `commit_id`, and `comments`.
 7. Keep each finding in one public channel:
    - an anchored finding lives in an inline thread while GitHub accepts its captured location;
