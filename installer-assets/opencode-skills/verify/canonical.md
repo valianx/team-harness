@@ -15,6 +15,14 @@ workspace, selected lens decision and applicable project/provider evidence. Keep
 reviewed and corrected candidates distinct and return findings and closure to
 the same plan before Publication; a direct verify request remains review-only.
 
+First compare selected questions with existing independent assessments. Reuse
+attributable results with known target, scope and coverage after inspecting any
+subsequent changes. If all selected coverage is already satisfied, link those
+original results and Main's disposition; do not repackage or redispatch merely
+to obtain this skill's return format. Honor an explicit request for a fresh
+review. Partial coverage stays explicit. Use the
+helper and dispatch below for the remaining independent review.
+
 Use `scripts/review-fan.mjs` from this selected skill installation. When developing
 TH itself, use the repository's canonical copy. Do not select a helper from another
 runtime's cache or an unbound newer directory.

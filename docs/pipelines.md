@@ -20,6 +20,9 @@ evidence; this page only maps the existing entry points to that method.
 The coordinator may stop at the requested endpoint or resume a later phase from
 the existing workspace and canonical tasks. Tool outputs are recommendations
 and evidence; Main decides how to proceed. Publication does not imply merge.
+PR descriptions end with a descriptive risk flag in their own language, such
+as `Risky change: true` or `Cambio riesgoso: false`. Main's assessment informs
+the operator without adding an approval step.
 
 | Objective | Entry | Supporting source |
 | --- | --- | --- |

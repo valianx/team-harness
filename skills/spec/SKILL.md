@@ -54,17 +54,14 @@ reconstruct earlier work or rerun valid checks to reenact the phase sequence.
 Reuse the workspace and existing review decision. Read delivery conventions early
 so release metadata and generated files join the candidate before final validation.
 
-Resolve the declared OpenSpec, TEA and Superpowers capabilities for the active host
-using [dependency preparation](references/upstream-tools.md#spec-dependency-preparation).
-Reuse verified healthy installations; revisit preparation when a selected entry is
-missing, changed or fails, not on each phase transition. Apply the [OpenSpec
-lifecycle](references/lifecycle.md) to relevant changes before revising intent or closing work.
-Spec executes TEA test-design, test-review and trace, Superpowers
-verification-before-completion, and OpenSpec implementation verification at the
-stages below. Use their current installed instructions, not TH copies of their
-methods. Main runs these methods with the same relevant inputs; a tool or stage
-does not imply a new agent. Delegate a bounded question only when independent work
-helps. A missing provider leaves its stage pending while independent work continues.
+Read [the shared development phases](references/development-phases.md) for the
+sequence and expected outcomes. That reference owns the tool stages; this entry
+owns spec routing and continuity. Use [upstream tools](references/upstream-tools.md)
+for provider preparation/invocation and [lifecycle](references/lifecycle.md) for
+OpenSpec completion. Load each resource when needed and reuse its unchanged
+instructions within the effort. Following a link does not restart its caller or
+completed work. Refresh context after a relevant change, failure or an explicit
+upstream requirement.
 
 Main repairs operational failures before treating the objective as blocked. A
 wrong path, malformed contract, missing tool/library or recoverable transport
@@ -80,82 +77,27 @@ or inspect its commit status. An uncertain outcome never authorizes replay; reus
 existing approval only for the same authorized effect and seek a decision for a
 new effect.
 
-### 1. Spec
+Follow the installed OpenSpec propose/update workflow for intent and tasks;
+validate the change with `openspec validate <change> --strict`. Use
+[implement](../implement/SKILL.md), then [validate](../validate/SKILL.md), with
+the same plan and evidence. Apply the shared phases' provider methods without
+another agent per method. Keep canonical tasks current as their work completes;
+record later delivery progress in the workspace. A planning-only endpoint ends
+after the required planning outputs.
 
-Follow the installed OpenSpec propose/update workflow to author the bounded
-proposal, requirements, useful design and implementation tasks. Execute TEA
-test-design with current intent and existing tests; keep its working strategy
-in the selected workspace and use it to select later methods and checks.
+Assemble the candidate through [create-pr](../create-pr/SKILL.md) for agreed PR
+delivery, otherwise through the lifecycle directly. Preserve the selected
+[author-review choice](references/author-review.md), existing independent
+coverage and any actual gaps; use [verify](../verify/SKILL.md) for remaining
+committed-candidate review. Main judges findings and verifies authorized repairs.
+An assessment, correction or phase transition is not a reason to repeat a
+completed review. For bug fixes, retain useful
+[before/after evidence](references/author-review.md#optional-fix-evidence).
 
-Run `openspec validate <change> --strict` and resolve structural problems in
-the same artifacts. Refresh the operator plan with phase outputs and selected
-capabilities. Link it and reuse the user's existing authorization; ask only
-for a missing scope or material decision. A planning-only endpoint ends here.
-
-### 2. Implementation
-
-Use [implement](../implement/SKILL.md) on the feature branch. Main implements
-and continues into validation. Delegate independent work only when useful,
-with explicit ownership and preservation of other writers' work.
-Check off canonical tasks as their specified work is completed; derive the
-workspace plan's progress from them, without a state file or event trace.
-
-Execute the TEA implementation methods selected by test-design and appropriate
-focused project checks. Keep commands, candidate, environment and relevant skips
-with their results for later validation and reviewers. Apply `docs/testing.md § Selected test evidence`:
-required omitted tests leave their scenario unverified even after exit zero;
-unrelated optional skips do not erase sufficient evidence. For a bug fix, use
-[before/after evidence](references/author-review.md#optional-fix-evidence) when
-useful. Product changes, maintained tests and actual local results are this
-phase's outputs; later assessments remain pending.
-
-### 3. Validation
-
-Use [validate](../validate/SKILL.md) with the plan's selected checks and
-diagnostics, including real CRAP when selected for changed executable functions.
-After implementation and relevant tests, execute TEA test-review and trace,
-selected NFR work, Superpowers verification-before-completion and upstream
-OpenSpec implementation verify. Use the [provider reference](references/upstream-tools.md)
-for inputs, outputs and reuse; structural validate and optional TH review do
-not replace implementation verification.
-
-Share the existing evidence: test-review assesses test quality, trace maps coverage,
-and OpenSpec verify compares implementation with intent. An independent reviewer
-answers its selected question using those assessments. None is a reason by itself
-to repeat the full test analysis or suite. Renew checks for changed relevant inputs,
-a concrete coverage gap, a failure, or an explicit repository/operator requirement.
-
-Resolve actual completion defects. Use [create-pr](../create-pr/SKILL.md)'s
-preparation checkpoint for agreed PR delivery, otherwise the [lifecycle](references/lifecycle.md)
-directly. Prepare completed archive and living specs on the delivery branch
-before committing the final review candidate.
-
-Use [verify](../verify/SKILL.md) for the committed candidate, binding the exact
-archived change when applicable. Reuse the live selection and completion rules
-in [author review](references/author-review.md); risk signals inform Main's
-lens choice. Main judges findings, performs authorized repairs and records
-evidence-backed closure. Preserve the reviewed revision and original outcome
-separately from a corrected head; renew affected checks without automatically
-starting another full review or manufacturing a pass.
-
-### 4. Publication
-
-For local completion, report the result and remaining limits without creating
-a PR. For PR delivery, apply the existing [author-review conditions](references/author-review.md)
-and use [create-pr](../create-pr/SKILL.md)'s publication checkpoint. Keep incomplete
-review coverage explicit; Main decides delivery under existing authorization and any
-explicit operator prerequisites. Preparing a PR does not itself authorize publication.
-
-Continue already authorized publication once its real prerequisites hold,
-following repository conventions and native permissions without another
-approval ceremony for unchanged work. The coordinator's publication decision
-is distinct from the historical reviewer verdict and is not enforced by
-`gh pr create`.
-
-Close with delivery, remaining work and any archive/reconciliation pending
-under the [lifecycle](references/lifecycle.md). Preserve declined offers.
-Upstream apply completion returns here for candidate assembly, validation and
-closure; it does not end the effort by itself.
+Continue to the authorized endpoint, reporting delivery and remaining limits.
+PR preparation does not itself authorize publication; existing publication
+authority needs no new ceremony for unchanged work. Upstream apply completion
+returns here for candidate assembly, validation and closure.
 
 ## Operator plan
 
@@ -168,15 +110,12 @@ Reuse the same plan on later days by matching its `mode: spec`, change slug and 
 path. Preserve an existing user or pipeline plan; use a separate `<date>_<change>-spec` directory
 for a collision. Do not infer a pipeline or approval from the document's existence.
 
-Keep the view short: the intended result, current status, a small table of work steps and their
-results/status, task completion count, next action, and links to canonical proposal/tasks and
-any existing design/specs. Show the four phases and selected capabilities with purpose,
-scope/candidate, actual execution state, outcome/evidence and recovery or next action
-using the shared phase reference. Keep archive/review/publication progress here instead
-of creating future delivery checkboxes that must be completed before archive.
-Group tasks for readability; derive progress from `tasks.md` and link
-the source instead of copying acceptance criteria or creating another editable task list.
-A small Mermaid diagram is optional when dependencies are easier to understand that way.
+Keep the view short: objective, phase progress, canonical task count, next action
+and links to intent and actual results. Record each capability's scope, outcome
+or pending work once, in the phase row or a useful detail row. Link original
+provider artifacts rather than copying their analysis or creating another report
+per handoff. Preserve required upstream outputs. Keep archive/review/publication
+progress here instead of adding future delivery checkboxes to canonical tasks.
 
 Refresh this same view after intent/task revisions and at validation and delivery milestones;
 report only observed progress and results. Intent changes still follow the existing approval

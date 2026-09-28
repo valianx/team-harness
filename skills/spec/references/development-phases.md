@@ -18,7 +18,10 @@ Spec keeps execution with the principal and uses independent reviewers for the
 selected questions. Pipeline adds coordination of useful specialists: group
 coherent work, reuse an owner for corrections and parallelize independent tasks.
 The four phases describe outcomes; they do not prescribe four agent handoffs.
-Both methods use the same applicable tools and evidence below.
+Both methods use the same applicable tools and evidence below. This reference
+owns the sequence; provider instructions own invocation and lifecycle owns
+archive readiness. Read each needed reference once per unchanged context,
+without recursively replaying entry or preparation steps at a handoff.
 
 For already implemented work, recover intent and current checks and enter at the
 missing outcome. Main runs routine checks and provider methods; delegate a useful
@@ -87,8 +90,9 @@ installation or generated files alone do not prove live activation.
 | verify / independent lenses | Local author review of the committed candidate under the existing review choice; distinguish this from review-pr on an existing PR. |
 | create-pr | Candidate preparation and authorized publication, consuming current evidence and artifact hygiene. |
 
-Keep a short capability table in the existing plan: purpose/selection reason,
-scope or candidate, status, actual outcome/evidence link and next action.
+Record capability outcomes once in the existing plan: purpose/selection reason,
+scope or candidate, status, actual outcome/evidence link and next action. Phase
+rows can carry these links; a second capability table is optional.
 Account for the declared spec stages and selected additional methods; give a
 brief reason for relevant catalog capabilities left unselected. No blanket
 installation or exhaustive empty report tree is needed.
@@ -151,7 +155,13 @@ Preserve explicit lifecycle decisions and keep review corrections coherent with
 the archived intent and affected verification.
 
 Apply [author review](author-review.md) and [verify](../../verify/SKILL.md) with
-the existing selected lenses. An unanswered choice or incomplete accepted review
+the existing selected lenses. Plan final independent coverage once: a pipeline
+QA/security/tester assessment and a verify lens do not both need to answer the
+same question. Reuse complete, attributable coverage where its relevant inputs
+still apply; tests alone do not replace an unperformed independent review.
+Inspect subsequent changes and request missing coverage, preserving the original
+target and verdict. A handoff or a different report format alone does not justify
+another review. An unanswered choice or incomplete accepted review
 is not a decline or successful review. Recover unavailable execution through supported
 native read-only capabilities and preserve any remaining coverage limit. Main decides
 delivery under existing authorization and explicit operator prerequisites; a review

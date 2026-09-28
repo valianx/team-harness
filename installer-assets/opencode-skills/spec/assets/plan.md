@@ -12,22 +12,18 @@ source: "{{canonical_change_path}}"
 
 ## Phases
 
-| Phase | Expected result | Status |
+| Phase | Expected result | Status and evidence |
 | --- | --- | --- |
-| Spec | Intent, tasks, testing strategy and presented data model/wireframe for affected DB/frontend | {{spec_status}} |
-| Implementation | Product changes and focused checks | {{implementation_status}} |
-| Validation | Checks, provider assessments and selected reviews | {{validation_status}} |
-| Publication | Authorized local delivery, PR preparation or publication | {{publication_status}} |
-
-## Tools and evidence
-
-| Phase / capability | Purpose and selection reason | Scope / candidate | Status | Actual outcome / evidence / next action |
-| --- | --- | --- | --- | --- |
-| {{phase_capability}} | {{selection_reason}} | {{scope_or_candidate}} | {{execution_status}} | {{evidence_and_next_action}} |
+| Spec | Intent, tasks, testing strategy and presented data model/wireframe for affected DB/frontend | {{spec_status_and_links}} |
+| Implementation | Product changes and focused checks | {{implementation_status_and_links}} |
+| Validation | Checks, provider assessments and selected reviews | {{validation_status_and_links}} |
+| Publication | Authorized local delivery, PR preparation or publication | {{publication_status_and_links}} |
 
 Use pending, executed, not applicable, declined or deferred with the actual
 outcome or reason. Future work is pending; an executed assessment may have
-findings. Link canonical tasks and provider results instead of duplicating them.
+findings. Include each selected capability's purpose, scope/candidate and actual
+outcome or next action once. Add detail rows only when useful; link canonical
+tasks and provider results instead of duplicating their analysis.
 
 **Next:** {{next_action}}
 

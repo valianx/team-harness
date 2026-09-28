@@ -1,8 +1,9 @@
 # External tools in the TH workflow
 
-Read this shared integration reference when spec enters a provider stage, or
-when another TH flow selects an upstream capability. Resolve the installed
-provider before use; availability in one host does not prove activation in another.
+Use this shared reference for provider invocation and preparation; the
+[development phases](development-phases.md) own the stage sequence. Reuse the
+effort's resolved provider entries; availability in one host does not prove
+activation in another.
 
 TH coordinates the objective, workspace and delivery. OpenSpec, Superpowers and
 TEA supply their own maintained methods. TH selects an installed capability,
@@ -155,8 +156,8 @@ useful, give that reviewer the unanswered question and existing results.
 | Knip | When `audit` asks about unused files, exports or dependencies in an applicable JS/TS project | Run the project/tool-cache executable with entry points/framework configuration and peer dependencies as needed. Treat output as candidates until contextual consumer checks complete. Do not select it for ordinary `review-pr`. |
 | Sentry `find-bugs` | When Main explicitly selects an installed upstream change-review method for a captured PR or scoped contextual bug investigation | Assign the existing general reviewer the captured base/head and permitted evidence. Reuse its bounded assessment; do not run a second equivalent TH checklist or allow a live default-branch lookup. |
 
-Advancing through spec executes OpenSpec's required stages and the declared
-TEA/Superpowers capabilities at their corresponding stages. Quality providers are
+Execute spec's declared methods at the stages in the shared development phases.
+Quality providers are
 optional: when a spec stage or consuming flow selects one by objective, stack and
 active host, prepare and use that provider and retain its evidence; otherwise leave
 it unselected. These integrations are part of the selected workflow, not a
@@ -174,23 +175,10 @@ run. Missing mandatory OpenSpec verify prevents a completion claim for the chang
 
 ## How this fits spec, pipeline and direct work
 
-Spec uses the sequence below. Pipeline and direct work reuse the same invocation,
+Pipeline and direct work reuse the same invocation,
 workspace and evidence methods for their selected capabilities; invoking a tool
 does not activate a second top-level workflow. OpenSpec verification remains
 mandatory for relevant completed changes in any entry point.
-
-1. **Spec:** OpenSpec owns intent; execute TEA test-design to establish the testing
-   strategy and select later methods, commands and expected evidence.
-2. **Implementation:** use that context, execute selected ATDD/automation or
-   infrastructure methods, and produce maintained tests and focused test results.
-3. **Validation:** execute TEA test-review and trace, selected NFR analysis,
-   Superpowers verification-before-completion and upstream OpenSpec verify with
-   applicable evidence. Address actual defects, prepare completed archive and
-   perform the selected independent candidate review. Renew affected evidence
-   after corrections; preserve original results and their dispositions.
-4. **Publication:** create-pr consumes that evidence for artifact hygiene and
-   the authorized preparation/publication endpoint. It does not rerun every
-   provider or imply merge.
 
 Reaching design does not execute future completion stages. A planning-only request
 stops at its authorized scope; it does not need implementation results that do not
@@ -238,9 +226,12 @@ Superpowers uses its native plugin skills. TEA uses BMAD-generated native skills
 or pointers; a supported upstream CLI runner may be used when headless execution
 helps. Resolve actual entries from the installed version.
 
-Before entering a provider stage, resolve its current installed skill and version
-from the host's native discovery or an explicitly bound official installation.
-Read that source afresh; a newer cache directory alone does not select it.
+Resolve each provider's installed entry and version once for the effort through
+native discovery or an explicitly bound official installation. Load each distinct
+method when first needed and reuse its unchanged instructions and applicable
+results across handoffs. Refresh the affected binding after an update, activation
+change, missing entry or failure, or when the upstream method explicitly requires
+a fresh read. A newer cache directory alone does not select it.
 An official package may expose a skill root for direct native-agent execution:
 read and follow its upstream entry and referenced steps with the actual project
 root. Loading those instructions does not prove plugin activation or a CLI run.

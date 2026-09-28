@@ -2,8 +2,9 @@
 
 Apply [the shared Validation phase](../../spec/references/development-phases.md)
 with the existing plan's tool selection, actual outcomes and evidence links.
-Run the pending spec provider stages and selected real CRAP/other diagnostics;
-missing selected inputs stay pending. Native reviews consume that evidence.
+Complete pending methods using the already resolved providers and shared evidence;
+missing selected inputs stay pending. Native reviews answer the remaining
+independent questions, not a second copy of an applicable assessment.
 
 Build a reviewable candidate with completed OpenSpec archive and no transient
 repository artifacts. Run relevant checks and repository requirements. Independent
