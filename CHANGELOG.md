@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.42.5] - 2026-09-29
+
+### Changed
+- Codex specialists and pipeline roles use GPT 6.1 Sol with their existing reasoning efforts; Astra remains available for the main chat.
+- Setup and update migrate formerly managed generic subagent defaults to Sol 6.1/max with a backup, preserving the main chat model and custom fallback pairs.
+
 ## [3.42.4] - 2026-09-27
 
 ### Changed

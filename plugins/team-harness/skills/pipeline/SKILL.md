@@ -51,12 +51,13 @@ the shared phases: an earlier applicable QA/security/tester assessment is not
 repeated merely because verify or Publication is next. Renew affected evidence,
 retain original outcomes and let Main judge findings and remaining coverage.
 
-Keep the installed native model settings unless the operator selects a supported
-override. Workflow simplification does not require changing reviewer models.
+In Codex, use `gpt-6.1-sol` for delegated roles and retain each role's reasoning
+effort. Reserve Astra for Main's chat; never inherit it into pipeline agents.
+Report unavailable Sol dispatch without silently selecting another model.
+Other runtimes retain their native model settings.
 Historical helpers remain available for old records, outside current dispatch.
 
 Use native Codex roles as appropriate: architect, implementer, tester, cleaner,
 QA, security and delivery. Read their current instructions when dispatching.
-Honor a user-selected supported model/effort; otherwise use the installed role
-settings. Read phase references progressively, starting with
+Use the installed Sol 6.1 role settings independently of Main's chat model. Read phase references progressively, starting with
 [activation](references/activation.md) and [design](references/design.md).

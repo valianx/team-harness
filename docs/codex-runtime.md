@@ -20,7 +20,7 @@ language preferences and optional GitHub identity routes, leaves personal MCP
 configuration and credentials untouched, preserves native execution preferences,
 and places twenty bundled specialist
 agents in project or global scope: seven standard logical roles, seven
-spawn-overridable `pipeline-*` identities, one direct read-only inline reviewer,
+Sol 6.1 `pipeline-*` identities, one direct read-only inline reviewer,
 and five for immutable PR review.
 An explicit setup import can copy missing values from Claude Code or opencode
 without printing opaque values; normal Codex modes never read another
@@ -135,7 +135,7 @@ CI and the prepublish guard require these sites to be changed together when a
 distributed runtime input changes. Repositories that predate the Codex plugin
 or installer path retain optional-site compatibility until that path exists.
 
-The seven spawn-overridable `pipeline-*` identities are optional packaged roles
+The seven Sol 6.1 `pipeline-*` identities are optional packaged roles
 for bounded native delegation. A coordinated workflow can use whichever assigned
 role is available; setup/update install the complete set for predictable coverage,
 but their presence is not a preflight, permission or startup requirement. The
@@ -190,23 +190,21 @@ standard installed specialists:
 
 | Claude role metadata | Codex model | Effort |
 |---|---|---|
-| `opus` | `gpt-6-astra` | `xhigh` |
-| `sonnet` + `high` or `xhigh` | `gpt-6-luna` | `max` |
-| `sonnet` + `medium` | `gpt-6-luna` | `max` |
-| `haiku` | `gpt-6-luna` | `max` |
+| `opus` | `gpt-6.1-sol` | `xhigh` |
+| `sonnet` + `high` or `xhigh` | `gpt-6.1-sol` | `max` |
+| `sonnet` + `medium` | `gpt-6.1-sol` | `max` |
+| `haiku` | `gpt-6.1-sol` | `max` |
 
-For a coordinated workflow, an unambiguous live request such as “pipeline en
-Luna max” selects one ephemeral model/effort pair for native role assignments.
-Main asks the operator to use the native `/model` selector when the current chat
-is not already confirmed on that pair, then passes the pair to the assignments
-that use it. No exact flag syntax is required. The choice is never written to
-Codex or Team Harness configuration, workspace state, events, reports, or
-handoffs, and expires when the live Main thread ends. Without an override,
-assigned roles use the standard projection above.
+All twenty shipped specialists, including the seven `pipeline-*` aliases, pin
+`gpt-6.1-sol` with the effort shown above. Astra is reserved for Main's chat.
+Delegation must not inherit the chat model or require changing it with `/model`.
+If the active host cannot dispatch Sol 6.1, report the exact limitation and
+continue suitable work directly without silently substituting another model.
 
 The role table is independent from the generic fallback. Global setup and
 update install a missing fallback and atomically migrate the exact formerly
-managed `gpt-5.6-terra` / `medium` and `gpt-5.6-luna` / `max` pairs to `gpt-6-luna` / `max`, with a
+managed `gpt-5.6-terra` / `medium`, `gpt-5.6-luna` / `max`, and
+`gpt-6-luna` / `max` pairs to `gpt-6.1-sol` / `max`, with a
 backup. Any other complete operator-selected pair is preserved as
 `custom-preserved`. A
 fallback or named-role change reports `restartRequired: true`; the active Codex

@@ -3,7 +3,7 @@
   "runtime": "codex",
   "max_concurrent_threads_per_session": 4,
   "project_defaults": {
-    "default_subagent_model": "gpt-6-luna",
+    "default_subagent_model": "gpt-6.1-sol",
     "default_subagent_reasoning_effort": "max",
     "project_doc_fallback_filenames": [
       "CLAUDE.md"
@@ -91,19 +91,19 @@
       "inherit_parent": false,
       "tiers": {
         "opus": {
-          "model": "gpt-6-astra",
+          "model": "gpt-6.1-sol",
           "reasoning_effort": "xhigh"
         },
         "sonnet-high": {
-          "model": "gpt-6-luna",
+          "model": "gpt-6.1-sol",
           "reasoning_effort": "max"
         },
         "sonnet-medium": {
-          "model": "gpt-6-luna",
+          "model": "gpt-6.1-sol",
           "reasoning_effort": "max"
         },
         "haiku": {
-          "model": "gpt-6-luna",
+          "model": "gpt-6.1-sol",
           "reasoning_effort": "max"
         }
       }
@@ -217,8 +217,8 @@
     {
       "name": "pipeline-architect",
       "role": "architect",
-      "model_policy": "spawn",
-      "description": "Runs the architect role with the model explicitly selected for the active pipeline session.",
+      "model_policy": "profile",
+      "description": "Runs the architect role with GPT 6.1 Sol and the role's configured reasoning effort.",
       "semantic_source": "agents/architect.md",
       "sandbox_mode": "workspace-write",
       "capabilities": [
@@ -232,8 +232,8 @@
     {
       "name": "pipeline-implementer",
       "role": "implementer",
-      "model_policy": "spawn",
-      "description": "Runs the implementer role with the model explicitly selected for the active pipeline session.",
+      "model_policy": "profile",
+      "description": "Runs the implementer role with GPT 6.1 Sol and the role's configured reasoning effort.",
       "semantic_source": "agents/implementer.md",
       "sandbox_mode": "workspace-write",
       "capabilities": [
@@ -247,8 +247,8 @@
     {
       "name": "pipeline-tester",
       "role": "tester",
-      "model_policy": "spawn",
-      "description": "Runs the tester role with the model explicitly selected for the active pipeline session.",
+      "model_policy": "profile",
+      "description": "Runs the tester role with GPT 6.1 Sol and the role's configured reasoning effort.",
       "semantic_source": "agents/tester.md",
       "sandbox_mode": "workspace-write",
       "capabilities": [
@@ -262,8 +262,8 @@
     {
       "name": "pipeline-cleaner",
       "role": "cleaner",
-      "model_policy": "spawn",
-      "description": "Runs the cleaner role with the model explicitly selected for the active pipeline session.",
+      "model_policy": "profile",
+      "description": "Runs the cleaner role with GPT 6.1 Sol and the role's configured reasoning effort.",
       "semantic_source": "agents/cleaner.md",
       "sandbox_mode": "workspace-write",
       "capabilities": [
@@ -277,8 +277,8 @@
     {
       "name": "pipeline-qa",
       "role": "qa",
-      "model_policy": "spawn",
-      "description": "Runs the QA role with the model explicitly selected for the active pipeline session.",
+      "model_policy": "profile",
+      "description": "Runs the QA role with GPT 6.1 Sol and the role's configured reasoning effort.",
       "semantic_source": "agents/qa.md",
       "sandbox_mode": "read-only",
       "capabilities": [
@@ -291,8 +291,8 @@
     {
       "name": "pipeline-security",
       "role": "security",
-      "model_policy": "spawn",
-      "description": "Runs the security role with the model explicitly selected for the active pipeline session.",
+      "model_policy": "profile",
+      "description": "Runs the security role with GPT 6.1 Sol and the role's configured reasoning effort.",
       "semantic_source": "agents/security.md",
       "sandbox_mode": "read-only",
       "capabilities": [
@@ -306,8 +306,8 @@
     {
       "name": "pipeline-delivery",
       "role": "delivery",
-      "model_policy": "spawn",
-      "description": "Runs the delivery role with the model explicitly selected for the active pipeline session.",
+      "model_policy": "profile",
+      "description": "Runs the delivery role with GPT 6.1 Sol and the role's configured reasoning effort.",
       "semantic_source": "agents/delivery.md",
       "sandbox_mode": "workspace-write",
       "capabilities": [

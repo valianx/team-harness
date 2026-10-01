@@ -1,5 +1,12 @@
 # Specialist dispatch
 
+In Codex, delegated agents use `gpt-6.1-sol`, including every `pipeline-*`
+role. Preserve the installed reasoning effort. Astra is reserved for Main's
+chat and must not be selected or inherited by a specialist. Main keeps its
+independent chat model. If the live host cannot dispatch Sol 6.1, report that
+limitation and continue suitable work directly; do not silently substitute
+another model or change the chat model to configure delegation.
+
 Give each specialist an objective, owned files or read-only scope, canonical
 repository/worktree, selected absolute workspace, relevant inputs and expected
 result. Explain concurrent ownership so it preserves others' edits.

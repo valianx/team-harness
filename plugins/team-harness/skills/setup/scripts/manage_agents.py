@@ -37,9 +37,9 @@ ROLES = (
     "reviewer-consolidator",
 )
 MANAGED_MARKER = "# Code generated from runtime/schema/codex-agents.json; DO NOT EDIT."
-DEFAULT_SUBAGENT_MODEL = "gpt-6-luna"
+DEFAULT_SUBAGENT_MODEL = "gpt-6.1-sol"
 DEFAULT_SUBAGENT_REASONING_EFFORT = "max"
-LEGACY_SUBAGENT_PAIRS = frozenset({("gpt-5.6-terra", "medium"), ("gpt-5.6-luna", "max")})
+LEGACY_SUBAGENT_PAIRS = frozenset({("gpt-5.6-terra", "medium"), ("gpt-5.6-luna", "max"), ("gpt-6-luna", "max")})
 PROJECT_DOC_FALLBACK = "CLAUDE.md"
 RUNTIME_KEYS = (
     "default_subagent_model",

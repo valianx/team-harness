@@ -55,40 +55,6 @@ The frozen review worktree SHALL live under the git-ignored `workspaces/` tree a
 - **WHEN** supported repository paths become longer than 260 characters under the isolated review root
 - **THEN** capture materializes them successfully using snapshot-local Git configuration and preserves the operator checkout
 
-### Requirement: Critical Codex roles use Astra and bounded roles use Luna
-The standard Team Harness Codex profile SHALL assign gpt-6-astra with xhigh reasoning to Opus source projections, including architect, QA, security and PR review verifier. Sonnet and Haiku projections SHALL use gpt-6-luna with max reasoning. The unpublished spec-validator and pr-creator roles and their exclusive runtime mappings SHALL be absent from the delivered roster. Existing native model selection and explicit concrete operator choices SHALL remain supported; Main's selected model and independent reviewer profiles SHALL remain unchanged by coordination simplification.
-
-#### Scenario: Standard agent projections are generated
-- **WHEN** the canonical registry is projected into runtime agents, packaged copies and the roster
-- **THEN** the existing model tiers remain consistent and no required spec completion roles are introduced.
-
-#### Scenario: A pipeline runs without a live model override
-- **WHEN** Main dispatches standard pipeline specialists
-- **THEN** implementer, tester, cleaner and delivery use Luna/max, while architect, QA and security use Astra/xhigh.
-
-#### Scenario: Explicit native model selection
-- **WHEN** the operator selects a supported alternative model or effort
-- **THEN** pipeline coordination uses the host's supported selection route without adding a TH model resolver or changing unrelated role defaults.
-
-#### Scenario: The phase roles are installed in another runtime
-- **WHEN** skills and roles are distributed to Claude Code or OpenCode
-- **THEN** they retain the existing runtime model policy and the same principal/spec and coordinated/pipeline behavior, without completion-role-specific exceptions.
-
-### Requirement: The managed generic fallback converges on Luna max
-The generated Codex project configuration and newly installed runtime configuration SHALL use `gpt-6-luna` with `max` reasoning as the generic subagent fallback. Setup and update SHALL migrate only the exact managed `gpt-5.6-terra` / `medium` and `gpt-5.6-luna` / `max` pairs to Luna 6/max with the existing backup and native activation reporting, while preserving every other complete operator-selected pair.
-
-#### Scenario: Setup encounters the former managed Terra fallback
-- **WHEN** setup or update reconciles a configuration whose generic subagent fallback is `gpt-5.6-terra` with `medium` effort
-- **THEN** it atomically replaces the model and effort with Luna 6/max, preserves unrelated configuration, creates the required backup, and reports the changed configuration for the existing native activation procedure
-
-#### Scenario: Setup encounters the former managed Luna fallback
-- **WHEN** setup or update reconciles `gpt-5.6-luna` with `max` effort
-- **THEN** it migrates to `gpt-6-luna` with `max`, preserves unrelated configuration, and a second reconciliation is a no-op
-
-#### Scenario: Setup encounters a custom fallback
-- **WHEN** setup or update reconciles a complete fallback other than the current or exact former managed pairs, including Luna 5.6 with a different effort
-- **THEN** it preserves the complete custom model and effort pair and reports the configuration as custom-preserved
-
 ### Requirement: Model policy is execution metadata, not authority
 An operator-selected or standard specialist model policy SHALL be recorded as
 non-secret resumable execution metadata after the live choice. Losing context
@@ -204,4 +170,46 @@ Main SHALL check the native roles and capabilities needed for the current assign
 
 #### Scenario: The standard role profile is selected
 - **WHEN** no live override replaces the installed standard profile
-- **THEN** native dispatch uses the existing Luna/max and Astra/xhigh settings for their roles, with observed activation limits reported honestly.
+- **THEN** native dispatch uses Sol 6.1 with each role's existing max or xhigh reasoning, with observed activation limits reported honestly.
+
+### Requirement: Codex specialists use Sol 6.1 independently of Main
+The standard Team Harness Codex profile SHALL assign gpt-6.1-sol to all delivered specialists, including pipeline aliases. Opus projections SHALL retain xhigh reasoning; Sonnet and Haiku projections SHALL retain max reasoning. Astra SHALL be reserved for Main's chat and SHALL NOT be selected or inherited by delegated agents. Main's model SHALL remain independently selected. Retired spec-validator and pr-creator roles SHALL remain absent.
+
+#### Scenario: Standard agent projections are generated
+- **WHEN** the registry generates runtime agents, packaged copies and the roster
+- **THEN** all twenty delivered specialists explicitly select Sol 6.1 with their existing reasoning efforts, including pipeline aliases
+
+#### Scenario: Main uses Astra
+- **WHEN** Main coordinates a pipeline from an Astra chat
+- **THEN** delegated specialists use Sol 6.1 without changing Main's model
+
+#### Scenario: A pipeline runs without a live model override
+- **WHEN** Main dispatches standard pipeline specialists
+- **THEN** all use Sol 6.1 with max for implementer, tester, cleaner and delivery, and xhigh for architect, QA and security
+
+#### Scenario: Explicit native model selection
+- **WHEN** the operator selects a supported reasoning effort for delegated Sol 6.1 agents
+- **THEN** coordination uses the host's supported selection route without changing Main's chat model or introducing a TH model resolver
+
+#### Scenario: The live host lacks Sol 6.1 dispatch
+- **WHEN** the active native dispatch capability cannot select Sol 6.1
+- **THEN** Main reports that limitation and continues suitable work directly without silently substituting another model
+
+#### Scenario: The phase roles are installed in another runtime
+- **WHEN** skills and roles are distributed to Claude Code or OpenCode
+- **THEN** they retain their existing runtime model policy
+
+### Requirement: The managed generic fallback converges on Sol 6.1 max
+The generated Codex project configuration and newly installed runtime configuration SHALL use `gpt-6.1-sol` with `max` reasoning as the generic subagent fallback. Setup and update SHALL migrate only the exact managed `gpt-5.6-terra` / `medium`, `gpt-5.6-luna` / `max`, and `gpt-6-luna` / `max` pairs to Sol 6.1/max with the existing backup and native activation reporting, while preserving every other complete operator-selected pair.
+
+#### Scenario: Setup encounters the former managed Terra fallback
+- **WHEN** setup or update reconciles a configuration whose generic subagent fallback is `gpt-5.6-terra` with `medium` effort
+- **THEN** it atomically replaces the model and effort with Sol 6.1/max, preserves unrelated configuration, creates the required backup, and reports the changed configuration for the existing native activation procedure
+
+#### Scenario: Setup encounters the former managed Luna fallback
+- **WHEN** setup or update reconciles `gpt-5.6-luna` or `gpt-6-luna` with `max` effort
+- **THEN** it migrates to `gpt-6.1-sol` with `max`, preserves unrelated configuration, and a second reconciliation is a no-op
+
+#### Scenario: Setup encounters a custom fallback
+- **WHEN** setup or update reconciles a complete fallback other than the current or exact former managed pairs, including Luna 5.6 with a different effort
+- **THEN** it preserves the complete custom model and effort pair and reports the configuration as custom-preserved

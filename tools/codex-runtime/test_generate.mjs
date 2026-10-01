@@ -137,14 +137,14 @@ assert.match(
 assert.match(projectConfig, /^\[features\]$/m);
 assert.match(projectConfig, /^multi_agent = true$/m);
 assert.match(projectConfig, /^multi_agent_v2 = true$/m);
-assert.match(projectConfig, /^default_subagent_model = "gpt-6-luna"$/m);
+assert.match(projectConfig, /^default_subagent_model = "gpt-6\.1-sol"$/m);
 assert.match(projectConfig, /^default_subagent_reasoning_effort = "max"$/m);
 assert.doesNotMatch(projectConfig, /gpt-5\.6-terra/, "project fallback retains Terra");
 assert.doesNotMatch(projectConfig, /^\[shell_environment_policy\]$/m);
 
 for (const name of ["architect", "qa", "security", "pr-review-verifier"]) {
   const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
-  assert.match(content, /^model = "gpt-6-astra"$/m);
+  assert.match(content, /^model = "gpt-6\.1-sol"$/m);
   assert.match(content, /^model_reasoning_effort = "xhigh"$/m);
 }
 for (const name of [
@@ -159,17 +159,17 @@ for (const name of [
   "reviewer-consolidator",
 ]) {
   const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
-  assert.match(content, /^model = "gpt-6-luna"$/m);
+  assert.match(content, /^model = "gpt-6\.1-sol"$/m);
   assert.match(content, /^model_reasoning_effort = "max"$/m);
 }
 const inlineReviewer = first.files.get(join(root, ".codex/agents/inline-reviewer.toml"));
-assert.match(inlineReviewer, /^model = "gpt-6-luna"$/m);
+assert.match(inlineReviewer, /^model = "gpt-6\.1-sol"$/m);
 assert.match(inlineReviewer, /^model_reasoning_effort = "max"$/m);
 assert.match(inlineReviewer, /^sandbox_mode = "read-only"$/m);
 assert.doesNotMatch(inlineReviewer, /^\[capabilities\]$/m);
 
 const cleaner = first.files.get(join(root, ".codex/agents/cleaner.toml"));
-assert.match(cleaner, /^model = "gpt-6-luna"$/m);
+assert.match(cleaner, /^model = "gpt-6\.1-sol"$/m);
 assert.match(cleaner, /^model_reasoning_effort = "max"$/m);
 assert.match(cleaner, /^sandbox_mode = "workspace-write"$/m);
 
@@ -184,8 +184,9 @@ const pipelineRoleMap = {
 };
 for (const [name, role] of Object.entries(pipelineRoleMap)) {
   const content = first.files.get(join(root, `.codex/agents/${name}.toml`));
-  assert.doesNotMatch(content, /^model = /m, `${name} must accept an explicit spawn model`);
-  assert.doesNotMatch(content, /^model_reasoning_effort = /m, `${name} must accept an explicit spawn effort`);
+  assert.match(content, /^model = "gpt-6\.1-sol"$/m, `${name} must use Sol independently of Main`);
+  const base = first.files.get(join(root, `.codex/agents/${role}.toml`));
+  assert.equal(content.match(/^model_reasoning_effort = .+$/m)?.[0], base.match(/^model_reasoning_effort = .+$/m)?.[0]);
   assert.match(content, new RegExp(`^name = "${name}"$`, "m"));
   assert.match(content, new RegExp(`^# Instruction source: runtime/codex/instructions/${role}\\.md$`, "m"));
   assert.match(content, new RegExp(`^# Semantic source: agents/${role}\\.md`, "m"));
@@ -209,19 +210,19 @@ assert.equal(herdrReference, await readFile(join(root, "agents/_shared/herdr-age
 const roster = first.files.get(join(root, ".codex/README.md"));
 assert.doesNotMatch(roster, /gpt-5\.6-terra/, "current generated roster retains Terra");
 assert.match(roster, /\| Agent \| Canonical Claude model \| Canonical source effort \| Codex model \| Codex effort \| Codex availability \|/);
-assert.match(roster, /\| `architect` \| `opus` \| `xhigh` \| `gpt-6-astra` \| `xhigh` \| installed custom agent \|/);
-assert.match(roster, /\| `qa` \| `opus` \| `xhigh` \| `gpt-6-astra` \| `xhigh` \| installed custom agent \|/);
-assert.match(roster, /\| `adversary` \| `sonnet` \| `xhigh` \| `gpt-6-luna` \| `max` \| not shipped in Codex beta \|/);
-assert.match(roster, /\| `implementer` \| `sonnet` \| `high` \| `gpt-6-luna` \| `max` \| installed custom agent \|/);
-assert.match(roster, /\| `cleaner` \| `sonnet` \| `medium` \| `gpt-6-luna` \| `max` \| installed custom agent \|/);
-assert.match(roster, /\| `inline-reviewer` \| `sonnet` \| `high` \| `gpt-6-luna` \| `max` \| installed custom agent \|/);
-assert.match(roster, /\| `reviewer` \| `sonnet` \| `high` \| `gpt-6-luna` \| `max` \| installed custom agent \|/);
-assert.match(roster, /\| `pr-review-qa` \| `sonnet` \| `high` \| `gpt-6-luna` \| `max` \| installed custom agent \|/);
-assert.match(roster, /\| `pr-review-security` \| `sonnet` \| `high` \| `gpt-6-luna` \| `max` \| installed custom agent \|/);
-assert.match(roster, /\| `pr-review-verifier` \| `opus` \| `high` \| `gpt-6-astra` \| `xhigh` \| installed custom agent \|/);
-assert.match(roster, /\| `reviewer-consolidator` \| `sonnet` \| `medium` \| `gpt-6-luna` \| `max` \| installed custom agent \|/);
-assert.match(roster, /\| `researcher` \| `haiku` \| `medium` \| `gpt-6-luna` \| `max` \| not shipped in Codex beta \|/);
-assert.match(roster, /\| `agent-builder` \| `opus` \| `xhigh` \| `gpt-6-astra` \| `xhigh` \| not shipped in Codex beta \|/);
+assert.match(roster, /\| `architect` \| `opus` \| `xhigh` \| `gpt-6\.1-sol` \| `xhigh` \| installed custom agent \|/);
+assert.match(roster, /\| `qa` \| `opus` \| `xhigh` \| `gpt-6\.1-sol` \| `xhigh` \| installed custom agent \|/);
+assert.match(roster, /\| `adversary` \| `sonnet` \| `xhigh` \| `gpt-6\.1-sol` \| `max` \| not shipped in Codex beta \|/);
+assert.match(roster, /\| `implementer` \| `sonnet` \| `high` \| `gpt-6\.1-sol` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `cleaner` \| `sonnet` \| `medium` \| `gpt-6\.1-sol` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `inline-reviewer` \| `sonnet` \| `high` \| `gpt-6\.1-sol` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `reviewer` \| `sonnet` \| `high` \| `gpt-6\.1-sol` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `pr-review-qa` \| `sonnet` \| `high` \| `gpt-6\.1-sol` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `pr-review-security` \| `sonnet` \| `high` \| `gpt-6\.1-sol` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `pr-review-verifier` \| `opus` \| `high` \| `gpt-6\.1-sol` \| `xhigh` \| installed custom agent \|/);
+assert.match(roster, /\| `reviewer-consolidator` \| `sonnet` \| `medium` \| `gpt-6\.1-sol` \| `max` \| installed custom agent \|/);
+assert.match(roster, /\| `researcher` \| `haiku` \| `medium` \| `gpt-6\.1-sol` \| `max` \| not shipped in Codex beta \|/);
+assert.match(roster, /\| `agent-builder` \| `opus` \| `xhigh` \| `gpt-6\.1-sol` \| `xhigh` \| not shipped in Codex beta \|/);
 assert.doesNotMatch(roster, /qa-plan/, "generated Codex roster exposes the removed planning-QA role");
 await assert.rejects(readFile(join(root, "agents/qa-plan.md")), /ENOENT/);
 await assert.rejects(readFile(join(root, "plugins/team-harness/agents/qa-plan.md")), /ENOENT/);
@@ -233,7 +234,7 @@ try {
   await writeFile(source, content.replace("model: sonnet\neffort: high", "model: opus\neffort: high"));
   const projected = await render({ rootDir: opusOtherFixture });
   const output = projected.files.get(join(opusOtherFixture, ".codex/agents/implementer.toml"));
-  assert.match(output, /^model = "gpt-6-astra"$/m);
+  assert.match(output, /^model = "gpt-6\.1-sol"$/m);
   assert.match(output, /^model_reasoning_effort = "xhigh"$/m);
 } finally {
   await rm(opusOtherFixture, { recursive: true, force: true });
@@ -246,7 +247,7 @@ try {
   await writeFile(source, content.replace("model: haiku\neffort: medium", "model: haiku\neffort: xhigh"));
   const projected = await render({ rootDir: haikuFixture });
   const roster = projected.files.get(join(haikuFixture, ".codex/README.md"));
-  assert.match(roster, /\| `init-project` \| `haiku` \| `xhigh` \| `gpt-6-luna` \| `max` \| not shipped in Codex beta \|/);
+  assert.match(roster, /\| `init-project` \| `haiku` \| `xhigh` \| `gpt-6\.1-sol` \| `max` \| not shipped in Codex beta \|/);
 } finally {
   await rm(haikuFixture, { recursive: true, force: true });
 }
@@ -254,9 +255,6 @@ try {
 await expectRegistryFailure(registry => {
   registry.agents[0].name = "Bad_Name";
 }, /invalid name/);
-await expectRegistryFailure(registry => {
-  registry.agents.find(agent => agent.name === "pipeline-architect").model_policy = "profile";
-}, /aliased roles must use spawn model policy/);
 await expectRegistryFailure(registry => {
   registry.agents.find(agent => agent.name === "pipeline-architect").model_policy = "ambient";
 }, /unsupported model policy/);

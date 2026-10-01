@@ -16,14 +16,14 @@ follows:
 
 | Canonical source | Codex model | Codex effort |
 |---|---|---|
-| `opus` + any allowed effort | `gpt-6-astra` | `xhigh` |
-| `sonnet` + `high` or `xhigh` | `gpt-6-luna` | `max` |
-| `sonnet` + `medium` | `gpt-6-luna` | `max` |
-| `haiku` + any allowed effort | `gpt-6-luna` | `max` |
+| `opus` + any allowed effort | `gpt-6.1-sol` | `xhigh` |
+| `sonnet` + `high` or `xhigh` | `gpt-6.1-sol` | `max` |
+| `sonnet` + `medium` | `gpt-6.1-sol` | `max` |
+| `haiku` + any allowed effort | `gpt-6.1-sol` | `max` |
 
 The critical installed roles (`architect`, `qa`, `security`, and
-`pr-review-verifier`) use Astra at `xhigh`, preserving their existing reasoning
-effort. Bounded roles and the generic fallback use Luna at `max`. Main keeps
+`pr-review-verifier`) use Sol 6.1 at `xhigh`, preserving their existing reasoning
+effort. Bounded roles and the generic fallback use Sol 6.1 at `max`. Main keeps
 the model selected in the active chat.
 
 Every role must match exactly one data-driven tier. The generator rejects an
@@ -38,11 +38,12 @@ contains the Codex contributor workflow plus the complete canonical Team
 Harness roster, with an explicit availability column distinguishing the
 installed custom roles, the Main-hosted orchestrator posture, and roles not yet
 shipped in the Codex beta. Seven additional `pipeline-*` identities reuse the
-logical role adapters while leaving model and effort unset for explicit live
-dispatch. These files are committed so a trusted checkout works
+logical role adapters and explicitly pin the same Sol 6.1 model and reasoning
+effort as their standard counterparts. Astra is reserved for Main's chat.
+These files are committed so a trusted checkout works
 without a build step. Do not edit generated files directly.
 
-The generated project config uses `gpt-6-luna` at `max` as its generic
+The generated project config uses `gpt-6.1-sol` at `max` as its generic
 subagent fallback without overriding Main's selected model, adds `CLAUDE.md` as
 an ordered project-instruction fallback when `AGENTS.md` is absent, and enables
 both `multi_agent` and `multi_agent_v2`. It deliberately omits

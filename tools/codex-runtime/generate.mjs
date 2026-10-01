@@ -141,9 +141,9 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
   if (!projectDefaults || typeof projectDefaults !== "object" || Array.isArray(projectDefaults)) {
     fail("project_defaults must be an object");
   }
-  if (projectDefaults.default_subagent_model !== "gpt-6-luna"
+  if (projectDefaults.default_subagent_model !== "gpt-6.1-sol"
       || projectDefaults.default_subagent_reasoning_effort !== "max") {
-    fail("project_defaults must set the generic Luna/max fallback");
+    fail("project_defaults must set the generic Sol 6.1/max fallback");
   }
   if (!Array.isArray(projectDefaults.project_doc_fallback_filenames)
       || projectDefaults.project_doc_fallback_filenames.length !== 1
@@ -195,9 +195,6 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     const modelPolicy = agent.model_policy ?? "profile";
     if (!new Set(["profile", "spawn"]).has(modelPolicy)) {
       fail(`${agent.name}: unsupported model policy ${modelPolicy}`);
-    }
-    if (role !== agent.name && modelPolicy !== "spawn") {
-      fail(`${agent.name}: aliased roles must use spawn model policy`);
     }
     const expectedSemanticSource = `agents/${role}.md`;
     if (agent.semantic_source !== expectedSemanticSource) fail(`${agent.name}: semantic_source must be ${expectedSemanticSource}`);
