@@ -8,7 +8,7 @@ Start Codex from the repository root. Use `@Team-Harness init <request>` for lig
 
 Author shared role intent in `agents/*.md`. Codex model and effort values are projected from that frontmatter, while Codex-specific execution instructions live in `runtime/codex/instructions/*.md` and workflow adapters live in `plugins/team-harness/skills/`. A semantic prompt change is not translated automatically into those adapters, so review both surfaces when behavior should change in Claude Code and Codex.
 
-The seven additional `pipeline-*` custom-agent identities reuse the corresponding logical role adapter but intentionally omit `model` and `model_reasoning_effort`. A coordinated workflow may pass both values explicitly to a bounded native assignment, using the standard role matrix by default or one ephemeral pair selected in the current live Main session; their presence is not a preflight or permission requirement.
+The seven additional `pipeline-*` custom-agent identities reuse the corresponding logical role adapter and explicitly pin `gpt-6.1-sol` with the same reasoning effort as their standard counterparts. Main keeps its independently selected chat model; Astra is reserved for that chat and is not inherited by specialists. Report unavailable Sol 6.1 dispatch without silently substituting another model. These aliases are optional native roles, not a preflight or permission requirement.
 
 After changing any canonical agent's model or effort, an installed role contract, a Codex instruction adapter, or `runtime/schema/codex-agents.json`, run `$sync-codex-agents`. The equivalent repository commands are:
 
@@ -27,33 +27,33 @@ Generated with the `team-harness` profile. This table includes every canonical T
 
 | Agent | Canonical Claude model | Canonical source effort | Codex model | Codex effort | Codex availability |
 |---|---|---|---|---|---|
-| `adversary` | `sonnet` | `xhigh` | `gpt-6-luna` | `max` | not shipped in Codex beta |
-| `agent-builder` | `opus` | `xhigh` | `gpt-6-astra` | `xhigh` | not shipped in Codex beta |
-| `architect` | `opus` | `xhigh` | `gpt-6-astra` | `xhigh` | installed custom agent |
-| `cleaner` | `sonnet` | `medium` | `gpt-6-luna` | `max` | installed custom agent |
-| `code-researcher` | `sonnet` | `medium` | `gpt-6-luna` | `max` | not shipped in Codex beta |
-| `d2-diagrammer` | `sonnet` | `medium` | `gpt-6-luna` | `max` | not shipped in Codex beta |
-| `delivery` | `sonnet` | `medium` | `gpt-6-luna` | `max` | installed custom agent |
-| `diagrammer` | `sonnet` | `medium` | `gpt-6-luna` | `max` | not shipped in Codex beta |
-| `documenter` | `sonnet` | `high` | `gpt-6-luna` | `max` | not shipped in Codex beta |
-| `gcp-cost-analyzer` | `opus` | `high` | `gpt-6-astra` | `xhigh` | not shipped in Codex beta |
-| `gcp-infra` | `opus` | `xhigh` | `gpt-6-astra` | `xhigh` | not shipped in Codex beta |
-| `implementer` | `sonnet` | `high` | `gpt-6-luna` | `max` | installed custom agent |
-| `init-project` | `haiku` | `medium` | `gpt-6-luna` | `max` | not shipped in Codex beta |
-| `inline-reviewer` | `sonnet` | `high` | `gpt-6-luna` | `max` | installed custom agent |
-| `likec4-diagrammer` | `sonnet` | `medium` | `gpt-6-luna` | `max` | not shipped in Codex beta |
-| `mentor` | `opus` | `high` | `gpt-6-astra` | `xhigh` | not shipped in Codex beta |
-| `orchestrator` | `opus` | `high` | `gpt-6-astra` | `xhigh` | Main via `init` / `pipeline` workflows |
-| `plan-reviewer` | `sonnet` | `medium` | `gpt-6-luna` | `max` | not shipped in Codex beta |
-| `pr-review-qa` | `sonnet` | `high` | `gpt-6-luna` | `max` | installed custom agent |
-| `pr-review-security` | `sonnet` | `high` | `gpt-6-luna` | `max` | installed custom agent |
-| `pr-review-verifier` | `opus` | `high` | `gpt-6-astra` | `xhigh` | installed custom agent |
-| `qa` | `opus` | `xhigh` | `gpt-6-astra` | `xhigh` | installed custom agent |
-| `research-consolidator` | `sonnet` | `high` | `gpt-6-luna` | `max` | not shipped in Codex beta |
-| `researcher` | `haiku` | `medium` | `gpt-6-luna` | `max` | not shipped in Codex beta |
-| `reviewer-consolidator` | `sonnet` | `medium` | `gpt-6-luna` | `max` | installed custom agent |
-| `reviewer` | `sonnet` | `high` | `gpt-6-luna` | `max` | installed custom agent |
-| `security` | `opus` | `xhigh` | `gpt-6-astra` | `xhigh` | installed custom agent |
-| `tester` | `sonnet` | `high` | `gpt-6-luna` | `max` | installed custom agent |
-| `translator` | `sonnet` | `medium` | `gpt-6-luna` | `max` | not shipped in Codex beta |
-| `ux-reviewer` | `opus` | `high` | `gpt-6-astra` | `xhigh` | not shipped in Codex beta |
+| `adversary` | `sonnet` | `xhigh` | `gpt-6.1-sol` | `max` | not shipped in Codex beta |
+| `agent-builder` | `opus` | `xhigh` | `gpt-6.1-sol` | `xhigh` | not shipped in Codex beta |
+| `architect` | `opus` | `xhigh` | `gpt-6.1-sol` | `xhigh` | installed custom agent |
+| `cleaner` | `sonnet` | `medium` | `gpt-6.1-sol` | `max` | installed custom agent |
+| `code-researcher` | `sonnet` | `medium` | `gpt-6.1-sol` | `max` | not shipped in Codex beta |
+| `d2-diagrammer` | `sonnet` | `medium` | `gpt-6.1-sol` | `max` | not shipped in Codex beta |
+| `delivery` | `sonnet` | `medium` | `gpt-6.1-sol` | `max` | installed custom agent |
+| `diagrammer` | `sonnet` | `medium` | `gpt-6.1-sol` | `max` | not shipped in Codex beta |
+| `documenter` | `sonnet` | `high` | `gpt-6.1-sol` | `max` | not shipped in Codex beta |
+| `gcp-cost-analyzer` | `opus` | `high` | `gpt-6.1-sol` | `xhigh` | not shipped in Codex beta |
+| `gcp-infra` | `opus` | `xhigh` | `gpt-6.1-sol` | `xhigh` | not shipped in Codex beta |
+| `implementer` | `sonnet` | `high` | `gpt-6.1-sol` | `max` | installed custom agent |
+| `init-project` | `haiku` | `medium` | `gpt-6.1-sol` | `max` | not shipped in Codex beta |
+| `inline-reviewer` | `sonnet` | `high` | `gpt-6.1-sol` | `max` | installed custom agent |
+| `likec4-diagrammer` | `sonnet` | `medium` | `gpt-6.1-sol` | `max` | not shipped in Codex beta |
+| `mentor` | `opus` | `high` | `gpt-6.1-sol` | `xhigh` | not shipped in Codex beta |
+| `orchestrator` | `opus` | `high` | `gpt-6.1-sol` | `xhigh` | Main via `init` / `pipeline` workflows |
+| `plan-reviewer` | `sonnet` | `medium` | `gpt-6.1-sol` | `max` | not shipped in Codex beta |
+| `pr-review-qa` | `sonnet` | `high` | `gpt-6.1-sol` | `max` | installed custom agent |
+| `pr-review-security` | `sonnet` | `high` | `gpt-6.1-sol` | `max` | installed custom agent |
+| `pr-review-verifier` | `opus` | `high` | `gpt-6.1-sol` | `xhigh` | installed custom agent |
+| `qa` | `opus` | `xhigh` | `gpt-6.1-sol` | `xhigh` | installed custom agent |
+| `research-consolidator` | `sonnet` | `high` | `gpt-6.1-sol` | `max` | not shipped in Codex beta |
+| `researcher` | `haiku` | `medium` | `gpt-6.1-sol` | `max` | not shipped in Codex beta |
+| `reviewer-consolidator` | `sonnet` | `medium` | `gpt-6.1-sol` | `max` | installed custom agent |
+| `reviewer` | `sonnet` | `high` | `gpt-6.1-sol` | `max` | installed custom agent |
+| `security` | `opus` | `xhigh` | `gpt-6.1-sol` | `xhigh` | installed custom agent |
+| `tester` | `sonnet` | `high` | `gpt-6.1-sol` | `max` | installed custom agent |
+| `translator` | `sonnet` | `medium` | `gpt-6.1-sol` | `max` | not shipped in Codex beta |
+| `ux-reviewer` | `opus` | `high` | `gpt-6.1-sol` | `xhigh` | not shipped in Codex beta |

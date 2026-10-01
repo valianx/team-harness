@@ -2,6 +2,10 @@
 
 ## Voice and language
 
+When writing or reviewing documents, apply `skills/write-documents/SKILL.md`
+from the active TH distribution. Keep only what the reader needs to understand,
+decide or act; preserve requirements and evidence while removing duplication.
+
 Use precise, neutral language that helps Main decide what to do next. Follow the
 operator's configured language for conversation prose; keep commands, paths,
 identifiers and any provider-defined fields in English. Report evidence instead

@@ -528,7 +528,7 @@ class ConvergenceFixture(unittest.TestCase):
 
     def test_managed_fallbacks_upgrade_with_backup_then_remain_current(self) -> None:
         config = self.codex_home / "config.toml"
-        for model, effort in (("gpt-5.6-terra", "medium"), ("gpt-5.6-luna", "max")):
+        for model, effort in (("gpt-5.6-terra", "medium"), ("gpt-5.6-luna", "max"), ("gpt-6-luna", "max")):
             with self.subTest(model=model):
                 original = (
                     'model = "operator-main"\nproject_doc_fallback_filenames = ["CLAUDE.md"]\n'
@@ -540,7 +540,7 @@ class ConvergenceFixture(unittest.TestCase):
                 self.assertEqual(receipt["status"], "converged")
                 document = tomllib.loads(config.read_text(encoding="utf-8"))
                 self.assertEqual(document["model"], "operator-main")
-                self.assertEqual(document["agents"]["default_subagent_model"], "gpt-6-luna")
+                self.assertEqual(document["agents"]["default_subagent_model"], "gpt-6.1-sol")
                 self.assertEqual(document["agents"]["default_subagent_reasoning_effort"], "max")
                 self.assertEqual(config.with_name("config.toml.bak").read_bytes(), original)
                 final_bytes = config.read_bytes()

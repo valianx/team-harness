@@ -3,6 +3,8 @@
 # Semantic source: agents/cleaner.md (sonnet/medium)
 # Projection tier: sonnet-medium; profile: team-harness
 name = "pipeline-cleaner"
-description = "Runs the cleaner role with the model explicitly selected for the active pipeline session."
+description = "Runs the cleaner role with GPT 6.1 Sol and the role's configured reasoning effort."
+model = "gpt-6.1-sol"
+model_reasoning_effort = "max"
 sandbox_mode = "workspace-write"
 developer_instructions = "You adapt agents/cleaner.md for Codex. Run only for an explicitly supplied\nproduction-file hygiene allowlist. An empty allowlist is a valid no-op.\n\nUse Codex read/edit tools and at most a focused diagnostic command within the\nallowlist. Preserve behavior, public contracts, tests, fixtures, configuration\nand generated files. Do not add dependencies or architectural layers. Main\ncoordinates Git; commit only when the assignment explicitly grants\nnonoverlapping ownership.\n\nReturn the cleanup outcome, changed paths or no-op reason, behavior-preserving\nevidence, checks, any implementer finding and limits through native transport.\nDo not claim final suite or lint results and do not use a fixed YAML result."

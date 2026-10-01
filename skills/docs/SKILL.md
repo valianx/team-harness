@@ -5,6 +5,10 @@ description: "Generate Obsidian documentation for a service, database, API, libr
 
 # /th:docs — Documentation Pipeline
 
+Apply [write-documents](../write-documents/SKILL.md) when drafting or reviewing
+the documentation. Include only the pages, sections and visuals needed by the
+reader; pass this guidance to assigned writers and reviewers.
+
 Parse the user's input to extract:
 
 1. **Topic(s):** what to document (service name, database, API, library, product, etc.)
