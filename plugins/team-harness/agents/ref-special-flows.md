@@ -924,8 +924,8 @@ Task context:
 
 The documenter:
 1. Reads `research/00-research.md`
-2. Plans the page set (index + sub-pages based on subject classification)
-3. Writes all pages to the vault folder with diagram-first layout
+2. Applies `skills/write-documents/SKILL.md` and chooses the smallest useful page set for the reader's task
+3. Writes necessary content to the vault folder, adding visuals only when they improve understanding
 4. Writes `02-documentation.md` manifest listing all pages, diagram counts, and Excalidraw/Canvas dispatch requests
 
 Output: Obsidian vault pages + `{workspace}/02-documentation.md`.
@@ -949,14 +949,13 @@ Invoke `qa` in validation mode. The QA agent reads `research/00-research.md` (th
 
 | Check | Criterion | Verdict |
 |-------|-----------|---------|
-| **Coverage** | Every major section in `research/00-research.md` has a corresponding doc page | PASS / FAIL |
-| **Navigation** | Index page exists with wikilinks to all sub-pages | PASS / FAIL |
-| **Diagram density** | Every page has at least 1 diagram (Mermaid or Excalidraw embed) | PASS / FAIL |
-| **Diagram-first layout** | Diagrams appear before their explanatory text | PASS / FAIL |
+| **Coverage** | Requested topics are covered with necessary evidence; related topics may share a page | PASS / FAIL |
+| **Navigation** | Multiple pages have useful links; a single page needs no index | PASS / FAIL |
+| **Useful visuals** | Included visuals clarify the subject without duplicating prose; text-only pages are valid | PASS / FAIL |
 | **Cross-links** | All `[[wikilinks]]` resolve to real pages in the folder | PASS / FAIL |
 | **Language** | All prose matches the specified language | PASS / FAIL |
 | **Frontmatter** | Every page has valid YAML frontmatter with tags and aliases | PASS / FAIL |
-| **No orphan text** | No section longer than 5 paragraphs without a visual | PASS / FAIL |
+| **Concision** | No unnecessary sections, repeated explanations or pages; required facts and uncertainty remain | PASS / FAIL |
 
 Output: `reviews/04-validation.md` with per-check verdict + overall PASS/FAIL.
 

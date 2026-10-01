@@ -5,6 +5,10 @@ description: Develop through Spec, Implementation, Validation and Publication wi
 
 # Spec: lightweight development
 
+Use [write-documents](../write-documents/SKILL.md) when authoring or reviewing
+planning artifacts: preserve acceptance criteria and evidence, remove repeated
+explanations, and add no companion documents without a concrete purpose.
+
 Use OpenSpec for a bounded objective that benefits from durable written intent
 and tasks. The current principal carries Spec, Implementation, Validation and
 Publication in the shared workspace, with selected independent reviewers.

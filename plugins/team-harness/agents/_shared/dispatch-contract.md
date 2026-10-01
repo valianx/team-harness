@@ -1,5 +1,9 @@
 # Specialist dispatch
 
+For assignments that write or review documents, provide the active distribution's
+`skills/write-documents/SKILL.md` guidance. Ask for only useful content and
+actionable findings, preserving required evidence without duplicate reports.
+
 In Codex, delegated agents use `gpt-6.1-sol`, including every `pipeline-*`
 role. Preserve the installed reasoning effort. Astra is reserved for Main's
 chat and must not be selected or inherited by a specialist. Main keeps its

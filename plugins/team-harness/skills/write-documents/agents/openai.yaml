@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Write Documents"
+  short_description: "Team Harness Write Documents workflow"
+  default_prompt: "Use $team-harness:write-documents for this request."

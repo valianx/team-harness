@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.42.5] - 2026-09-29
 
 ### Changed
+- Added the `write-documents` editorial guide for concise drafting and review, with source preservation and MIT attribution to avoid-ai-writing. Documentation and planning use the guide; documenter and documentation QA no longer require page or diagram quotas.
 - Codex specialists and pipeline roles use GPT 6.1 Sol with their existing reasoning efforts; Astra remains available for the main chat.
 - Setup and update migrate formerly managed generic subagent defaults to Sol 6.1/max with a backup, preserving the main chat model and custom fallback pairs.
 
