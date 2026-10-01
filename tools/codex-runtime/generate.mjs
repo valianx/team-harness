@@ -362,7 +362,7 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     "",
     "Author shared role intent in `agents/*.md`. Codex model and effort values are projected from that frontmatter, while Codex-specific execution instructions live in `runtime/codex/instructions/*.md` and workflow adapters live in `plugins/team-harness/skills/`. A semantic prompt change is not translated automatically into those adapters, so review both surfaces when behavior should change in Claude Code and Codex.",
     "",
-    "The seven additional `pipeline-*` custom-agent identities reuse the corresponding logical role adapter but intentionally omit `model` and `model_reasoning_effort`. A coordinated workflow may pass both values explicitly to a bounded native assignment, using the standard role matrix by default or one ephemeral pair selected in the current live Main session; their presence is not a preflight or permission requirement.",
+    "The seven additional `pipeline-*` custom-agent identities reuse the corresponding logical role adapter and explicitly pin `gpt-6.1-sol` with the same reasoning effort as their standard counterparts. Main keeps its independently selected chat model; Astra is reserved for that chat and is not inherited by specialists. Report unavailable Sol 6.1 dispatch without silently substituting another model. These aliases are optional native roles, not a preflight or permission requirement.",
     "",
     "After changing any canonical agent's model or effort, an installed role contract, a Codex instruction adapter, or `runtime/schema/codex-agents.json`, run `$sync-codex-agents`. The equivalent repository commands are:",
     "",
