@@ -60,10 +60,16 @@ results with their original identity.
 | **Validation** | Identified candidate, requirements, tests and selected checks. Run project checks and selected diagnostics; execute spec's TEA test-review/trace, Superpowers completion evidence and OpenSpec implementation verify. Prepare completed archive, then the selected independent candidate review; judge findings and verify corrections. | Current evidence, measured/omitted scope, original assessments and reasoned dispositions in the workspace. Living specs/archive stay in the repository. State what is verified and what remains unknown. |
 | **Publication** | Evaluated candidate, evidence, review decision and authorized destination. Use create-pr for candidate/file hygiene and preparation/publication. | Prepared PR or published URL with observed CI/review state and remaining action. Local completion without a PR is a valid endpoint. Merge is separate. |
 
-Only execute capabilities belonging to reached stages. A planning request needs
-the testing strategy, not fabricated implementation results. Returning from a
-finding to implementation renews affected verification instead of restarting
-the whole flow.
+For acceptance spanning components or a sensitive requirement, explain its
+scenario and implementation/contract prerequisites in the existing task. Check
+that task order respects the required producers and planned validation commands
+cover the named scenarios. Test design may proceed in parallel; executing
+HTTP/worker recovery acceptance waits for both producers.
+
+Only execute capabilities belonging to reached stages. A planning request defines
+the testing strategy and future verification without running product acceptance
+or claiming implementation results. Returning from a finding to implementation
+renews affected verification instead of restarting the whole flow.
 
 ## Select and account for tools
 
