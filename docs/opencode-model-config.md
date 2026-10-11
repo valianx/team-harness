@@ -33,7 +33,7 @@ is actually adopted.
 ## opencode rules we must obey (empirically confirmed)
 
 1. **An agent's `model:` is a static literal** in the form `provider/model-id`
-   (e.g. `anthropic/claude-haiku-4-5`). There is **no runtime variable, alias, tier
+   (e.g. `anthropic/claude-haiku-5-5`). There is **no runtime variable, alias, tier
    label, or `inherit` keyword** — opencode does not resolve `model: {tier}`.
    (opencode docs, confirmed 2026-06-22.)
 2. **Omitting `model:` triggers inheritance**, and inheritance differs by role:
@@ -64,7 +64,8 @@ Opus 5.5 for Anthropic API, Bedrock, and Google providers. Microsoft Foundry may
 continue resolving `opus` to Opus 4.6 or a provider-specific override; that
 availability and upgrade decision belongs to the runtime/provider. Team Harness
 only uses the alias as the default tier input and pins the opt-in Anthropic
-opencode projection to `claude-opus-5-5`. Existing concrete model ids remain
+opencode projection to `claude-opus-5-5`, `claude-sonnet-5-5` and
+`claude-haiku-5-5`. Existing concrete model ids remain
 unchanged and pass through as authored. See Claude Code's [model configuration
 reference](https://code.claude.com/docs/en/model-config) and Anthropic's [model
 overview](https://platform.claude.com/docs/en/models/overview) for the
@@ -123,8 +124,8 @@ CLI surface:
 
 ```shell
 install --runtime opencode --opencode-tier anthropic
-# bakes: orchestrator → anthropic/claude-opus-5-5; implementer → anthropic/claude-sonnet-4-6;
-#        init/researcher → anthropic/claude-haiku-4-5
+# bakes: orchestrator → anthropic/claude-opus-5-5; implementer → anthropic/claude-sonnet-5-5;
+#        init/researcher → anthropic/claude-haiku-5-5
 ```
 
 ## Reference

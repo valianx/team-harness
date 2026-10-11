@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.42.6] - 2026-10-10
+
+### Changed
+- OpenCode cost tiering and alias resolution pin the current Sonnet and Haiku models, `anthropic/claude-sonnet-5-5` and `anthropic/claude-haiku-5-5`, alongside `anthropic/claude-opus-5-5`.
+
 ## [3.42.5] - 2026-09-29
 
 ### Changed

@@ -43,8 +43,8 @@ const ANTHROPIC_PREFIX = "anthropic/";
  */
 const ALIAS_TO_CONCRETE_MODEL = {
   opus: "claude-opus-5-5",
-  sonnet: "claude-sonnet-4-6",
-  haiku: "claude-haiku-4-5",
+  sonnet: "claude-sonnet-5-5",
+  haiku: "claude-haiku-5-5",
 };
 
 // ---------------------------------------------------------------------------
@@ -91,8 +91,8 @@ const PROVIDER_TIER_FAMILY = {
 const PROVIDER_TIER_CONCRETE = {
   anthropic: {
     default: "claude-opus-5-5",
-    medium: "claude-sonnet-4-6",
-    low: "claude-haiku-4-5",
+    medium: "claude-sonnet-5-5",
+    low: "claude-haiku-5-5",
   },
 };
 
