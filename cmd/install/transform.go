@@ -25,8 +25,8 @@ const anthropicPrefix = "anthropic/"
 // Map content must stay byte-identical to ALIAS_TO_CONCRETE_MODEL in migrate.mjs.
 var aliasToConcreteModel = map[string]string{
 	"opus":   "claude-opus-5-5",
-	"sonnet": "claude-sonnet-4-6",
-	"haiku":  "claude-haiku-4-5",
+	"sonnet": "claude-sonnet-5-5",
+	"haiku":  "claude-haiku-5-5",
 }
 
 // ---------------------------------------------------------------------------
@@ -76,8 +76,8 @@ var providerTierFamily = map[string]map[string]string{
 var providerTierConcrete = map[string]map[string]string{
 	"anthropic": {
 		"default": "claude-opus-5-5",
-		"medium":  "claude-sonnet-4-6",
-		"low":     "claude-haiku-4-5",
+		"medium":  "claude-sonnet-5-5",
+		"low":     "claude-haiku-5-5",
 	},
 }
 

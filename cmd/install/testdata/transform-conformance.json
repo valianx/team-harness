@@ -245,16 +245,16 @@
     "surface": "agent",
     "tierProvider": "anthropic",
     "input": "---\ndescription: Implementer\nmodel: sonnet\ntools: Read, Edit, Write, Bash, Glob\n---\n",
-    "expectedOutput": "---\ndescription: Implementer\nmodel: anthropic/claude-sonnet-4-6\nmode: subagent\nth-origin: opencode\n---\n",
-    "note": "#424 AC-9: sonnet -> medium -> anthropic/claude-sonnet-4-6."
+    "expectedOutput": "---\ndescription: Implementer\nmodel: anthropic/claude-sonnet-5-5\nmode: subagent\nth-origin: opencode\n---\n",
+    "note": "#424 AC-9: sonnet -> medium -> anthropic/claude-sonnet-5-5."
   },
   {
     "name": "tiered_haiku_bakes_anthropic_haiku",
     "surface": "agent",
     "tierProvider": "anthropic",
     "input": "---\nname: init-project\nmodel: haiku\ntools: \n---\nBody.\n",
-    "expectedOutput": "---\nname: init-project\nmodel: anthropic/claude-haiku-4-5\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
-    "note": "#424 AC-9: haiku -> low -> anthropic/claude-haiku-4-5."
+    "expectedOutput": "---\nname: init-project\nmodel: anthropic/claude-haiku-5-5\nmode: subagent\nth-origin: opencode\n---\nBody.\n",
+    "note": "#424 AC-9: haiku -> low -> anthropic/claude-haiku-5-5."
   },
   {
     "name": "tiered_already_concrete_model_falls_back_to_model_less",
