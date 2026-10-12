@@ -15,14 +15,17 @@ const sites = {
   installer: "cmd/install/main.go",
 };
 
-function fixtureEnv() {
+function fixtureEnv(root) {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
-  return { ...env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_SYSTEM: os.devNull, GIT_CONFIG_GLOBAL: os.devNull };
+  const emptyConfig = path.join(root, ".git", "fixture-empty-config");
+  return { ...env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_SYSTEM: emptyConfig, GIT_CONFIG_GLOBAL: emptyConfig };
 }
 
 async function fixture({ includeCodex = true, includeInstaller = true, initialDistributedFile = null, initialVersion = "1.2.3" } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "th-version-preflight-"));
-  const git = (...args) => execFileSync("git", args, { cwd: root, stdio: "ignore", env: fixtureEnv() });
+  await mkdir(path.join(root, ".git"));
+  await writeFile(path.join(root, ".git", "fixture-empty-config"), "");
+  const git = (...args) => execFileSync("git", args, { cwd: root, env: fixtureEnv(root) });
   await mkdir(path.join(root, ".claude-plugin"), { recursive: true });
   if (includeCodex) await mkdir(path.dirname(path.join(root, sites.codex)), { recursive: true });
   if (includeInstaller) await mkdir(path.dirname(path.join(root, sites.installer)), { recursive: true });
@@ -45,7 +48,7 @@ async function fixture({ includeCodex = true, includeInstaller = true, initialDi
   git("config", "user.name", "Version Preflight Test");
   git("add", ".");
   git("commit", "-qm", "baseline");
-  const base = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8", env: fixtureEnv() }).trim();
+  const base = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8", env: fixtureEnv(root) }).trim();
   return { root, base, git };
 }
 
@@ -76,7 +79,7 @@ function invoke(f, args = ["--base", f.base, "--head", "HEAD"], extraEnv = {}) {
   return spawnSync(process.execPath, [script, ...args], {
     cwd: f.root,
     encoding: "utf8",
-    env: { ...fixtureEnv(), ...extraEnv },
+    env: { ...fixtureEnv(f.root), ...extraEnv },
   });
 }
 
@@ -381,7 +384,7 @@ await withFixture(async (f) => {
 await withFixture(async (f) => {
   const brokenCommit = execFileSync("git", ["hash-object", "-t", "commit", "--literally", "-w", "--stdin"], {
     cwd: f.root,
-    env: fixtureEnv(),
+    env: fixtureEnv(f.root),
     encoding: "utf8",
     input: "tree ffffffffffffffffffffffffffffffffffffffff\nauthor Test <test@example.invalid> 0 +0000\ncommitter Test <test@example.invalid> 0 +0000\n\nunreadable tree\n",
   }).trim();
@@ -391,7 +394,7 @@ await withFixture(async (f) => {
 }, { name: "fails closed when valid commit objects cannot be diffed" });
 
 function gitText(f, ...args) {
-  return execFileSync("git", args, { cwd: f.root, encoding: "utf8", env: fixtureEnv() }).trim();
+  return execFileSync("git", args, { cwd: f.root, encoding: "utf8", env: fixtureEnv(f.root) }).trim();
 }
 
 async function removeLooseBlob(f, ref, file) {
