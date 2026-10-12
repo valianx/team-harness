@@ -20,9 +20,11 @@ evidence; this page only maps the existing entry points to that method.
 The coordinator may stop at the requested endpoint or resume a later phase from
 the existing workspace and canonical tasks. Tool outputs are recommendations
 and evidence; Main decides how to proceed. Publication does not imply merge.
-PR descriptions end with a descriptive risk flag in their own language, such
-as `Risky change: true` or `Cambio riesgoso: false`. Main's assessment informs
-the operator without adding an approval step.
+PR descriptions end with `Human verification required: false` or the localized
+equivalent when no necessary human check remains. Automated checks and advisory
+agent reviews can cover validation. Main uses `true` only for a concrete remaining
+check that needs a person and identifies it above the footer. Technical risk and validation limits
+remain in the body; this flag adds no approval step or publication/merge authority.
 
 | Objective | Entry | Supporting source |
 | --- | --- | --- |
