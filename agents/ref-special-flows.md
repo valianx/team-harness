@@ -41,26 +41,30 @@ Locate the needed section by heading; do not read this file in full.
 
 ## Research Flow
 
-When the user asks to investigate, compare technologies, evaluate a migration, or study an approach:
+For technology, migration or approach research:
 
-1. **Intake** — classify as `research`
-2. **Gather evidence directly** for a small question. For independent questions
-   or a complex external comparison, Main may fan out bounded `researcher`
-   tasks through the host's native dispatch (up to five lanes).
-   - Compose N distinct angles for the topic (e.g., `official-docs`, `benchmarks`, `known-issues`, `migration-guides`, `community-adoption`). Cap at 5.
-   - Give each lane a distinct angle and an explicit findings path under
-     `{workspace}/research/`.
-   - A failed lane is recorded in the report and does not erase other evidence;
-     no event stream is required.
-3. **Consolidate when useful** — an optional `research-consolidator` merges
-   multiple findings files, preserves `### Conflicting sources`, and writes
-   `{workspace}/research/00-research.md`.
-4. **Synthesize when useful** — the architect may read the report and append a
-   recommendation when a design decision needs it.
-6. **Skip Phases 2-5** (no implementation, testing, validation, or delivery)
-7. **Present** the research report to the user
-8. **Ask** the user how to proceed (implement, discard, or investigate further)
-9. **Act on user's choice:**
+1. **Intake** — classify as `research` and preserve the selected absolute workspace.
+2. **Gather evidence directly** for small questions; otherwise Main may dispatch
+   up to five independent `researcher` lanes through native tools.
+   - Assign distinct angles, topics and relevance criteria. Specialists return
+     evidence via native transport without writing, shell execution, delegation
+     or publication.
+   - Record failed lanes without erasing evidence; distinguish failures from
+     honest zero results. No event stream is required.
+3. **Synthesize and persist** — Main compares returned findings and saves useful
+   evidence and recommendations as `{workspace}/research/00-research.md`.
+   Preserve citations, confidence, `## Conflicting Sources`, skipped lanes and
+   failures. An optional `research-consolidator` returns advisory synthesis
+   from supplied findings or Main-persisted read-only files. Main may request
+   architect analysis when a design decision needs it; assign its output
+   explicitly. Neither specialist is a required next stage.
+4. **Resolve material gaps** — Main decides whether a gap blocks the requested
+   answer and dispatches bounded follow-up only when needed or requested.
+   Specialist gap recommendations do not trigger work. Amend the same report.
+5. **Skip Phases 2-5** (no implementation, testing, validation, or delivery)
+6. **Present** the research report to the user
+7. **Ask** the user how to proceed (implement, discard, or investigate further)
+8. **Act on user's choice:**
    - **Implement:** reclassify the pipeline and re-enter the pipeline with all gates:
      a. Determine the new type: `refactor` if the research identified structural changes to existing code; `feature` if it identified new functionality to build.
      b. Pass the research report to the current pipeline route; its active
@@ -80,9 +84,10 @@ When the user asks to investigate, compare technologies, evaluate a migration, o
 
 ## Research-Code Flow
 
-When the operator asks to investigate how the codebase works, trace a flow in real files, understand a subsystem or concern across files, or research a codebase question that may also have an external-knowledge facet:
+For codebase behavior, subsystem traces or cross-file concerns:
 
-1. **Intake** — classify as `research-code` (read-only)
+1. **Intake** — the current general agent coordinates `research-code` directly;
+   source investigation remains read-only. Do not dispatch another coordinator.
 2. Resolve the absolute workspace supplied by the caller. A direct
    research-code session does not require a state, event, or knowledge-context
    file.
@@ -90,32 +95,39 @@ When the operator asks to investigate how the codebase works, trace a flow in re
 
    | # | Strategy | When it applies | Lane = |
    |---|----------|-----------------|--------|
-   | 1 | **By subsystem / directory** | The repo has clear top-level boundaries and the question spans them | One disjoint path-set per lane (e.g., lane A = `agents/`, lane B = `hooks/ + tests/`) |
-   | 2 | **By concern** | The question is cross-cutting and a directory split would fragment it (e.g., "how is error-handling done?") | One concern per lane: `auth`, `data/persistence`, `error-handling`, `config`, `transport` — each lane greps the whole repo for its concern |
-   | 3 | **By question facet** | The question is a single compound question ("does X cause Y, and is Z safe?") | One sub-question per lane, each scoped to the files that answer it |
+   | 1 | **By subsystem / directory** | Clear directory boundaries; question spans them | One disjoint path-set |
+   | 2 | **By concern** | Cross-cutting question | One concern across the repo |
+   | 3 | **By question facet** | Compound question | One sub-question and its supporting files |
 
    **Non-overlap rule:** state each lane's boundary (path-set, concern, or
    question facet) explicitly. Do not assign the same file to two lanes for the
    same purpose.
 
-   **Default scope:** current repo. **Cross-repo scope:** when the operator passes ≥2 repo paths (`--multi-repo`), repo is the outermost partition key. Each lane is scoped to ONE repo. A lane that spans two repos is only valid when the question explicitly addresses a cross-repo seam, in which case that seam is its own dedicated lane.
+   **Default scope:** current repo. With `--multi-repo`, partition first by repo.
+   Each lane covers one repo; an explicitly named cross-repo seam gets its own lane.
 
-4. **Optionally compose ≤2 web lanes** (the existing haiku `researcher` agent) when the question has an external-knowledge facet — a library, framework, or spec the codebase consumes. These web lanes run in parallel alongside the code lanes. Hybrid = code lanes + optional web lanes. When no external-knowledge facet exists, use code lanes only.
+4. **Optionally add ≤2 `researcher` web lanes** for external facets such as a
+   library, framework or spec. Run alongside code lanes; otherwise use code only.
 5. **Run selected lanes** through native bounded dispatch when the question is
-   large enough to benefit from it; otherwise inspect directly. A failed lane
-   is recorded in the report, and no research event stream is required.
-6. **Consolidate when useful** — merge code and web evidence into
-   `{workspace}/research/00-research.md`, preserving `## Conflicting Sources`
-   and `## Code vs Docs Conflicts`.
-7. **Present** the report and ask whether to implement, discard, or investigate
-   a named gap. Any follow-up amends the same report without a loop, round
-   counter, or state scaffold.
+   large enough to benefit from it; otherwise inspect directly. Research
+   specialists return evidence through native transport without writing,
+   executing shell commands, delegating or publishing. A failed lane is
+   recorded in the report, and no research event stream is required.
+6. **Synthesize and persist** — Main merges code and web evidence into
+   `{workspace}/research/00-research.md`, preserving file:line references,
+   excerpts, citations, confidence, skipped lanes and failures. Preserve
+   `## Conflicting Sources` and `## Code vs Docs Conflicts` when applicable.
+   An optional consolidator returns advisory synthesis from supplied evidence
+   or Main-persisted read-only files; architect analysis is optional and has
+   an explicitly assigned output.
+7. **Resolve material gaps** — Main judges specialist recommendations and
+   dispatches follow-up only when a material gap blocks the answer or the
+   operator requests it. Amend the same report without a loop, round counter
+   or state scaffold.
 8. **Skip Phases 2-5** (no implementation, testing, validation, or delivery)
-9. **Present** the research report to the user
-10. **Ask** the user how to proceed (implement, discard, or investigate further)
-11. **Act on user's choice** — same options as Research Flow (implement →
-    pipeline reclassification; discard → clean up; investigate further → a
-    bounded follow-up question that amends the same report).
+9. **Present** the report and offer the Research Flow choices: implement,
+   discard or investigate further. Apply the chosen branch; follow-up amends
+   the same report.
 
 ### `/th:cross-repo` boundary (explicitly distinct)
 
@@ -124,9 +136,9 @@ When the operator asks to investigate how the codebase works, trace a flow in re
 | Dimension | `/th:research-code --multi-repo` | `/th:cross-repo` |
 |-----------|----------------------------------|-----------------|
 | **Purpose** | Evidence-gathering research: "what does this code actually do, across these repos?" | Flow/invariant auditor: "does this system obey its contracts and invariants?" |
-| **Route** | Routes through the coordinator; produces one consolidated `{workspace}/research/00-research.md` | Standalone audit utility; uses native bounded dispatch when useful |
+| **Route** | Current general agent coordinates and persists `{workspace}/research/00-research.md` | Standalone audit utility; uses native bounded dispatch when useful |
 | **Output** | One `{workspace}/research/00-research.md` with hybrid evidence + conflict detection | Per-repo architect+security+qa+tester audits; `00-consolidated.md`; profile/contract validation |
-| **Agents** | `code-researcher` (sonnet) + optional `researcher` (haiku) + `research-consolidator` + `architect` | `architect`, `security`, `qa`, `tester` (per repo); separate workspaces per repo |
+| **Agents** | Bounded `code-researcher` tasks when useful; optional web evidence, consolidator or architect analysis | `architect`, `security`, `qa`, `tester` (per repo); separate workspaces per repo |
 | **When to use** | "How does the retry logic work across the gateway and the worker services?" | "Does the payment service honor the idempotency contract declared in the API profile?" |
 
 Use `/th:research-code --multi-repo` when the question is about understanding code behavior. Use `/th:cross-repo` when the question is about contract compliance and invariant validation.
@@ -878,11 +890,15 @@ automatic KG capture. Reusable patterns may be saved explicitly through
 external knowledge is needed, Main may dispatch up to five `researcher`
 tasks through the host's native bounded mechanism for external evidence:
 - Compose N distinct angles for the topic (e.g., `official-docs`, `known-issues`, `migration-guides`).
-- Dispatch each task with an angle, topic, relevance criteria, and an explicit
-  findings path under the supplied workspace.
-- A failed task is recorded in the report and does not erase other evidence.
-- When several findings exist, an optional consolidator merges them into
-  `{workspace}/research/00-research.md`.
+- Dispatch each task with an angle, topic and relevance criteria. Researchers
+  return cited evidence through native transport without writing, executing
+  shell commands, delegating or publishing.
+- Main preserves useful findings in the selected absolute workspace. Record
+  failed and skipped tasks without erasing other evidence or claiming zero
+  findings for a failed search.
+- An optional consolidator returns advisory synthesis from supplied findings
+  or Main-persisted read-only files. Main decides whether a material gap
+  requires follow-up and passes the retained evidence to the architect.
 
 For codebase-only subjects (`service`, `database`, `api`, `infrastructure`) where external web research adds little value, skip the fan-out and proceed directly to Step 1b.
 
@@ -897,11 +913,13 @@ For codebase-only subjects (`service`, `database`, `api`, `infrastructure`) wher
 | `infrastructure` | Dockerfile, docker-compose, CI/CD workflows, deploy scripts, env vars, monitoring |
 | `product` | All of the above — full-scope investigation; pre-digested web findings if fan-out ran |
 
-Instruction to architect: "Research mode. Investigate {topic} for documentation purposes. Produce `research/00-research.md` covering architecture, components, data flows, configuration, and key decisions. The output will be consumed by the documenter agent — be thorough but structured."
+Assign the architect `research/00-research.md` for the documenter, covering
+architecture, components, data flows, configuration and key decisions for {topic}.
 
-When consolidated web findings are present (`research/00-research.md` exists):
-"Read `{workspace}/research/00-research.md` as the primary external evidence
-base. Spot-fetch only to fill a specific gap."
+When Main supplies returned web findings or an absolute path to persisted
+evidence, use it as the primary external evidence base. Spot-fetch only to fill
+a specific gap within the assigned research scope. The architect retains its
+assigned `research/00-research.md` writing contract.
 
 **Multi-topic:** if 2+ topics, use bounded native tasks per topic when useful
 (separate subfolders under the selected workspace), or run them sequentially

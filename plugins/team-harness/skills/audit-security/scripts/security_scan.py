@@ -80,7 +80,7 @@ READ_ONLY_AGENTS = {
     "architect", "security", "qa", "reviewer",
     "plan-reviewer", "mentor", "adversary", "pr-review-qa",
     "pr-review-security", "pr-review-verifier", "reviewer-consolidator",
-    "inline-reviewer",
+    "inline-reviewer", "researcher", "code-researcher", "research-consolidator",
 }
 
 PR_REVIEW_AGENT_TOOLS = {
@@ -94,9 +94,15 @@ PR_REVIEW_AGENT_TOOLS = {
     "reviewer-consolidator": ["Read", "Glob", "Grep"],
 }
 
-# PR-review roles and the inline reviewer have an exact read-only boundary:
+RESEARCH_AGENT_TOOLS = {
+    "researcher": ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
+    "code-researcher": ["Read", "Glob", "Grep"],
+    "research-consolidator": ["Read", "Glob", "Grep"],
+}
+
+# PR-review, research roles and the inline reviewer have a no-mutation boundary:
 # Check 1 must reject Bash, Edit, and Write for all of them.
-NO_MUTATION_AGENTS = set(PR_REVIEW_AGENT_TOOLS) | {"inline-reviewer"}
+NO_MUTATION_AGENTS = set(PR_REVIEW_AGENT_TOOLS) | set(RESEARCH_AGENT_TOOLS) | {"inline-reviewer"}
 
 # The full agent roster. check_0_roster_reachability() below fails when a name
 # here no longer resolves to a file.
@@ -325,7 +331,7 @@ def check_1_readonly_bash() -> int:
                     f"agents/{agent_name}.md — no-mutation agent carries {forbidden!r} in tools:",
                 )
 
-        expected_tools = PR_REVIEW_AGENT_TOOLS.get(agent_name)
+        expected_tools = PR_REVIEW_AGENT_TOOLS.get(agent_name, RESEARCH_AGENT_TOOLS.get(agent_name))
         if expected_tools is not None and agent_tools != expected_tools:
             # An opencode-projected agent (marked th-origin) carries a
             # deny-by-default permission block instead of a tools: field; the
@@ -341,14 +347,15 @@ def check_1_readonly_bash() -> int:
                 finding(
                     "FAIL",
                     "check-1",
-                    f"agents/{agent_name}.md — PR-review capability allowlist is {agent_tools!r},"
+                    f"agents/{agent_name}.md — {'research' if agent_name in RESEARCH_AGENT_TOOLS else 'PR-review'}"
+                    f" capability allowlist is {agent_tools!r},"
                     f" expected exactly {expected_tools!r}",
                 )
 
     if len(findings) == before:
         print(
             f"  [PASS] check-1 — {passed_count} read-only-tier agents audited;"
-            " PR-review agents expose their exact read-only allowlists"
+            " PR-review and research agents expose their exact read-only allowlists"
         )
     return len(findings) - before
 
@@ -658,6 +665,17 @@ def _self_test_check_1() -> None:
         root = Path(directory)
         (root / "implementer.md").write_text(
             "---\nname: implementer\ntools: Read, Write, Edit, Bash\n---\n", encoding="utf-8")
+        (root / "architect.md").write_text(
+            "---\nname: architect\ntools: Read, Glob, Grep, Write, Edit\n---\n", encoding="utf-8")
+        (root / "documenter.md").write_text(
+            "---\nname: documenter\ntools: Read, Write, Edit, Bash\n---\n", encoding="utf-8")
+        valid_tools = {
+            "pr-review-verifier": "Read, Glob, Grep",
+            "inline-reviewer": "Read, Glob, Grep",
+            "researcher": "Read, Glob, Grep, WebFetch, WebSearch",
+            "code-researcher": "Read, Glob, Grep",
+            "research-consolidator": "Read, Glob, Grep",
+        }
         verifier = root / "pr-review-verifier.md"
         inline_reviewer = root / "inline-reviewer.md"
         cases = [
@@ -678,25 +696,34 @@ def _self_test_check_1() -> None:
                  ("Read, Glob, Grep, Write", True)),
             ),
         ]
+        for name in ("researcher", "code-researcher", "research-consolidator"):
+            tools = valid_tools[name]
+            toolsets = [(tools, False)]
+            toolsets.extend((tools + ", " + forbidden, True) for forbidden in (
+                "Bash", "Edit", "Write", "NotebookEdit", "Task", "mcp__github__create_issue",
+            ))
+            if name == "researcher":
+                toolsets.append(("Read, Glob, Grep, WebFetch", True))
+            else:
+                toolsets.extend(((tools + ", WebFetch", True), (tools + ", WebSearch", True)))
+            cases.append((name, root / f"{name}.md", toolsets))
+        checked = 0
         for agent_name, agent_path, toolsets in cases:
             for toolset, should_fail in toolsets:
-                # Keep the other read-only fixture valid so each assertion is
-                # about the tool boundary under test.
-                verifier.write_text(
-                    "---\nname: pr-review-verifier\ntools: Read, Glob, Grep\n---\n",
-                    encoding="utf-8",
-                )
-                inline_reviewer.write_text(
-                    "---\nname: inline-reviewer\ntools: Read, Glob, Grep\n---\n",
-                    encoding="utf-8",
-                )
-                agent_path.write_text(
-                    f"---\nname: {agent_name}\ntools: {toolset}\n---\n",
-                    encoding="utf-8",
-                )
-                with patch.dict(globals(), {"AGENTS_DIR": root, "findings": []}), redirect_stdout(io.StringIO()):
-                    failures = check_1_readonly_bash()
-                assert (failures > 0) == should_fail, f"check-1 {agent_name} fixture: {toolset}"
+                metadata_cases = (f"name: {agent_name}\n",)
+                if agent_name in ("researcher", "code-researcher", "research-consolidator"):
+                    metadata_cases += ("", "name: implementer\n")
+                for metadata in metadata_cases:
+                    for name, tools in valid_tools.items():
+                        (root / f"{name}.md").write_text(
+                            f"---\nname: {name}\ntools: {tools}\n---\n", encoding="utf-8")
+                    agent_path.write_text(
+                        f"---\n{metadata}tools: {toolset}\n---\n", encoding="utf-8")
+                    with patch.dict(globals(), {"AGENTS_DIR": root, "findings": []}), redirect_stdout(io.StringIO()):
+                        failures = check_1_readonly_bash()
+                    assert (failures > 0) == should_fail, f"check-1 {agent_name} fixture: {metadata!r}, {toolset}"
+                    checked += 1
+        print(f"  [PASS] check-1 fixtures: {checked} tool/identity cases with 3 authorized writers present")
 
 
 def _self_test_check_2() -> None:

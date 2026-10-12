@@ -1,50 +1,34 @@
 
+# Code Research
+
 Analyze the input: $ARGUMENTS
 
-## Mode 1 — Topic or question provided
+The current general agent coordinates, synthesizes and persists the work.
+Preserve the selected absolute workspace and the operator's native permissions;
+do not dispatch a nested orchestrator. Ask what to investigate only when the
+request supplies no question or topic.
 
-1. Pass to the `orchestrator` agent:
-   ```
-   Direct Mode Task:
-   - Mode: research-code
-   - Topic: {user's input}
-   ```
+Inspect the current repo by default. With `--multi-repo <path1> <path2> ...`,
+use the repo list as the outermost partition key: each code lane is scoped to
+one repo, with explicitly named cross-repo seams as dedicated lanes.
 
-## Mode 2 — No input provided
+Follow the [code research method](../../agents/ref-special-flows.md#research-code-flow).
+Decompose into non-overlapping lanes only when the question benefits from it.
+Use the host's native task/session dispatch for bounded parallel work; otherwise
+inspect directly. Optional web evidence, consolidation or architect analysis
+may help with external knowledge or several independent findings.
 
-Ask the user: "What do you want to investigate in the codebase? Example: 'how does the retry logic work?', 'trace the research fan-out flow from the skill to the agents', 'how is error-handling implemented across the gateway and worker?'"
+`researcher`, `code-researcher` and `research-consolidator` return evidence or
+advisory synthesis through native transport without writing files, executing
+shell commands, delegating or publishing. Main compares the evidence and saves
+useful findings and conclusions as `{workspace}/research/00-research.md`. Retain file:line references, excerpts,
+citations, confidence, conflicts, skipped lanes and failures. Include
+`## Code vs Docs Conflicts` when code and external sources were both used.
 
-## Mode 3 — Cross-repo research (`--multi-repo <paths>`)
-
-When the user passes `--multi-repo <path1> <path2> ...`:
-
-1. Pass to the `orchestrator` agent:
-   ```
-   Direct Mode Task:
-   - Mode: research-code
-   - Topic: {user's question}
-   - Repos: {list of paths}
-   ```
-
-The orchestrator uses the repo list as the outermost partition key — each code lane is scoped to one repo, with cross-repo seams as dedicated lanes.
-
-## Important
-
-- Route through the current coordinator so it can preserve the selected absolute
-  workspace and the operator's native permissions.
-- Decompose into non-overlapping code lanes only when the question is large
-  enough to benefit from it. Optional web lanes and a consolidator are useful
-  for external knowledge or several independent findings; neither is required
-  for a simple code question.
-- Use the host's native task/session dispatch for bounded parallel work. Do not
-  require a particular shell, terminal multiplexer, model host, or permission
-  bypass.
-- Output: `{workspace}/research/00-research.md` with hybrid evidence and a
-  `## Code vs Docs Conflicts` section when both code and external sources were used.
-- A follow-up runs only when the operator names it or a material gap blocks the
-  requested conclusion. Amend the same report and stop when the question is
-  answered; do not create a gap loop or event/state protocol for ordinary direct
-  research.
+Main decides whether a material gap blocks the requested answer and needs
+follow-up. A specialist's gap recommendation does not trigger work. Amend the
+same report when follow-up is needed or requested, and stop when the question
+is answered; ordinary direct research needs no gap loop or event/state protocol.
 
 ## When to use `/th:research-code --multi-repo` vs `/th:cross-repo`
 
@@ -53,7 +37,7 @@ These two skills are DISTINCT and do NOT duplicate:
 | | `/th:research-code` (this skill) | `/th:cross-repo` |
 |--|----------------------------------|-----------------|
 | **Question answered** | "What does this code actually do?" (evidence-gathering) | "Does this system obey its contracts/invariants?" (auditing) |
-| **Route** | Routes through the coordinator; produces one consolidated `{workspace}/research/00-research.md` | Standalone audit utility; uses native bounded dispatch when useful |
+| **Route** | Current general agent coordinates and persists `{workspace}/research/00-research.md` | Standalone audit utility; uses native bounded dispatch when useful |
 | **Output** | One `{workspace}/research/00-research.md` (hybrid code + web evidence, conflict detection) | Per-repo audit reports; `00-consolidated.md`; profile/contract validation |
 | **Use when** | "How does the retry logic work across service A and service B?" | "Does service A honor the idempotency contract declared in the shared API profile?" |
 

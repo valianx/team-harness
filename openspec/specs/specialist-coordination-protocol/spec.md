@@ -144,3 +144,26 @@ Main SHALL supply each reviewer with a specific question, candidate, included an
 #### Scenario: A correct plan or editorial repair is inspected
 - **WHEN** the artifacts contain no material defect or the plan changes without another explicit plan-review invocation
 - **THEN** zero findings is valid and no new review, panel or scope requirement is introduced
+
+### Requirement: Research advice retains Main-owned decisions and persistence
+The researcher, code-researcher and research-consolidator SHALL return evidence or advisory synthesis through native transport without editing files, executing shell commands, delegating work or publishing externally. Main SHALL choose useful analytical assistance, inspect its evidence, decide gap follow-up and persist selected findings or synthesis in the configured workspace. Specialist-created files and a fixed research consolidation chain SHALL NOT be prerequisites. Assigned architect, documenter and implementer writing responsibilities SHALL remain supported.
+
+#### Scenario: Research lanes return findings
+- **WHEN** Main assigns bounded web or code questions
+- **THEN** specialists return claims with source or file/line evidence and material limits, and Main selects and persists the useful results
+
+#### Scenario: Synthesis needs optional assistance
+- **WHEN** Main supplies returned evidence or its previously persisted findings to a research consolidator
+- **THEN** the specialist returns attributed synthesis, source conflicts and skipped-lane limits without writing a report or deciding dispositions
+
+#### Scenario: A gap is found
+- **WHEN** a research specialist identifies missing or conflicting evidence
+- **THEN** it reports the gap as advice and Main decides whether a bounded follow-up is needed
+
+#### Scenario: Documentation needs research inputs
+- **WHEN** documenter receives research evidence for an assigned documentation output
+- **THEN** Main preserves the research handoff and documenter retains its authorized writing tools
+
+#### Scenario: Research yields no useful evidence
+- **WHEN** a bounded investigation finds no relevant supported claim
+- **THEN** it returns an honest zero with coverage and tool-failure limits rather than inventing a finding or starting another lane

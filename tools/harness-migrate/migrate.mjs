@@ -739,6 +739,23 @@ function prReviewPermission() {
   return { "*": "deny", read: "allow", glob: "allow", grep: "allow" };
 }
 
+const RESEARCH_AGENTS = new Set(["researcher", "code-researcher", "research-consolidator"]);
+
+function researchPermission(name) {
+  const permission = { "*": "deny", read: "allow", glob: "allow", grep: "allow" };
+  if (name === "researcher") {
+    permission.webfetch = "allow";
+    permission.websearch = "allow";
+  }
+  return permission;
+}
+
+function restrictedAgentPermission(name) {
+  if (PR_REVIEW_AGENTS.has(name)) return prReviewPermission();
+  if (RESEARCH_AGENTS.has(name)) return researchPermission(name);
+  return undefined;
+}
+
 /**
  * Map a CC color name to an opencode named enum.
  * Already-valid opencode enum values and hex colors pass through unchanged.
@@ -1090,9 +1107,9 @@ function transformToOpencode(filePath, content, repoRoot) {
     // provider lock-in and ProviderModelNotFoundError. Per-provider tiering is a
     // future additive step (docs/opencode-model-config.md); toProviderPrefixedModel
     // is retained for it and for the reverse (opencode→CC) direction.
-    if (PR_REVIEW_AGENTS.has(path.basename(filePath, ".md")) || PR_REVIEW_AGENTS.has(fm["name"])) {
-      projected["permission"] = prReviewPermission();
-    }
+    const permission = restrictedAgentPermission(path.basename(filePath, ".md"))
+      ?? restrictedAgentPermission(fm["name"]);
+    if (permission !== undefined) projected["permission"] = permission;
     projected["mode"] = "subagent";
     // color: map CC color names → opencode named enums; pass through valid values.
     // Unknown colors are dropped (omitted) to avoid emitting an invalid field.
@@ -1118,25 +1135,22 @@ function transformToOpencode(filePath, content, repoRoot) {
 }
 
 /**
- * applyModeByRole mirrors cmd/install/transform.go::applyModeByRole: the
- * orchestrator agent (the top-level coordinator) receives mode: "primary" and
- * displays as "TH-orchestrator" in the opencode agent picker; every other
- * agent is returned unchanged. Applied as a POST-PROJECTION step in
- * runTransform, ON TOP OF the generic transformToOpencode output, and
- * deliberately NOT part of the transform-conformance.json fixture (which
- * binds only the generic mapping, so transformToOpencode's exported output
- * stays name: orchestrator / mode: subagent for the orchestrator).
+ * Mirrors cmd/install/transform.go::applyModeByRole: promote the installed
+ * orchestrator to primary with its OpenCode display name and select exact
+ * PR-review/research permissions by filename. Shared sourcePath fixtures
+ * exercise this post-projection layer; the generic orchestrator stays subagent.
  */
 function applyModeByRole(content, agentName) {
-  // The role's installed filename also preserves review permission restrictions.
-  if (agentName !== "orchestrator" && !PR_REVIEW_AGENTS.has(agentName)) {
+  // Installed filenames preserve the capability boundary despite conflicting metadata.
+  const permission = restrictedAgentPermission(agentName);
+  if (agentName !== "orchestrator" && permission === undefined) {
     // No change needed — the generic transform already set mode: subagent.
     return content;
   }
 
   const { frontmatter: fm, body } = parseFrontmatter(content);
-  if (PR_REVIEW_AGENTS.has(agentName)) {
-    fm["permission"] = prReviewPermission();
+  if (permission !== undefined) {
+    fm["permission"] = permission;
   } else {
     fm["mode"] = "primary";
     fm["name"] = "TH-orchestrator";
@@ -1234,9 +1248,9 @@ function transformToCC(filePath, content, repoRoot) {
     // Each key maps back to the CC tool name; "edit" maps to "Edit" (canonical; Write is
     // omitted since Edit is the more specific tool in CC format).
     if (permission !== undefined) projected["tools"] = opencodePermissionToAgentTools(permission);
-    if (PR_REVIEW_AGENTS.has(path.basename(filePath, ".md")) || PR_REVIEW_AGENTS.has(fm["name"])) {
-      projected["tools"] = "Read, Glob, Grep";
-    }
+    const restrictedPermission = restrictedAgentPermission(path.basename(filePath, ".md"))
+      ?? restrictedAgentPermission(fm["name"]);
+    if (restrictedPermission !== undefined) projected["tools"] = opencodePermissionToAgentTools(restrictedPermission);
     // color: map opencode enum back to a canonical CC color (lossy — e.g. info could have
     // been blue, cyan, or teal; we pick a canonical one per enum).
     if (fm["color"] !== undefined) projected["color"] = opencodeColorToCC(String(fm["color"]));

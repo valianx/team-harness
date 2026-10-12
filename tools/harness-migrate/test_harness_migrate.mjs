@@ -388,7 +388,7 @@ console.log("\n=== Section 4: Forward transform CC → opencode (AC-1, AC-2, AC-
       JSON.stringify(fm["permission"]) === JSON.stringify(expectedPermission),
       JSON.stringify(fm["permission"]),
     );
-    for (const metadata of ["", "name: implementer\n", `name: ${name} # comment\n`]) {
+    for (const metadata of ["", "name: implementer\n", "name: researcher\n", `name: ${name} # comment\n`]) {
       const malformed = `---\n${metadata}tools: Read, Write, Bash, Task\n---\nBody.\n`;
       const forward = transformToOpencode(`agents/${name}.md`, malformed, "/repo");
       assert(`PR review basename ${name} remains restricted with ${JSON.stringify(metadata)}`,
@@ -401,6 +401,46 @@ console.log("\n=== Section 4: Forward transform CC → opencode (AC-1, AC-2, AC-
   }
   const writer = transformToOpencode("agents/implementer.md", "---\nname: implementer\ntools: Read, Write, Edit, Bash\n---\nBody.\n", "/repo");
   assert("PR review restrictions do not replace implementer native permissions", parseFrontmatter(writer.content).frontmatter.permission === undefined);
+}
+
+{
+  const readPermission = { "*": "deny", read: "allow", glob: "allow", grep: "allow" };
+  const webPermission = { "*": "deny", read: "allow", glob: "allow", grep: "allow", webfetch: "allow", websearch: "allow" };
+  for (const [name, permission, tools] of [
+    ["researcher", webPermission, "Read, Glob, Grep, WebFetch, WebSearch"],
+    ["code-researcher", readPermission, "Read, Glob, Grep"],
+    ["research-consolidator", readPermission, "Read, Glob, Grep"],
+  ]) {
+    for (const metadata of ["", `name: ${name}\n`, "name: implementer\n", "name: researcher\n", "name: code-researcher\n", "name: reviewer\n", `name: ${name} # comment\n`]) {
+      const source = `---\n${metadata}tools: Read, Write, Edit, Bash, Task, WebFetch, WebSearch\n---\nBody.\n`;
+      const forward = transformToOpencode(`agents/${name}.md`, source, "/repo");
+      assert(`Research basename ${name} selects its exact native profile with ${JSON.stringify(metadata)}`,
+        JSON.stringify(parseFrontmatter(forward.content).frontmatter.permission) === JSON.stringify(permission));
+      const installed = applyModeByRole(forward.content, name);
+      assert(`Research role override ${name} preserves its exact native profile with ${JSON.stringify(metadata)}`,
+        JSON.stringify(parseFrontmatter(installed).frontmatter.permission) === JSON.stringify(permission));
+
+      const inverseInputs = [
+        installed,
+        `---\n${metadata}permission:\n  edit: allow\n  bash: allow\n  task: allow\n  webfetch: allow\n  websearch: allow\n---\nBody.\n`,
+        `---\n${metadata}permission: {allow: [Read, Write, Bash, Task, WebFetch, WebSearch]}\n---\nBody.\n`,
+        `---\n${metadata}---\nBody.\n`,
+      ];
+      for (const [index, inverseInput] of inverseInputs.entries()) {
+        const inverse = transformToCC(`.opencode/agents/${name}.md`, inverseInput, "/repo");
+        assert(`Inverse research basename ${name} restores only its canonical tools (${index}) with ${JSON.stringify(metadata)}`,
+          parseFrontmatter(inverse.content).frontmatter.tools === tools);
+      }
+    }
+  }
+
+  for (const name of ["architect", "documenter", "implementer"]) {
+    const forward = transformToOpencode(`agents/${name}.md`, `---\nname: ${name}\ntools: Read, Write, Edit, Bash, Task\n---\nBody.\n`, "/repo");
+    const installed = applyModeByRole(forward.content, name);
+    assert(`Research restrictions preserve ${name} native writer permissions`, parseFrontmatter(installed).frontmatter.permission === undefined);
+    const inverse = transformToCC(`.opencode/agents/${name}.md`, `---\nname: ${name}\npermission: {read: allow, edit: allow, bash: allow, task: allow}\n---\nBody.\n`, "/repo");
+    assert(`Inverse research restrictions preserve ${name} writing capabilities`, parseFrontmatter(inverse.content).frontmatter.tools === "Read, Edit, Bash, Task");
+  }
 }
 
 {

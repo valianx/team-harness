@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.42.10] - 2026-10-12
+
+### Changed
+- Research specialists return read-only advice; Main decides follow-up and saves findings without a mandatory synthesis chain.
+
 ## [3.42.9] - 2026-10-12
 
 ### Fixed

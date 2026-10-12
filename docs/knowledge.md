@@ -284,3 +284,4 @@ superseded unless a bullet explicitly records the current two-posture contract.
 - [decision] Spec keeps execution with Main and selected independent reviewers; pipeline adds useful native delegation without mandatory phase agents, legacy reports or per-task commits. Publication shares create-pr. → `skills/spec/SKILL.md`, `skills/pipeline/SKILL.md`
 - [decision] Design proposals use one document with functional content before technical detail; split only on operator request and reconcile existing OpenSpec intent. → `skills/design/references/solution-proposal.md`
 - [constraint] Release preflight compares committed revisions, covers embedded installer payloads and published bootstrap scripts, and preserves local completion. → `tools/codex-runtime/version-preflight.mjs`
+- [constraint] Research specialists return advisory evidence through native transport; Main owns persistence and follow-up, while assigned writer roles retain writing tools.

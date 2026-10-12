@@ -29,8 +29,12 @@ do not maintain a second hand-written model/tool matrix here.
 | Specialized work | mentor, translator, init-project, agent-builder, gcp-cost-analyzer, gcp-infra |
 
 Specialists receive bounded assignments with ownership and the selected workspace.
-PR review roles remain read-only. Findings are recommendations from partial
-context; Main verifies evidence, judges dispositions and continues authorized work.
+PR review roles remain read-only. `researcher`, `code-researcher`
+and `research-consolidator` return evidence or advisory synthesis through native
+transport without writing, executing shell commands, delegating or publishing.
+Main owns research synthesis, persistence and follow-up decisions. Findings are
+recommendations from partial context; Main verifies evidence, judges dispositions
+and continues authorized work.
 No automatic remote memory, capability lease or gate authority is required.
 
 ### Objective column — authoring standard
