@@ -132,6 +132,18 @@ bash tests/run-all.sh
 This runs the repository's structure and frontmatter suites. CI runs the same
 command on every PR. See [`docs/testing.md`](./docs/testing.md) for the suite registry.
 
+Before publishing a committed candidate, run the same release check as CI:
+
+```bash
+node tools/codex-runtime/version-preflight.mjs --base origin/main --head HEAD
+```
+
+Fetch the selected base first. Distributed inputs, including embedded OpenCode
+payloads and published bootstrap scripts, require consistent increasing SemVer
+in the publishable X.Y.Z format and a matching changelog. Installer testdata
+fixtures alone require no bump. The check reads committed content and preserves local
+completion without a PR.
+
 ### Verifying gh-fallback paths locally
 
 To smoke-test the graceful degradation introduced in v2.10.0 without needing to actually uninstall `gh`:

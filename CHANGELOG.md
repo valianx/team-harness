@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.42.9] - 2026-10-12
+
+### Fixed
+- Local and CI release checks reject unchanged versions and missing metadata for distributed installer and bootstrap changes.
+
 ## [3.42.8] - 2026-10-12
 
 ### Added

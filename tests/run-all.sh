@@ -328,6 +328,7 @@ else
 fi
 
 run_node_suite "workspace-preflight" "test_workspace_preflight.mjs" "node not found — install Node.js to run this suite"
+run_node_suite "version-preflight" "test_version_preflight.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "workspace-identity" "test_workspace_identity.mjs" "node not found — install Node.js to run this suite"
 
 echo

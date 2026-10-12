@@ -124,6 +124,8 @@ behavior remains covered by its executable suites.
 
 **Runners.** `tests/run-all.sh` runs ordinary development verification and exits non-zero if any behavioral or structural check fails; `TH_REQUIRE_RUNTIMES=1` (set in CI) converts a missing-runtime SKIP into a FAIL. `TH_RELEASE_TESTS=1` adds release-only version coordination. `tests/run-behavioral.sh` runs slower end-to-end tests that need environment the default run cannot guarantee.
 
+`node tests/test_version_preflight.mjs` validates committed release metadata with isolated Git repositories; it invokes no models.
+
 ## When to add a test
 
 Add one when you change code that has an exit code. A new runtime behavior needs an observable test case. A new installer behaviour needs a Go test. A new agent file is picked up automatically by `test_agent_frontmatter.py` — no manual registration.
