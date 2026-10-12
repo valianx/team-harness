@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.42.7] - 2026-10-11
+
+### Changed
+- Plan acceptance checks prerequisites and scenario coverage; requested repair reviews preserve agreed guarantees and optional history.
+
 ## [3.42.6] - 2026-10-10
 
 ### Changed

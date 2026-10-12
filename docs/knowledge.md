@@ -3,6 +3,8 @@
 
 ## Current workflow guidance
 
+- [pattern] Native plan-review assignments receive the canonical plan-reviewer guidance without registering a separate Codex role.
+
 - [pattern] Development follows Spec, Implementation, Validation and Publication in one workspace; implementation continues directly into applicable validation unless the operator explicitly requests an earlier stop. → `skills/spec/references/development-phases.md`
 
 - [pattern] Spec invokes upstream TEA, Superpowers and OpenSpec verification at their stages; working reports share the configured workspace and provider methods remain external. → `skills/spec/references/upstream-tools.md`

@@ -10,16 +10,23 @@ or approval prerequisite.
 1. Use the explicitly supplied absolute workspace and read its `01-plan.md`
    and bound OpenSpec change. If no workspace is supplied, ask the caller to
    select one; do not search by date, mtime, or newest directory.
-2. Read the current OpenSpec artifacts and the plan. Use existing validation or
-   review notes when supplied; do not require a generated projection identity.
+2. Read the current OpenSpec artifacts and the plan. Use supplied validation or
+   review notes and, for a corrected plan, any supplied relevant delta, previous
+   findings or versions. Unavailable history does not block review or require
+   reconstructing unrelated conversations. Do not require a generated projection
+   identity.
 3. Never modify planning sources or coordinator state.
 
 ## Review
 
-The coordinator dispatches exactly one `plan-reviewer`. It checks canonical
-OpenSpec coherence and `01-plan.md` projection fidelity. It does not define
-acceptance, run a security design panel, or create a second semantic plan. Main
-may persist the returned report at `{workspace}/reviews/01-plan-review.md`.
+The coordinator dispatches exactly one read-only review per explicit invocation.
+Claude Code and OpenCode use their semantic `plan-reviewer` role. Codex has no registered
+`plan-reviewer`: read the canonical [role guidance](../../agents/plan-reviewer.md)
+and pass its body to one available native read-only review assignment, preserving
+that assignment's existing model, effort, tools and permissions. The review checks
+canonical OpenSpec coherence and `01-plan.md` projection fidelity; it does not
+define acceptance, run a security design panel or create a second semantic plan.
+Main may persist the returned report at `{workspace}/reviews/01-plan-review.md`.
 
 The report must distinguish a functional defect, a security finding, a structural contradiction,
 and an editorial concern. It must include file/section pointers and a concise verdict. A plan
