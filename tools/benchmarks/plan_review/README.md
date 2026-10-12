@@ -66,7 +66,12 @@ python3 tools/benchmarks/plan_review/benchmark.py run \
 `--max-trials` is required and reserves only that many pending trials before
 launching. Repeat the command to resume; completed successes and errors are
 immutable and skipped. A started trial without a result has ambiguous consumption
-and is skipped too. Changing fixtures, prompts, runner or protocol stops reuse;
+and is skipped too. Before launching any selected trial, the runner reconstructs
+its native argv from the declared runtime configuration and exact study paths,
+requires matching trial configuration and stored argv, and checks the complete
+bounded selection's prompts, working directories and answer schema bytes against
+the built-in protocol. The selected native binary remains a trusted operator
+choice. Changing fixtures, prompts, commands, schema, runner or protocol stops reuse;
 prepare a new study in a new directory when changing inputs. A crash can leave
 `.run.lock`; remove it only after confirming the earlier process has stopped.
 Timeouts terminate the native process group. This process isolation currently
@@ -89,6 +94,8 @@ tool output are not retained; their hashes and bounded, redacted native
 diagnostics are. Codex warning items do not invalidate completed reviews;
 top-level errors and failed turns do. One native invocation is one process,
 while model request counts remain unknown when the client does not report them.
+Complete Authorization, Proxy-Authorization and cookie header values are redacted
+alongside bearer/basic tokens and named secrets before diagnostics are retained.
 
 ## Quality and descriptive analysis
 
@@ -117,6 +124,20 @@ Null preserves an unknown judgment; a missing field remains missing. The analyze
 rejects missing/wrong study bindings and contradictory labels, deduplicates
 equivalent rows and excludes conflicting duplicates. This binding remains
 compatible with earlier prepared study/adjudication packages.
+The three required counts cannot be null, boolean, negative or non-integer;
+rejected or incomplete rows do not imply complete adjudication or zero counts.
+
+Native receipts have a separate binding: `started.json` requires the trial ID,
+stored command, declared runner/protocol/concurrency identity and the canonical
+manifest digest in `manifest_sha256`. Canonical JSON sorts keys, retains Unicode
+and uses compact separators; this digest differs from the adjudication package's
+hash of the exact manifest bytes. Results must match trial and protocol identity;
+new results also carry the canonical manifest digest. Earlier results without
+that additional field remain valid when their started receipt binds them to the
+current study. Both `summarize` and the analyzer exclude missing or mismatched
+native receipts from quality, latency and usage comparisons, preserving integrity
+issues and an explicit excluded-evidence count/state. Legitimate native failures
+retain reported usage; absent usage remains unknown.
 
 ```sh
 python3 tools/benchmarks/plan_review/analyze.py \

@@ -3,6 +3,7 @@ import contextlib
 import io
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 import tempfile
@@ -58,6 +59,37 @@ def make_repository(repo):
         git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
             "-c", "commit.gpgsign=false", "commit", "-qm", version)
     return repo
+
+
+def make_runtime_manifest(out, scripts, workers=1):
+    """Legitimate native argv and receipts using an explicitly selected fake client."""
+    case = BENCH.load_cases(ROOT / "cases.json")["producer_order"]
+    cases = {"producer_order": case}
+    BENCH.atomic_json(out / "cases.json", cases)
+    BENCH.atomic_json(out / "answer.schema.json", BENCH.answer_schema())
+    binary = out / "fake-client"
+    binary.write_text(f"#!{sys.executable}\nfrom pathlib import Path\n"
+                      + f"scripts = {scripts!r}\nexec(scripts[Path.cwd().parent.name])\n", encoding="utf-8")
+    binary.chmod(0o755)
+    config = {"binary": str(binary), "model": "fixture-model", "effort": "high"}
+    trials = []
+    for index, tid in enumerate(scripts):
+        directory = out / "trials" / tid
+        (directory / "cwd").mkdir(parents=True)
+        (directory / "prompt.txt").write_text("Review only", encoding="utf-8")
+        trials.append({"trial_id": tid, "pair_id": index // 2 + 1, "runtime": "codex",
+                       "case_id": "producer_order", "flow": "spec", "variant": "AB"[index % 2],
+                       "prompt_sha256": __import__("hashlib").sha256(b"Review only").hexdigest(),
+                       "config": dict(config),
+                       "command": BENCH.native_command("codex", **config, cwd=directory / "cwd",
+                                                       schema=out / "answer.schema.json",
+                                                       answer=directory / "native-answer.json")})
+    manifest = {"benchmark_version": 2, "scope": "unit_test_only", "fixture_sha256": BENCH.digest(cases),
+                "runtime_configs": {"codex": config}, "timeout_seconds": 2, "workers": workers,
+                "runner_sha256": BENCH.runner_sha256(), "protocol_sha256": BENCH.protocol_sha256(workers),
+                "trials": trials}
+    BENCH.atomic_json(out / "manifest.json", manifest)
+    return manifest
 
 
 class BenchmarkTests(unittest.TestCase):
@@ -215,20 +247,18 @@ class BenchmarkTests(unittest.TestCase):
         # Synthetic native envelopes verify runner mechanics only, never model-review efficacy.
         with tempfile.TemporaryDirectory(prefix="th-plan-review-") as tmp:
             out = Path(tmp)
-            case = BENCH.load_cases(ROOT / "cases.json")["producer_order"]
-            cases = {"producer_order": case}
-            BENCH.atomic_json(out / "cases.json", cases)
-            trials = []
+            scripts = {}
             for trial_id in ["finished", "ambiguous"]:
-                directory = out / "trials" / trial_id
-                (directory / "cwd").mkdir(parents=True)
-                (directory / "prompt.txt").write_text("Review only")
                 counter = out / "counter.txt"
                 events = [{"type": "item.completed", "item": {"type": "agent_message", "text": json.dumps(answer())}}, {"type": "turn.completed", "usage": {"input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 1}}]
                 script = "from pathlib import Path; import json; p=Path(" + repr(str(counter)) + "); p.write_text(str(int(p.read_text())+1) if p.exists() else '1'); print(" + repr("\n".join(json.dumps(e) for e in events)) + ")"
-                trials.append({"trial_id": trial_id, "runtime": "codex", "case_id": "producer_order", "flow": "spec", "variant": "A", "prompt_sha256": __import__("hashlib").sha256(b"Review only").hexdigest(), "command": [sys.executable, "-c", script]})
-            (out / "trials" / "ambiguous" / "started.json").write_text('{}')
-            BENCH.atomic_json(out / "manifest.json", {"fixture_sha256": BENCH.digest(cases), "timeout_seconds": 2, "trials": trials})
+                scripts[trial_id] = script
+            manifest = make_runtime_manifest(out, scripts)
+            trial = manifest["trials"][1]
+            BENCH.atomic_json(out / "trials" / "ambiguous" / "started.json",
+                              {"trial_id": "ambiguous", "started_at_unix": 100,
+                               "manifest_sha256": BENCH.digest(manifest), "command": trial["command"],
+                               "run_identity": {key: manifest[key] for key in ("workers", "runner_sha256", "protocol_sha256")}})
             args = SimpleNamespace(manifest=out / "manifest.json", max_trials=2)
             with contextlib.redirect_stdout(io.StringIO()):
                 BENCH.run(args)
@@ -240,9 +270,15 @@ class BenchmarkTests(unittest.TestCase):
         # Catches token undercounting when a billed review fails parsing or uses tools.
         with tempfile.TemporaryDirectory(prefix="th-plan-review-") as tmp:
             out = Path(tmp)
-            trial = {"trial_id": "invalid", "runtime": "codex", "flow": "spec", "variant": "A"}
-            BENCH.atomic_json(out / "manifest.json", {"scope": "unit_test_only", "trials": [trial]})
-            BENCH.atomic_json(out / "trials" / "invalid" / "result.json", {"status": "error", "wall_seconds": 1.5, "usage": BENCH.token_usage({"input_tokens": 100, "cached_input_tokens": 80, "output_tokens": 10}, "codex")})
+            manifest = make_runtime_manifest(out, {"invalid": "pass"})
+            identity = {key: manifest[key] for key in ("workers", "runner_sha256", "protocol_sha256")}
+            BENCH.atomic_json(out / "trials/invalid/started.json",
+                              {"trial_id": "invalid", "started_at_unix": 100, "manifest_sha256": BENCH.digest(manifest),
+                               "run_identity": identity, "command": manifest["trials"][0]["command"]})
+            BENCH.atomic_json(out / "trials/invalid/result.json",
+                              {"trial_id": "invalid", "status": "error", "wall_seconds": 1.5,
+                               "manifest_sha256": BENCH.digest(manifest), "run_identity": identity,
+                               "usage": BENCH.token_usage({"input_tokens": 100, "cached_input_tokens": 80, "output_tokens": 10}, "codex")})
             output = io.StringIO()
             with contextlib.redirect_stdout(output):
                 BENCH.summarize(SimpleNamespace(manifest=out / "manifest.json"))
@@ -298,17 +334,10 @@ class BenchmarkTests(unittest.TestCase):
     def test_runner_persists_and_emits_redacted_cause_without_repeating_failed_call(self):
         with tempfile.TemporaryDirectory(prefix="th-plan-review-") as tmp:
             out = Path(tmp)
-            case = BENCH.load_cases(ROOT / "cases.json")["producer_order"]
-            cases = {"producer_order": case}
-            BENCH.atomic_json(out / "cases.json", cases)
             directory = out / "trials" / "failure"
-            (directory / "cwd").mkdir(parents=True)
-            (directory / "prompt.txt").write_text("Review only")
             event = {"type": "error", "message": "HTTP 503 upstream unavailable; access_token=fake-secret"}
             script = "import json,sys; print(" + repr(json.dumps(event)) + "); sys.exit(1)"
-            trial = {"trial_id": "failure", "runtime": "codex", "case_id": "producer_order", "flow": "spec", "variant": "A", "prompt_sha256": __import__("hashlib").sha256(b"Review only").hexdigest(), "command": [sys.executable, "-c", script]}
-            manifest = {"fixture_sha256": BENCH.digest(cases), "timeout_seconds": 2, "trials": [trial]}
-            BENCH.atomic_json(out / "manifest.json", manifest)
+            manifest = make_runtime_manifest(out, {"failure": script})
             output = io.StringIO()
             args = SimpleNamespace(manifest=out / "manifest.json", max_trials=1)
             with contextlib.redirect_stdout(output):
@@ -329,21 +358,14 @@ class BenchmarkTests(unittest.TestCase):
         # Real disposable subprocesses expose overlap/order/independent writes without model calls.
         with tempfile.TemporaryDirectory(prefix="th-plan-review-") as tmp:
             out = Path(tmp)
-            case = BENCH.load_cases(ROOT / "cases.json")["producer_order"]
-            cases = {"producer_order": case}
-            BENCH.atomic_json(out / "cases.json", cases)
-            trials = []
+            scripts = {}
             events = [{"type": "item.completed", "item": {"type": "agent_message", "text": json.dumps(answer())}}, {"type": "turn.completed", "usage": {"input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 1}}]
             for i in range(6):
                 trial_id = "trial" + str(i + 1)
-                directory = out / "trials" / trial_id
-                (directory / "cwd").mkdir(parents=True)
-                (directory / "prompt.txt").write_text("Review only")
                 marks = out / (trial_id + ".json")
                 script = "import json,time; from pathlib import Path; start=time.time(); time.sleep(0.3); Path(" + repr(str(marks)) + ").write_text(json.dumps({'start':start,'end':time.time()})); print(" + repr("\n".join(json.dumps(e) for e in events)) + ")"
-                trials.append({"trial_id": trial_id, "pair_id": i // 2 + 1, "runtime": "codex", "case_id": "producer_order", "flow": "spec", "variant": ["A", "B", "B", "A", "A", "B"][i], "prompt_sha256": __import__("hashlib").sha256(b"Review only").hexdigest(), "command": [sys.executable, "-c", script]})
-            manifest = {"fixture_sha256": BENCH.digest(cases), "timeout_seconds": 2, "workers": 2, "trials": trials}
-            BENCH.atomic_json(out / "manifest.json", manifest)
+                scripts[trial_id] = script
+            manifest = make_runtime_manifest(out, scripts, workers=2)
             output = io.StringIO()
             with contextlib.redirect_stdout(output):
                 BENCH.run(SimpleNamespace(manifest=out / "manifest.json", max_trials=5))
@@ -367,7 +389,10 @@ class BenchmarkTests(unittest.TestCase):
             self.assertEqual(len(progress), 5)
             self.assertTrue(all(row.get("total_tokens") == 2 for row in progress))
             before = {p: p.read_bytes() for p in (out / "trials").glob("*/result.json")}
-            (out / "trials" / "trial6" / "started.json").write_text('{}')
+            BENCH.atomic_json(out / "trials" / "trial6" / "started.json",
+                              {"trial_id": "trial6", "started_at_unix": 100,
+                               "manifest_sha256": BENCH.digest(manifest), "command": manifest["trials"][5]["command"],
+                               "run_identity": {key: manifest[key] for key in ("workers", "runner_sha256", "protocol_sha256")}})
             with contextlib.redirect_stdout(io.StringIO()):
                 BENCH.run(SimpleNamespace(manifest=out / "manifest.json", max_trials=6))
             self.assertEqual({p: p.read_bytes() for p in before}, before)
@@ -462,6 +487,7 @@ else:
             self.assertEqual(len(results), 8)
             self.assertTrue(all(result["status"] == "ok" for result in results), results)
             self.assertEqual({result["usage"]["total_tokens"] for result in results}, {110, 135})
+            self.assertTrue(all(result.get("manifest_sha256") == BENCH.digest(manifest) for result in results))
             self.assertEqual(json.loads((output / "manifest.json").read_text()), manifest)
 
     def test_claude_only_cli_requires_its_selected_model_and_effort(self):
@@ -500,6 +526,109 @@ else:
             base = Path(tmp)
             (base / ".git").mkdir()
             self.assertEqual(BENCH.require_output_directory(base / "study"), base / "study")
+
+    def test_regression_command_and_config_drift_rejects_full_selection_before_launch(self):
+        for mutation in ("command", "config", "runtime"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory(prefix="th-command-integrity-") as tmp:
+                out = Path(tmp)
+                marker = out / "native-launched"
+                script = f"Path({str(marker)!r}).write_text('launched')"
+                manifest = make_runtime_manifest(out, {"first": script, "second": script, "third": script}, workers=2)
+                changed = manifest["trials"][2]
+                if mutation == "command":
+                    changed["command"] = [sys.executable, "-c", script]
+                elif mutation == "config":
+                    changed["config"]["model"] = "another-model"
+                else:
+                    changed["runtime"] = "claude"
+                (out / "manifest.json").write_text(json.dumps(manifest))
+                with self.assertRaisesRegex(ValueError, "command|config|runtime"):
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        BENCH.run(SimpleNamespace(manifest=out / "manifest.json", max_trials=3))
+                self.assertFalse(marker.exists())
+                self.assertEqual(list((out / "trials").glob("*/started.json")), [])
+
+    def test_regression_schema_content_or_bytes_rejects_selection_before_launch(self):
+        for mutation in ("content", "bytes", "missing"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory(prefix="th-schema-integrity-") as tmp:
+                out = Path(tmp)
+                marker = out / "native-launched"
+                manifest = make_runtime_manifest(out, {"first": f"Path({str(marker)!r}).write_text('launched')"})
+                schema = out / "answer.schema.json"
+                if mutation == "content":
+                    schema.write_text('{"type": "string"}')
+                elif mutation == "bytes":
+                    schema.write_bytes(schema.read_bytes() + b"\n")
+                else:
+                    schema.unlink()
+                with self.assertRaisesRegex(ValueError, "schema"):
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        BENCH.run(SimpleNamespace(manifest=out / "manifest.json", max_trials=1))
+                self.assertFalse(marker.exists())
+                self.assertEqual(list((out / "trials").glob("*/started.json")), [])
+
+    def test_regression_direct_trial_cannot_execute_changed_stored_command(self):
+        with tempfile.TemporaryDirectory(prefix="th-direct-trial-integrity-") as tmp:
+            out = Path(tmp)
+            marker = out / "native-launched"
+            script = f"from pathlib import Path; Path({str(marker)!r}).write_text('launched')"
+            manifest = make_runtime_manifest(out, {"first": script})
+            trial = manifest["trials"][0]
+            trial["command"] = [sys.executable, "-c", script]
+            case = BENCH.load_cases(out / "cases.json")["producer_order"]
+            identity = {key: manifest[key] for key in ("workers", "runner_sha256", "protocol_sha256")}
+            with self.assertRaisesRegex(ValueError, "command"):
+                BENCH.run_trial(out, manifest, trial, case, identity)
+            self.assertFalse(marker.exists())
+            self.assertFalse((out / "trials/first/started.json").exists())
+
+    def test_regression_basic_and_multi_cookie_headers_are_redacted_in_diagnostics(self):
+        messages = ["HTTP 401 Authorization: Basic opaque-basic-credential",
+                    "HTTP 401 Cookie: pref=dark; session=opaque-cookie-credential",
+                    'HTTP 401 {"Authorization": "Basic opaque-json-basic", "Cookie": "pref=dark; session=opaque-json-cookie"}',
+                    "HTTP 401 Authorization: Token opaque-token-credential",
+                    "HTTP 401 Authorization: Digest response=opaque-digest-credential",
+                    "HTTP 401 Proxy-Authorization: Token opaque-proxy-credential",
+                    'HTTP 401 {"Authorization": "Token opaque-json-token", "Proxy-Authorization": "Digest response=opaque-json-digest"}',
+                    'HTTP 401 Authorization: Digest response="opaque-quoted-digest"',
+                    'HTTP 401 Cookie: pref="dark"; session="opaque-quoted-cookie"']
+        for message in messages:
+            with self.subTest(message=message):
+                native = BENCH.native_metadata("codex", json.dumps({"type": "error", "message": message}))
+                stderr = BENCH.stderr_diagnostics("ERROR transport: " + message)
+                persisted = json.dumps({"native": native, "stderr": stderr})
+                for secret in ("opaque-basic-credential", "opaque-cookie-credential", "opaque-json-basic", "opaque-json-cookie", "pref=dark",
+                               "opaque-token-credential", "opaque-digest-credential", "opaque-proxy-credential", "opaque-json-token", "opaque-json-digest"):
+                    self.assertNotIn(secret, persisted)
+                self.assertIn("HTTP 401", persisted)
+                for secret in ("opaque-quoted-digest", "opaque-quoted-cookie"):
+                    self.assertNotIn(secret, persisted)
+                envelope = json.loads(BENCH.redact(json.dumps({"summary": message, "other": "preserved"})))
+                self.assertEqual(envelope["other"], "preserved")
+                for secret in ("opaque-quoted-digest", "opaque-quoted-cookie"):
+                    self.assertNotIn(secret, envelope["summary"])
+
+    def test_regression_summary_excludes_a_result_copied_from_another_study(self):
+        with tempfile.TemporaryDirectory(prefix="th-summary-study-binding-") as tmp:
+            base = Path(tmp)
+            events = [{"type": "item.completed", "item": {"type": "agent_message", "text": json.dumps(answer())}},
+                      {"type": "turn.completed", "usage": {"input_tokens": 100, "cached_input_tokens": 80, "output_tokens": 10}}]
+            script = "print(" + repr("\n".join(json.dumps(event) for event in events)) + ")"
+            for name in ("old", "current"):
+                out = base / name
+                make_runtime_manifest(out, {"first": script})
+                with contextlib.redirect_stdout(io.StringIO()):
+                    BENCH.run(SimpleNamespace(manifest=out / "manifest.json", max_trials=1))
+            shutil.copyfile(base / "old/trials/first/result.json", base / "current/trials/first/result.json")
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                BENCH.summarize(SimpleNamespace(manifest=base / "current/manifest.json"))
+            summary = json.loads(output.getvalue())
+            group = summary["groups"]["codex/spec/A"]
+            self.assertEqual(group["valid_reviews"], 0)
+            self.assertEqual(group["excluded_evidence"], 1)
+            self.assertIsNone(group["tokens"]["total_tokens"]["sum_reported"])
+            self.assertIn("result_manifest_sha256_mismatch", [issue["kind"] for issue in summary["integrity_issues"]])
 
 
 if __name__ == "__main__":

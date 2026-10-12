@@ -172,7 +172,9 @@ def aggregate(records):
                              "applicability_unknown_planned": sum(r.get("applicability", {}).get(field) is None for r in records)}
     return {
         "trials": {"planned": len(records), "complete": len(completed), "valid": len(valid), "errors": sum(r["result"].get("status") != "ok" for r in completed),
-                   "pending": sum(not r.get("result") and not r.get("started") for r in records), "in_progress_or_interrupted": sum(not r.get("result") and bool(r.get("started")) for r in records),
+                   "pending": sum(not r.get("result") and not r.get("started") and not r.get("excluded_evidence") for r in records),
+                   "in_progress_or_interrupted": sum(not r.get("result") and bool(r.get("started")) and not r.get("excluded_evidence") for r in records),
+                   "excluded_evidence": sum(bool(r.get("excluded_evidence")) for r in records),
                    "adjudicated_complete": sum(bool(r.get("adjudication_complete")) for r in completed), "missing_adjudication_trial_ids": missing_adj},
         "native_invocations_reported": summarize_values([(r.get("result") or {}).get("native_invocation_count") for r in completed]),
         "fixture_expected_material_defects_planned": sum(r["fixture_expected"] for r in records) if records and all(number(r.get("fixture_expected")) for r in records) else None,
@@ -196,6 +198,57 @@ def compare_group(records):
     latency = {stat: difference(a["latency_seconds"][stat], b["latency_seconds"][stat]) for stat in ["mean", "median"]}
     tokens = {field: {stat: difference(a["tokens"][field][stat], b["tokens"][field][stat]) for stat in ["sum", "mean", "median"]} for field in TOKEN_FIELDS}
     return {"A": a, "B": b, "B_minus_A": {"latency_seconds": latency, "tokens": tokens}, "paired": pair_summary(records)}
+
+
+def bind_native_receipts(manifest, trial, result, started, result_present, started_present, issues):
+    """Exclude unbound native evidence; legitimate older results bind through started."""
+    tid = trial["trial_id"]
+    manifest_hash = hashlib.sha256(json.dumps(manifest, sort_keys=True, ensure_ascii=False,
+                                            separators=(",", ":")).encode()).hexdigest()
+    start_valid, result_valid = started_present, result_present
+    if started_present and not isinstance(started, dict):
+        issues.append({"kind": "invalid_started_receipt", "trial_id": tid})
+        start_valid = False
+    elif started_present:
+        if started.get("trial_id") != tid:
+            issues.append({"kind": "started_trial_id_mismatch", "trial_id": tid})
+            start_valid = False
+        if not started.get("manifest_sha256"):
+            issues.append({"kind": "missing_started_manifest_sha256", "trial_id": tid})
+            start_valid = False
+        elif started["manifest_sha256"] != manifest_hash:
+            issues.append({"kind": "started_manifest_sha256_mismatch", "trial_id": tid})
+            start_valid = False
+        if started.get("command") != trial.get("command"):
+            issues.append({"kind": "started_command_mismatch", "trial_id": tid})
+            start_valid = False
+    elif result_present:
+        issues.append({"kind": "missing_started_receipt", "trial_id": tid})
+    if result_present and not isinstance(result, dict):
+        issues.append({"kind": "invalid_result_receipt", "trial_id": tid})
+        result_valid = False
+    elif result_present:
+        if result.get("trial_id") != tid:
+            issues.append({"kind": "result_trial_id_mismatch", "trial_id": tid})
+            result_valid = False
+        if "manifest_sha256" in result and result["manifest_sha256"] != manifest_hash:
+            issues.append({"kind": "result_manifest_sha256_mismatch", "trial_id": tid})
+            result_valid = False
+    for name, receipt in [("started", started), ("result", result)]:
+        if not isinstance(receipt, dict):
+            continue
+        identity = receipt.get("run_identity")
+        identity = identity if isinstance(identity, dict) else {}
+        for field in ["workers", "runner_sha256", "protocol_sha256"]:
+            if field in manifest and identity.get(field) != manifest[field]:
+                issues.append({"kind": name + "_protocol_identity_mismatch", "trial_id": tid, "field": field})
+                if name == "started":
+                    start_valid = False
+                else:
+                    result_valid = False
+    result_valid = result_valid and start_valid
+    excluded = (started_present and not start_valid) or (result_present and not result_valid)
+    return result if result_valid else None, started if start_valid else None, bool(excluded)
 
 
 def collect(manifest_path, adjudication_dir):
@@ -233,13 +286,15 @@ def collect(manifest_path, adjudication_dir):
     for tid, trial in trials.items():
         directory = manifest_path.parent / "trials" / tid
         result, started = read(directory / "result.json"), read(directory / "started.json")
-        if result and result.get("trial_id") != tid:
-            issues.append({"kind": "result_trial_id_mismatch", "trial_id": tid})
+        result_present = (directory / "result.json").exists()
+        started_present = (directory / "started.json").exists()
+        result, started, excluded = bind_native_receipts(manifest, trial, result, started,
+                                                         result_present, started_present, issues)
         expected = len(cases[trial["case_id"]]["oracle"]["material_defects"]) if trial["case_id"] in cases else None
         row = adjudications["rows"].get(tid)
         complete_adj = False
         if row:
-            bad = [field for field in COUNT_FIELDS if row.get(field) is not None and (not isinstance(row[field], int) or isinstance(row[field], bool) or row[field] < 0)]
+            bad = [field for field in COUNT_FIELDS if field in row and (not isinstance(row[field], int) or isinstance(row[field], bool) or row[field] < 0)]
             bad += [field for field in QUALITY_FIELDS if row.get(field) is not None and not isinstance(row[field], bool)]
             if row.get("material_expected") is not None and expected is not None and row["material_expected"] != expected:
                 bad.append("material_expected")
@@ -255,16 +310,14 @@ def collect(manifest_path, adjudication_dir):
                     issues.append({"kind": "incomplete_adjudication", "trial_id": tid, "missing_fields": missing})
                 if not result:
                     issues.append({"kind": "adjudication_without_result", "trial_id": tid})
+                    row, complete_adj = None, False
         tokens = trial_tokens(result or {})
         if number(tokens["input_tokens_total"]) and number(tokens["cached_input_tokens"]) and tokens["cached_input_tokens"] > tokens["input_tokens_total"]:
             issues.append({"kind": "cache_exceeds_input", "trial_id": tid})
         if number(tokens["output_tokens"]) and number(tokens["reasoning_output_tokens"]) and tokens["reasoning_output_tokens"] > tokens["output_tokens"]:
             issues.append({"kind": "reasoning_exceeds_output", "trial_id": tid})
-        if result:
-            for field in ["workers", "runner_sha256", "protocol_sha256"]:
-                if field in manifest and (result.get("run_identity") or {}).get(field) != manifest[field]:
-                    issues.append({"kind": "result_protocol_identity_mismatch", "trial_id": tid, "field": field})
         records.append({"trial": trial, "result": result, "started": started, "fixture_expected": expected,
+                        "result_present": result_present, "excluded_evidence": excluded,
                         "applicability": case_applicability(cases[trial["case_id"]]) if trial["case_id"] in cases else {},
                         "adjudication": row, "adjudication_complete": complete_adj, "adjudication_provenance": adjudications["provenance"].get(tid, []), "tokens": tokens})
     return manifest, records, issues, hashes, []
@@ -281,7 +334,9 @@ def build_analysis(manifest, records, issues, hashes, overhead):
             "scope": "bounded_text_review_benchmark", "planned_trials": len(manifest["trials"]), "completed_trials": completed, "adjudicated_completed_trials": adjudicated,
             "protocol": {key: manifest.get(key) for key in ["runtime_configs", "workers", "repetitions", "seed", "fixture_sha256", "runner_sha256", "protocol_sha256", "snapshot_identities"]},
             "methods": {"quality": "External adjudication only; provisional scores are not used and no semantic review is performed.",
+                        "native_binding": "Started receipts require the canonical manifest digest, trial ID, stored command and declared protocol identity. Result IDs/protocol must match; new results also bind their canonical manifest digest. Unbound evidence is excluded from quality and resource comparisons. Older results without their own manifest digest require a valid started receipt.",
                         "adjudication_binding": "Each package requires study_manifest_sha256 matching the SHA-256 of manifest.json bytes. Missing or mismatched bindings exclude its rows and generate an integrity issue.",
+                        "adjudication_counts": "Required counts must be nonnegative integers, excluding booleans and null. Invalid rows are rejected and missing fields remain incomplete; unknown counts are not converted to zero.",
                         "quality_denominators": "Correction: cases with expected material defects. Parallel design: nonempty oracle.parallel_design_tasks. Origin: regression/late_discovery/unknown required. Guarantees: nonempty oracle.guarantees. Dimensions across all valid reviews are also retained separately.",
                         "tokens": "native_turn_usage counted once, falling back to usage. Cached input is included in input total; reasoning is a subset of output. Input without cache reads = input_total - cached_input.",
                         "variation": "Sample standard deviation; null with fewer than two values. No statistical inference or monetary conversion.",
@@ -296,10 +351,10 @@ def build_analysis(manifest, records, issues, hashes, overhead):
             "by_case": {case: compare_group([r for r in records if r["trial"]["case_id"] == case]) for case in manifest["case_ids"]},
             "observed_study_window": observed_window(records), "integrity_issues": issues,
             "missing_adjudication_trial_ids": [r["trial"]["trial_id"] for r in records if not r.get("adjudication_complete")],
-            "missing_result_trial_ids": [r["trial"]["trial_id"] for r in records if not r.get("result")],
+            "missing_result_trial_ids": [r["trial"]["trial_id"] for r in records if not r.get("result_present", bool(r.get("result")))],
             "diagnostic_overhead_excluded_from_AB": overhead, "source_file_sha256": hashes,
             "trial_rows": [{"trial_id": r["trial"]["trial_id"], "pair_id": r["trial"].get("pair_id"), "variant": r["trial"]["variant"], "runtime": r["trial"]["runtime"], "flow": r["trial"]["flow"], "case_id": r["trial"]["case_id"],
-                            "status": (r.get("result") or {}).get("status", "in_progress_or_interrupted" if r.get("started") else "pending"),
+                            "status": "excluded_evidence" if r.get("excluded_evidence") else (r.get("result") or {}).get("status", "in_progress_or_interrupted" if r.get("started") else "pending"),
                             "wall_seconds": (r.get("result") or {}).get("wall_seconds"), "tokens": r["tokens"], "adjudication": {field: r["adjudication"][field] for field in ADJ_FIELDS if field in r["adjudication"]} if r.get("adjudication") else None,
                             "applicability": r["applicability"], "adjudication_complete": r["adjudication_complete"], "adjudication_provenance": r["adjudication_provenance"]} for r in records]}
 
@@ -317,11 +372,11 @@ def render_report(data):
     lines = [f"# A/B benchmark: status {status}", "",
              f"There are {data['completed_trials']}/{data['planned_trials']} complete results and {data['adjudicated_completed_trials']} adjudicated complete results. Textual reviews use {data['protocol'].get('repetitions')} repetition(s) per case/context; results are descriptive.", "",
              "Model/effort: " + ", ".join(f"`{runtime}: {config.get('model')}/{config.get('effort')}`" for runtime, config in (data['protocol'].get('runtime_configs') or {}).items()) + f". Fixed concurrency: {data['protocol'].get('workers')} pairs.", "",
-             "| Variant | Complete | Valid | Errors | Pending | In progress/uncertain | Adjudicated | Adjudicated detected/expected | False positives |",
-             "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"]
+             "| Variant | Complete | Valid | Errors | Pending | In progress/uncertain | Excluded evidence | Adjudicated | Adjudicated detected/expected | False positives |",
+             "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"]
     for variant, group in [("A", a), ("B", b)]:
         t, q = group["trials"], group["quality"]
-        lines.append(f"| {variant} | {t['complete']} | {t['valid']} | {t['errors']} | {t['pending']} | {t['in_progress_or_interrupted']} | {t['adjudicated_complete']} | {fmt(q['material_detected'])}/{fmt(q['material_expected'])} | {fmt(q['false_positives']['sum'])} |")
+        lines.append(f"| {variant} | {t['complete']} | {t['valid']} | {t['errors']} | {t['pending']} | {t['in_progress_or_interrupted']} | {t['excluded_evidence']} | {t['adjudicated_complete']} | {fmt(q['material_detected'])}/{fmt(q['material_expected'])} | {fmt(q['false_positives']['sum'])} |")
     lines += ["", "Quality uses external adjudication only. Unknown values and absent judgments retain their status; invalid controls are not considered correct.", "",
               "Global and per-flow aggregates are descriptive when several runtimes are present. Compare A/B within each runtime with the same model/effort and context; differences between models cannot be attributed to guidance.", "",
               "## Latency and differences", "", "| Variant | n | Mean (s) | Median (s) | Sample stdev (s) | Min–max (s) |", "| --- | ---: | ---: | ---: | ---: | --- |"]

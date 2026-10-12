@@ -3,6 +3,7 @@
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -412,17 +413,68 @@ def native_command(runtime, binary, model, effort, cwd, schema, answer):
     return command
 
 
+def validate_prepared_schema(out):
+    expected = (json.dumps(answer_schema(), indent=2, ensure_ascii=False) + "\n").encode()
+    try:
+        prepared = (out / "answer.schema.json").read_bytes()
+    except OSError as error:
+        raise ValueError("Prepared answer schema is missing or unreadable") from error
+    if prepared != expected:
+        raise ValueError("Prepared answer schema identity changed")
+
+
+def prepared_trial_command(out, manifest, trial):
+    """Reconstruct trusted native argv; stored argv is evidence, never executable input."""
+    tid = trial.get("trial_id")
+    if not isinstance(tid, str) or tid in {".", ".."} or Path(tid).name != tid:
+        raise ValueError("Invalid trial directory identity")
+    directory = out / "trials" / tid
+    if directory.resolve() != directory or (directory / "cwd").resolve() != directory / "cwd":
+        raise ValueError("Trial paths must remain inside their prepared study directory")
+    runtime = trial.get("runtime")
+    configs = manifest.get("runtime_configs") or {}
+    config = configs.get(runtime)
+    if runtime not in {"codex", "claude"} or not isinstance(config, dict):
+        raise ValueError("Trial runtime has no declared configuration")
+    if set(config) != {"binary", "model", "effort"} or any(not isinstance(value, str) or not value for value in config.values()):
+        raise ValueError("Invalid declared runtime configuration")
+    if trial.get("config") != config:
+        raise ValueError("Trial configuration differs from its declared runtime")
+    command = native_command(runtime, **config, cwd=directory / "cwd",
+                             schema=out / "answer.schema.json", answer=directory / "native-answer.json")
+    if trial.get("command") != command:
+        raise ValueError("Prepared command differs from the declared native protocol")
+    validate_prepared_schema(out)
+    return command
+
+
 def redact(text):
-    text = re.sub(r"(?i)(bearer\s+)[^\s\"']+", r"\1[REDACTED]", text)
+    keys = r"authorization|proxy[_-]?authorization|x[_-]?api[_-]?key|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|password|secret|token|cookie|set-cookie|x-amz-security-token|x-amz-signature"
+    # Redact string values, rather than JSON syntax, so full headers cannot swallow closing quotes.
+    try:
+        structured = json.loads(text)
+    except ValueError:
+        structured = None
+    if isinstance(structured, (dict, list, str)):
+        def scrub(value):
+            if isinstance(value, dict):
+                return {key: "[REDACTED]" if re.fullmatch(keys, key, re.IGNORECASE) else scrub(child)
+                        for key, child in value.items()}
+            if isinstance(value, list):
+                return [scrub(child) for child in value]
+            return redact(value) if isinstance(value, str) else value
+        return json.dumps(scrub(structured), ensure_ascii=False)
+    text = re.sub(r"(?i)((?:bearer|basic)\s+)[^\s\"']+", r"\1[REDACTED]", text)
     text = re.sub(r"\bsk-[A-Za-z0-9_-]{12,}", "[REDACTED]", text)
     text = re.sub(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+", "[REDACTED]", text)
     text = re.sub(r"(?i)(https?://)[^\s/@]+:[^\s/@]+@", r"\1[REDACTED]@", text)
-    keys = r"authorization|proxy[_-]?authorization|x[_-]?api[_-]?key|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|password|secret|token|cookie|set-cookie|x-amz-security-token|x-amz-signature"
-    pattern = r'''(?i)(["']?\b(?:''' + keys + r''')["']?\s*[:=]\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,;&]+)'''
+    pattern = r'''(?i)(["']?\b(?:''' + keys + r''')["']?\s*[:=]\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,;&"']+)'''
     def replace(match):
         value = match.group(2)
         quote = value[0] if value.startswith(('"', "'")) else ""
         return match.group(1) + quote + "[REDACTED]" + quote
+    header = r'''(?i)(["']?\b(?:authorization|proxy[_-]?authorization|cookie|set-cookie)["']?\s*[:=]\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\r\n]+)'''
+    text = re.sub(header, replace, text)
     return re.sub(pattern, replace, text)
 
 
@@ -571,6 +623,16 @@ def run(args):
                 pending.append(trial)
         pairs = {}
         for trial in pending:
+            # Reject the entire bounded selection before any worker can launch a native client.
+            prepared_trial_command(out, manifest, trial)
+            directory = out / "trials" / trial["trial_id"]
+            prompt = (directory / "prompt.txt").read_text()
+            if hashlib.sha256(prompt.encode()).hexdigest() != trial["prompt_sha256"]:
+                raise ValueError("Prepared prompt identity changed")
+            if any((directory / "cwd").iterdir()):
+                raise ValueError("Trial working directory is not empty")
+            if trial["case_id"] not in cases:
+                raise ValueError("Trial case is not in the prepared fixture")
             pairs.setdefault(trial.get("pair_id", trial["trial_id"]), []).append(trial)
         def run_pair(trials):
             for trial in trials:
@@ -588,6 +650,7 @@ def run(args):
 
 
 def run_trial(out, manifest, trial, case, identity):
+    command = prepared_trial_command(out, manifest, trial)
     directory = out / "trials" / trial["trial_id"]
     prompt = (directory / "prompt.txt").read_text()
     if hashlib.sha256(prompt.encode()).hexdigest() != trial["prompt_sha256"]:
@@ -595,11 +658,12 @@ def run_trial(out, manifest, trial, case, identity):
     if any((directory / "cwd").iterdir()):
         raise ValueError("Trial working directory is not empty")
     atomic_json(directory / "started.json", {"trial_id": trial["trial_id"], "started_at_unix": time.time(), "manifest_sha256": digest(manifest),
-                                           "run_identity": identity, "command": trial["command"]})
+                                           "run_identity": identity, "command": command})
     result = {"trial_id": trial["trial_id"], "status": "error", "native_invocation_count": 1, "run_identity": identity,
+              "manifest_sha256": digest(manifest),
               "model_request_count": None, "usage": None, "answer": None, "score": None}
     try:
-        process = bounded_process(trial["command"], prompt, directory / "cwd", manifest["timeout_seconds"])
+        process = bounded_process(command, prompt, directory / "cwd", manifest["timeout_seconds"])
         result.update({k: process[k] for k in ["returncode", "timed_out", "wall_seconds"]})
         result["stderr_characters"] = len(process["stderr"])
         result["stderr_sha256"] = hashlib.sha256(process["stderr"].encode()).hexdigest()
@@ -631,24 +695,45 @@ def summarize(args):
     manifest_path = args.manifest.resolve()
     out = manifest_path.parent
     manifest = json.loads(manifest_path.read_text())
-    groups = {}
+    # Both reports use the same pure receipt binding, loaded from this tooling's sibling file.
+    spec = importlib.util.spec_from_file_location("plan_review_analysis", ROOT / "analyze.py")
+    analysis = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(analysis)
+    groups, excluded_groups, issues = {}, {}, []
     pending, interrupted = 0, 0
     for trial in manifest["trials"]:
         directory = out / "trials" / trial["trial_id"]
         state = trial_state(directory)
+        receipts = []
+        for name in ["result.json", "started.json"]:
+            path = directory / name
+            try:
+                receipts.append(json.loads(path.read_text()) if path.exists() else None)
+            except (ValueError, UnicodeDecodeError):
+                issues.append({"kind": "unreadable_json", "source": str(path)})
+                receipts.append(None)
+        result, started, excluded = analysis.bind_native_receipts(manifest, trial, *receipts,
+                                                                  (directory / "result.json").exists(),
+                                                                  (directory / "started.json").exists(), issues)
+        key = f"{trial['runtime']}/{trial['flow']}/{trial['variant']}"
+        if excluded:
+            groups.setdefault(key, [])
+            excluded_groups[key] = excluded_groups.get(key, 0) + 1
+            continue
         if state != "complete":
             pending += state == "pending"
             interrupted += state == "interrupted"
             continue
-        key = f"{trial['runtime']}/{trial['flow']}/{trial['variant']}"
-        groups.setdefault(key, []).append(json.loads((directory / "result.json").read_text()))
+        groups.setdefault(key, []).append(result)
     summary = {"scope": manifest["scope"], "status": "descriptive_provisional", "manual_adjudication_required": True,
                "workers": manifest.get("workers", 1), "runner_sha256": manifest.get("runner_sha256"), "protocol_sha256": manifest.get("protocol_sha256"),
-               "planned_invocations": len(manifest["trials"]), "pending": pending, "interrupted_ambiguous_cost": interrupted, "groups": {}}
+               "planned_invocations": len(manifest["trials"]), "pending": pending, "interrupted_ambiguous_cost": interrupted,
+               "excluded_evidence": sum(excluded_groups.values()), "integrity_issues": issues, "groups": {}}
     for key, results in groups.items():
         valid = [r for r in results if r["status"] == "ok"]
         scores = [r["score"] for r in valid]
         group = {"native_invocations": len(results), "valid_reviews": len(valid), "errors": len(results) - len(valid),
+                 "excluded_evidence": excluded_groups.get(key, 0),
                  "median_wall_seconds": statistics.median([r["wall_seconds"] for r in results if "wall_seconds" in r]) if any("wall_seconds" in r for r in results) else None,
                  "material_defects_expected": sum(s["expected_material_defects"] for s in scores),
                  "material_defects_missed": sum(s["missed_material_defects"] for s in scores), "false_positives": sum(s["false_positives"] for s in scores),

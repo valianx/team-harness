@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -17,13 +18,51 @@ if SPEC and SPEC.origin and Path(SPEC.origin).exists():
     ANALYSIS = importlib.util.module_from_spec(SPEC)
     SPEC.loader.exec_module(ANALYSIS)
 
+BENCH_SPEC = importlib.util.spec_from_file_location("plan_review_runner", ROOT / "benchmark.py")
+BENCH = importlib.util.module_from_spec(BENCH_SPEC)
+BENCH_SPEC.loader.exec_module(BENCH)
+
 
 def write_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 
 
-def make_study(root):
+def canonical_sha(value):
+    return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False,
+                                    separators=(",", ":")).encode()).hexdigest()
+
+
+def refresh_receipts(root):
+    """Bind synthetic receipts after intentional fixture manifest changes."""
+    manifest = json.loads((root / "manifest.json").read_text())
+    identity = {key: manifest[key] for key in ("workers", "runner_sha256", "protocol_sha256")}
+    for trial in manifest["trials"]:
+        directory = root / "trials" / trial["trial_id"]
+        result = json.loads((directory / "result.json").read_text())
+        result.update(manifest_sha256=canonical_sha(manifest), run_identity=identity)
+        write_json(directory / "result.json", result)
+        started = json.loads((directory / "started.json").read_text())
+        started.update(trial_id=trial["trial_id"], manifest_sha256=canonical_sha(manifest),
+                       run_identity=identity, command=trial["command"])
+        write_json(directory / "started.json", started)
+
+
+def adjudication_rows(manifest):
+    return [{"trial_id": trial["trial_id"], "material_expected": 1 if trial["case_id"] == "defect" else 0,
+             "material_detected": 1 if trial["case_id"] == "defect" else 0, "false_positives": 0,
+             "origin_correct": True, "correction_sufficient": True, "task_order_preserved": True,
+             "parallel_design_preserved": True, "coverage_sufficient": True, "guarantees_preserved": True}
+            for trial in manifest["trials"]]
+
+
+def write_adjudication(manifest_path, directory, rows):
+    write_json(directory / "batch-fixture.json",
+               {"method": "blind_semantic_review", "adjudicator": "fixture-reviewer",
+                "study_manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(), "rows": rows})
+
+
+def make_study(root, seed=42):
     """Hand-sized evidence; no model, auth, installed package or pilot data."""
     root.mkdir(parents=True, exist_ok=True)
     cases = {
@@ -41,7 +80,13 @@ def make_study(root):
                                               ("a2", 2, "A", "control"), ("b2", 2, "B", "control")]]
     manifest = {"benchmark_version": 2, "flows": ["spec"], "case_ids": ["defect", "control"],
                 "runtime_configs": {"codex": {"binary": "never-call-this-client", "model": "fixture", "effort": "high"}},
-                "fixture_sha256": fixture_hash, "seed": 42, "repetitions": 1, "trials": trials}
+                "workers": 1, "runner_sha256": "a" * 64, "protocol_sha256": "b" * 64,
+                "fixture_sha256": fixture_hash, "seed": seed, "repetitions": 1, "trials": trials}
+    for trial in trials:
+        directory = root / "trials" / trial["trial_id"]
+        trial["config"] = dict(manifest["runtime_configs"][trial["runtime"]])
+        trial["command"] = BENCH.native_command(trial["runtime"], **trial["config"], cwd=directory / "cwd",
+                                               schema=root / "answer.schema.json", answer=directory / "native-answer.json")
     manifest_path = root / "manifest.json"
     write_json(manifest_path, manifest)
     write_json(root / "cases.json", cases)
@@ -60,6 +105,7 @@ def make_study(root):
                   "wall_seconds": [10, 15, 1, 2][index], "score": {"false_positives": 999}}
         write_json(root / "trials" / tid / "result.json", result)
         write_json(root / "trials" / tid / "started.json", {"started_at_unix": 100 + index * 10})
+    refresh_receipts(root)
     return manifest_path, adjudication_dir
 
 
@@ -217,7 +263,7 @@ class AnalysisTests(unittest.TestCase):
             base = Path(tmp)
             manifest_path, adjudication = make_study(base)
             manifest = json.loads(manifest_path.read_text())
-            manifest.update(workers=1, runner_sha256="a" * 64, protocol_sha256="b" * 64)
+            manifest.update(workers=2, runner_sha256="c" * 64, protocol_sha256="d" * 64)
             write_json(manifest_path, manifest)
             cases = json.loads((base / "cases.json").read_text())
             cases["control"]["oracle"]["required_scenarios"] = ["changed"]
@@ -256,6 +302,7 @@ class AnalysisTests(unittest.TestCase):
                 if trial["case_id"] == "control":
                     trial["runtime"] = "claude"
             write_json(manifest_path, manifest)
+            refresh_receipts(manifest_path.parent)
             manifest, records, issues, hashes, overhead = ANALYSIS.collect(manifest_path, adjudication)
             data = ANALYSIS.build_analysis(manifest, records, issues, hashes, overhead)
             self.assertEqual(set(data["by_runtime"]), {"codex", "claude"})
@@ -272,6 +319,110 @@ class AnalysisTests(unittest.TestCase):
             self.assertIsNone(codex["A"]["quality"]["material_detected"])
             self.assertEqual({row["trial_id"]: row["runtime"] for row in data["trial_rows"]},
                              {"a1": "codex", "b1": "codex", "a2": "claude", "b2": "claude"})
+
+    def test_regression_copied_receipts_from_another_study_do_not_supply_quality_or_resources(self):
+        with tempfile.TemporaryDirectory(prefix="th-native-study-binding-") as tmp:
+            base = Path(tmp)
+            old_manifest, _ = make_study(base / "old", seed=42)
+            manifest_path, adjudication = make_study(base / "current", seed=43)
+            manifest = json.loads(manifest_path.read_text())
+            write_adjudication(manifest_path, adjudication, adjudication_rows(manifest)[:1])
+            for name in ("started.json", "result.json"):
+                shutil.copyfile(old_manifest.parent / "trials/a1" / name, manifest_path.parent / "trials/a1" / name)
+            manifest, records, issues, hashes, overhead = ANALYSIS.collect(manifest_path, adjudication)
+            data = ANALYSIS.build_analysis(manifest, records, issues, hashes, overhead)
+            group = data["all"]["A"]
+            self.assertEqual(group["trials"]["valid"], 1)
+            self.assertIsNone(group["tokens"]["total_tokens"]["sum"])
+            self.assertEqual(group["latency_seconds"]["sum"], 1)
+            self.assertIsNone(group["quality"]["material_detected"])
+            self.assertEqual(data["adjudicated_completed_trials"], 0)
+            self.assertIn("started_manifest_sha256_mismatch", [issue["kind"] for issue in issues])
+            self.assertIn("result_manifest_sha256_mismatch", [issue["kind"] for issue in issues])
+
+    def test_regression_missing_or_wrong_native_receipts_are_excluded_with_integrity_issues(self):
+        mutations = {"missing_started": "missing_started_receipt", "started_study": "started_manifest_sha256_mismatch",
+                     "missing_study": "missing_started_manifest_sha256", "started_trial": "started_trial_id_mismatch",
+                     "result_trial": "result_trial_id_mismatch", "result_protocol": "result_protocol_identity_mismatch",
+                     "started_protocol": "started_protocol_identity_mismatch", "result_study": "result_manifest_sha256_mismatch",
+                     "started_command": "started_command_mismatch"}
+        for mutation, expected_issue in mutations.items():
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory(prefix="th-native-receipt-integrity-") as tmp:
+                manifest_path, adjudication = make_study(Path(tmp))
+                directory = manifest_path.parent / "trials/a1"
+                started = json.loads((directory / "started.json").read_text())
+                result = json.loads((directory / "result.json").read_text())
+                if mutation == "started_study":
+                    started["manifest_sha256"] = "0" * 64
+                elif mutation == "missing_study":
+                    del started["manifest_sha256"]
+                elif mutation == "started_trial":
+                    started["trial_id"] = "another-trial"
+                elif mutation == "result_trial":
+                    result["trial_id"] = "another-trial"
+                elif mutation == "result_protocol":
+                    result["run_identity"]["runner_sha256"] = "0" * 64
+                elif mutation == "started_protocol":
+                    del started["run_identity"]
+                elif mutation == "result_study":
+                    result["manifest_sha256"] = "0" * 64
+                elif mutation == "started_command":
+                    started["command"] = ["another-command"]
+                write_json(directory / "started.json", started)
+                write_json(directory / "result.json", result)
+                if mutation == "missing_started":
+                    (directory / "started.json").unlink()
+                manifest, records, issues, hashes, overhead = ANALYSIS.collect(manifest_path, adjudication)
+                data = ANALYSIS.build_analysis(manifest, records, issues, hashes, overhead)
+                group = data["all"]["A"]
+                self.assertEqual(group["trials"]["valid"], 1)
+                self.assertIsNone(group["tokens"]["total_tokens"]["sum"])
+                self.assertEqual(group["latency_seconds"]["sum"], 1)
+                self.assertEqual(group["trials"]["excluded_evidence"], 1)
+                self.assertIn(expected_issue, [issue["kind"] for issue in issues])
+
+    def test_regression_null_required_counts_cannot_imply_complete_adjudication(self):
+        with tempfile.TemporaryDirectory(prefix="th-adjudication-count-types-") as tmp:
+            manifest_path, adjudication = make_study(Path(tmp))
+            manifest = json.loads(manifest_path.read_text())
+            rows = adjudication_rows(manifest)
+            for row in rows:
+                for field in ("material_expected", "material_detected", "false_positives"):
+                    row[field] = None
+            write_adjudication(manifest_path, adjudication, rows)
+            manifest, records, issues, hashes, overhead = ANALYSIS.collect(manifest_path, adjudication)
+            data = ANALYSIS.build_analysis(manifest, records, issues, hashes, overhead)
+            self.assertEqual(data["status"], "parcial")
+            self.assertEqual(data["adjudicated_completed_trials"], 0)
+            self.assertEqual(data["all"]["paired"]["both_adjudicated"], 0)
+            self.assertEqual(set(data["missing_adjudication_trial_ids"]), {"a1", "b1", "a2", "b2"})
+            for variant in ("A", "B"):
+                self.assertIsNone(data["all"][variant]["quality"]["material_detected"])
+                self.assertIsNone(data["all"][variant]["quality"]["false_positives"]["sum"])
+            self.assertEqual(sum(issue["kind"] == "invalid_or_contradictory_adjudication" for issue in issues), 4)
+
+    def test_legacy_results_use_valid_started_binding_and_keep_failures_pending_and_unknowns(self):
+        with tempfile.TemporaryDirectory(prefix="th-legacy-native-receipts-") as tmp:
+            manifest_path, adjudication = make_study(Path(tmp))
+            for path in manifest_path.parent.glob("trials/*/result.json"):
+                result = json.loads(path.read_text())
+                del result["manifest_sha256"]
+                write_json(path, result)
+            manifest, records, issues, hashes, overhead = ANALYSIS.collect(manifest_path, adjudication)
+            data = ANALYSIS.build_analysis(manifest, records, issues, hashes, overhead)
+            self.assertEqual(issues, [])
+            self.assertEqual(data["completed_trials"], 4)
+            self.assertEqual(data["all"]["B"]["trials"]["errors"], 1)
+            self.assertEqual(data["all"]["B"]["tokens"]["total_tokens"]["sum"], 280)
+            (manifest_path.parent / "trials/a1/result.json").unlink()
+            (manifest_path.parent / "trials/b1/result.json").unlink()
+            (manifest_path.parent / "trials/b1/started.json").unlink()
+            manifest, records, issues, hashes, overhead = ANALYSIS.collect(manifest_path, adjudication)
+            data = ANALYSIS.build_analysis(manifest, records, issues, hashes, overhead)
+            self.assertEqual(issues, [])
+            self.assertEqual(data["all"]["A"]["trials"]["in_progress_or_interrupted"], 1)
+            self.assertEqual(data["all"]["B"]["trials"]["pending"], 1)
+            self.assertEqual(data["all"]["B"]["tokens"]["total_tokens"]["sum"], 150)
 
 
 if __name__ == "__main__":
