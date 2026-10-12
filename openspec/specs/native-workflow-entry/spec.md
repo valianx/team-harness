@@ -72,7 +72,6 @@ entry without a platform-separator error.
 - **WHEN** the removed component has Windows-native filesystem paths
 - **THEN** its removal record uses the portable configuration-root path and passes structural validation
 
-
 ### Requirement: Workflow discovery without role replacement
 Team Harness startup context and managed guidance SHALL describe available workflows without replacing the native general agent or activating a pipeline implicitly. Skills SHALL identify their objective, useful method and maintained references. The current general agent SHALL coordinate selected audit, find-bugs, research and GCP workflows and delegate bounded work when useful rather than invoking a nested orchestrator merely to route the request. Spec, pipeline, review-pr, create-pr and find-bugs SHALL remain discoverable. Supported installations SHALL make this guidance available through native instruction discovery without requiring a TH default-agent selection.
 
@@ -216,3 +215,30 @@ Installation and update MUST retain native discovery of TH skills and voice guid
 #### Scenario: No artificial restart requirement
 - **WHEN** setup or update only changes reloadable TH workflow resources
 - **THEN** it refreshes supported resources and requests a restart only for a demonstrated native host limitation.
+
+### Requirement: Research roles project native read-only tool access
+Canonical and OpenCode research roles SHALL expose reading/search capabilities without mutation, shell execution, delegation or publication tools. The researcher SHALL additionally support external search/fetch; code-researcher and research-consolidator SHALL retain local reading only. Go and JavaScript transforms SHALL preserve these profiles even when installed role metadata is missing or conflicts with the filename identity. Supported inverse conversion SHALL reconstruct the corresponding canonical allowlist. Existing writer-role capabilities and native permission authority SHALL remain intact.
+
+#### Scenario: Research profiles are installed
+- **WHEN** a native research role is projected for OpenCode
+- **THEN** unspecified tools are denied, read/glob/grep are allowed and only researcher additionally allows webfetch/websearch
+
+#### Scenario: Role metadata cannot establish the installed identity
+- **WHEN** a research-role filename has missing or conflicting role metadata
+- **THEN** its filename profile still prevents capabilities outside that research role's boundary
+
+#### Scenario: A research role is converted back
+- **WHEN** supported inverse conversion reads a projected research role
+- **THEN** it restores the matching canonical reading/search tool allowlist without adding writing, Bash or delegation
+
+#### Scenario: A writer is projected
+- **WHEN** architect, documenter or implementer is installed or converted
+- **THEN** its existing authorized writing profile remains supported rather than inheriting research restrictions
+
+#### Scenario: Writer metadata conflicts with its filename
+- **WHEN** a supported canonical writer filename carries conflicting restricted-role metadata
+- **THEN** forward projection preserves the mapped tools declared in its source and denies unspecified tools, and inverse conversion retains only tools allowed by its actual native permissions
+
+#### Scenario: An arbitrary filename uses restricted metadata
+- **WHEN** an arbitrary custom filename or a generic projection has restricted-role metadata without a supported canonical filename identity
+- **THEN** the restricted metadata profile still applies rather than granting writer capabilities

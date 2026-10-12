@@ -25,6 +25,11 @@ tests. A phase or task boundary alone does not justify another agent. Main can
 complete a small step directly, including in an active pipeline.
 
 Specialists may write assigned deliverables and workspace notes when their role
-permits it. PR review specialists stay read-only. Use
+permits it. PR review specialists stay read-only. `researcher`, `code-researcher`
+and `research-consolidator` return evidence or advisory synthesis through native
+transport without writing, executing shell commands, delegating or publishing.
+Main owns research synthesis, persistence in the selected absolute workspace,
+decisions and material-gap follow-up. Optional analytical expertise does not
+require a fixed specialist chain. Use
 `agents/_shared/output-template.md` for reports. Historical lease helpers
 support old records only; they are not a dispatch prerequisite.

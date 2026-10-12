@@ -6,6 +6,8 @@
 // migrate.mjs's forward transform (transformToOpencode) produces the expected
 // logical output for each case — the JS half of the cross-language drift contract.
 // The Go half is cmd/install/transform_test.go::TestTransformConformance_FixtureGo.
+// Optional sourcePath exercises installed filename identity; expectedInverseTools
+// adds a JS inverse-conversion allowlist check where supported.
 //
 // Comparison strategy:
 //   - Error cases: assert the transform throws (same as Go).
@@ -29,6 +31,8 @@ import {
   parseFrontmatter,
   transformToOpencode,
   transformToOpencodeTiered,
+  applyModeByRole,
+  transformToCC,
 } from "./migrate.mjs";
 
 // ---------------------------------------------------------------------------
@@ -119,17 +123,22 @@ function diffFrontmatter(want, got) {
 // Transform wrapper: runs the forward transform with correct path classification.
 // ---------------------------------------------------------------------------
 
-function runForwardTransform(content, surface, tierProvider) {
+function runForwardTransform(content, surface, tierProvider, sourcePath) {
   const fakeRepoRoot = "/conformance-fixture-repo";
-  const fakePath = surface === "agent"
-    ? path.join(fakeRepoRoot, "agents", "test.md")
-    : path.join(fakeRepoRoot, ".claude", "commands", "test.md");
+  const fakePath = sourcePath
+    ? path.join(fakeRepoRoot, sourcePath)
+    : surface === "agent"
+      ? path.join(fakeRepoRoot, "agents", "test.md")
+      : path.join(fakeRepoRoot, ".claude", "commands", "test.md");
 
   try {
     const result = tierProvider
       ? transformToOpencodeTiered(fakePath, content, fakeRepoRoot, tierProvider)
       : transformToOpencode(fakePath, content, fakeRepoRoot);
-    return { output: result.content };
+    const output = sourcePath && surface === "agent"
+      ? applyModeByRole(result.content, path.basename(sourcePath, ".md"), content)
+      : result.content;
+    return { output, outputPath: result.outputPath };
   } catch (err) {
     return { error: err };
   }
@@ -157,14 +166,14 @@ console.log(`Loaded ${cases.length} conformance case(s).`);
 console.log("");
 
 for (const tc of cases) {
-  const { name, surface, input, expectedOutput, expectError, tierProvider } = tc;
+  const { name, surface, input, expectedOutput, expectError, tierProvider, sourcePath, expectedInverseTools } = tc;
 
   if (!name || !surface || input === undefined) {
     fail(name || "<unnamed>", "fixture case missing required fields (name, surface, input)");
     continue;
   }
 
-  const { output, error } = runForwardTransform(input, surface, tierProvider);
+  const { output, outputPath, error } = runForwardTransform(input, surface, tierProvider, sourcePath);
 
   if (expectError) {
     // Error cases: assert the transform throws, matching Go behavior.
@@ -205,6 +214,16 @@ for (const tc of cases) {
       parts.push(`body mismatch:\n  want: ${JSON.stringify(wantBody)}\n  got:  ${JSON.stringify(gotBody)}`);
     }
     fail(name, parts.join("\n"));
+  }
+
+  if (expectedInverseTools !== undefined) {
+    const inverse = transformToCC(outputPath, output, "/conformance-fixture-repo");
+    const { frontmatter: inverseFm } = parseFrontmatter(inverse.content);
+    if (inverseFm.tools === expectedInverseTools) {
+      pass(`${name} [inverse tools]`);
+    } else {
+      fail(`${name} [inverse tools]`, `want=${expectedInverseTools} got=${inverseFm.tools}`);
+    }
   }
 }
 

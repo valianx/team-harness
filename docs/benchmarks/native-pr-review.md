@@ -12,6 +12,9 @@ separate work under #662. No restart was needed for the checks described below.
 
 ## Component inventory for #662
 
+Current dispositions (2026-10-12) include the later native-routing and research-contract changes.
+The runtime observations and pilot results below retain their original historical scope.
+
 | Component | Purpose and inputs → outputs | Authority / guarantees | Dependencies and native equivalent | Decision and cost evidence |
 | --- | --- | --- | --- | --- |
 | PR consolidation role | Independent drafts and frozen code → one draft and finding dispositions | Advises; Main owns final decisions and all writes | Review reports, code, identities; native primary session can synthesize | Move required execution to Main; retain installed role for compatibility. Removes a required handoff when multiple drafts exist; token/latency benefit remains to be measured. |
@@ -21,7 +24,7 @@ separate work under #662. No restart was needed for the checks described below.
 | Finding/verification helper | Original findings and independent assessments → validated coverage and unchanged findings | No automatic severity, deletion or final ledger decisions | Frozen identities validated by Main; existing artifact helper | Adapt. Main retains source reports, original input, verifier identity and final disposition ledger for resume. |
 | Preview/publication | Canonical body/comments, exact approval and fresh context → one GitHub review | Main plus live operator/native permission policy | Approved-byte hashes, changed-line anchors, GH review endpoint | Retain. Removing an agent does not relax outward-write authority. |
 | Runtime adapters/generators | Canonical roles and runtime schema → native roles/skills | Native permissions remain authoritative | Claude tool lists, Codex TOML, OpenCode permission rules | Retain and align. Verifier omission in the JavaScript converter and security scan fixed; implementer writing retained. |
-| Research chain | Research question and sources → evidence and synthesis | Research advice, not operator decisions | Search, native context isolation and lead synthesis | Defer behavior changes. No measured benefit from deleting the general research chain is claimed here. |
+| Research chain | Research question and sources → returned evidence and optional synthesis | Specialists advise; Main decides follow-up and persists useful results | Native search/read transport, optional analytical assistance; Go/JS research profiles deny unspecified tools | Fixed routing simplified in #669/#673; canonical roles and live consumers aligned with Main-owned persistence. Keep useful research expertise. Comparative quality/token/latency benefit remains unmeasured. |
 | Pipeline/generic wrappers | Approved development plan and state → role dispatch, recoverable progress and delivery | Existing live authorization and scoped writers | Project knowledge, runtime adapters, state helpers | Retain pending a separate component-specific experiment. No blanket removal or new mandatory control layer. |
 
 ## Runtime and capability matrix

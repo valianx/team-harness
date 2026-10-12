@@ -388,7 +388,7 @@ console.log("\n=== Section 4: Forward transform CC → opencode (AC-1, AC-2, AC-
       JSON.stringify(fm["permission"]) === JSON.stringify(expectedPermission),
       JSON.stringify(fm["permission"]),
     );
-    for (const metadata of ["", "name: implementer\n", `name: ${name} # comment\n`]) {
+    for (const metadata of ["", "name: implementer\n", "name: researcher\n", `name: ${name} # comment\n`]) {
       const malformed = `---\n${metadata}tools: Read, Write, Bash, Task\n---\nBody.\n`;
       const forward = transformToOpencode(`agents/${name}.md`, malformed, "/repo");
       assert(`PR review basename ${name} remains restricted with ${JSON.stringify(metadata)}`,
@@ -401,6 +401,126 @@ console.log("\n=== Section 4: Forward transform CC → opencode (AC-1, AC-2, AC-
   }
   const writer = transformToOpencode("agents/implementer.md", "---\nname: implementer\ntools: Read, Write, Edit, Bash\n---\nBody.\n", "/repo");
   assert("PR review restrictions do not replace implementer native permissions", parseFrontmatter(writer.content).frontmatter.permission === undefined);
+}
+
+{
+  const readPermission = { "*": "deny", read: "allow", glob: "allow", grep: "allow" };
+  const webPermission = { "*": "deny", read: "allow", glob: "allow", grep: "allow", webfetch: "allow", websearch: "allow" };
+  for (const [name, permission, tools] of [
+    ["researcher", webPermission, "Read, Glob, Grep, WebFetch, WebSearch"],
+    ["code-researcher", readPermission, "Read, Glob, Grep"],
+    ["research-consolidator", readPermission, "Read, Glob, Grep"],
+  ]) {
+    for (const metadata of ["", `name: ${name}\n`, "name: implementer\n", "name: researcher\n", "name: code-researcher\n", "name: reviewer\n", `name: ${name} # comment\n`]) {
+      const source = `---\n${metadata}tools: Read, Write, Edit, Bash, Task, WebFetch, WebSearch\n---\nBody.\n`;
+      const forward = transformToOpencode(`agents/${name}.md`, source, "/repo");
+      assert(`Research basename ${name} selects its exact native profile with ${JSON.stringify(metadata)}`,
+        JSON.stringify(parseFrontmatter(forward.content).frontmatter.permission) === JSON.stringify(permission));
+      const installed = applyModeByRole(forward.content, name);
+      assert(`Research role override ${name} preserves its exact native profile with ${JSON.stringify(metadata)}`,
+        JSON.stringify(parseFrontmatter(installed).frontmatter.permission) === JSON.stringify(permission));
+
+      const inverseInputs = [
+        installed,
+        `---\n${metadata}permission:\n  edit: allow\n  bash: allow\n  task: allow\n  webfetch: allow\n  websearch: allow\n---\nBody.\n`,
+        `---\n${metadata}permission: {allow: [Read, Write, Bash, Task, WebFetch, WebSearch]}\n---\nBody.\n`,
+        `---\n${metadata}---\nBody.\n`,
+      ];
+      for (const [index, inverseInput] of inverseInputs.entries()) {
+        const inverse = transformToCC(`.opencode/agents/${name}.md`, inverseInput, "/repo");
+        assert(`Inverse research basename ${name} restores only its canonical tools (${index}) with ${JSON.stringify(metadata)}`,
+          parseFrontmatter(inverse.content).frontmatter.tools === tools);
+      }
+    }
+  }
+
+  for (const name of ["architect", "documenter", "implementer"]) {
+    const forward = transformToOpencode(`agents/${name}.md`, `---\nname: ${name}\ntools: Read, Write, Edit, Bash, Task\n---\nBody.\n`, "/repo");
+    const installed = applyModeByRole(forward.content, name);
+    assert(`Research restrictions preserve ${name} native writer permissions`, parseFrontmatter(installed).frontmatter.permission === undefined);
+    const inverse = transformToCC(`.opencode/agents/${name}.md`, `---\nname: ${name}\npermission: {read: allow, edit: allow, bash: allow, task: allow}\n---\nBody.\n`, "/repo");
+    assert(`Inverse research restrictions preserve ${name} writing capabilities`, parseFrontmatter(inverse.content).frontmatter.tools === "Read, Edit, Bash, Task");
+  }
+}
+
+{
+  const writers = [
+    { name: "implementer", tools: "Read, Edit, Write, Bash, Glob, Grep", inverse: "Read, Edit, Bash, Glob, Grep", permission: { "*": "deny", read: "allow", edit: "allow", bash: "allow", glob: "allow", grep: "allow" } },
+    { name: "tester", tools: "Read, Edit, Write, Bash, Glob, Grep", inverse: "Read, Edit, Bash, Glob, Grep", permission: { "*": "deny", read: "allow", edit: "allow", bash: "allow", glob: "allow", grep: "allow" } },
+    { name: "architect", tools: "Read, Glob, Grep, Edit, Write, WebFetch, WebSearch", inverse: "Read, Glob, Grep, Edit, WebFetch, WebSearch", permission: { "*": "deny", read: "allow", glob: "allow", grep: "allow", edit: "allow", webfetch: "allow", websearch: "allow" } },
+    { name: "documenter", tools: "Read, Edit, Write, Glob, Grep, Bash", inverse: "Read, Edit, Glob, Grep, Bash", permission: { "*": "deny", read: "allow", edit: "allow", glob: "allow", grep: "allow", bash: "allow" } },
+    { name: "delivery", tools: "Read, Edit, Write", inverse: "Read, Edit", permission: { "*": "deny", read: "allow", edit: "allow" } },
+    { name: "orchestrator", tools: "Read, Edit, Write, Bash, Glob, Grep, Task", inverse: "Read, Edit, Bash, Glob, Grep, Task", permission: { "*": "deny", read: "allow", edit: "allow", bash: "allow", glob: "allow", grep: "allow", task: "allow" } },
+  ];
+  for (const name of ["adversary", "agent-builder", "cleaner", "d2-diagrammer", "diagrammer", "gcp-cost-analyzer", "gcp-infra", "init-project", "likec4-diagrammer", "mentor", "qa", "security", "translator", "ux-reviewer"]) {
+    writers.push({ name, tools: "Read, Write", inverse: "Read, Edit", permission: { "*": "deny", read: "allow", edit: "allow" } });
+  }
+  for (const name of ["custom-worker", "test-agent"]) {
+    writers.push({ name, custom: true, tools: "Read, Write", inverse: "Read, Edit", permission: { "*": "deny", read: "allow", edit: "allow" } });
+  }
+  for (const writer of writers.filter((item) => !item.custom)) {
+    const absent = transformToCC(`.opencode/agents/${writer.name}.md`, "---\nname: researcher\n---\nWriter.\n", "/repo");
+    assert(`Inverse ${writer.name} cannot reconstruct permissions that are absent`, parseFrontmatter(absent.content).frontmatter.tools === undefined);
+    const partial = transformToCC(`.opencode/agents/${writer.name}.md`, "---\nname: researcher\npermission: {read: allow, edit: ask, bash: deny}\n---\nWriter.\n", "/repo");
+    assert(`Inverse ${writer.name} retains only actually allowed native permissions`, parseFrontmatter(partial.content).frontmatter.tools === "Read");
+  }
+  const metadataReadPermission = { "*": "deny", read: "allow", glob: "allow", grep: "allow" };
+  const metadataWebPermission = { "*": "deny", read: "allow", glob: "allow", grep: "allow", webfetch: "allow", websearch: "allow" };
+  for (const identity of ["missing", "canonical", "researcher", "code-researcher", "research-consolidator", "pr-review-verifier"]) {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "hm-writer-identity-"));
+    try {
+      const agentsDir = path.join(tmpDir, "agents");
+      await fs.mkdir(agentsDir);
+      for (const writer of writers) {
+        const metadata = identity === "missing" ? "" : `name: ${identity === "canonical" ? writer.name : identity}\n`;
+        await fs.writeFile(path.join(agentsDir, `${writer.name}.md`), `---\n${metadata}model: sonnet\ntools: ${writer.tools}\n---\nWriter.\n`);
+      }
+      const forward = await runTransform(DIRECTION_TO_OPENCODE, tmpDir);
+      assert(`Installed writer batch projects every ${identity} metadata fixture`, forward.length === writers.length && forward.every((item) => item.status === "projected"));
+      for (const writer of writers) {
+        const nativePath = path.join(tmpDir, ".opencode", "agents", `${writer.name}.md`);
+        const { frontmatter: fm, body } = parseFrontmatter(await fs.readFile(nativePath, "utf8"));
+        const expected = identity === "missing" || identity === "canonical"
+          ? undefined
+          : writer.custom ? (identity === "researcher" ? metadataWebPermission : metadataReadPermission) : writer.permission;
+        assert(`Installed ${writer.name} with ${identity} metadata preserves only source-declared tools`, JSON.stringify(fm.permission) === JSON.stringify(expected));
+        // Import an explicit native writer profile so reverse availability is
+        // checked independently of a potentially broken forward projection.
+        await fs.writeFile(nativePath, serializeFrontmatter({ ...fm, permission: writer.permission }, body));
+      }
+      const inverse = await runTransform(DIRECTION_TO_CC, tmpDir);
+      assert(`Inverse installed writer batch projects every ${identity} metadata fixture`, inverse.length === writers.length && inverse.every((item) => item.status === "projected"));
+      for (const writer of writers) {
+        const { frontmatter: fm } = parseFrontmatter(await fs.readFile(path.join(agentsDir, `${writer.name}.md`), "utf8"));
+        const expected = writer.custom && identity !== "missing" && identity !== "canonical"
+          ? identity === "researcher" ? "Read, Glob, Grep, WebFetch, WebSearch" : "Read, Glob, Grep"
+          : writer.inverse;
+        assert(`Inverse installed ${writer.name} with ${identity} metadata respects its filename or metadata identity`, fm.tools === expected);
+      }
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  }
+}
+
+{
+  const scriptDir = path.dirname(url.fileURLToPath(import.meta.url));
+  const agentsDir = path.resolve(scriptDir, "..", "..", "agents");
+  const writingTools = new Set(["Write", "Edit", "NotebookEdit", "Bash", "Task"]);
+  for (const entry of await fs.readdir(agentsDir, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+    const { frontmatter: sourceFm } = parseFrontmatter(await fs.readFile(path.join(agentsDir, entry.name), "utf8"));
+    if (typeof sourceFm.tools !== "string") continue;
+    const writing = sourceFm.tools.split(",").some((tool) => writingTools.has(tool.trim()));
+    const input = "---\nname: researcher\ntools: Read, Write\n---\nBody.\n";
+    const projected = transformToOpencode(path.join(agentsDir, entry.name), input, "/repo");
+    const installed = applyModeByRole(projected.content, entry.name.slice(0, -3), input);
+    const { frontmatter: fm } = parseFrontmatter(installed);
+    const expected = { "*": "deny", read: "allow", edit: "allow" };
+    assert(`Canonical ${entry.name} identity follows the source writing roster`, writing
+      ? JSON.stringify(fm.permission) === JSON.stringify(expected)
+      : fm.permission?.edit !== "allow");
+  }
 }
 
 {

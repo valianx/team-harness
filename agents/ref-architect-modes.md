@@ -30,12 +30,14 @@ context file.
 
 1. **Define the research question** — technology migration, library
    comparison, approach evaluation, or feasibility study.
-2. **Gather evidence.** When the coordinator provides a consolidated findings
-   file (written by `research-consolidator`), read it as the primary evidence
-   base; spot-fetch with WebFetch only for specific gaps named in the
-   supplied findings — do not re-run broad WebSearch over covered angles.
-   With no consolidated findings, use context7, WebSearch, codebase analysis,
-   and a compatibility check against the existing stack directly.
+2. **Gather evidence.** Use returned findings supplied by Main, or read its
+   persisted evidence at the supplied absolute path, as the primary evidence
+   base. Research specialists return read-only evidence or advisory synthesis;
+   Main owns its persistence and follow-up decisions. Spot-fetch with WebFetch
+   only for specific gaps within the assigned research scope; do not re-run
+   broad WebSearch over covered angles. With no supplied findings, use context7,
+   WebSearch, codebase analysis and a compatibility check against the existing
+   stack directly.
 3. **Analyze per option:** concrete pros/cons, migration effort, risk and
    reversibility, team impact, stack compatibility.
 4. **Write the report.** If the operator names a follow-up, amend the same

@@ -28,10 +28,12 @@ type conformanceCase struct {
 	ExpectError    bool   `json:"expectError"`
 	Note           string `json:"note"`
 	TierProvider   string `json:"tierProvider"` // optional — empty means model-less (AC-9)
+	SourcePath     string `json:"sourcePath"`   // optional — exercise installed filename identity
 }
 
 // TestTransformConformance_FixtureGo asserts every case in the shared
-// transform-conformance.json fixture against transformToOpencode.
+// transform-conformance.json fixture against the generic projection or, when
+// sourcePath is set, the installed filename projection.
 //
 // This is half of the cross-language drift contract (AC-3). The other half is
 // the node-side assertion in tools/harness-migrate/ which runs migrate.mjs
@@ -57,7 +59,11 @@ func TestTransformConformance_FixtureGo(t *testing.T) {
 
 			var got []byte
 			var err error
-			if tc.TierProvider != "" {
+			if tc.SourcePath != "" && tc.TierProvider != "" {
+				got, err = opencodeRuntimeTransformTiered([]byte(tc.Input), kind, tc.SourcePath, tc.TierProvider)
+			} else if tc.SourcePath != "" {
+				got, err = opencodeRuntimeTransform([]byte(tc.Input), kind, tc.SourcePath)
+			} else if tc.TierProvider != "" {
 				got, err = transformToOpencodeTiered([]byte(tc.Input), kind, tc.TierProvider)
 			} else {
 				got, err = transformToOpencode([]byte(tc.Input), kind)
@@ -162,7 +168,7 @@ func TestTransform_BlankModelSkipped(t *testing.T) {
 // Review permission selection must survive missing or conflicting source metadata.
 func TestTransform_ReviewBasenameCannotLosePermissions(t *testing.T) {
 	for _, name := range []string{"reviewer", "pr-review-qa", "pr-review-security", "pr-review-verifier", "reviewer-consolidator"} {
-		for _, metadata := range []string{"", "name: implementer\n", "name: " + name + " # comment\n"} {
+		for _, metadata := range []string{"", "name: implementer\n", "name: researcher\n", "name: " + name + " # comment\n"} {
 			t.Run(name+metadata, func(t *testing.T) {
 				src := []byte("---\n" + metadata + "tools: Read, Write, Bash, Task\n---\nBody.\n")
 				got, err := opencodeRuntimeTransform(src, TransformKindAgent, "agents/"+name+".md")
@@ -177,6 +183,178 @@ func TestTransform_ReviewBasenameCannotLosePermissions(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestTransform_ResearchBasenameSelectsExactPermissions(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		want string
+	}{
+		{"researcher", "permission: {\"*\": deny, read: allow, glob: allow, grep: allow, webfetch: allow, websearch: allow}\n"},
+		{"code-researcher", "permission: {\"*\": deny, read: allow, glob: allow, grep: allow}\n"},
+		{"research-consolidator", "permission: {\"*\": deny, read: allow, glob: allow, grep: allow}\n"},
+	} {
+		for _, metadata := range []string{"", "name: implementer\n", "name: researcher\n", "name: code-researcher\n", "name: reviewer\n", "name: " + tc.name + " # comment\n"} {
+			for _, provider := range []string{"", "anthropic"} {
+				t.Run(tc.name+"/"+metadata+"/"+provider, func(t *testing.T) {
+					src := []byte("---\n" + metadata + "model: sonnet\ntools: Read, Write, Edit, Bash, Task, WebFetch, WebSearch\npermission: {edit: allow}\n---\nBody.\n")
+					var got []byte
+					var err error
+					if provider == "" {
+						got, err = opencodeRuntimeTransform(src, TransformKindAgent, "agents/"+tc.name+".md")
+					} else {
+						got, err = opencodeRuntimeTransformTiered(src, TransformKindAgent, "agents/"+tc.name+".md", provider)
+					}
+					if err != nil {
+						t.Fatal(err)
+					}
+					if !strings.Contains(string(got), tc.want) {
+						t.Fatalf("installed filename did not select the exact research permissions:\n%s", got)
+					}
+					if !strings.Contains(string(got), "mode: subagent\n") {
+						t.Fatalf("research role must remain a subagent:\n%s", got)
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestTransform_ResearchRestrictionsPreserveWriters(t *testing.T) {
+	for _, name := range []string{"architect", "documenter", "implementer"} {
+		t.Run(name, func(t *testing.T) {
+			src := []byte("---\nname: " + name + "\ntools: Read, Write, Edit, Bash, Task\n---\nBody.\n")
+			got, err := opencodeRuntimeTransform(src, TransformKindAgent, "agents/"+name+".md")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(got), "permission:") {
+				t.Fatalf("writer permissions must remain governed by the native host policy:\n%s", got)
+			}
+		})
+	}
+}
+
+func TestTransform_WriterFilenameConflictPreservesSourceTools(t *testing.T) {
+	type writerFixture struct {
+		name  string
+		tools string
+		want  string
+	}
+	writers := []writerFixture{
+		{"implementer", "Read, Edit, Write, Bash, Glob, Grep", `permission: {"*": deny, read: allow, edit: allow, bash: allow, glob: allow, grep: allow}`},
+		{"tester", "Read, Edit, Write, Bash, Glob, Grep", `permission: {"*": deny, read: allow, edit: allow, bash: allow, glob: allow, grep: allow}`},
+		{"architect", "Read, Glob, Grep, Edit, Write, WebFetch, WebSearch", `permission: {"*": deny, read: allow, glob: allow, grep: allow, edit: allow, webfetch: allow, websearch: allow}`},
+		{"documenter", "Read, Edit, Write, Glob, Grep, Bash", `permission: {"*": deny, read: allow, edit: allow, glob: allow, grep: allow, bash: allow}`},
+		{"delivery", "Read, Edit, Write", `permission: {"*": deny, read: allow, edit: allow}`},
+		{"orchestrator", "Read, Edit, Write, Bash, Glob, Grep, Task", `permission: {"*": deny, read: allow, edit: allow, bash: allow, glob: allow, grep: allow, task: allow}`},
+	}
+	for _, name := range []string{"adversary", "agent-builder", "cleaner", "d2-diagrammer", "diagrammer", "gcp-cost-analyzer", "gcp-infra", "init-project", "likec4-diagrammer", "mentor", "qa", "security", "translator", "ux-reviewer"} {
+		writers = append(writers, writerFixture{name, "Read, Write", `permission: {"*": deny, read: allow, edit: allow}`})
+	}
+	for _, tc := range writers {
+		for _, metadata := range []string{"", "name: " + tc.name + "\n", "name: researcher\n", "name: code-researcher\n", "name: research-consolidator\n", "name: pr-review-verifier\n"} {
+			for _, provider := range []string{"", "anthropic"} {
+				t.Run(tc.name+"/"+metadata+"/"+provider, func(t *testing.T) {
+					src := []byte("---\n" + metadata + "model: sonnet\ntools: " + tc.tools + "\n---\nWriter.\n")
+					var got []byte
+					var err error
+					if provider == "" {
+						got, err = opencodeRuntimeTransform(src, TransformKindAgent, "agents/"+tc.name+".md")
+					} else {
+						got, err = opencodeRuntimeTransformTiered(src, TransformKindAgent, "agents/"+tc.name+".md", provider)
+					}
+					if err != nil {
+						t.Fatal(err)
+					}
+					if metadata == "" || metadata == "name: "+tc.name+"\n" {
+						if strings.Contains(string(got), "permission:") {
+							t.Fatalf("ordinary writer must retain native permission policy:\n%s", got)
+						}
+					} else if !strings.Contains(string(got), tc.want+"\n") {
+						t.Fatalf("writer filename must preserve only source-declared tools despite stale metadata:\n%s", got)
+					}
+					if tc.name == "orchestrator" && !strings.Contains(string(got), "mode: primary\n") {
+						t.Fatalf("installed coordinator must remain primary:\n%s", got)
+					}
+					if provider != "" && !strings.Contains(string(got), "model: anthropic/claude-sonnet-5-5\n") {
+						t.Fatalf("installed writer must preserve selected provider tier:\n%s", got)
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestTransform_CustomFilenameRetainsRestrictedMetadataFallback(t *testing.T) {
+	for _, name := range []string{"custom-worker", "test-agent"} {
+		for _, tc := range []struct {
+			metadata string
+			want     string
+		}{
+			{"researcher", `permission: {"*": deny, read: allow, glob: allow, grep: allow, webfetch: allow, websearch: allow}`},
+			{"code-researcher", `permission: {"*": deny, read: allow, glob: allow, grep: allow}`},
+			{"research-consolidator", `permission: {"*": deny, read: allow, glob: allow, grep: allow}`},
+			{"pr-review-verifier", `permission: {"*": deny, read: allow, glob: allow, grep: allow}`},
+		} {
+			t.Run(name+"/"+tc.metadata, func(t *testing.T) {
+				src := []byte("---\nname: " + tc.metadata + "\ntools: Read, Write, Bash, Task\n---\nBody.\n")
+				got, err := opencodeRuntimeTransform(src, TransformKindAgent, "agents/"+name+".md")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !strings.Contains(string(got), tc.want+"\n") {
+					t.Fatalf("custom filename cannot override a selected restricted metadata role:\n%s", got)
+				}
+			})
+		}
+	}
+}
+
+func TestTransform_CanonicalWriterIdentityFollowsSourceRoster(t *testing.T) {
+	entries, err := os.ReadDir("../../agents")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
+			continue
+		}
+		source, err := os.ReadFile("../../agents/" + entry.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
+		fm, _, err := parseFrontmatterYAML(source)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tools, hasTools := fm["tools"].(string)
+		if !hasTools {
+			continue
+		}
+		writing := false
+		for _, tool := range strings.Split(tools, ",") {
+			switch strings.TrimSpace(tool) {
+			case "Write", "Edit", "NotebookEdit", "Bash", "Task":
+				writing = true
+			}
+		}
+		t.Run(entry.Name(), func(t *testing.T) {
+			input := []byte("---\nname: researcher\ntools: Read, Write\n---\nBody.\n")
+			got, err := opencodeRuntimeTransform(input, TransformKindAgent, "agents/"+entry.Name())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if writing {
+				want := "permission: {\"*\": deny, read: allow, edit: allow}\n"
+				if !strings.Contains(string(got), want) {
+					t.Fatalf("canonical writer identity must be recognized without expanding its declared source tools:\n%s", got)
+				}
+			} else if strings.Contains(string(got), "edit: allow") {
+				t.Fatalf("non-writing canonical identity cannot override restricted metadata:\n%s", got)
+			}
+		})
 	}
 }
 
@@ -404,9 +582,13 @@ func assertPlacedAgentFrontmatter(t *testing.T, agentPath, frontmatter string) {
 	t.Helper()
 	name := strings.TrimSuffix(agentPath[strings.LastIndex(agentPath, "/")+1:], ".md")
 	expectedPermission := `permission: {"*": deny, read: allow, glob: allow, grep: allow}`
-	if isPRReviewAgent(name) && !strings.Contains(frontmatter, expectedPermission) {
-		t.Errorf("agent %s: expected exact deny-by-default PR-review permission; got:\n%s", agentPath, frontmatter)
-	} else if !isPRReviewAgent(name) && strings.Contains(frontmatter, "permission:") {
+	restricted := isPRReviewAgent(name) || name == "code-researcher" || name == "research-consolidator" || name == "researcher"
+	if name == "researcher" {
+		expectedPermission = `permission: {"*": deny, read: allow, glob: allow, grep: allow, webfetch: allow, websearch: allow}`
+	}
+	if restricted && !strings.Contains(frontmatter, expectedPermission) {
+		t.Errorf("agent %s: expected exact deny-by-default permission; got:\n%s", agentPath, frontmatter)
+	} else if !restricted && strings.Contains(frontmatter, "permission:") {
 		t.Errorf("agent %s: permission must be omitted so native OpenCode policy applies", agentPath)
 	}
 	if strings.Contains(frontmatter, "mcp__") {
