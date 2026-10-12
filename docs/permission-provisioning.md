@@ -135,4 +135,4 @@ The same contract serves two active consumers and preserves the existing destina
 
 The activation reference performs the already-present check, shows the exact bounded allow/deny/additional-directory delta, and requires documented live confirmation. It delegates the canonical allowlist and outcome contract here rather than restating them. The project-local destination remains gitignored and revertible; the user-scoped destination retains its cross-project blast-radius disclosure.
 
-`settings.json`/`settings.local.json` are Claude Code's own configuration files, not a team-harness config file — writing to them does not violate the "single config file — `~/.claude/.team-harness.json`" rule (CLAUDE.md §5).
+`settings.json`/`settings.local.json` are Claude Code's own configuration files, not a team-harness config file — writing to them does not violate the [single config file rule](./conventions.md#single-config-file--claudeteam-harnessjson).

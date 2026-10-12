@@ -2,9 +2,10 @@
 
 Team Harness provides shared development workflows for the native agents of
 Claude Code, Codex, and OpenCode. This guide
-covers how to propose a change. The **binding rules** for any change live in
-[`CLAUDE.md` §6 — Mandatory Working Agreements](./CLAUDE.md#6-mandatory-working-agreements);
-this document summarizes them and shows you the contribution flow.
+covers how to propose a change. Repository instructions live in
+[`AGENTS.md`](./AGENTS.md), with publication rules in the
+[working agreements](./docs/working-agreements.md). This document summarizes
+them and shows you the contribution flow.
 
 ## Contributing with native tools
 
@@ -42,11 +43,10 @@ If you are not a collaborator on `valianx/team-harness`, contribute via a fork:
 **Collaborators** with write access may skip the fork and branch directly in the
 upstream repo, but still open a PR — no one pushes to `main` directly.
 
-## The binding rules (summary — see CLAUDE.md §6 for the authority)
+## Working rules
 
-These are the floor for every change. The full, authoritative text is in
-[`CLAUDE.md` §6](./CLAUDE.md#6-mandatory-working-agreements) — this is a summary,
-not a second source of truth.
+These summarize [`AGENTS.md`](./AGENTS.md#working-here) and the
+[working agreements](./docs/working-agreements.md).
 
 - **Branch naming:** use a task branch, including the native host's `codex/` prefix or the repository's `feat/`, `fix/`, `chore/`, `docs/`, `refactor/` conventions.
 - **Conventional commits:** `feat(area): …`, `fix(area): …`, `docs(area): …`, etc.
@@ -62,8 +62,9 @@ not a second source of truth.
 - **Tests green before you push:** run `bash tests/run-all.sh` — it must exit 0.
 - **Never commit secrets** — tokens, API keys, `.env` files, certificates, private keys.
 
-See [`CLAUDE.md` §6](./CLAUDE.md#6-mandatory-working-agreements) for the complete
-agreements, governance escalation rules, and the anti-pattern list.
+Follow [`AGENTS.md`](./AGENTS.md#validation-and-delivery) for validation and
+delivery, and the [working agreements](./docs/working-agreements.md) for the
+complete publication rules.
 
 ## Cross-runtime development
 
@@ -97,8 +98,9 @@ behavior, and the complete Codex verification set, follow the
 [Codex runtime guide](./docs/codex-runtime.md).
 
 For opencode, most existing surfaces remain cross-harness with no extra work —
-agents, skills, and rules (`CLAUDE.md` / `AGENTS.md`) are read as documented by
-that runtime. Two rules apply when a change touches its runtime-specific surfaces:
+agents, skills, and rules (`AGENTS.md`, with native `CLAUDE.md` compatibility)
+are read as documented by that runtime. Two rules apply when a change touches
+its runtime-specific surfaces:
 
 - **Retained context and observation remain a Claude Code surface.** Do not add
   a Team Harness policy-hook layer to Codex or OpenCode; use each host's native
@@ -114,11 +116,12 @@ Background and the per-asset-type process:
 
 ## Agent and pipeline changes
 
-Per [`CLAUDE.md` §14](./CLAUDE.md#14-subagent-orchestration):
+Follow the current selected skill and
+[`AGENTS.md`](./AGENTS.md#purpose-and-workflows):
 
-- Adding or modifying an agent → route through `architect` first, then `agent-builder` writes the prompt.
-- Installer / hooks / MCP server changes → `architect` then `security` review (elevated privileges on the user's machine).
-- Pipeline phase changes → architecture review mandatory; update `agents/ref-pipeline.md` + `agents/_shared/gate-contract.md` + affected references atomically. Activation-boundary changes also update `agents/orchestrator.md`.
+- Give delegated specialists bounded tasks, explicit ownership, and the selected workspace.
+- Treat independent findings as evidence; the coordinator evaluates recommendations and verifies corrections.
+- Keep canonical roles, runtime adapters, and affected workflow references consistent; generate distributed copies.
 
 ## Verifying your change
 

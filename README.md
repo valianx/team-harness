@@ -377,7 +377,7 @@ Full contract: docs/dev-mode.md.
 | [Migration guide](./docs/plugin-migration.md) | Migrating from the Go installer to the plugin |
 | [Agents reference](./agents/README.md) | Full agent roster, model/effort matrix, low-cost mode |
 | [Agent tree](./docs/agent-tree.md) | How `th:orchestrator` and the leaf specialists relate at runtime |
-| [Configuration reference](./CLAUDE.md) | Architectural conventions, working agreements, subagent routing |
+| [Contributor instructions](./AGENTS.md) | Repository workflows, working agreements, validation and benchmarks |
 | [Knowledge base](./docs/knowledge.md) | Decisions, patterns, stack notes, and constraints accumulated across features |
 | [Integration guide](./docs/integration.md) | Optional knowledge integrations; workspace context has no remote dependency |
 | [External tools](./docs/upstream-tools.md) | OpenSpec, Superpowers, TEA and quality analyzers: selection, execution, shared workspace and upstream ownership |

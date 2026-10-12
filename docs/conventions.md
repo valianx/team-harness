@@ -1,6 +1,8 @@
 # Architectural Conventions — Extended Reference
 
-> Extracted from CLAUDE.md §5 to keep the main file under its size cap. The one-liner rules and pointers stay in CLAUDE.md §5. This file holds the extended detail for conventions that do not have a dedicated `docs/` file of their own.
+> Contributor reference for workspace and configuration conventions. Repository
+> instructions live in [`AGENTS.md`](../AGENTS.md#working-here); this file holds
+> details that do not have a dedicated guide.
 
 ---
 

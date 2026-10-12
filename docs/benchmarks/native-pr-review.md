@@ -6,8 +6,9 @@ Baseline: `a2683ae3dedc5d06f5ff3eb96c7cc6b95ef6ab48` (3.29.7). Evidence date: 20
 
 This report separates implemented behavior, native capability observations and comparative
 quality evidence. Passing projection tests is not evidence that a model completed a review or
-that one runtime is equivalent to another. Delivery is a draft PR with the OpenSpec change still
-active; neither issue is claimed resolved. No restart was needed for the checks described below.
+that one runtime is equivalent to another. The delivery state described below is historical.
+The implementation subsequently shipped; comparative quality/cost measurement remains
+separate work under #662. No restart was needed for the checks described below.
 
 ## Component inventory for #662
 
@@ -142,7 +143,9 @@ not reviews with zero findings. The other frozen fixtures have not yet been comp
 Record final findings found/missed, false positives, selected coverage, source-to-final ledger
 accounting, actual native dispatch, retries, authority violations, wall time and available
 consumption. Repeat a cell if stochastic disagreement changes its conclusion. No improvement
-or three-runtime quality parity is established yet; task 4.2 remains open.
+or three-runtime quality parity is established by this pilot. Task 4.2 was subsequently
+completed for implementation readiness; comparative latency/token measurement remains
+a separate #662 experiment. See the [maintained measurement entries](README.md).
 
 ## Automated verification and boundaries
 

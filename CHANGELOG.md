@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.42.8] - 2026-10-12
+
+### Added
+- Contributors can reproduce bounded plan-review A/B studies with maintained tools, synthetic cases and honest quality/resource metrics.
+
+### Changed
+- Contributor guidance uses AGENTS.md; living specs preserve delivered intent while completed archive records are cleared from the repository.
+
 ## [3.42.7] - 2026-10-11
 
 ### Changed

@@ -1,8 +1,8 @@
 # Working Agreements — Post-work Deliverables
 
-> Offloaded from `CLAUDE.md § 6.3` to keep CLAUDE.md within its §7b size budget. This file is the
-> canonical text; `CLAUDE.md § 6.3` is a condensed pointer here. The rules below are the floor for
-> any user-facing change, whether it ships through the orchestrated pipeline or as a manual commit.
+> Publication rules for contributors, linked from
+> [`AGENTS.md`](../AGENTS.md#validation-and-delivery). They apply to any user-facing
+> change, whether it ships through a selected workflow or as a manual commit.
 
 ## Post-work (deliverables for any user-facing change)
 
@@ -34,8 +34,9 @@
   `Documentation budget: extended — {reason}; max {N} lines`. With no local format, use one title,
   a one-sentence purpose, and only task-oriented sections; omit introductions, conclusions, FAQs,
   architecture tours, repeated facts, and examples not required to use the changed behavior.
-- If §3 Tech Stack or §4 Golden Commands of CLAUDE.md changed, update those sections in the same
-  PR — do not let CLAUDE.md drift from the repo.
+- If the tech stack or verification commands changed, update the relevant
+  [lifecycle](./lifecycle.md), [runtime](./codex-runtime.md), or
+  [testing](./testing.md) documentation in the same PR.
 - If the change establishes a decision, pattern, or constraint that future work must respect,
   append a one-line bullet to `docs/knowledge.md` with the matching tag prefix (`[decision]`,
   `[pattern]`, `[stack]`, `[constraint]`).

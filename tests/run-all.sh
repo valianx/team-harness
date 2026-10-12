@@ -559,6 +559,24 @@ fi
 
 echo
 echo "############################################################"
+echo "# Maintained plan-review A/B tooling (hermetic, no model calls)"
+echo "############################################################"
+if [ -n "$PY" ]; then
+    for benchmark_test in test_plan_review_benchmark.py test_plan_review_analysis.py; do
+        if $PY "$TESTS_DIR/$benchmark_test"; then
+            echo "${benchmark_test%.py}: PASS"
+        else
+            echo "${benchmark_test%.py}: FAIL"
+            FAILED=$((FAILED + 1))
+        fi
+    done
+else
+    echo "plan-review-benchmarks: FAIL (Python 3 not found)"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 if [ $FAILED -eq 0 ]; then
     echo "# All suites passed."
     echo "############################################################"

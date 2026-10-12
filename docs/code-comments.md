@@ -1,8 +1,8 @@
 # Code Comments — Contract and Guide
 
 > Single source of truth for when and how to comment code across all surfaces in this repo.
-> Sibling to `docs/voice-guide.md`. See `CLAUDE.md §6.5` for the anti-pattern prohibition
-> and `CLAUDE.md §9` for the positive-pattern pointer.
+> Sibling to `docs/voice-guide.md`, linked from
+> [`AGENTS.md`](../AGENTS.md#working-here) for contributor guidance.
 
 ---
 
@@ -155,7 +155,8 @@ Need to capture a rationale / decision / constraint / non-obvious trade-off?
 │   skills must follow (more than a page, with sub-rules / tables)?
 │     └─ YES → a docs/*.md contract file
 │              (e.g., voice-guide.md, conventions.md, worktree-discipline.md);
-│              add the one-line pointer + tag-line to CLAUDE.md + knowledge.md
+│              add the one-line tag-line to knowledge.md;
+│              link from AGENTS.md when needed for contributor instructions
 │
 └─ Is it purely local — a single non-obvious line of code, a regex,
     a security-floor reason a reader of THIS file needs?
@@ -215,8 +216,7 @@ execution-site enumeration.
 
 ## 9. Pointers
 
-- `CLAUDE.md §6.5` — prohibition bullet (anti-pattern floor)
-- `CLAUDE.md §9` — positive-pattern pointer
+- [`AGENTS.md`](../AGENTS.md#working-here) — repository working rules
 - `docs/voice-guide.md` — sibling guide (how we write prose in operator-facing surfaces)
 - `agents/review-lenses/comment-rot.md` — the lens that enforces this guide at review time
 - `docs/code-hygiene-gate.md` — the Stage-2 enforcement contract (deterministic scan + qa audit)

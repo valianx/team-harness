@@ -3,7 +3,7 @@ name: Tag Sync
 # The single, deterministic, idempotent tag authority (see
 # agents/delivery.md Step 11.4c, which VERIFIES the tag this workflow
 # creates rather than pushing it itself). Runs whenever any PR's version
-# bump merges to main — team-harness bumps once per PR (CLAUDE.md §6.3) —
+# bump merges to main — team-harness bumps once per PR (docs/working-agreements.md) —
 # so the opencode-side artifact pipeline (release.yml) never depends on a
 # human remembering to push the tag. Trigger/logic unchanged.
 on:

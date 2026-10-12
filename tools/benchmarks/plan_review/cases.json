@@ -1,0 +1,80 @@
+{
+  "producer_order": {
+    "input": {
+      "objective": "Review the proposed plan for an idempotent payment recovery path. This is a planning delivery; product acceptance will execute during implementation.",
+      "requirements": [{"id": "R-http", "text": "POST /payments records an idempotency key and returns the same outcome on retry."}, {"id": "R-recovery", "text": "After the HTTP process dies following its durable write, the recovery worker completes the pending payment exactly once."}],
+      "current_plan": {"tasks": [{"id": "T1", "action": "Design acceptance fixtures and expected outcomes; no product execution."}, {"id": "T2", "action": "Execute crash-recovery acceptance immediately after T1; depends only on T1."}, {"id": "T3", "action": "Implement HTTP durable-write/idempotency contract after T2."}, {"id": "T4", "action": "Implement recovery worker after T3."}], "validation_command": "pytest tests/acceptance -q"},
+      "test_inventory": [{"id": "http", "path": "tests/acceptance/test_http.py", "scenario_ids": ["S-http"]}, {"id": "recovery", "path": "tests/acceptance/test_recovery.py", "scenario_ids": ["S-recovery"]}],
+      "scenario_requirements": {"S-http": "R-http", "S-recovery": "R-recovery"},
+      "history": null
+    },
+    "oracle": {"material_defects": [{"requirement_id": "R-recovery", "task_ids": ["T2", "T3", "T4"], "origin": "not_applicable"}], "before": [["T3", "T2"], ["T4", "T2"]], "parallel_design_tasks": ["T1"], "required_scenarios": ["S-http", "S-recovery"], "guarantees": []}
+  },
+  "command_coverage": {
+    "input": {
+      "objective": "Review acceptance completeness for a ledger migration and recovery release.",
+      "requirements": [{"id": "R-http", "text": "HTTP retry returns one durable result."}, {"id": "R-recovery", "text": "Worker recovery after HTTP crash completes one result."}, {"id": "R-migration", "text": "Every legacy ledger entry survives the migration with the same persisted fields and multiplicity, including NULL memo values."}],
+      "current_plan": {"tasks": [{"id": "C1", "action": "Implement the HTTP producer."}, {"id": "C2", "action": "Implement recovery worker."}, {"id": "C3", "action": "Implement ledger migration with complete row comparison."}, {"id": "C4", "action": "Execute all three required acceptance scenarios after C1, C2 and C3; selected validation command: pytest tests/acceptance/test_http.py -q."}], "validation_command": "pytest tests/acceptance/test_http.py -q"},
+      "test_inventory": [{"id": "http", "path": "tests/acceptance/test_http.py", "scenario_ids": ["S-http"]}, {"id": "recovery", "path": "tests/acceptance/test_recovery.py", "scenario_ids": ["S-recovery"]}, {"id": "migration", "path": "tests/acceptance/test_migration.py", "scenario_ids": ["S-migration"]}],
+      "scenario_requirements": {"S-http": "R-http", "S-recovery": "R-recovery", "S-migration": "R-migration"},
+      "history": null
+    },
+    "oracle": {"material_defects": [{"requirement_id": "R-recovery", "task_ids": ["C4"], "origin": "not_applicable"}, {"requirement_id": "R-migration", "task_ids": ["C4"], "origin": "not_applicable"}], "before": [["C1", "C4"], ["C2", "C4"], ["C3", "C4"]], "parallel_design_tasks": [], "required_scenarios": ["S-http", "S-recovery", "S-migration"], "guarantees": []}
+  },
+  "migration_repair": {
+    "input": {
+      "objective": "The operator requested one review of the corrected migration plan. Assess the current artifact and the supplied change/history.",
+      "requirements": [{"id": "R-migration", "text": "Migration must preserve the complete multiset of persisted rows: entry_id, tenant_id, currency, amount, posted_at and memo, including duplicate rows and NULL values. Physical row order is irrelevant."}],
+      "current_plan": {"tasks": [{"id": "M1", "action": "Implement migration producers."}, {"id": "M2", "action": "Validate migration after M1 using only total row count and total amount sum; declare equivalence when both totals match."}], "validation_command": "pytest tests/acceptance/test_migration.py -q"},
+      "test_inventory": [{"id": "migration", "path": "tests/acceptance/test_migration.py", "scenario_ids": ["S-migration"]}],
+      "scenario_requirements": {"S-migration": "R-migration"},
+      "history": {"prior_plan": {"M2": "Run migration acceptance before M1; compare both directions with EXCEPT ALL across all six persisted fields."}, "prior_findings": [{"location": "prior_plan:M2", "text": "Execution before the migration producer is a material dependency defect. Retain the agreed preservation contract when repairing it."}], "delta": "M2 moved after M1. Its bidirectional complete-row comparison was replaced by count/sum to make verification faster."}
+    },
+    "oracle": {"material_defects": [{"requirement_id": "R-migration", "task_ids": ["M2"], "origin": "regression"}], "before": [["M1", "M2"]], "parallel_design_tasks": [], "required_scenarios": ["S-migration"], "guarantees": [{"requirement_id": "R-migration", "kinds": ["multiset_equality", "full_row_equality", "keyed_row_equality"], "fields": ["entry_id", "tenant_id", "currency", "amount", "posted_at", "memo"], "multiplicity": true, "nulls": true}]}
+  },
+  "equivalent_control": {
+    "input": {
+      "objective": "Review a corrected ledger migration plan. A verification implementation can differ when it satisfies the agreed contract.",
+      "requirements": [{"id": "R-migration", "text": "Preserve the complete multiset of entry_id, tenant_id, currency, amount, posted_at and memo, including duplicate rows and NULL values. Physical row order is irrelevant."}],
+      "current_plan": {"tasks": [{"id": "E1", "action": "Design migration fixtures in parallel with E2."}, {"id": "E2", "action": "Implement migration producers."}, {"id": "E3", "action": "After E1/E2, compare complete rows via EXCEPT ALL in both directions separately for every tenant/currency partition, including partitions present on only one side. All six persisted columns are projected; NULL and duplicate multiplicity follow SQL set-operator semantics. Fail if any partition differs."}], "validation_command": "python -m pytest tests/acceptance -q"},
+      "test_inventory": [{"id": "migration", "path": "tests/acceptance/test_migration.py", "scenario_ids": ["S-migration"]}],
+      "scenario_requirements": {"S-migration": "R-migration"},
+      "history": {"prior_plan": {"E3": "Execute validation before E2; compare complete rows globally via EXCEPT ALL in both directions."}, "prior_findings": [{"location": "prior_plan:E3", "text": "Move execution after the producer; test design may continue independently."}], "delta": "Move E3 after E2 and partition the exact comparison. Correct a heading typo."}
+    },
+    "oracle": {"material_defects": [], "before": [["E2", "E3"]], "parallel_design_tasks": ["E1"], "required_scenarios": ["S-migration"], "guarantees": [{"requirement_id": "R-migration", "kinds": ["multiset_equality", "full_row_equality", "keyed_row_equality"], "fields": ["entry_id", "tenant_id", "currency", "amount", "posted_at", "memo"], "multiplicity": true, "nulls": true}]}
+  },
+  "aggregate_control": {
+    "input": {
+      "objective": "Review a reporting-store rebuild plan against its explicitly limited preservation requirement.",
+      "requirements": [{"id": "R-reporting", "text": "The new reporting store intentionally contains summaries only. For each tenant_id/currency group preserve row_count and amount_sum. Individual source rows, memo values and row ordering need not be reproduced."}],
+      "current_plan": {"tasks": [{"id": "A1", "action": "Implement grouped reporting-store rebuild."}, {"id": "A2", "action": "After A1 compare tenant_id, currency, row_count and amount_sum across all source and destination groups, including groups present on only one side."}], "validation_command": "pytest tests/acceptance/test_reporting.py -q"},
+      "test_inventory": [{"id": "reporting", "path": "tests/acceptance/test_reporting.py", "scenario_ids": ["S-reporting"]}],
+      "scenario_requirements": {"S-reporting": "R-reporting"},
+      "history": {"prior_plan": {"A2": "Same comparison, heading misspelled."}, "prior_findings": [], "delta": "Correct heading spelling only."}
+    },
+    "oracle": {"material_defects": [], "before": [["A1", "A2"]], "parallel_design_tasks": [], "required_scenarios": ["S-reporting"], "guarantees": [{"requirement_id": "R-reporting", "kinds": ["aggregate_equality", "multiset_equality", "full_row_equality", "keyed_row_equality"], "fields": ["tenant_id", "currency", "row_count", "amount_sum"], "multiplicity": false, "nulls": false}]}
+  },
+  "transfer_inventory": {
+    "held_out": true,
+    "input": {
+      "objective": "Review a corrected warehouse replay plan. This plan concerns stock lots rather than payments or a ledger.",
+      "requirements": [{"id": "R-lots", "text": "Replay preserves every stock-lot record and duplicate multiplicity: sku, zone, lot_code, quantity and nullable expires_at. Lots with the same SKU must remain associated with their original zone and expiry. Order is irrelevant."}],
+      "current_plan": {"tasks": [{"id": "W1", "action": "Implement stock-lot replay."}, {"id": "W2", "action": "After W1 certify replay by comparing distinct SKU count and summed quantity. Accept when those two statistics match; per-zone/lot/expiry comparison was removed."}], "validation_command": "pytest tests/acceptance/test_lots.py -q"},
+      "test_inventory": [{"id": "lots", "path": "tests/acceptance/test_lots.py", "scenario_ids": ["S-lots"]}],
+      "scenario_requirements": {"S-lots": "R-lots"},
+      "history": {"prior_plan": {"W2": "Compare the full stock-lot multiset in both directions after W1, retaining expiry NULLs."}, "prior_findings": [{"location": "prior_plan:W2", "text": "The proposal should explain expected fixture volume; this is an editorial concern."}], "delta": "Add fixture volume and replace the comparison by two aggregate statistics."}
+    },
+    "oracle": {"material_defects": [{"requirement_id": "R-lots", "task_ids": ["W2"], "origin": "regression"}], "before": [["W1", "W2"]], "parallel_design_tasks": [], "required_scenarios": ["S-lots"], "guarantees": [{"requirement_id": "R-lots", "kinds": ["multiset_equality", "full_row_equality", "keyed_row_equality"], "fields": ["sku", "zone", "lot_code", "quantity", "expires_at"], "multiplicity": true, "nulls": true}]}
+  },
+  "missing_history": {
+    "input": {
+      "objective": "The operator requests review of the current corrected migration plan. The prior plan is unavailable; do not reconstruct unavailable conversations.",
+      "requirements": [{"id": "R-migration", "text": "Preserve the complete multiset of entry_id, tenant_id, currency, amount, posted_at and memo, including duplicate rows and NULL values. Physical row order is irrelevant."}],
+      "current_plan": {"tasks": [{"id": "M1", "action": "Implement migration producers."}, {"id": "M2", "action": "After M1 validate using only total row count and total amount sum; matching totals certify row equivalence."}], "validation_command": "pytest tests/acceptance/test_migration.py -q"},
+      "test_inventory": [{"id": "migration", "path": "tests/acceptance/test_migration.py", "scenario_ids": ["S-migration"]}],
+      "scenario_requirements": {"S-migration": "R-migration"},
+      "history": {"prior_plan": null, "prior_findings": [{"location": "prior_plan:M2", "text": "Resolve validation scheduling."}], "delta": "The supplied note says M2 scheduling was adjusted. It does not establish the prior verification method."}
+    },
+    "oracle": {"material_defects": [{"requirement_id": "R-migration", "task_ids": ["M2"], "origin": "unknown"}], "before": [["M1", "M2"]], "parallel_design_tasks": [], "required_scenarios": ["S-migration"], "guarantees": [{"requirement_id": "R-migration", "kinds": ["multiset_equality", "full_row_equality", "keyed_row_equality"], "fields": ["entry_id", "tenant_id", "currency", "amount", "posted_at", "memo"], "multiplicity": true, "nulls": true}]}
+  }
+}
