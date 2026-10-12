@@ -1,3 +1,0 @@
-- [x] 1. Document the optional direct fix-evidence procedure and bounded reporting.
-- [x] 2. Demonstrate the procedure on the real stdin fix with the same probe across base and candidate.
-- [x] 3. Sync skill projections and validate OpenSpec and applicable checks.

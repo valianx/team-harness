@@ -1,6 +1,8 @@
 # Patterns & Conventions — Full History
 
-> Overflow file for CLAUDE.md §9 Patterns & Conventions. Most recent entries stay inline in CLAUDE.md; older entries accumulate here.
+> Historical patterns retained for contributor context. Current instructions live
+> in [`AGENTS.md`](../AGENTS.md) and the selected skill; entries below do not add
+> requirements to current work.
 
 - **Three-state update**: update-available / already-current / installed-ahead; installed-ahead reports only; already-current zero-writes. → `cmd/install/update.go`
 - **Restart-to-activate honesty**: never claim live; print after any apply, not on zero-write paths. → `cmd/install/update.go`

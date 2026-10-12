@@ -129,7 +129,7 @@ python3 PLUGIN/skills/setup/scripts/manage_agents.py sync --scope global
 
 The current release uses one version namespace across four sites: the Claude
 plugin manifest, Claude marketplace entry, Codex plugin manifest, and the
-installer's checked-in `var version` fallback. `CLAUDE.md` is contributor
+installer's checked-in `var version` fallback. `AGENTS.md` is contributor
 guidance rather than release metadata and is not a version site.
 CI and the prepublish guard require these sites to be changed together when a
 distributed runtime input changes. Repositories that predate the Codex plugin

@@ -177,7 +177,7 @@ Every new distributed implementation must be authorable for both Claude Code and
 ### Actionable now (enforceable as review discipline)
 
 - Author skills in their existing `SKILL.md` format with cross-harness-compatible frontmatter.
-- Author rules in `CLAUDE.md` (and optionally in `AGENTS.md`); keep rule content free of CC-specific invocation syntax.
+- Author shared contributor rules in `AGENTS.md`; keep rule content free of CC-specific invocation syntax.
 - Keep agent and command bodies free of runtime-specific frontmatter values.
 - **Author all new hooks in TypeScript/JavaScript, not Bash.** Decision A is closed.
 

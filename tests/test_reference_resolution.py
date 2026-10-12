@@ -59,7 +59,7 @@ def sources() -> list[Path]:
     found = []
     for pattern in ("agents/**/*.md", "docs/**/*.md", "skills/**/*.md"):
         found.extend(ROOT.glob(pattern))
-    found.extend(path for path in (ROOT / "CLAUDE.md", ROOT / "README.md") if path.exists())
+    found.extend(path for path in (ROOT / "AGENTS.md", ROOT / "README.md") if path.exists())
     return sorted(path for path in found if not any(part in str(path) for part in SKIP_PARTS))
 
 

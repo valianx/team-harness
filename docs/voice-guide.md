@@ -1,12 +1,14 @@
 # Voice and Language Guide — Full Reference
 
-> Extracted from CLAUDE.md §7 to keep the main file under 40 KB. The core rules (§7.1 forbidden/required, §7.2 dev-natural verbs, §7.3 language summary) remain inline in CLAUDE.md. This file contains the full language rules, boundary tables, exceptions, and contributor checklist.
+> Canonical voice and language guide for contributors and operator-facing copy.
+> [`AGENTS.md`](../AGENTS.md#working-here) links here for the full rules, boundary
+> tables, exceptions and contributor checklist.
 
-## Voice §7.1 — full examples and rationale
+## Voice — examples and rationale
 
-The four guidelines in CLAUDE.md §7 evolved from observed friction with the pre-2026-05 voice (enthusiasm markers in status blocks, phase-number jargon leaking into operator copy, Spanish prose in skill files). The rules are deliberately tight — a tool that speaks like a professional instrument frees the operator to focus on the actual work, which is designing solutions and solving problems.
+These guidelines evolved from observed friction with the pre-2026-05 voice (enthusiasm markers in status blocks, phase-number jargon leaking into operator copy, Spanish prose in skill files). The rules are deliberately tight — a tool that speaks like a professional instrument frees the operator to focus on the actual work, which is designing solutions and solving problems.
 
-## Canonical OUT / IN lists (§7.1)
+## Canonical OUT / IN lists
 
 **OUT** — what never appears in committed copy:
 
@@ -53,9 +55,9 @@ The Good variant: (a) uses dev-natural stage vocabulary (`Verify`), not phase nu
 
 ---
 
-## Language — English-only repo content (§7.3 full)
+## Language — English-only repo content
 
-Every committed artefact is in English: `README.md`, all files under `docs/`, `agents/*.md`, `skills/*.md`, `CLAUDE.md`, `cmd/install/*.go` strings, `bin/install.{sh,ps1,cmd}` echoes, `hooks/*.sh` echoes, `.github/workflows/*.yml`, `CHANGELOG.md`, commit messages, PR titles and bodies.
+Every committed artefact is in English: `README.md`, all files under `docs/`, `agents/*.md`, `skills/*.md`, `AGENTS.md`, `cmd/install/*.go` strings, `bin/install.{sh,ps1,cmd}` echoes, `hooks/*.sh` echoes, `.github/workflows/*.yml`, `CHANGELOG.md`, commit messages, PR titles and bodies.
 
 **Why:** team-harness is open-source and targets an international developer audience. Mixed-language repos are jarring, harder to grep, and force readers through a translation step. Live chat is ephemeral; repo content is the durable artefact that outlives any conversation.
 
@@ -85,9 +87,9 @@ No other committed artefact carries a language exception. `agents/security.md`, 
 
 **Live chat is NOT a committed artefact.** The English-only rule does NOT apply to chat replies — the operator may chat in any language and Claude replies in the operator's language.
 
-## Operator-Supplied Content Boundary (§7.4)
+## Operator-Supplied Content Boundary
 
-Outside the operator-facing tier and the §7.3 live-chat exception, the agent
+Outside the operator-facing tier and the live-chat exception above, the agent
 never composes prose in the operator's language — it composes English. Within
 the operator-facing tier and live chat, the agent composes in the operator's
 resolved language. Whatever content the operator supplies in their own
@@ -108,13 +110,13 @@ language, the agent preserves verbatim.
 | Prose body content in agentic-tier workspace docs (analyses, rationales, summaries, insights, narrative verdicts) | Agent | English |
 | Prose body content in committed agent reports — `reviews/04-security.md`, `reviews/04-adversary.md` | Agent | English |
 | Status-block `summary:` of every agent (including security, reviewer) | Agent | English (machine-parseable, always) |
-| Prose anywhere else (committed) | Agent | English (per §7.3) |
+| Prose anywhere else (committed) | Agent | English (per the language rules above) |
 
 **Rule of thumb (two-axis):**
 - **What is it?** Structural (headers, keys, filenames, closed-set enum values) → English always, regardless of where it lives. Prose → depends on which tier it lives in.
-- **Which tier does it live in?** Operator-facing-tier workspace docs (`01-plan.md`, `sketches/*`, `01-root-cause.md`) → operator's resolved language. Agentic-tier workspace docs and every committed repo file (including `reviews/04-*.md` report bodies) → English (with the two documented §7.3 exceptions: orchestrator live chat and the intent-routing table).
+- **Which tier does it live in?** Operator-facing-tier workspace docs (`01-plan.md`, `sketches/*`, `01-root-cause.md`) → operator's resolved language. Agentic-tier workspace docs and every committed repo file (including `reviews/04-*.md` report bodies) → English (see the documented live-chat exception above).
 
-## Internal Chatter — IN/OUT table (§7.1.1 full)
+## Internal Chatter — IN/OUT table
 
 The table below defines which operations are **silent** vs **operator-facing**. Agents enforce this split at every step: internal mechanics (config, connectivity, init) produce no output on success; operator-facing events (decisions, results, STOP blocks, stage transitions) always surface.
 
@@ -138,21 +140,26 @@ actionable failure or real decision exists.
 
 ---
 
-## orchestrator as the Canonical Entry Point (§7.5)
+## Workflow entry points
 
-When documenting how to invoke the system, treat `@th:orchestrator <natural-language>` as the primary path. Slash commands (`/design`, `/deliver`, `/recover`, `/issue`) are optional shortcuts that route to the same agent under the hood — they are mentioned where they help (deterministic entry, GitHub-issue fetching) but never positioned as the recommended path.
+Document the selected skill using the active host's invocation syntax. The
+native general agent coordinates the work; the current skill supplies its
+workflow. Follow [`AGENTS.md`](../AGENTS.md#purpose-and-workflows) for workflow
+selection.
 
-The operator's mental model is: the coordinator is the single front door; slash commands are a fallback for edge cases. Documentation matches that model.
+**Historical entry point.** Earlier guidance recommended
+`@th:orchestrator <natural-language>` as the primary path and treated slash
+commands as shortcuts. Retained historical references describe that model.
 
-## Application Checklist for Contributors (§7.6)
+## Application Checklist for Contributors
 
 Before opening a PR that adds or modifies operator-facing copy, walk through this checklist:
 
 - [ ] No enthusiasm markers, no emoji decoration of routine status messages.
 - [ ] No first-person personality or anthropomorphic framing.
 - [ ] Dev-natural verbs (`plan`, `implement`, `PR`, `validate`, `recover`) in operator-visible status blocks, STOP-block templates, install prompts, error messages, skill help text.
-- [ ] Phase numbers and gate identifiers appear only in contributor surfaces (CLAUDE.md, `agents/*.md` instructional sections, workspace doc templates). Exception: `/th:pipelines` and `/trace` output, and STAGE-GATE-{1,2,3} STOP-block header identifiers.
-- [ ] All committed copy is in English. Live chat is not committed copy; see §7.3.
-- [ ] If the change documents how to invoke the system, the example uses `@th:orchestrator <natural-language>` as the primary path; slash commands are positioned as optional shortcuts.
+- [ ] Phase numbers and gate identifiers appear only in contributor surfaces (`AGENTS.md`, `agents/*.md` instructional sections, workspace doc templates). Exception: `/th:pipelines` and `/trace` output, and STAGE-GATE-{1,2,3} STOP-block header identifiers.
+- [ ] All committed copy is in English. Live chat is not committed copy; see the language rules above.
+- [ ] If the change documents an invocation, the example uses the selected skill and the active host's supported syntax.
 
 No suite enforces these rules mechanically — voice is a human-judgement property and the presence-based checks that once claimed to cover a subset of it were retired (README.md § "What gets a test"). The checklist above is the standard; review is what applies it.

@@ -1,7 +1,8 @@
 # openspec-change-scope Specification
 
 ## Purpose
-TBD - created by archiving change right-size-pipeline-contracts. Update Purpose after archive.
+Keep OpenSpec changes focused on product behavior, with proportionate artifacts
+and completed work reflected in the living specifications.
 
 ## Requirements
 

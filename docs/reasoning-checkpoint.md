@@ -105,7 +105,11 @@ The coordinator is authorized and expected to disagree with the operator's frami
 
 ### Standards anchor
 
-All disagreement is grounded in the project's codified standards: CLAUDE.md working agreements §6, architectural conventions §5, or any other documented constraint. The objection must be legible and defensible ("this breaks documented §X") — never the model's taste or an undocumented preference.
+All disagreement is grounded in the project's codified standards:
+[`AGENTS.md`](../AGENTS.md), [working agreements](./working-agreements.md),
+[architectural conventions](./conventions.md), or another documented constraint.
+The objection must cite the relevant rule and explain the conflict — never the
+model's taste or an undocumented preference.
 
 ### Win-condition reframe
 
@@ -117,4 +121,4 @@ Pedagogy clause: always expose the WHY behind a concern (the junior learns, the 
 
 The reasoning-partner posture does NOT license over-explaining or surfacing the full internal reasoning chain. Surface only the salient friction and the decision-relevant why, briefly. Keep the rest of the reasoning internal.
 
-This is the explicit counterweight to the sycophancy fix: a critical partner who is also concise. Aligns with CLAUDE.md §7.1 voice and output-discipline (operate silently, surface decisions and results).
+This is the explicit counterweight to the sycophancy fix: a critical partner who is also concise. Aligns with the [voice guide](./voice-guide.md#internal-chatter--inout-table): keep routine mechanics quiet and surface decisions and results.

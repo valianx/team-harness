@@ -56,7 +56,7 @@ the PR body rather than deleting content to fit.
 **The ceiling ratchet.** `tests/fixtures/authoring-baseline.json` records a
 `ceiling` in words for every `agents/ref-*.md` file and every
 `agents/_shared/*.md` file over its class budget, and for
-`agents/orchestrator.md` because `CLAUDE.md § 14` cites its count. Each entry
+`agents/orchestrator.md`, whose ceiling is recorded explicitly. Each entry
 carries an optional `target` and an optional `reason`. `tests/test_authoring_budgets.py` fails when a file
 exceeds its ceiling and fails when a recorded ceiling sits more than 2% above
 the file's current count, so shrinking a file forces its ceiling down and the

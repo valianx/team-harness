@@ -1,6 +1,7 @@
 # Architecture Decisions — Full History
 
-> Overflow file for CLAUDE.md §8 Architecture Decisions. Most recent entries stay inline in CLAUDE.md; older entries accumulate here.
+> Dated architecture decisions retained for contributor context. Current
+> instructions live in [`AGENTS.md`](../AGENTS.md) and the selected skill.
 
 > Current working methods are described in `docs/pipeline-lanes.md`: direct work, lightweight spec development with Main, and an operator-selected pipeline for useful coordination. The dated gate, Freeze, control-plane and role-routing decisions below are historical; they do not add requirements to current skills.
 

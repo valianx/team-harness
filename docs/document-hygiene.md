@@ -1,44 +1,37 @@
-# Document Hygiene — Full Reference
+# Document Hygiene
 
-> Extracted from CLAUDE.md §7b to keep the main file under its size cap. The cap numbers (35 KB trigger / 40 KB hard cap) and the offload trigger condition stay inline in CLAUDE.md §7b for every planned edit.
+Contributor guide to keeping repository instructions concise and detailed
+documentation in its canonical home.
 
-## File size cap mechanics
+## Repository entry point
 
-**CLAUDE.md must stay under 40 KB.** Claude Code warns above this threshold and performance degrades. Any planned edit checks the resulting size; if CLAUDE.md exceeds 35 KB, that same reviewed change must offload the largest non-structural section to `docs/` before Phase 2.8 Freeze. Structural sections (§1-§7) are exempt — they shrink by extracting detailed tables/protocols to docs/ files (as done with §7.4-7.6 → `docs/voice-guide.md` and §14 protocol → `docs/subagent-orchestration.md`). Because project and user CLAUDE.md load into Claude Code's cached project-context layer at session start, the size cap also bounds the per-session cached-token footprint — not only file readability (see `docs/cost-and-caching.md`).
+[`AGENTS.md`](../AGENTS.md) is the contributor entry point. Keep actionable
+repository instructions there and link to the detailed guides in `docs/`.
+Detailed tables, rationale, protocols and historical entries belong in their
+owning document rather than being duplicated in the entry point.
 
-## Section size rules
+## What belongs in AGENTS.md vs docs/
 
-| Section | Max entries in CLAUDE.md | Overflow target |
-|---------|------------------------|-----------------|
-| Architecture Decisions (§8) | 10 | `docs/decisions.md` |
-| Patterns & Conventions (§9) | 10 | `docs/patterns.md` |
-| Known Constraints (§10) | 10 | `docs/constraints.md` |
-| Testing Conventions (§11) | 10 | `docs/testing.md` |
-
-When a section exceeds its limit, the agent responsible for the reviewed CLAUDE.md edit extracts older entries to the overflow file and replaces the section body with a pointer:
-
-```
-See `docs/decisions.md` for the full log. Recent entries kept inline below.
-```
-
-## What belongs in CLAUDE.md vs docs/
-
-| CLAUDE.md | docs/ |
+| AGENTS.md | docs/ |
 |-----------|-------|
-| Golden commands (copy-paste ready) | Extended decision rationale |
-| Tech stack summary (one table) | Migration guides, ADRs |
-| Current conventions (active rules) | Historical patterns, superseded decisions |
-| Architectural boundaries (one-liners) | Detailed constraint analysis |
-| Pointers to docs/ files | The detailed content itself |
+| Workflow selection and responsibility boundaries | Detailed workflow contracts and migration guides |
+| Canonical source locations and working rules | Architectural conventions and rationale |
+| Required contributor validation and delivery pointers | Suite registry, commands and release lifecycle |
+| Benchmark boundaries and evidence pointers | Reproducible protocols and run evidence |
+| Links to canonical guides | Detailed content and historical decisions |
 
 ## docs/ structure
 
 | File | Content | Updated by |
 |------|---------|-----------|
-| `docs/knowledge.md` | Flat bullets with tag prefixes — the agent pre-read file | explicit knowledge flow |
-| `docs/decisions.md` | Architecture decisions overflow (date + decision + rationale) | agent editing CLAUDE.md |
-| `docs/patterns.md` | Patterns overflow (pattern + example path) | agent editing CLAUDE.md |
-| `docs/constraints.md` | Constraints overflow (constraint + detail) | agent editing CLAUDE.md |
-| `docs/testing.md` | Testing conventions overflow (convention + description) | agent editing CLAUDE.md |
+| `docs/knowledge.md` | Flat bullets with tag prefixes | explicit knowledge flow |
+| `docs/decisions.md` | Architecture decision history (date + decision + rationale) | contributor documenting a decision |
+| `docs/patterns.md` | Historical patterns (pattern + example path) | contributor documenting a pattern |
+| `docs/constraints.md` | Constraints and supporting detail | contributor documenting a constraint |
+| `docs/testing.md` | Testing conventions and suite registry | contributor changing tests or verification commands |
 
-The agent performing the reviewed CLAUDE.md edit creates overflow files on first offload. Agents that require project knowledge consume only task-relevant entries supplied by the coordinator; when none are available, the implementer uses a bounded grep fallback and never reads `docs/knowledge.md` in full. Overflow files remain on demand when the CLAUDE.md pointer section is relevant.
+Update the existing canonical document when its content changes. Agents that
+require project knowledge consume task-relevant entries supplied by the
+coordinator; when none are available, the implementer uses a bounded `rg`
+fallback and never reads `docs/knowledge.md` in full. Detailed guides remain
+available on demand.

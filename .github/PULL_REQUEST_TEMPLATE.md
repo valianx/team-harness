@@ -4,7 +4,7 @@
 
 ## Checklist
 
-<!-- See CONTRIBUTING.md and CLAUDE.md §6 for the full rules. -->
+<!-- See CONTRIBUTING.md, AGENTS.md and docs/working-agreements.md for the full rules. -->
 
 - [ ] Work is on a task branch based on `main`, using repository or native-host naming conventions
 - [ ] Commits follow conventional-commit format (`feat(area): …`)
@@ -20,7 +20,7 @@
       section only when intentionally batching several changes into one cut
 - [ ] `bash tests/run-all.sh` passes locally (exits 0)
 - [ ] No secrets, tokens, API keys, `.env` files, or private keys committed
-- [ ] Updated `CLAUDE.md` §3/§4 if the tech stack or golden commands changed
+- [ ] Updated the relevant lifecycle or testing documentation if the tech stack or verification commands changed
 
 ## Related issues
 

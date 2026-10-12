@@ -3,6 +3,7 @@
 Use these reusable requests when a live comparison would answer a specific
 question about pipeline cost or quality. They do not need to run before every
 contract change, and this guide is not a claim that any run has completed.
+For other measured surfaces, see the [maintained benchmark entries](README.md).
 
 | Fixture | Class | Request |
 |---|---|---|
