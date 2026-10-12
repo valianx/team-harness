@@ -133,7 +133,7 @@ function isDistributedChange(file) {
   if (file === "assets.go") return true;
   if (/^bin\/[^/]+\.(?:sh|ps1|cmd)$/.test(file)) return true;
   if (DISTRIBUTED_PREFIXES.some((prefix) => file.startsWith(prefix))) return true;
-  return file.startsWith("cmd/install/") && !file.endsWith("_test.go");
+  return file.startsWith("cmd/install/") && !file.startsWith("cmd/install/testdata/") && !file.endsWith("_test.go");
 }
 
 function escapedRegex(value) {
@@ -180,6 +180,9 @@ function checkVersionContract(base, head, changedFiles) {
   }
   if (compareSemver(newVersion, baseVersion) <= 0) {
     fail(`Head version ${newVersion.text} must be strictly greater than base version ${baseVersion.text}.`);
+  }
+  if (newVersion.prerelease !== null || newVersion.text.includes("+")) {
+    fail(`Head version ${newVersion.text} must use publishable X.Y.Z without prerelease or build metadata.`);
   }
   for (const site of activeSites) {
     const result = git(["diff", "--no-ext-diff", "--no-textconv", "--quiet", base, head, "--", site.path]);

@@ -17,7 +17,7 @@ The preflight SHALL accept explicit base and head Git commit references through 
 - **THEN** preflight fails instead of reporting a clean release candidate
 
 ### Requirement: Classification covers distributed payload changes
-The preflight SHALL require release metadata validation for distributed role, skill, hook, runtime adapter, embedded installer payload, installer implementation, runtime tooling and published bootstrap script changes. Deleted paths and moves out of distributed locations SHALL retain their original classification. Ordinary documentation and test-only changes SHALL not require a release bump.
+The preflight SHALL require release metadata validation for distributed role, skill, hook, runtime adapter, embedded installer payload, installer implementation, runtime tooling and published bootstrap script changes. Deleted paths and moves out of distributed locations SHALL retain their original classification. Ordinary documentation and test-only changes, including installer testdata fixtures, SHALL not require a release bump.
 
 #### Scenario: OpenCode installer payload changes
 - **WHEN** an installer-assets skill or command changes without release metadata updates
@@ -32,11 +32,11 @@ The preflight SHALL require release metadata validation for distributed role, sk
 - **THEN** its source deletion still requires release metadata validation
 
 #### Scenario: Only tests or documentation change
-- **WHEN** the candidate changes ordinary documentation, tests or installer test files only
+- **WHEN** the candidate changes ordinary documentation, tests, installer test files or installer testdata fixtures only
 - **THEN** preflight succeeds without requiring release metadata changes
 
 ### Requirement: Versions agree and increase in SemVer precedence
-For a distributed change or explicit version-site edit, the canonical plugin and marketplace versions SHALL exist at both commits. Every additional version site present at either commit SHALL remain present at head. Base versions SHALL agree, head versions SHALL agree, all head versions SHALL be valid SemVer with strictly greater precedence than base, and every applicable site SHALL be updated. Build metadata SHALL not create a precedence increase.
+For a distributed change or explicit version-site edit, the canonical plugin and marketplace versions SHALL exist at both commits. Every additional version site present at either commit SHALL remain present at head. Base versions SHALL agree, head versions SHALL agree, all head versions SHALL be valid SemVer with strictly greater precedence than base, and every applicable site SHALL be updated. Head versions SHALL use the bare X.Y.Z grammar accepted by repository tag and release workflows. Build metadata SHALL not create a precedence increase.
 
 #### Scenario: Version text changes without an increase
 - **WHEN** all sites keep the base version or change only build metadata
@@ -45,6 +45,10 @@ For a distributed change or explicit version-site edit, the canonical plugin and
 #### Scenario: Historical repository has two version sites
 - **WHEN** the canonical plugin and marketplace exist and optional sites exist at neither commit
 - **THEN** matching increasing versions in both required sites satisfy version consistency
+
+#### Scenario: A release version is unsupported by tagging
+- **WHEN** head versions contain prerelease or build metadata
+- **THEN** preflight fails rather than accepting a candidate the tag workflow cannot publish
 
 #### Scenario: An optional site disappears
 - **WHEN** a version site present at base is absent at head

@@ -140,7 +140,8 @@ node tools/codex-runtime/version-preflight.mjs --base origin/main --head HEAD
 
 Fetch the selected base first. Distributed inputs, including embedded OpenCode
 payloads and published bootstrap scripts, require consistent increasing SemVer
-and a matching changelog. The check reads committed content and preserves local
+in the publishable X.Y.Z format and a matching changelog. Installer testdata
+fixtures alone require no bump. The check reads committed content and preserves local
 completion without a PR.
 
 ### Verifying gh-fallback paths locally

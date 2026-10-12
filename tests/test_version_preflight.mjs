@@ -303,17 +303,17 @@ for (const relative of ["bin/README.md", "docs/example.md", "tests/example.mjs",
   }, { name: `does not require a release for ${relative}` });
 }
 
-for (const [baseVersion, headVersion, accepted] of [
-  ["1.2.3-alpha", "1.2.3-alpha.1", true],
-  ["1.2.3-alpha.1", "1.2.3-alpha.beta", true],
-  ["1.2.3-beta.2", "1.2.3-beta.11", true],
-  ["1.2.3-beta.11", "1.2.3-rc.1", true],
+for (const [baseVersion, headVersion, accepted, failure = "strictly greater"] of [
+  ["1.2.3-alpha", "1.2.3-alpha.1", false, "publishable"],
+  ["1.2.3-alpha.1", "1.2.3-alpha.beta", false, "publishable"],
+  ["1.2.3-beta.2", "1.2.3-beta.11", false, "publishable"],
+  ["1.2.3-beta.11", "1.2.3-rc.1", false, "publishable"],
   ["1.2.3-rc.1", "1.2.3", true],
   ["1.2.3", "1.2.3-rc.1", false],
   ["1.2.3-beta.11", "1.2.3-beta.2", false],
   ["1.2.3+first", "1.2.3+second", false],
   ["1.2.3-beta.2+first", "1.2.3-beta.2+second", false],
-  ["1.2.3+first", "1.2.4+second", true],
+  ["1.2.3+first", "1.2.4+second", false, "publishable"],
 ]) {
   await withFixture(async (f) => {
     await changeVersion(f, headVersion);
@@ -322,7 +322,7 @@ for (const [baseVersion, headVersion, accepted] of [
     if (accepted) assert.equal(result.status, 0, result.stderr);
     else {
       assert.notEqual(result.status, 0);
-      assert.match(result.stderr, /strictly greater/i);
+      assert.match(result.stderr, new RegExp(failure, "i"));
     }
   }, { initialVersion: baseVersion, name: `${accepted ? "accepts" : "rejects"} SemVer ${baseVersion} -> ${headVersion}` });
 }
@@ -479,3 +479,33 @@ await test("fixture Git operations ignore ambient signing and repository overrid
     if (f) await rm(f.root, { recursive: true, force: true });
   }
 });
+
+for (const version of ["1.2.4-rc.1", "1.2.4+build"]) {
+  await withFixture(async (f) => {
+    await changeVersion(f, version);
+    commit(f, "unpublishable release version");
+    const result = invoke(f);
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /publishable.*X\.Y\.Z/i);
+  }, { name: `rejects a version unsupported by tag publication: ${version}` });
+}
+
+for (const file of ["cmd/install/testdata/resolver-conformance.json", "cmd/install/testdata/transform-conformance.json"]) {
+  await withFixture(async (f) => {
+    await mkdir(path.dirname(path.join(f.root, file)), { recursive: true });
+    await writeFile(path.join(f.root, file), "[]\n");
+    commit(f, "installer test fixture maintenance");
+    const result = invoke(f);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /No release metadata change required/);
+  }, { name: `installer test fixture does not require a release: ${file}` });
+}
+
+await withFixture(async (f) => {
+  await mkdir(path.join(f.root, "cmd/install/testdata"), { recursive: true });
+  await rename(path.join(f.root, "cmd/install/source.go"), path.join(f.root, "cmd/install/testdata/source.go"));
+  commit(f, "move production file into test fixtures");
+  const result = invoke(f);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /strictly greater/i);
+}, { name: "moving a distributed installer file into testdata still requires a release", initialDistributedFile: "cmd/install/source.go" });
