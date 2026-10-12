@@ -63,8 +63,9 @@ results with their original identity.
 For acceptance spanning components or a sensitive requirement, explain its
 scenario and implementation/contract prerequisites in the existing task. Check
 that task order respects the required producers and planned validation commands
-cover the named scenarios. Test design may proceed in parallel; executing
-HTTP/worker recovery acceptance waits for both producers.
+cover the named scenarios. Test design may proceed in parallel; execute each
+acceptance scenario only after all of its required producers have supplied the
+necessary implementation or contract inputs.
 
 Only execute capabilities belonging to reached stages. A planning request defines
 the testing strategy and future verification without running product acceptance
