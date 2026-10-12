@@ -234,3 +234,11 @@ Canonical and OpenCode research roles SHALL expose reading/search capabilities w
 #### Scenario: A writer is projected
 - **WHEN** architect, documenter or implementer is installed or converted
 - **THEN** its existing authorized writing profile remains supported rather than inheriting research restrictions
+
+#### Scenario: Writer metadata conflicts with its filename
+- **WHEN** a supported canonical writer filename carries conflicting restricted-role metadata
+- **THEN** forward projection preserves the mapped tools declared in its source and denies unspecified tools, and inverse conversion retains only tools allowed by its actual native permissions
+
+#### Scenario: An arbitrary filename uses restricted metadata
+- **WHEN** an arbitrary custom filename or a generic projection has restricted-role metadata without a supported canonical filename identity
+- **THEN** the restricted metadata profile still applies rather than granting writer capabilities

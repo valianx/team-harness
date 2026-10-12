@@ -741,6 +741,14 @@ function prReviewPermission() {
 
 const RESEARCH_AGENTS = new Set(["researcher", "code-researcher", "research-consolidator"]);
 
+// Canonical writing/execution identities, aligned with cmd/install/transform.go.
+// Source-roster behavior tests and shared fixtures cover this boundary.
+const CANONICAL_WRITER_AGENTS = new Set([
+  "adversary", "agent-builder", "architect", "cleaner", "d2-diagrammer", "delivery",
+  "diagrammer", "documenter", "gcp-cost-analyzer", "gcp-infra", "implementer", "init-project",
+  "likec4-diagrammer", "mentor", "orchestrator", "qa", "security", "tester", "translator", "ux-reviewer",
+]);
+
 function researchPermission(name) {
   const permission = { "*": "deny", read: "allow", glob: "allow", grep: "allow" };
   if (name === "researcher") {
@@ -754,6 +762,20 @@ function restrictedAgentPermission(name) {
   if (PR_REVIEW_AGENTS.has(name)) return prReviewPermission();
   if (RESEARCH_AGENTS.has(name)) return researchPermission(name);
   return undefined;
+}
+
+function sourceToolsPermission(tools) {
+  return { "*": "deny", ...agentToolsToOpencodePermission(tools) };
+}
+
+function projectedAgentPermission(agentName, fm) {
+  const filenamePermission = restrictedAgentPermission(agentName);
+  if (filenamePermission !== undefined) return filenamePermission;
+  const metadataPermission = restrictedAgentPermission(fm.name);
+  if (metadataPermission !== undefined && CANONICAL_WRITER_AGENTS.has(agentName)) {
+    return sourceToolsPermission(fm.tools);
+  }
+  return metadataPermission;
 }
 
 /**
@@ -1107,8 +1129,7 @@ function transformToOpencode(filePath, content, repoRoot) {
     // provider lock-in and ProviderModelNotFoundError. Per-provider tiering is a
     // future additive step (docs/opencode-model-config.md); toProviderPrefixedModel
     // is retained for it and for the reverse (opencode→CC) direction.
-    const permission = restrictedAgentPermission(path.basename(filePath, ".md"))
-      ?? restrictedAgentPermission(fm["name"]);
+    const permission = projectedAgentPermission(path.basename(filePath, ".md"), fm);
     if (permission !== undefined) projected["permission"] = permission;
     projected["mode"] = "subagent";
     // color: map CC color names → opencode named enums; pass through valid values.
@@ -1138,20 +1159,28 @@ function transformToOpencode(filePath, content, repoRoot) {
  * Mirrors cmd/install/transform.go::applyModeByRole: promote the installed
  * orchestrator to primary with its OpenCode display name and select exact
  * PR-review/research permissions by filename. Shared sourcePath fixtures
- * exercise this post-projection layer; the generic orchestrator stays subagent.
+ * exercise this post-projection layer; original source tools bound conflicting
+ * canonical writer metadata. The generic orchestrator stays subagent.
  */
-function applyModeByRole(content, agentName) {
+function applyModeByRole(content, agentName, originalSource) {
   // Installed filenames preserve the capability boundary despite conflicting metadata.
-  const permission = restrictedAgentPermission(agentName);
-  if (agentName !== "orchestrator" && permission === undefined) {
+  let permission = restrictedAgentPermission(agentName);
+  const recoverWriter = CANONICAL_WRITER_AGENTS.has(agentName) && originalSource !== undefined;
+  if (agentName !== "orchestrator" && permission === undefined && !recoverWriter) {
     // No change needed — the generic transform already set mode: subagent.
     return content;
   }
 
   const { frontmatter: fm, body } = parseFrontmatter(content);
+  if (recoverWriter) {
+    const { frontmatter: sourceFm } = parseFrontmatter(originalSource);
+    permission = projectedAgentPermission(agentName, sourceFm);
+  }
+  if (agentName !== "orchestrator" && permission === undefined) return content;
   if (permission !== undefined) {
     fm["permission"] = permission;
-  } else {
+  }
+  if (agentName === "orchestrator") {
     fm["mode"] = "primary";
     fm["name"] = "TH-orchestrator";
   }
@@ -1248,8 +1277,9 @@ function transformToCC(filePath, content, repoRoot) {
     // Each key maps back to the CC tool name; "edit" maps to "Edit" (canonical; Write is
     // omitted since Edit is the more specific tool in CC format).
     if (permission !== undefined) projected["tools"] = opencodePermissionToAgentTools(permission);
-    const restrictedPermission = restrictedAgentPermission(path.basename(filePath, ".md"))
-      ?? restrictedAgentPermission(fm["name"]);
+    const agentName = path.basename(filePath, ".md");
+    const restrictedPermission = restrictedAgentPermission(agentName)
+      ?? (CANONICAL_WRITER_AGENTS.has(agentName) ? undefined : restrictedAgentPermission(fm["name"]));
     if (restrictedPermission !== undefined) projected["tools"] = opencodePermissionToAgentTools(restrictedPermission);
     // color: map opencode enum back to a canonical CC color (lossy — e.g. info could have
     // been blue, cyan, or teal; we pick a canonical one per enum).
@@ -1433,7 +1463,7 @@ async function runTransform(direction, repoRoot, options = {}) {
     // stays name: orchestrator / mode: subagent for the orchestrator.
     if (direction === DIRECTION_TO_OPENCODE && transformed.surface === "agent") {
       const agentName = path.basename(srcPath, ".md");
-      transformed = { ...transformed, content: applyModeByRole(transformed.content, agentName) };
+      transformed = { ...transformed, content: applyModeByRole(transformed.content, agentName, content) };
     }
 
     // Validate output path (containment dry-run).

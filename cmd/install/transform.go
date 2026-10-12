@@ -308,13 +308,14 @@ func insertModelLine(transformed []byte, concrete string) []byte {
 
 // applyModeByRole promotes the installed orchestrator to primary with its
 // OpenCode display name and selects exact PR-review/research permissions by
-// filename. It follows the generic projection; shared fixtures with sourcePath
-// exercise this layer without changing the canonical role name.
-func applyModeByRole(src []byte, agentName string) ([]byte, error) {
+// filename. Original source tools bound recovery when a canonical writer has
+// conflicting restricted metadata; custom identities keep the metadata policy.
+func applyModeByRole(src []byte, agentName string, originalSource ...[]byte) ([]byte, error) {
 	// Restricted profiles follow the installed filename so conflicting metadata
 	// cannot change the role's capabilities.
 	permission, restricted := restrictedAgentPermission(agentName)
-	if agentName != "orchestrator" && !restricted {
+	recoverWriter := !restricted && canonicalWriterAgents[agentName] && len(originalSource) > 0
+	if agentName != "orchestrator" && !restricted && !recoverWriter {
 		// No change needed — generic transform already set mode: subagent.
 		return src, nil
 	}
@@ -323,9 +324,25 @@ func applyModeByRole(src []byte, agentName string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("applyModeByRole parse: %v", err)
 	}
+	if recoverWriter {
+		sourceFM, _, err := parseFrontmatterYAML(originalSource[0])
+		if err != nil {
+			return nil, fmt.Errorf("applyModeByRole source parse: %v", err)
+		}
+		metadataName, _ := sourceFM["name"].(string)
+		if _, conflict := restrictedAgentPermission(metadataName); conflict {
+			tools, _ := sourceFM["tools"].(string)
+			permission = sourceToolsPermission(tools)
+			restricted = true
+		}
+	}
+	if agentName != "orchestrator" && !restricted {
+		return src, nil
+	}
 	if restricted {
 		fm["permission"] = permission
-	} else {
+	}
+	if agentName == "orchestrator" {
 		fm["mode"] = "primary"
 		fm["name"] = "TH-orchestrator"
 	}
@@ -468,6 +485,16 @@ var researchAgents = map[string]bool{
 	"researcher": true, "code-researcher": true, "research-consolidator": true,
 }
 
+// Canonical sources declaring writing/execution tools. Keep the JS identities
+// aligned; source-roster behavior tests and shared fixtures cover this boundary.
+var canonicalWriterAgents = map[string]bool{
+	"adversary": true, "agent-builder": true, "architect": true, "cleaner": true,
+	"d2-diagrammer": true, "delivery": true, "diagrammer": true, "documenter": true,
+	"gcp-cost-analyzer": true, "gcp-infra": true, "implementer": true, "init-project": true,
+	"likec4-diagrammer": true, "mentor": true, "orchestrator": true, "qa": true,
+	"security": true, "tester": true, "translator": true, "ux-reviewer": true,
+}
+
 func researchPermission(name string) orderedPermission {
 	permission := orderedPermission{
 		keys: []string{"*", "read", "glob", "grep"},
@@ -491,6 +518,13 @@ func restrictedAgentPermission(name string) (orderedPermission, bool) {
 		return researchPermission(name), true
 	}
 	return orderedPermission{}, false
+}
+
+func sourceToolsPermission(tools string) orderedPermission {
+	permission := agentToolsToOpencodePermission(tools)
+	permission.keys = append([]string{"*"}, permission.keys...)
+	permission.values["*"] = "deny"
+	return permission
 }
 
 // agentToolsToOpencodePermission converts a CC tools comma-string to an

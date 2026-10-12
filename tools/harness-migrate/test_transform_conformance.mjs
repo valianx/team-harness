@@ -136,7 +136,7 @@ function runForwardTransform(content, surface, tierProvider, sourcePath) {
       ? transformToOpencodeTiered(fakePath, content, fakeRepoRoot, tierProvider)
       : transformToOpencode(fakePath, content, fakeRepoRoot);
     const output = sourcePath && surface === "agent"
-      ? applyModeByRole(result.content, path.basename(sourcePath, ".md"))
+      ? applyModeByRole(result.content, path.basename(sourcePath, ".md"), content)
       : result.content;
     return { output, outputPath: result.outputPath };
   } catch (err) {

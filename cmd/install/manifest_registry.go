@@ -400,7 +400,7 @@ func opencodeRuntimeTransform(src []byte, kind, sourcePath string) ([]byte, erro
 	filename := parts[len(parts)-1]
 	agentName := strings.TrimSuffix(filename, ".md")
 
-	return applyModeByRole(transformed, agentName)
+	return applyModeByRole(transformed, agentName, src)
 }
 
 // opencodeRuntimeTransformTiered is opencodeRuntimeTransform's opt-in
@@ -423,5 +423,5 @@ func opencodeRuntimeTransformTiered(src []byte, kind, sourcePath, provider strin
 	filename := parts[len(parts)-1]
 	agentName := strings.TrimSuffix(filename, ".md")
 
-	return applyModeByRole(transformed, agentName)
+	return applyModeByRole(transformed, agentName, src)
 }

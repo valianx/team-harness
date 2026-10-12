@@ -1,5 +1,212 @@
 [
   {
+    "name": "adversary_filename_conflict_limits_recovery_to_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/adversary.md",
+    "input": "---\nname: researcher\ntools: Read, Write\n---\nWriter.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, edit: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit"
+  },
+  {
+    "name": "agent_builder_filename_conflict_limits_recovery_to_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/agent-builder.md",
+    "input": "---\nname: researcher\ntools: Read, Write\n---\nWriter.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, edit: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit"
+  },
+  {
+    "name": "cleaner_filename_conflict_limits_recovery_to_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/cleaner.md",
+    "input": "---\nname: researcher\ntools: Read, Write\n---\nWriter.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, edit: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit"
+  },
+  {
+    "name": "d2_diagrammer_filename_conflict_limits_recovery_to_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/d2-diagrammer.md",
+    "input": "---\nname: researcher\ntools: Read, Write\n---\nWriter.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, edit: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit"
+  },
+  {
+    "name": "diagrammer_filename_conflict_limits_recovery_to_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/diagrammer.md",
+    "input": "---\nname: researcher\ntools: Read, Write\n---\nWriter.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, edit: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit"
+  },
+  {
+    "name": "gcp_cost_analyzer_filename_conflict_limits_recovery_to_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/gcp-cost-analyzer.md",
+    "input": "---\nname: researcher\ntools: Read, Write\n---\nWriter.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, edit: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit"
+  },
+  {
+    "name": "gcp_infra_filename_conflict_limits_recovery_to_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/gcp-infra.md",
+    "input": "---\nname: researcher\ntools: Read, Write\n---\nWriter.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, edit: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit"
+  },
+  {
+    "name": "init_project_filename_conflict_limits_recovery_to_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/init-project.md",
+    "input": "---\nname: researcher\ntools: Read, Write\n---\nWriter.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, edit: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit"
+  },
+  {
+    "name": "likec4_diagrammer_filename_conflict_limits_recovery_to_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/likec4-diagrammer.md",
+    "input": "---\nname: researcher\ntools: Read, Write\n---\nWriter.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, edit: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit"
+  },
+  {
+    "name": "mentor_filename_conflict_limits_recovery_to_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/mentor.md",
+    "input": "---\nname: researcher\ntools: Read, Write\n---\nWriter.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, edit: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit"
+  },
+  {
+    "name": "qa_filename_conflict_limits_recovery_to_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/qa.md",
+    "input": "---\nname: researcher\ntools: Read, Write\n---\nWriter.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, edit: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit"
+  },
+  {
+    "name": "security_filename_conflict_limits_recovery_to_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/security.md",
+    "input": "---\nname: researcher\ntools: Read, Write\n---\nWriter.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, edit: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit"
+  },
+  {
+    "name": "translator_filename_conflict_limits_recovery_to_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/translator.md",
+    "input": "---\nname: researcher\ntools: Read, Write\n---\nWriter.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, edit: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit"
+  },
+  {
+    "name": "ux_reviewer_filename_conflict_limits_recovery_to_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/ux-reviewer.md",
+    "input": "---\nname: researcher\ntools: Read, Write\n---\nWriter.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, edit: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit"
+  },
+  {
+    "name": "documenter_filename_conflict_limits_recovery_to_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/documenter.md",
+    "input": "---\nname: researcher\ntools: Read, Write\n---\nWriter.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, edit: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit"
+  },
+  {
+    "name": "orchestrator_filename_conflict_preserves_primary_and_declared_delegation",
+    "surface": "agent",
+    "sourcePath": "agents/orchestrator.md",
+    "input": "---\nname: researcher\ntools: Read, Write, Task\n---\nCoordinator.\n",
+    "expectedOutput": "---\nname: TH-orchestrator\npermission: {\"*\": deny, read: allow, edit: allow, task: allow}\nmode: primary\nth-origin: opencode\n---\nCoordinator.\n",
+    "expectedInverseTools": "Read, Edit, Task"
+  },
+  {
+    "name": "custom_worker_filename_keeps_restricted_metadata_fallback",
+    "surface": "agent",
+    "sourcePath": "agents/custom-worker.md",
+    "input": "---\nname: researcher\ntools: Read, Write, Bash, Task\n---\nCustom.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, glob: allow, grep: allow, webfetch: allow, websearch: allow}\nmode: subagent\nth-origin: opencode\n---\nCustom.\n",
+    "expectedInverseTools": "Read, Glob, Grep, WebFetch, WebSearch"
+  },
+  {
+    "name": "test_agent_filename_keeps_restricted_metadata_fallback",
+    "surface": "agent",
+    "sourcePath": "agents/test-agent.md",
+    "input": "---\nname: researcher\ntools: Read, Write, Bash, Task\n---\nCustom.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, glob: allow, grep: allow, webfetch: allow, websearch: allow}\nmode: subagent\nth-origin: opencode\n---\nCustom.\n",
+    "expectedInverseTools": "Read, Glob, Grep, WebFetch, WebSearch"
+  },
+  {
+    "name": "implementer_filename_without_metadata_keeps_native_policy",
+    "surface": "agent",
+    "sourcePath": "agents/implementer.md",
+    "input": "---\ntools: Read, Edit, Write, Bash, Glob, Grep\n---\nWriter.\n",
+    "expectedOutput": "---\nmode: subagent\nth-origin: opencode\n---\nWriter.\n"
+  },
+  {
+    "name": "implementer_filename_with_researcher_metadata_keeps_only_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/implementer.md",
+    "input": "---\nname: researcher\ntools: Read, Edit, Write, Bash, Glob, Grep\n---\nWriter.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, edit: allow, bash: allow, glob: allow, grep: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit, Bash, Glob, Grep"
+  },
+  {
+    "name": "tester_filename_with_code_researcher_metadata_keeps_only_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/tester.md",
+    "input": "---\nname: code-researcher\ntools: Read, Edit, Write, Bash, Glob, Grep\n---\nWriter.\n",
+    "expectedOutput": "---\nname: code-researcher\npermission: {\"*\": deny, read: allow, edit: allow, bash: allow, glob: allow, grep: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit, Bash, Glob, Grep"
+  },
+  {
+    "name": "architect_filename_with_consolidator_metadata_keeps_only_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/architect.md",
+    "input": "---\nname: research-consolidator\ntools: Read, Glob, Grep, Edit, Write, WebFetch, WebSearch\n---\nWriter.\n",
+    "expectedOutput": "---\nname: research-consolidator\npermission: {\"*\": deny, read: allow, glob: allow, grep: allow, edit: allow, webfetch: allow, websearch: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Glob, Grep, Edit, WebFetch, WebSearch"
+  },
+  {
+    "name": "delivery_filename_does_not_gain_undeclared_bash_or_delegation",
+    "surface": "agent",
+    "sourcePath": "agents/delivery.md",
+    "input": "---\nname: researcher\ntools: Read, Write\n---\nWriter.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, edit: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit"
+  },
+  {
+    "name": "conflicting_writer_without_source_tools_cannot_gain_capabilities",
+    "surface": "agent",
+    "sourcePath": "agents/implementer.md",
+    "input": "---\nname: researcher\n---\nWriter.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": ""
+  },
+  {
+    "name": "tiered_tester_filename_with_pr_metadata_keeps_only_source_tools",
+    "surface": "agent",
+    "sourcePath": "agents/tester.md",
+    "tierProvider": "anthropic",
+    "input": "---\nname: pr-review-verifier\nmodel: sonnet\ntools: Read, Edit, Write, Bash, Glob, Grep\n---\nWriter.\n",
+    "expectedOutput": "---\nname: pr-review-verifier\nmodel: anthropic/claude-sonnet-5-5\npermission: {\"*\": deny, read: allow, edit: allow, bash: allow, glob: allow, grep: allow}\nmode: subagent\nth-origin: opencode\n---\nWriter.\n",
+    "expectedInverseTools": "Read, Edit, Bash, Glob, Grep"
+  },
+  {
+    "name": "metadata_only_researcher_still_denies_widened_source_tools",
+    "surface": "agent",
+    "input": "---\nname: researcher\ntools: Read, Write, Edit, Bash, Task\n---\nResearch.\n",
+    "expectedOutput": "---\nname: researcher\npermission: {\"*\": deny, read: allow, glob: allow, grep: allow, webfetch: allow, websearch: allow}\nmode: subagent\nth-origin: opencode\n---\nResearch.\n",
+    "expectedInverseTools": "Read, Glob, Grep, WebFetch, WebSearch"
+  },
+  {
     "name": "researcher_keeps_read_and_web_search",
     "surface": "agent",
     "input": "---\nname: researcher\ntools: Read, Glob, Grep, WebFetch, WebSearch\n---\nResearch.\n",
