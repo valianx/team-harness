@@ -185,7 +185,7 @@ def aggregate(records):
                     "false_positives": summarize_values([(r.get("adjudication") or {}).get("false_positives") for r in valid]),
                     "dimensions": dimensions, "dimensions_all_valid_reviews": {field: bool_counts(valid, field) for field in QUALITY_FIELDS}},
         "controls": {"planned": len(controls), "valid": len(valid_controls), "adjudicated": sum(bool(r.get("adjudication_complete")) for r in valid_controls),
-                     "clean_adjudicated_controls": sum((r.get("adjudication") or {}).get("false_positives") == 0 for r in valid_controls),
+                     "clean_adjudicated_controls": sum(bool(r.get("adjudication_complete")) and r["adjudication"]["false_positives"] == 0 for r in valid_controls),
                      "controls_with_false_positives": sum(number((r.get("adjudication") or {}).get("false_positives")) and r["adjudication"]["false_positives"] > 0 for r in valid_controls),
                      "false_positives": summarize_values([(r.get("adjudication") or {}).get("false_positives") for r in valid_controls])},
         "tokens": {field: summarize_values([r["tokens"].get(field) for r in completed]) for field in TOKEN_FIELDS},
@@ -271,7 +271,7 @@ def collect(manifest_path, adjudication_dir):
     cases = read(manifest_path.parent / "cases.json", True) or {}
     canonical_cases = json.dumps(cases, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     if hashlib.sha256(canonical_cases.encode()).hexdigest() != manifest.get("fixture_sha256"):
-        issues.append({"kind": "fixture_identity_mismatch"})
+        raise ValueError("Fixture identity changed after preparation; restore the prepared cases or prepare a new study")
     trials = {}
     for trial in manifest["trials"]:
         tid = trial["trial_id"]

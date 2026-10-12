@@ -126,6 +126,8 @@ equivalent rows and excludes conflicting duplicates. This binding remains
 compatible with earlier prepared study/adjudication packages.
 The three required counts cannot be null, boolean, negative or non-integer;
 rejected or incomplete rows do not imply complete adjudication or zero counts.
+Only complete adjudications count toward clean controls. Analysis stops before
+writing reports if the cases no longer match the prepared fixture hash.
 
 Native receipts have a separate binding: `started.json` requires the trial ID,
 stored command, declared runner/protocol/concurrency identity and the canonical

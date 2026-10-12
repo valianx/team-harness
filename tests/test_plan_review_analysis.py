@@ -258,20 +258,62 @@ class AnalysisTests(unittest.TestCase):
             self.assertTrue(all(record["adjudication"] is None for record in records))
             self.assertIn("study_manifest_sha256_mismatch", [issue["kind"] for issue in issues])
 
-    def test_collect_reports_changed_fixture_and_protocol_receipt(self):
+    def test_collect_reports_changed_protocol_receipt(self):
         with tempfile.TemporaryDirectory(prefix="th-plan-review-integrity-") as tmp:
             base = Path(tmp)
             manifest_path, adjudication = make_study(base)
             manifest = json.loads(manifest_path.read_text())
             manifest.update(workers=2, runner_sha256="c" * 64, protocol_sha256="d" * 64)
             write_json(manifest_path, manifest)
-            cases = json.loads((base / "cases.json").read_text())
-            cases["control"]["oracle"]["required_scenarios"] = ["changed"]
-            write_json(base / "cases.json", cases)
             _, _, issues, _, _ = ANALYSIS.collect(manifest_path, adjudication)
             kinds = [issue["kind"] for issue in issues]
-            self.assertIn("fixture_identity_mismatch", kinds)
             self.assertEqual(kinds.count("result_protocol_identity_mismatch"), 12)
+
+    def test_codex_review_cli_rejects_changed_or_corrupt_fixtures_without_reports(self):
+        for mutation in ("changed_oracle", "corrupt_json"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory(prefix="th-frozen-fixture-") as tmp:
+                base = Path(tmp)
+                manifest_path, adjudication = make_study(base / "study")
+                manifest = json.loads(manifest_path.read_text())
+                write_adjudication(manifest_path, adjudication, adjudication_rows(manifest))
+                fixture = manifest_path.parent / "cases.json"
+                if mutation == "changed_oracle":
+                    cases = json.loads(fixture.read_text())
+                    cases["control"]["oracle"]["material_defects"] = [{"origin": "unknown"}]
+                    cases["control"]["oracle"]["parallel_design_tasks"] = ["new-task"]
+                    write_json(fixture, cases)
+                else:
+                    fixture.write_text("{")
+                output = base / "metrics"
+                analyzed = subprocess.run([sys.executable, "-B", str(ROOT / "analyze.py"),
+                                           "--manifest", str(manifest_path), "--adjudication-dir", str(adjudication),
+                                           "--out", str(output)], capture_output=True, text=True, timeout=10)
+                self.assertNotEqual(analyzed.returncode, 0)
+                self.assertIn("Fixture identity changed after preparation", analyzed.stderr)
+                self.assertFalse(output.exists())
+
+    def test_codex_review_incomplete_control_is_not_clean_until_adjudication_completes(self):
+        with tempfile.TemporaryDirectory(prefix="th-control-coverage-") as tmp:
+            manifest_path, adjudication = make_study(Path(tmp))
+            manifest = json.loads(manifest_path.read_text())
+            row = next(row for row in adjudication_rows(manifest) if row["trial_id"] == "a2")
+            incomplete = dict(row)
+            del incomplete["origin_correct"]
+            write_adjudication(manifest_path, adjudication, [incomplete])
+            manifest, records, issues, hashes, overhead = ANALYSIS.collect(manifest_path, adjudication)
+            data = ANALYSIS.build_analysis(manifest, records, issues, hashes, overhead)
+            controls = data["all"]["A"]["controls"]
+            self.assertEqual(controls["valid"], 1)
+            self.assertEqual(controls["false_positives"]["sum"], 0)
+            self.assertEqual(controls["adjudicated"], 0)
+            self.assertEqual(controls["clean_adjudicated_controls"], 0)
+            self.assertIn("incomplete_adjudication", [issue["kind"] for issue in issues])
+            write_adjudication(manifest_path, adjudication, [row])
+            manifest, records, issues, hashes, overhead = ANALYSIS.collect(manifest_path, adjudication)
+            data = ANALYSIS.build_analysis(manifest, records, issues, hashes, overhead)
+            self.assertEqual(data["all"]["A"]["controls"]["adjudicated"], 1)
+            self.assertEqual(data["all"]["A"]["controls"]["clean_adjudicated_controls"], 1)
+            self.assertEqual(data["all"]["B"]["controls"]["clean_adjudicated_controls"], 0)
 
     def test_analysis_output_rejects_unignored_repository_location_without_writes(self):
         with tempfile.TemporaryDirectory(prefix="th-plan-review-report-output-") as tmp:
