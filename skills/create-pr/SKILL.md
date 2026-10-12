@@ -78,13 +78,16 @@ candidate; reference a partially resolved issue without auto-closing it. Keep th
 candidate reviewable and report the files inspected, prepared, or retained with the
 rationale for any scope decision.
 
-End every prepared or published PR body with one descriptive risk flag in the
-PR's language: `Risky change: true` / `Risky change: false` in English or
-`Cambio riesgoso: true` / `Cambio riesgoso: false` in Spanish. Main judges the actual impact and available evidence,
-including material uncertainty, and refreshes the flag when the change affects
-that judgment. Keep template content above it. The footer contains only the flag;
-it informs the operator's choice of human checking without adding an approval
-step, classifier or score.
+End every prepared or published PR body with one localized human verification flag:
+`Human verification required: true` / `Human verification required: false` in English,
+or `Verificación humana requerida: true` / `Verificación humana requerida: false` in Spanish.
+Main uses `false` when no necessary human check remains; automated validation and
+advisory agent reviews can provide sufficient evidence. Use `true` only for a concrete remaining
+check that needs a person; identify that check above the footer. Technical risk, pending
+CI or an omitted automated check alone does not establish that need. Report actual risk
+and validation limits in the body and preserve existing completion conditions.
+Refresh the flag when the candidate or evidence changes. Keep template content above
+it; the footer contains only the flag. It adds no approval step or publication/merge authority.
 
 This preparation/publication method is shared by direct, spec and pipeline work.
 Main normally executes it. A pipeline delivery specialist can perform the assigned

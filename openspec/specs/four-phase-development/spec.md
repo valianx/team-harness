@@ -149,17 +149,29 @@ Publication SHALL use create-pr and the existing archive, review and artifact-hy
 - **WHEN** the selected suite cannot exercise a requirement in the current shell, filesystem or permission context
 - **THEN** Main identifies the concrete prerequisite, uses a supported environment where available and retains which checks ran or remain unverified without silently skipping them or claiming cross-platform success
 
-### Requirement: PR descriptions end with a localized risk flag
-PR preparation and publication through create-pr SHALL end the description with one descriptive true/false risk flag in the PR's language. Main SHALL judge actual change impact and available evidence, including material uncertainty, and refresh the flag when relevant changes affect that judgment. The footer SHALL contain only the flag, after other template content. It SHALL inform the operator without automatically requiring human approval or another risk tool.
+### Requirement: PR descriptions end with a localized human verification flag
+PR preparation and publication through create-pr SHALL end the description with one true/false human verification flag in the PR's language. Main SHALL use false when no necessary human check remains; applicable automated validation and advisory agent reviews can provide sufficient evidence. Main SHALL use true only for a concrete remaining check that requires a person and SHALL identify that check above the footer. Technical risk, pending CI or omitted automated checks alone SHALL NOT establish that need; actual risk, validation limits and existing completion conditions SHALL remain explicit in the body. Main SHALL refresh the flag when the candidate or evidence changes. The footer SHALL contain only the flag after other template content and SHALL NOT add approval steps or publication/merge authority.
 
 #### Scenario: English PR
-- **WHEN** a PR is prepared in English and Main judges the change risky
-- **THEN** its final line is `Risky change: true`, without a risk explanation or added checklist in the footer
+- **WHEN** available validation evidence leaves no necessary human check for an English PR
+- **THEN** its final line is `Human verification required: false`
 
 #### Scenario: Spanish PR
-- **WHEN** a PR is prepared in Spanish and Main judges the change not risky
-- **THEN** its final line is `Cambio riesgoso: false`
+- **WHEN** no necessary human check remains for a Spanish PR
+- **THEN** its final line is `Verificación humana requerida: false`
+
+#### Scenario: A concrete check requires a person
+- **WHEN** a necessary check cannot be completed by the available tools or agents and requires a person
+- **THEN** Main identifies that check above the footer and ends the description with the localized true flag without adding a separate approval ceremony
+
+#### Scenario: Technical risk does not require human verification
+- **WHEN** the change has technical impact but available validation leaves no necessary human check
+- **THEN** Main retains material risk information in the body and uses the false human verification flag
+
+#### Scenario: Automated validation is still pending
+- **WHEN** CI or a required automated check is incomplete and no necessary human check has been identified
+- **THEN** Main reports the incomplete check and preserves publication/review completion conditions rather than treating the footer as a pass or requiring a person only because automation is pending
 
 #### Scenario: Risk changes during preparation
-- **WHEN** the prepared candidate changes enough to alter Main's risk judgment
-- **THEN** Main refreshes the single localized flag without creating a new approval gate
+- **WHEN** the candidate or evidence changes its risk or resolves or establishes a necessary human check
+- **THEN** Main refreshes the single localized flag while preserving existing authorization and completion conditions

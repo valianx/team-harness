@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.42.11] - 2026-10-12
+
+### Changed
+- PR footers state whether a human check is required; automated checks and agent reviews can cover validation.
+
 ## [3.42.10] - 2026-10-12
 
 ### Changed
