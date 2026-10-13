@@ -2,6 +2,14 @@
 
 Reference for building accessible, styled controls using Radix UI primitives. These controls are used for interactive elements within scenes (speed selectors, toggles, sliders for timelines, etc.).
 
+Resolve an HTMLElement portal container inside the current scene content root
+before opening a portaled control, preserving its inherited theme and stylesheet.
+Pass it through the supported [Select](https://www.radix-ui.com/primitives/docs/components/select#portal)
+or [Tooltip](https://www.radix-ui.com/primitives/docs/components/tooltip#portal)
+`container` prop; their document-body default leaves that context. Verify popup
+placement, focus and outside interaction in the actual scaled scene. The template
+fixture checks native controls; it does not establish Radix popup behavior.
+
 ---
 
 ## Select (Dropdown — Scene Parameters)
@@ -11,10 +19,11 @@ Use for letting viewers switch between variants, select data sets, or choose vis
 ```tsx
 import * as Select from "@radix-ui/react-select";
 
-function SceneSelector({ options, value, onChange }: {
+function SceneSelector({ options, value, onChange, portalContainer }: {
   options: { value: string; label: string }[];
   value: string;
   onChange: (value: string) => void;
+  portalContainer: HTMLElement;
 }) {
   return (
     <Select.Root value={value} onValueChange={onChange}>
@@ -27,7 +36,7 @@ function SceneSelector({ options, value, onChange }: {
         </Select.Icon>
       </Select.Trigger>
 
-      <Select.Portal>
+      <Select.Portal container={portalContainer}>
         <Select.Content className="rounded-lg bg-scene-surface border border-scene-border shadow-xl overflow-hidden z-50">
           <Select.Viewport className="p-1">
             {options.map((opt) => (
@@ -144,9 +153,10 @@ function TimelineSlider({ value, max, onChange }: {
 ```tsx
 import * as Tooltip from "@radix-ui/react-tooltip";
 
-function InfoTooltip({ children, content }: {
+function InfoTooltip({ children, content, portalContainer }: {
   children: React.ReactNode;
   content: string;
+  portalContainer: HTMLElement;
 }) {
   return (
     <Tooltip.Provider delayDuration={200}>
@@ -154,7 +164,7 @@ function InfoTooltip({ children, content }: {
         <Tooltip.Trigger asChild>
           {children}
         </Tooltip.Trigger>
-        <Tooltip.Portal>
+        <Tooltip.Portal container={portalContainer}>
           <Tooltip.Content
             side="top"
             sideOffset={8}
