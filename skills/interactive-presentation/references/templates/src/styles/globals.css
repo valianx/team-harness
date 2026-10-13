@@ -2,74 +2,126 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  *,
-  *::before,
-  *::after {
-    box-sizing: border-box;
-  }
-
-  html {
-    font-size: 16px;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-
-  body {
-    @apply bg-scene-bg text-scene-text font-sans m-0 p-0;
-    overflow: hidden;
-  }
-
-  #root {
-    width: 100vw;
-    height: 100vh;
-  }
+:root {
+  --scene-bg: #f7f7f5;
+  --scene-surface: #fff;
+  --scene-text: #252523;
+  --scene-muted: #60605b;
+  --scene-border: #b9b9b2;
+  --scene-accent: #33332f;
+  --scene-accent-light: #57574f;
+  --scene-font: system-ui, sans-serif;
+  --scene-mono: ui-monospace, monospace;
+  font-family: var(--scene-font);
+  color: var(--scene-text);
+  background: var(--scene-bg);
 }
 
-@layer components {
-  /* React Flow overrides for dark theme */
-  .react-flow__background {
-    background-color: theme("colors.scene.bg") !important;
-  }
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; width: 100%; height: 100%; }
+body { overflow: hidden; }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: default; opacity: 0.4; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, [tabindex="0"]:focus-visible {
+  outline: 3px solid var(--scene-accent);
+  outline-offset: 4px;
+}
 
-  .react-flow__node {
-    @apply rounded-lg border border-scene-border bg-scene-surface text-scene-text shadow-lg;
-    font-family: theme("fontFamily.sans");
-  }
+.presentation-stage { position: relative; width: 100%; height: 100%; color: var(--scene-text); font-family: var(--scene-font); }
+.presentation-stage .reveal {
+  height: 100%; background: var(--scene-bg); color: var(--scene-text);
+  font-family: var(--scene-font); font-size: 24px; line-height: 1.4;
+}
+.presentation-stage .reveal .slides > section { height: 100%; padding: 0; text-align: left; }
+.scene-frame {
+  position: absolute; inset: 48px 64px 112px;
+  display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 24px;
+}
+.scene-frame[data-heading-embedded="true"] { grid-template-rows: minmax(0, 1fr); }
+.scene-heading { min-width: 0; padding-top: 4px; }
+.scene-title { margin: 0; font-size: 48px; font-weight: 650; line-height: 1.25; letter-spacing: -0.025em; }
+.scene-subtitle { margin: 14px 0 0; color: var(--scene-muted); font-size: 22px; line-height: 1.3; }
+.scene-content { min-width: 0; min-height: 0; position: relative; }
+.presentation-content {
+  width: 100%; height: 100%; color: var(--scene-text); font-family: var(--scene-font); font-size: 24px; line-height: 1.4;
+}
+.slide-body { height: 100%; font-size: 24px; line-height: 1.4; }
+.slide-body > :first-child { margin-top: 0; }
+.slide-body p, .slide-body ul, .slide-body ol { margin: 0 0 20px; }
+.slide-body ul, .slide-body ol { padding-left: 30px; }
+.slide-body ul { list-style: disc; }
+.slide-body ol { list-style: decimal; }
+.slide-body li + li { margin-top: 12px; }
+.slide-body h3 { margin: 0 0 16px; font-size: 30px; line-height: 1.2; }
+.slide-body a { color: var(--scene-accent); text-decoration: underline; }
+.slide-body code, .slide-body pre, .slide-body kbd { font-family: var(--scene-mono); }
+.slide-body pre { white-space: pre-wrap; padding: 20px; background: var(--scene-surface); border: 1px solid var(--scene-border); }
+.slide-body figure { margin: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 16px; height: 100%; }
+.slide-body img { display: block; width: 100%; height: 100%; min-height: 0; object-fit: contain; }
+.slide-body figcaption { font-size: 20px; color: var(--scene-muted); line-height: 1.3; }
+.slide-body[data-layout="text"] { max-width: 68ch; }
+.slide-body[data-layout="split"] { display: grid; grid-template-columns: 1fr 1fr; gap: 44px; }
+.slide-body[data-layout="split"] > * { min-width: 0; }
+.slide-body[data-layout="image"] { width: 100%; }
+.slide-body label { display: block; margin-bottom: 8px; font-size: 20px; }
+.slide-body input, .slide-body select, .slide-body textarea {
+  max-width: 100%; padding: 8px 12px; color: var(--scene-text);
+  border: 1px solid var(--scene-border); background: var(--scene-surface);
+}
+.slide-body button { padding: 8px 16px; border: 1px solid var(--scene-border); background: var(--scene-surface); }
 
-  .react-flow__node.highlighted {
-    @apply border-scene-accent ring-2 ring-scene-accent/30;
-    transition: all 0.3s ease;
-  }
+.flow-scene { height: 100%; display: grid; grid-template-rows: minmax(0, 1fr) 52px; gap: 16px; }
+.graph-stage { height: 100%; min-height: 0; position: relative; border: 1px solid var(--scene-border); }
+.graph-canvas { transform-origin: top left; }
+.graph-caption, .animation-caption { margin: 0; color: var(--scene-muted); font-size: 20px; line-height: 1.3; }
+.presentation-content .react-flow__node {
+  padding: 18px 24px; font-family: var(--scene-font); font-size: 24px; line-height: 1.2;
+  color: var(--scene-text); background: var(--scene-surface); border: 2px solid var(--scene-border); border-radius: 8px;
+}
+.presentation-content .react-flow__node.scene-highlighted { outline: 4px solid var(--scene-accent); outline-offset: 3px; }
+.presentation-content .react-flow__edge-path { stroke: var(--scene-muted); stroke-width: 2; }
+.presentation-content .scene-edge-highlighted .react-flow__edge-path { stroke-width: 4; }
+.presentation-content .react-flow__edge-text { fill: var(--scene-text); font-family: var(--scene-font); font-size: 20px; }
+.presentation-content .react-flow__edge-textbg { fill: var(--scene-bg); }
+.presentation-content .react-flow__controls { display: flex; flex-direction: row; box-shadow: none; }
+.presentation-content .react-flow__controls-button {
+  width: 36px; height: 36px; color: var(--scene-text); background: var(--scene-surface);
+  border: 1px solid var(--scene-border); fill: currentColor;
+}
+.presentation-content .react-flow__controls-button svg { max-width: 16px; max-height: 16px; }
 
-  .react-flow__edge-path {
-    stroke: theme("colors.scene.muted");
-    stroke-width: 2;
-  }
+.animation-stage { height: 100%; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 16px; }
+.animation-component { min-width: 0; min-height: 0; height: 100%; }
+.animation-component > svg { display: block; width: 100%; height: 100%; }
+.animation-component > div, .animation-component > section { height: 100%; }
 
-  .react-flow__edge.animated .react-flow__edge-path {
-    stroke: theme("colors.scene.accent");
-    stroke-dasharray: 5;
-    animation: dash 1s linear infinite;
-  }
+.presentation-control-area { position: absolute; inset: 0; z-index: 30; pointer-events: none; }
+.controls-trigger {
+  position: absolute; left: 64px; bottom: 24px; pointer-events: auto;
+  min-width: 44px; height: 44px; padding: 0 8px; border: 1px solid transparent;
+  background: transparent; color: var(--scene-muted); font-size: 28px; opacity: 0.65;
+}
+.controls-trigger:hover, .controls-trigger:focus-visible { background: var(--scene-surface); border-color: var(--scene-border); opacity: 1; }
+.presentation-controls {
+  position: absolute; right: 64px; bottom: 24px; display: flex; align-items: center; gap: 8px;
+  padding: 6px; border: 1px solid var(--scene-border); border-radius: 8px;
+  background: var(--scene-surface); pointer-events: auto; font-size: 18px;
+}
+.presentation-controls[hidden] { display: none; }
+.presentation-controls button {
+  min-width: 40px; height: 40px; padding: 0 8px; font-size: 24px;
+  color: var(--scene-text); border: 1px solid transparent; border-radius: 4px; background: transparent;
+}
+.presentation-controls button:hover:not(:disabled) { border-color: var(--scene-border); }
+.presentation-controls output { white-space: nowrap; padding: 0 6px; }
+.presentation-empty { padding: 48px; font: 24px/1.4 var(--scene-font); }
+.fullscreen-error { position: absolute; left: 24px; bottom: 80px; font-size: 16px; color: var(--scene-text); background: var(--scene-surface); }
 
-  @keyframes dash {
-    to {
-      stroke-dashoffset: -10;
-    }
-  }
-
-  /* Navigation dots */
-  .nav-dot {
-    @apply w-2.5 h-2.5 rounded-full bg-scene-muted/40 transition-all duration-300 cursor-pointer;
-  }
-
-  .nav-dot.active {
-    @apply bg-scene-accent w-8 rounded-full;
-  }
-
-  /* Scene transition */
-  .scene-enter {
-    @apply animate-fade-in;
+@media (prefers-reduced-motion: reduce) {
+  .presentation-stage *, .presentation-stage *::before, .presentation-stage *::after,
+  .presentation-content *, .presentation-content *::before, .presentation-content *::after {
+    animation-duration: 0s !important; transition-duration: 0s !important; scroll-behavior: auto !important;
   }
 }

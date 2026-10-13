@@ -9,6 +9,37 @@ permissions:
   contents: read
 
 jobs:
+  presentation-browser:
+    name: meeting presentation template (Chromium)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install maintained browser-test tooling
+        run: npm ci --prefix tests/presentation --no-audit --no-fund
+      - name: Provision Chromium explicitly
+        run: npm exec --prefix tests/presentation -- playwright install --with-deps chromium
+      - name: Check browser harness failure semantics
+        run: npm --prefix tests/presentation run test:harness
+      - name: Prepare the real copied template
+        run: npm --prefix tests/presentation run prepare-fixture -- --workspace "${{ runner.temp }}/meeting-presentations" --candidate "${{ github.sha }}"
+      - name: Execute meeting content and interaction checks
+        run: npm --prefix tests/presentation test -- --workspace "${{ runner.temp }}/meeting-presentations" --candidate "${{ github.sha }}"
+      - name: Retain captures, bounds and execution reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meeting-presentation-evidence
+          path: |
+            ${{ runner.temp }}/meeting-presentations/testing/runs/*/*.json
+            ${{ runner.temp }}/meeting-presentations/testing/runs/*/*.log
+            ${{ runner.temp }}/meeting-presentations/testing/runs/*/captures/
+          if-no-files-found: warn
+
   windows-hooks:
     name: native Windows hooks and filesystem
     runs-on: windows-latest

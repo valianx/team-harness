@@ -52,11 +52,9 @@ TOC_EXEMPT = {
     "skills/d2-diagram/references/dsl-reference.md",
     "skills/json-canvas/references/EXAMPLES.md",
     "skills/todo/references/task-format.md",
-    "skills/interactive-presentation/references/gsap-patterns.md",
     "skills/interactive-presentation/references/radix-patterns.md",
     "skills/interactive-presentation/references/svg-patterns.md",
     "skills/interactive-presentation/references/react-flow-patterns.md",
-    "skills/interactive-presentation/references/project-structure.md",
     "skills/excalidraw-diagram/references/element-templates.md",
     "skills/obsidian-bases/references/FUNCTIONS_REFERENCE.md",
 }

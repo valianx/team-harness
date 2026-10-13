@@ -126,6 +126,25 @@ behavior remains covered by its executable suites.
 
 `node tests/test_version_preflight.mjs` validates committed release metadata with isolated Git repositories; it invokes no models.
 
+The meeting presentation browser harness uses the real copied React template on
+Node 24 and Chromium. Prepare tooling and the fixture explicitly; ordinary test
+invocation installs nothing and fails when required tooling or prepared inputs
+are missing. Use an absolute workspace outside the repository and a fresh run
+identity, retaining earlier failures and captures:
+
+```bash
+npm ci --prefix tests/presentation
+npm exec --prefix tests/presentation -- playwright install chromium
+npm --prefix tests/presentation run test:harness
+npm --prefix tests/presentation run prepare-fixture -- --workspace /absolute/workspace --candidate revision-or-run-id
+npm --prefix tests/presentation test -- --workspace /absolute/workspace --candidate revision-or-run-id
+```
+
+CI provisions Chromium with system dependencies and executes this lane separately
+from `run-all.sh`. Reports, captures and meaningful content bounds remain in the
+external workspace; visual judgment complements these checks. Other browsers,
+live model authoring and host workflow activation are outside this evidence.
+
 ## When to add a test
 
 Add one when you change code that has an exit code. A new runtime behavior needs an observable test case. A new installer behaviour needs a Go test. A new agent file is picked up automatically by `test_agent_frontmatter.py` — no manual registration.

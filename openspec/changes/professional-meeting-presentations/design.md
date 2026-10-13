@@ -54,6 +54,8 @@ Let the active animated component register its actual timeline/controller with A
 
 Scope creation and cleanup to the component; remove registrations/callbacks and stop playback on scene deactivation/unmount. Publish completion and readiness back to transport. Disable controls until registration is ready and provide a useful failure state if registration fails. Under reduced motion, select stable states and explicit steps without mandatory auto-play. Test registration, pause, restart, completion and scene switching using visible component state, not only button labels. Refresh touched GSAP version/plugin guidance against current official installation/licensing documentation rather than preserving obsolete Club-plugin prohibitions.
 
+Documentation budget: extended — replace obsolete controller/template instructions and contextualize existing mechanics; max 80 total lines each for GSAP/project structure and 80 changed nonblank lines each for existing React Flow/SVG/Radix references, counting additions and removals. Keep testing guidance within its existing 20-line budget.
+
 ### 6. Verify behavior and rendered composition separately
 
 Maintain a deterministic fixture containing long/dense text, a local representative image, a labeled graph with steps, and a real animated component. Keep synthetic assets and hermetic tests in the repository; retain run artifacts/captures outside it. The maintained browser harness must run against the copied template and exact installed dependencies, not a hand-written substitute app.

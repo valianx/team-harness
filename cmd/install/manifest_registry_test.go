@@ -199,6 +199,17 @@ func TestBuildOpencodeManifests_PipelineRunnersPresent(t *testing.T) {
 // so a silently dropped source file breaks the scaffold on every target.
 func TestBuildOpencodeManifests_PresentationTemplateComplete(t *testing.T) {
 	const prefix = "installer-assets/opencode-skills/interactive-presentation/references/templates/"
+	for _, required := range []string{
+		"package.json", "package-lock.json", "index.html", "tsconfig.json",
+		"src/App.tsx", "src/types.ts", "src/components/Scene.tsx",
+		"src/components/SceneFrame.tsx", "src/components/SlideScene.tsx",
+		"src/components/FlowScene.tsx", "src/components/AnimatedScene.tsx",
+		"src/hooks/useScene.ts", "src/hooks/useReducedMotion.ts", "src/styles/globals.css",
+	} {
+		if _, err := fs.Stat(EmbeddedAssets(), prefix+required); err != nil {
+			t.Fatalf("required presentation scaffold file missing: %s: %v", required, err)
+		}
+	}
 	expected := map[string]bool{}
 	err := fs.WalkDir(EmbeddedAssets(), strings.TrimSuffix(prefix, "/"), func(path string, d fs.DirEntry, err error) error {
 		if err != nil {

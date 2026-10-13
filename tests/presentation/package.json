@@ -1,0 +1,14 @@
+{
+  "name": "team-harness-presentation-tests",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "prepare-fixture": "node prepare-fixture.mjs",
+    "test": "node run.mjs",
+    "test:harness": "node --test harness.test.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0"
+  }
+}

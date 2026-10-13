@@ -1,30 +1,20 @@
-import type { SceneData } from "../types";
+import type { AnimationRegistry, RegisterSceneControls, SceneData } from "../types";
 import { FlowScene } from "./FlowScene";
 import { AnimatedScene } from "./AnimatedScene";
 import { SlideScene } from "./SlideScene";
+import { SceneFrame } from "./SceneFrame";
 
-interface SceneProps {
+/** All scene variants use the same headline, content bounds and active control registration. */
+export function Scene({ scene, animations, reducedMotion, registerControls }: {
   scene: SceneData;
-}
-
-/**
- * Scene router. Renders the correct scene component based on `scene.type`.
- * Each scene type has its own wrapper that handles the specific rendering
- * logic (React Flow, GSAP timeline, or static HTML).
- */
-export function Scene({ scene }: SceneProps) {
-  switch (scene.type) {
-    case "flow":
-      return <FlowScene scene={scene} />;
-    case "animated":
-      return <AnimatedScene scene={scene} />;
-    case "slide":
-      return <SlideScene scene={scene} />;
-    default:
-      return (
-        <div className="flex items-center justify-center h-full text-scene-muted">
-          Unknown scene type
-        </div>
-      );
-  }
+  animations: AnimationRegistry;
+  reducedMotion: boolean;
+  registerControls: RegisterSceneControls;
+}) {
+  return <SceneFrame scene={scene}>
+    {scene.type === "slide" && <SlideScene scene={scene} />}
+    {scene.type === "flow" && <FlowScene scene={scene} reducedMotion={reducedMotion} registerControls={registerControls} />}
+    {scene.type === "animated" && <AnimatedScene scene={scene} animations={animations}
+      reducedMotion={reducedMotion} registerControls={registerControls} />}
+  </SceneFrame>;
 }

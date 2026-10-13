@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600" role="img" aria-label="Four essential corner markers surround the research-to-delivery cycle">
+  <rect width="800" height="600" fill="#eee8d8"/>
+  <rect x="28" y="28" width="744" height="544" rx="24" fill="#fffdf6" stroke="#755c34" stroke-width="4"/>
+  <g fill="#4c5135" font-family="sans-serif" font-size="24" font-weight="600" text-anchor="middle">
+    <text x="110" y="78">CONTEXT</text><text x="690" y="78">EVIDENCE</text>
+    <text x="110" y="546">COMPOSE</text><text x="690" y="546">DELIVER</text>
+  </g>
+  <circle cx="400" cy="300" r="142" fill="#d7dfc0" stroke="#4c5135" stroke-width="5"/>
+  <path d="M 400 196 L 488 300 L 400 404 L 312 300 Z" fill="#9f5839"/>
+  <g fill="#fffdf6" font-family="sans-serif" text-anchor="middle">
+    <text x="400" y="294" font-size="28" font-weight="700">MEETING</text>
+    <text x="400" y="327" font-size="22">READY</text>
+  </g>
+  <g stroke="#755c34" stroke-width="4" fill="none">
+    <path d="M 145 115 L 280 213"/><path d="M 655 115 L 520 213"/>
+    <path d="M 145 485 L 280 387"/><path d="M 655 485 L 520 387"/>
+  </g>
+</svg>
