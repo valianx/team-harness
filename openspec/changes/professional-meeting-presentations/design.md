@@ -34,6 +34,8 @@ Keep `SceneData`'s scene variants and existing complex components. The engine ow
 
 Configure a 16:9 stage unless request/project format overrides it, disable automatic slide advancement, and use the supported keyboard ownership condition. Graph/animation step navigation is an adapter to the active scene, not another slideshow engine. Route a stage-owned action to an available step before moving slides; expose explicit buttons for reverse/restart where applicable. Inputs, contenteditable, buttons, links, media, selectors, graph controls and consumed events retain their own keys. Inactive scenes must not keep intercepting input.
 
+The first copied-template browser run exposed a content boundary failure: Reveal 6.0.2's `isVerticalStack` searches slide descendants for `section`, so semantic sections in authored slide HTML become engine slide stacks and occlude content. Isolate SlideScene's authored HTML in an open shadow root with the compiled canonical styles and inherited theme tokens. Preserve the original semantic markup; keep Reveal's slide shell, notes and lifecycle outside this boundary. Keyboard and pointer ownership follow composed event paths and the deeply focused element. Browser measurements traverse the open root, including ancestor clipping and hit testing; the boundary must not weaken overflow or occlusion checks.
+
 If integration evidence exposes a package/API incompatibility, first repair the selected maintained route. A replacement that changes the architecture must be reconciled in this design before dependent edits; it must still satisfy incumbent preservation and maintained-engine reuse.
 
 ### 4. Give each scene the shared audience stage
