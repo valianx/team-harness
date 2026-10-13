@@ -73,7 +73,7 @@ entry without a platform-separator error.
 - **THEN** its removal record uses the portable configuration-root path and passes structural validation
 
 ### Requirement: Workflow discovery without role replacement
-Team Harness startup context and managed guidance SHALL describe available workflows without replacing the native general agent or activating a pipeline implicitly. Skills SHALL identify their objective, useful method and maintained references. The current general agent SHALL coordinate selected audit, find-bugs, research, research-app and GCP workflows and delegate bounded work when useful rather than invoking a nested orchestrator merely to route the request. Spec, pipeline, review-pr, create-pr, find-bugs and research-app SHALL remain discoverable. Supported installations SHALL make this guidance available through native instruction discovery without requiring a TH default-agent selection.
+Team Harness startup context and managed guidance SHALL describe available workflows without replacing the native general agent or activating a pipeline implicitly. Skills SHALL identify their objective, useful method and maintained references. The current general agent SHALL coordinate selected audit, find-bugs, research, research-app, ui-design and GCP workflows and delegate bounded work when useful rather than invoking a nested orchestrator merely to route the request. Spec, pipeline, review-pr, create-pr, find-bugs, research-app and ui-design SHALL remain discoverable. Supported installations SHALL make this guidance available through native instruction discovery without requiring a TH default-agent selection.
 
 #### Scenario: Ordinary session starts
 - **WHEN** a supported runtime starts with Team Harness available
@@ -98,6 +98,10 @@ Team Harness startup context and managed guidance SHALL describe available workf
 #### Scenario: Application research is requested
 - **WHEN** the operator selects research-app in Codex, Claude Code or OpenCode
 - **THEN** the current general agent can discover and apply that method without changing its identity, while preserving workspace, language and native permissions
+
+#### Scenario: Visual UI design is requested
+- **WHEN** the operator selects ui-design in Codex, Claude Code or OpenCode
+- **THEN** the current general agent can discover its visual-design method, distinguish it from design and sketch, and preserve workspace, authorization and native coordination
 
 ### Requirement: Preserve useful collaboration context
 Team Harness SHALL preserve voice guidance, language and English-learning preferences, workspace/Obsidian configuration, specialist coordination and recoverable workflow methods. Session discovery, traces, notifications and precompact context SHALL remain available independently of retired execution guards. Native runtime permissions SHALL govern execution; TH SHALL NOT weaken or replace the operator's configured policy. A workflow requiring an external workspace SHALL use the active runtime's access mechanism without provisioning settings belonging to another runtime.
