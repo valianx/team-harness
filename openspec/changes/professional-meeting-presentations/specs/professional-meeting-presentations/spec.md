@@ -100,7 +100,7 @@ Play, pause, restart and step actions SHALL control the actual active animation 
 - **THEN** inactive playback and stale callbacks are cleaned up and the explanation remains usable through stable states and explicit steps
 
 ### Requirement: Meeting readiness requires rendered checks
-New or improved presentations SHALL receive meaningful browser inspection at 1280×720 and at least one additional meeting viewport, including fullscreen and reduced motion where applicable. Checks SHALL cover representative long/dense text, an image, graph labels and steps, actual animation states, idle/revealed/focused controls and focus-aware navigation. Captures and content bounds SHALL support visual judgment; compilation or hidden overflow alone SHALL NOT establish readiness.
+New or improved presentations SHALL receive meaningful browser inspection at 1280×720 and at least one additional meeting viewport, including fullscreen and reduced motion where applicable. Checks SHALL cover representative content and interactions present in that deck, including long/dense text, images, graph labels and steps, actual animation states, idle/revealed/focused controls and focus-aware navigation where applicable. The maintained template fixture SHALL cover all these content and interaction types. Captures and content bounds SHALL support visual judgment; compilation or hidden overflow alone SHALL NOT establish readiness.
 
 #### Scenario: The presentation can run
 - **WHEN** a generated or improved deck is ready for validation
