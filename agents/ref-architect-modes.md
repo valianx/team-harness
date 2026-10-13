@@ -67,7 +67,7 @@ Table: options × criteria (performance, migration effort, community, learning c
 Report severity-categorized diagnostic findings with concrete file references,
 without proposals or task breakdowns, in `{workspace}/research/00-audit.md`.
 
-Follow the [audit coverage method](../skills/audit/references/coverage-method.md).
+Use the `audit` skill's `references/coverage-method.md`.
 
 1. **Scope** — full project, module, or layer.
 2. **Scan** structure, dependencies, pattern consistency, duplication, missing
