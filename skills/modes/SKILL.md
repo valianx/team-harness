@@ -30,7 +30,7 @@ text. Keep mode names and invocations exact.
 | `d2-diagram` | Create technical diagrams with the D2 language. | Claude Code + opencode + Codex |
 | `define-ac` | Define acceptance criteria for a feature or task. | Claude Code + opencode + Codex |
 | `deliver` | Prepare requested delivery from validated work using native authorization. | Claude Code + opencode + Codex |
-| `design` | Design the architecture and work plan for a task. | Claude Code + opencode + Codex |
+| `design` | Prepare a solution proposal with functional content before technical design. | Claude Code + opencode + Codex |
 | `diagram` | Create an Excalidraw diagram for a concept or workflow. | Claude Code + opencode + Codex |
 | `docs` | Generate Obsidian documentation through the documentation pipeline. | Claude Code + opencode + Codex |
 | `eval` | Evaluate and score agent or pipeline performance. | Claude Code + opencode + Codex |
@@ -80,6 +80,7 @@ text. Keep mode names and invocations exact.
 | `todo` | Manage one-note-per-task Obsidian Tasks entries. | Claude Code + opencode + Codex |
 | `trace` | Show pipeline observability for one feature. | Claude Code + opencode + Codex |
 | `translate` | Discover, extract, and translate UI strings for i18n. | Claude Code + opencode + Codex |
+| `ui-design` | Create or refine product-grounded visual UI through Impeccable. | Claude Code + opencode + Codex |
 | `update` | Update the installed Team Harness runtime. | Claude Code + opencode + Codex |
 | `validate` | Validate an implementation against criteria and relevant checks. | Claude Code + opencode + Codex |
 | `verify` | Run the inline verification fan over a committed range and decide its ship join. | Claude Code + opencode + Codex |

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.44.0] - 2026-10-12
+
+### Added
+- Create or refine product-grounded UI designs through Impeccable with ui-design.
+
 ## [3.43.0] - 2026-10-12
 
 ### Added

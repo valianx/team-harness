@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Ui Design"
+  short_description: "Team Harness Ui Design workflow"
+  default_prompt: "Use $team-harness:ui-design for this request."
