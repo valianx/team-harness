@@ -26,7 +26,7 @@ does not provision Memory or Context Harness credentials.
 
 ## Upstream provider route
 
-Route the explicit targets `openspec`, `superpowers`, `tea`, `semgrep`,
+Route the explicit targets `openspec`, `superpowers`, `tea`, `rea`, `semgrep`,
 `dependency-cruiser`, `knip`, `sentry`, `quality` and `quality-tools`
 (also `bmad tea`)
 here before inspecting or reconciling TH configuration. For a provider-only
@@ -36,6 +36,10 @@ the TH-specific procedure only when TH setup was also requested.
 Match provider names as complete words in the requested target, never as
 substrings: `team` and `team-harness` do not select `tea`. TH-only options apply
 only to a separately requested TH operation.
+
+For an explicit `rea` target, follow [REA application research](../spec/references/upstream-tools.md#rea-application-research)
+for the active client and return from this provider-only route. REA is separate
+from quality selection and is never prepared by full TH setup or update.
 
 Before routing a bare `find-bugs` target, resolve the owner from the live task:
 TH project/module diagnosis or Sentry's upstream captured-change method. If it

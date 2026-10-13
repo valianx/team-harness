@@ -17,6 +17,75 @@ may accept, reject or defer a recommendation with its reason. Preserve original
 results and disclose missing evidence; proceeding does not turn an unrun check
 into a pass. Native permissions and the operator's scope still govern execution.
 
+## REA application research
+
+Select REA at `research-app` entry/resumption or for explicit `setup rea` / `update rea`.
+It is outside `quality_providers`, ordinary spec/pipeline preparation, direct `audit`,
+`find-bugs` and `review-pr`. Complete-source repository analysis follows the upstream
+ordinary research route without REA readiness or provider commands.
+
+The owner is [morluto/rea](https://github.com/morluto/rea), package `rea-agents`;
+public entries are `rea` / `rea-agents`, `rea mcp` and the upstream native
+`reverse-engineer-anything` workflow. Do not import internal JavaScript modules or
+copy its skill, algorithms, schemas, scanner or tool catalog into TH.
+Observed release `6.4.0` (2026-10-12) requires Node `^22.19.0 || ^24.11.0 || >=26.0.0`
+and bundles workflow version `37`; repository-main instructions may be newer.
+Resolve the actual package/revision, matching instructions, public help or connected
+schemas and only the capabilities needed by the selected target. Reuse healthy
+capabilities without routine setup or diagnostics; unrelated engines are not a gate.
+
+### Scoped lifecycle
+
+Prefer an existing working CLI. If acquisition is authorized and it is absent,
+use the official `npx -y rea-agents@<resolved-version>` package-runner in its place.
+The CLI can perform supported work without global installation or host-config changes.
+For authorized preparation/repair, use the official setup route for the active client
+only; obtain its supported client identifier from current help:
+
+```text
+rea setup --client <active-client> --dry-run --json
+rea setup --client <active-client> --yes --json
+```
+
+Review the concrete plan's paths, backups, registration and matching skill before
+authorized apply. Preserve unrelated configuration and independently owned files;
+do not select all detected clients or install every engine. Setup does not install
+unrelated prerequisites. An instructions-only [skill route](https://github.com/morluto/rea/blob/main/docs/installation.md#skill-only-installation)
+does not register MCP, install engines or activate tools in a running conversation.
+`rea update` updates the owning npm/Bun global installation and returns a maintenance
+plan; refresh a package-runner copy by resolving the official package again.
+Refresh persistent registration/instructions through current setup at the same
+selected-client scope. REA maintenance is separate from TH installation/update.
+
+Report `installed`, `discoverable` and `usable` separately. Use current `doctor`
+options only for an observed blocker; check the selected engine/operation rather than
+requiring an audit-wide healthy result. File presence or a setup plan cannot prove
+live activation. Reload/reconnect only when required by the host's actual change.
+If a required capability is unavailable, retain partial evidence, report its specific
+pending scope and supported recovery, and continue independent supported work.
+
+### Evidence and execution ownership
+
+Keep complete original supported JSON/artifacts under workspace `research/rea/`;
+TH interpretation in `research/00-research.md` links identities, profiles, provenance,
+limits, omissions and diagnostics. Views/exports link their parent original; these
+paths add no TH Evidence schema. Verify output destinations and complete results.
+A standalone CLI Evidence record is portable through supported inline inputs for
+views/traces; separate CLI processes share no retained IDs. CLI Evidence import/export
+consume canonical upstream bundles, not bare records or handwritten wrappers.
+MCP retained IDs are connection-local: export a supported canonical Evidence bundle
+before closing when later reuse needs it, or retain complete inline Evidence when
+references are unavailable. Use supported summaries/views without rerunning the producer;
+an output preview is not a complete record. Preserve static/runtime and coverage limits.
+Main or a scoped native executor owns effects and session lifecycle; research roles
+remain read/search. Follow installed upstream passive/active, readiness, visible-outcome
+and owned/external-session cleanup requirements under the existing authorized scope.
+
+Primary guidance: [matching workflow](https://github.com/morluto/rea/blob/a56f7bb668ab23fec8d33f7af353ac7ed2fe1895/.agents/skills/reverse-engineer-anything/SKILL.md),
+[installation and updates](https://github.com/morluto/rea/blob/main/docs/installation.md),
+[public CLI](https://github.com/morluto/rea/blob/main/docs/cli.md) and
+[MCP Evidence contracts](https://github.com/morluto/rea/blob/main/docs/mcp-contracts.md).
+
 ## Quality capability preparation
 
 Quality providers are selected by the consuming objective, project stack, active host and

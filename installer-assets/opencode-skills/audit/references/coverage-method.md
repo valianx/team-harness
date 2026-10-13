@@ -9,7 +9,10 @@ certification of the architecture.
 ## Coverage record
 
 For the agreed project, module or layer, record the surfaces that matter and
-the relationships between them. For each material interaction, connect:
+the relationships between them. Start each selected capability with the
+user/system outcome to assess. Trace its entry, effective configuration,
+implementing components and relevant runtime/dependency handoffs through to
+the resulting behavior. For each material interaction, connect:
 
 - the component or boundary examined;
 - a relevant success, change or failure scenario;
@@ -23,7 +26,16 @@ stimulus, affected concern and observable response; omit inapplicable views
 with a reason. Trace actual consumers and cross-boundary handoffs before
 recommending removal or consolidation.
 
-Reading every entry point or counting files is inventory evidence only. It does
-not prove that interactions work or that defects are absent. A missing host,
-unreadable source, skipped command or unexecuted behavior remains an explicit
-coverage limit in `research/00-audit.md`.
+At entry or resumption, reuse evidence only while its question, source,
+environment and configuration still apply. When those inputs change, renew
+evidence for affected and dependent analysis; preserve completed independent
+analysis and its limits.
+
+Separate source observations, observed runtime behavior and inferred outcomes.
+For material uncertainty, identify the unverified step or environmental
+assumption and the smallest missing observation that could resolve it.
+
+Reading every entry point or counting files is inventory evidence only.
+Inventory or phase completion does not prove that interactions work or that
+defects are absent. A missing host, unreadable source, skipped command or
+unexecuted behavior remains an explicit coverage limit in `research/00-audit.md`.

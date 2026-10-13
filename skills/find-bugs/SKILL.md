@@ -10,10 +10,23 @@ the named repository or module and preserve the selected local or Obsidian
 workspace. A clean checkout is valid input; this workflow does not require a
 branch diff or start the `review-pr` flow.
 
-Trace the selected behaviors and failure paths through their actual consumers,
-using relevant existing project checks. Investigate contextual candidates even
-when an analyzer reports no matches. For a confirmed defect, report its trigger,
-expected versus observed behavior, impact and source evidence.
+Start with a concrete behavioral question. Trace inputs and preconditions
+through relevant data and state transitions and the defective operation or
+contract to the downstream symptom. Follow actual consumers and relevant
+seams, using existing project checks; investigate contextual candidates even
+when an analyzer reports no matches. For a supported defect, report its trigger,
+expected versus actual behavior, impact and source evidence, distinguishing
+reproduction from inference.
+
+Use available history or version differences as optional leads, then check the
+current consumer contract. A difference alone proves neither a defect nor a
+regression; leave unsupported origin unknown. No diff, fetch or whole-history
+review is required.
+
+Reuse evidence at entry or resumption only while its question, source,
+environment and configuration still apply. When those inputs change, renew
+evidence for affected and dependent analysis; preserve completed independent
+work and its limits.
 
 At entry or resumption, read the [shared upstream-tool integration
 reference](../spec/references/upstream-tools.md). Prepare selected tools through
@@ -36,8 +49,12 @@ they do not replace contextual investigation or create a second review loop.
 Write the diagnostic report to `research/00-find-bugs.md` in the selected
 workspace. Keep raw JSON/SARIF, command output and temporary fixtures in that
 workspace or permitted temporary storage, never as unrequested repository
-files. Report observed and inferred evidence, tool limitations, false-positive
-risk and unexamined areas. The workflow is diagnostic: it does not authorize
+files. Separate source observations, observed runtime behavior and inferred
+outcomes. Identify material unverified steps or environmental assumptions and
+the smallest missing observation that could resolve each uncertainty. Include
+tool limitations, false-positive risk and unexamined areas.
+
+The workflow is diagnostic: it does not authorize
 fixes, commits, publication or a quality gate. Use `audit` for architecture and
 health coverage, `review-pr` for an immutable pull-request review, and
 `security` for security-specific analysis.

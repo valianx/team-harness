@@ -19,9 +19,9 @@ that a component is unnecessary.
 Use the [architect's audit method](../../agents/ref-architect-modes.md#audit-mode)
 and the [coverage method](references/coverage-method.md) for a diagnostic report
 with concrete file references, impact, recommendations and coverage limits.
-Trace applicable components, relationships and success, change and failure
-scenarios. Distinguish evidence observed directly from reasoning inferred from
-code or documentation, and name material interactions that remain unverified.
+Make selected capability traces, scenario evidence and material limits visible
+in the existing report. Apply the coverage method's evidence applicability and
+uncertainty guidance at entry or resumption.
 Preserve the configured workspace/Obsidian destination, language and voice. Save
 the report as `research/00-audit.md` in that workspace and present the findings
 that affect the operator's next decision.
