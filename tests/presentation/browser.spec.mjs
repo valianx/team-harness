@@ -33,7 +33,7 @@ async function controls(page) {
   await expect(page.locator("[data-controls-state]")).toHaveAttribute("data-controls-state", "visible");
 }
 
-async function capture(page, info, state, { assertBounds = true } = {}) {
+async function capture(page, info, state) {
   await page.evaluate(async () => { await document.fonts.ready; });
   await page.locator("img").evaluateAll(async (images) => { await Promise.all(images.map((image) => image.decode())); });
   await page.waitForFunction(() => {
@@ -45,7 +45,7 @@ async function capture(page, info, state, { assertBounds = true } = {}) {
   await writeFile(path.join(process.env.PRESENTATION_RUN, `bounds-${process.env.PRESENTATION_EXECUTION}-${name}.json`), `${JSON.stringify(measured, null, 2)}\n`, { flag: "wx" });
   await page.screenshot({ path: path.join(process.env.PRESENTATION_CAPTURES, `${name}.png`) });
   expect(measured.measurements.length, `${state} must measure actual content`).toBeGreaterThan(0);
-  if (assertBounds) expect(measured.problems, `${state}: meaningful bounds and collisions`).toEqual([]);
+  expect(measured.problems, `${state}: meaningful bounds and collisions`).toEqual([]);
   return measured;
 }
 
