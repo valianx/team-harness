@@ -6,4 +6,4 @@
 ## 2. Verification
 
 - [x] 2.1 Generate and check affected skill/role distributions with the maintained commands; inspect the acceptance examples and complete candidate without prose-presence tests or a model benchmark.
-- [ ] 2.2 Consume the shared updated TEA strategy, current test-review/trace and OpenSpec implementation verify; record findings, dispositions and material coverage limits in the common workspace before lifecycle completion.
+- [x] 2.2 Consume the shared updated TEA strategy, current test-review/trace and OpenSpec implementation verify; record findings, dispositions and material coverage limits in the common workspace before lifecycle completion.

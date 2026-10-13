@@ -15,7 +15,7 @@
 - [x] 3.1 Run applicable runtime, distribution, reference and Go installer checks from the TEA strategy; extend ownership fixtures only for a demonstrated upstream-layout gap, without prose-presence or provider-algorithm tests.
 - [x] 3.2 Select a controlled representative target and verify a usable public REA handoff, original-result retention, portable reuse and project adaptation; exercise supported readiness/failure cases and record unexecuted scenarios as pending without narrowing technology support or running a model benchmark.
 - [x] 3.3 Review the complete candidate for the direct-flow boundary, native execution/session ownership, upstream ownership and independent companion audit/find-bugs improvements; resolve actual defects and disclose remaining live-host gaps.
-- [ ] 3.4 Execute applicable TEA test-review/trace, Superpowers completion verification and OpenSpec implementation verify with current intent and evidence; retain actual results and Main's dispositions in the same workspace.
+- [x] 3.4 Execute applicable TEA test-review/trace, Superpowers completion verification and OpenSpec implementation verify with current intent and evidence; retain actual results and Main's dispositions in the same workspace.
 
 ## 4. Delivery preparation after implementation
 
