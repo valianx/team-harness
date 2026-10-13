@@ -38,7 +38,7 @@ text. Keep mode names and invocations exact.
 | `implement` | Implement directly or continue an explicitly active pipeline after design approval. | Claude Code + opencode + Codex |
 | `init` | Load lightweight intake and bounded direct help without activating pipeline coordination. | Claude Code + opencode + Codex |
 | `inline` | Declare, exit, or query the operator-controlled inline posture. | Claude Code + opencode + Codex |
-| `interactive-presentation` | Build interactive web presentations with animated visual flows. | Claude Code + opencode + Codex |
+| `interactive-presentation` | Create or improve web presentations for live meetings. | Claude Code + opencode + Codex |
 | `issue` | Fetch a GitHub issue and route its requested work. | Claude Code + opencode + Codex |
 | `json-canvas` | Create and edit Obsidian JSON Canvas files. | Claude Code + opencode + Codex |
 | `kg` | Search, inspect, and manage the Knowledge Graph. | Claude Code + opencode + Codex |

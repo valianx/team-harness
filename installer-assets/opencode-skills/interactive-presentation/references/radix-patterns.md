@@ -2,6 +2,14 @@
 
 Reference for building accessible, styled controls using Radix UI primitives. These controls are used for interactive elements within scenes (speed selectors, toggles, sliders for timelines, etc.).
 
+Resolve an HTMLElement portal container inside the current scene content root
+before opening a portaled control, preserving its inherited theme and stylesheet.
+Pass it through the supported [Select](https://www.radix-ui.com/primitives/docs/components/select#portal)
+or [Tooltip](https://www.radix-ui.com/primitives/docs/components/tooltip#portal)
+`container` prop; their document-body default leaves that context. Verify popup
+placement, focus and outside interaction in the actual scaled scene. The template
+fixture checks native controls; it does not establish Radix popup behavior.
+
 ---
 
 ## Select (Dropdown — Scene Parameters)
@@ -11,14 +19,15 @@ Use for letting viewers switch between variants, select data sets, or choose vis
 ```tsx
 import * as Select from "@radix-ui/react-select";
 
-function SceneSelector({ options, value, onChange }: {
+function SceneSelector({ options, value, onChange, portalContainer }: {
   options: { value: string; label: string }[];
   value: string;
   onChange: (value: string) => void;
+  portalContainer: HTMLElement;
 }) {
   return (
     <Select.Root value={value} onValueChange={onChange}>
-      <Select.Trigger className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-scene-surface border border-scene-border text-sm text-scene-text hover:bg-scene-border transition-colors outline-none">
+      <Select.Trigger className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-scene-surface border border-scene-border text-sm text-scene-text hover:bg-scene-border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-scene-accent">
         <Select.Value />
         <Select.Icon>
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -27,14 +36,14 @@ function SceneSelector({ options, value, onChange }: {
         </Select.Icon>
       </Select.Trigger>
 
-      <Select.Portal>
+      <Select.Portal container={portalContainer}>
         <Select.Content className="rounded-lg bg-scene-surface border border-scene-border shadow-xl overflow-hidden z-50">
           <Select.Viewport className="p-1">
             {options.map((opt) => (
               <Select.Item
                 key={opt.value}
                 value={opt.value}
-                className="px-3 py-1.5 text-sm text-scene-text rounded cursor-pointer outline-none data-[highlighted]:bg-scene-accent/20 data-[highlighted]:text-scene-accent-light"
+                className="px-3 py-1.5 text-sm text-scene-text rounded cursor-pointer outline-none data-[highlighted]:bg-scene-accent data-[highlighted]:text-scene-bg"
               >
                 <Select.ItemText>{opt.label}</Select.ItemText>
               </Select.Item>
@@ -63,7 +72,7 @@ function LayerToggle({ label, pressed, onToggle }: {
     <Toggle.Root
       pressed={pressed}
       onPressedChange={onToggle}
-      className="px-3 py-1.5 rounded-lg text-sm border transition-colors data-[state=on]:bg-scene-accent/20 data-[state=on]:border-scene-accent data-[state=on]:text-scene-accent-light data-[state=off]:bg-scene-surface data-[state=off]:border-scene-border data-[state=off]:text-scene-muted"
+      className="px-3 py-1.5 rounded-lg text-sm border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-scene-accent data-[state=on]:bg-scene-accent data-[state=on]:border-scene-accent data-[state=on]:text-scene-bg data-[state=off]:bg-scene-surface data-[state=off]:border-scene-border data-[state=off]:text-scene-muted"
       aria-label={label}
     >
       {label}
@@ -98,7 +107,7 @@ function ViewModeSelector({ value, onChange }: {
         <ToggleGroup.Item
           key={item.value}
           value={item.value}
-          className="px-3 py-1.5 text-sm transition-colors data-[state=on]:bg-scene-accent data-[state=on]:text-white data-[state=off]:bg-scene-surface data-[state=off]:text-scene-muted hover:text-scene-text"
+          className="px-3 py-1.5 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-scene-accent data-[state=on]:bg-scene-accent data-[state=on]:text-scene-bg data-[state=off]:bg-scene-surface data-[state=off]:text-scene-muted hover:text-scene-text"
         >
           {item.label}
         </ToggleGroup.Item>
@@ -131,7 +140,7 @@ function TimelineSlider({ value, max, onChange }: {
       <Slider.Track className="relative grow rounded-full h-1.5 bg-scene-border">
         <Slider.Range className="absolute h-full rounded-full bg-scene-accent" />
       </Slider.Track>
-      <Slider.Thumb className="block w-4 h-4 rounded-full bg-scene-accent shadow-md border-2 border-scene-bg hover:bg-scene-accent-light focus:outline-none focus:ring-2 focus:ring-scene-accent/50 transition-colors" />
+      <Slider.Thumb aria-label="Timeline position" className="block w-4 h-4 rounded-full bg-scene-accent shadow-md border-2 border-scene-bg hover:bg-scene-accent-light focus:outline-none focus:ring-2 focus:ring-scene-accent transition-colors" />
     </Slider.Root>
   );
 }
@@ -144,9 +153,10 @@ function TimelineSlider({ value, max, onChange }: {
 ```tsx
 import * as Tooltip from "@radix-ui/react-tooltip";
 
-function InfoTooltip({ children, content }: {
+function InfoTooltip({ children, content, portalContainer }: {
   children: React.ReactNode;
   content: string;
+  portalContainer: HTMLElement;
 }) {
   return (
     <Tooltip.Provider delayDuration={200}>
@@ -154,7 +164,7 @@ function InfoTooltip({ children, content }: {
         <Tooltip.Trigger asChild>
           {children}
         </Tooltip.Trigger>
-        <Tooltip.Portal>
+        <Tooltip.Portal container={portalContainer}>
           <Tooltip.Content
             side="top"
             sideOffset={8}
@@ -174,36 +184,13 @@ function InfoTooltip({ children, content }: {
 
 ## Composition: Control Bar for a Scene
 
-```tsx
-function SceneControls({ scene }: { scene: AnimatedSceneData }) {
-  const [speed, setSpeed] = useState("1x");
-  const [showLabels, setShowLabels] = useState(true);
-
-  return (
-    <div className="flex items-center gap-3 px-4 py-2 border-t border-scene-border bg-scene-bg/80 backdrop-blur-sm">
-      <SceneSelector
-        options={[
-          { value: "0.5x", label: "0.5x" },
-          { value: "1x", label: "1x" },
-          { value: "2x", label: "2x" },
-        ]}
-        value={speed}
-        onChange={setSpeed}
-      />
-
-      <LayerToggle
-        label="Labels"
-        pressed={showLabels}
-        onToggle={setShowLabels}
-      />
-
-      <div className="flex-1">
-        <TimelineSlider value={0} max={100} onChange={() => {}} />
-      </div>
-    </div>
-  );
-}
-```
+Shared animation transport uses the component's actual registered controller;
+see [GSAP wiring](gsap-patterns.md). Add a scene parameter control only when it
+changes the visible component. Bind selectors/toggles to that component's real
+state and sliders to its actual position/action, rather than a no-op callback
+or a parallel timer. Place extra controls in the reserved overlay area without
+duplicating transport or consuming another permanent audience row. Verify focused
+Arrow/Space behavior and visible focus in the rendered scene.
 
 ---
 
@@ -212,5 +199,5 @@ function SceneControls({ scene }: { scene: AnimatedSceneData }) {
 1. All Radix primitives are WAI-ARIA compliant out of the box.
 2. Always provide `aria-label` on icon-only buttons.
 3. Keyboard navigation works automatically (Arrow keys in selects, Space on toggles).
-4. Focus rings use `focus:ring-2 focus:ring-scene-accent/50` — ensure visible focus.
+4. Focus rings use `focus:ring-2 focus:ring-scene-accent` — ensure visible focus.
 5. Color alone should not convey state — pair with text or icon changes.

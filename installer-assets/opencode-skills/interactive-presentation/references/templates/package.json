@@ -14,10 +14,12 @@
     "@radix-ui/react-toggle": "^1.1.2",
     "@radix-ui/react-toggle-group": "^1.1.2",
     "@radix-ui/react-tooltip": "^1.1.8",
+    "@revealjs/react": "0.2.2",
     "@xyflow/react": "^12.6.0",
-    "gsap": "^3.12.7",
+    "gsap": "3.13.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "reveal.js": "6.0.2"
   },
   "devDependencies": {
     "@types/react": "^18.3.18",

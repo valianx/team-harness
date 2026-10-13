@@ -1,234 +1,48 @@
-# GSAP Animation Patterns (v3.12+)
+# GSAP scenes with actual transport
 
-Reference for generating animated scenes. Use context7 to verify API details for specific plugins or methods.
+The new React template uses GSAP 3.13.0. The public package includes formerly bonus plugins from 3.13 onward; consult [official installation guidance](https://gsap.com/docs/v3/Installation/) and the selected plugin's API before adding it. Do not assume a private registry or a Club-only restriction.
 
-**License note:** Only core GSAP and free plugins (ScrollTrigger, Draggable, Flip, Observer, ScrollToPlugin, TextPlugin, MotionPathPlugin, CustomEase) are available. MorphSVGPlugin, SplitText, DrawSVGPlugin, and other Club-only plugins require a paid GSAP license and MUST NOT be used.
+## Component registration
 
----
-
-## Timeline Basics
-
-Every animated scene creates a GSAP timeline attached to the scene's container ref.
+An `animated` scene's `component` resolves through App's named `animations` registry. The component receives `AnimationComponentProps`, creates its real paused timeline and registers it. Ordered step labels must include time zero and the timeline's end. Without labels, transport uses those two endpoints. An empty timeline or invalid labels produce a visible error and disabled playback controls.
 
 ```tsx
-import { useRef, useEffect } from "react";
+import { useEffect, useRef } from "react";
 import gsap from "gsap";
+import type { AnimationComponentProps } from "../../types";
 
-function MyAnimation() {
-  const containerRef = useRef<HTMLDivElement>(null);
-
+export function Signal({ registerTimeline }: AnimationComponentProps) {
+  const container = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const ctx = gsap.context(() => {
-      const tl = gsap.timeline({ defaults: { ease: "power2.out" } });
-
-      tl.from(".box-1", { opacity: 0, y: 40, duration: 0.6 })
-        .from(".box-2", { opacity: 0, x: -40, duration: 0.6 }, "-=0.3")
-        .from(".arrow", { scaleX: 0, transformOrigin: "left", duration: 0.4 })
-        .from(".box-3", { opacity: 0, y: 40, duration: 0.6 }, "-=0.2");
-
-      return tl;
-    }, containerRef); // Scope all selectors to container
-
-    return () => ctx.revert(); // Clean up on unmount
-  }, []);
-
-  return (
-    <div ref={containerRef} className="relative w-full h-full">
-      {/* SVG or HTML content here */}
-    </div>
-  );
+    let unregister: (() => void) | undefined;
+    const context = gsap.context(() => {
+      const timeline = gsap.timeline({ paused: true });
+      timeline.addLabel("initial", 0)
+        .to(".signal", { x: 420, duration: 1.4, ease: "none" })
+        .addLabel("middle")
+        .to(".signal", { x: 840, duration: 1.4, ease: "none" })
+        .addLabel("complete");
+      unregister = registerTimeline(timeline, ["initial", "middle", "complete"]);
+    }, container);
+    return () => { unregister?.(); context.revert(); };
+  }, [registerTimeline]);
+  return <div ref={container}>
+    <p>A signal connects the observation to the decision.</p>
+    <svg viewBox="0 0 1000 260" role="img" aria-label="Signal travels toward the decision">
+      <line x1="60" x2="900" y1="105" y2="105" stroke="var(--scene-border)" />
+      <rect x="864" y="69" width="72" height="72" fill="none" stroke="var(--scene-accent)" />
+      <circle className="signal" cx="60" cy="105" r="24" fill="var(--scene-accent)" />
+    </svg>
+  </div>;
 }
 ```
 
----
+App mounts only the active scene. `AnimatedScene` preserves existing timeline callbacks, publishes actual progress/readiness/completion and controls the registered instance. Play resumes or restarts completed playback; Pause stops it; Restart returns to a paused initial state. Next/Previous seek stable step states before crossing slide boundaries. Do not create another master timeline in the wrapper or another global keyboard handler.
 
-## Stagger Animations (Lists, Grids)
+Reduced motion pauses an already registered timeline and disables continuous playback while keeping explicit steps and restart. This does not require component re-registration. Create a useful stable initial state; required explanatory content must not depend on an entrance tween completing. Component cleanup unregisters before [`context.revert()`](https://gsap.com/docs/v3/GSAP/gsap.context()/), stopping playback and removing scoped animations. Delayed registration must cancel pending work on unmount; failures call `reportError` and retain useful content.
 
-```tsx
-// Stagger items appearing one by one
-tl.from(".item", {
-  opacity: 0,
-  y: 30,
-  duration: 0.4,
-  stagger: 0.15,  // 150ms between each
-});
+## Authoring and checks
 
-// Grid stagger (left-to-right, top-to-bottom)
-tl.from(".grid-cell", {
-  scale: 0,
-  opacity: 0,
-  duration: 0.3,
-  stagger: {
-    grid: [4, 4],
-    from: "start",
-    amount: 0.8,  // Total spread time
-  },
-});
-```
+Scope selectors to the component; animate transforms rather than layout when practical. Use semantic theme variables instead of copied palette literals. Keep targets, labels and all meaningful intermediate/final states within the shared content region. Verify added plugin APIs against the installed package.
 
----
-
-## SVG Path Animation (Draw Effect — CSS only, no DrawSVGPlugin)
-
-Since DrawSVGPlugin is Club-only, use stroke-dasharray/dashoffset animation:
-
-```tsx
-// Set up in CSS or inline style first:
-// stroke-dasharray: totalLength; stroke-dashoffset: totalLength;
-
-function animateDrawPath(selector: string, tl: gsap.core.Timeline) {
-  const path = document.querySelector(selector) as SVGPathElement;
-  if (!path) return;
-
-  const length = path.getTotalLength();
-  gsap.set(path, { strokeDasharray: length, strokeDashoffset: length });
-
-  tl.to(path, {
-    strokeDashoffset: 0,
-    duration: 1.5,
-    ease: "power2.inOut",
-  });
-}
-```
-
----
-
-## Motion Path (Free Plugin)
-
-```tsx
-import { MotionPathPlugin } from "gsap/MotionPathPlugin";
-gsap.registerPlugin(MotionPathPlugin);
-
-// Animate element along an SVG path
-tl.to(".dot", {
-  motionPath: {
-    path: "#flow-path",
-    align: "#flow-path",
-    alignOrigin: [0.5, 0.5],
-  },
-  duration: 3,
-  ease: "none",
-});
-```
-
----
-
-## Text Animation (Character by Character — no SplitText)
-
-Since SplitText is Club-only, wrap characters manually:
-
-```tsx
-function splitText(text: string): string {
-  return text
-    .split("")
-    .map((char, i) =>
-      char === " "
-        ? " "
-        : `<span class="char" style="display:inline-block" data-index="${i}">${char}</span>`
-    )
-    .join("");
-}
-
-// In component:
-const textRef = useRef<HTMLDivElement>(null);
-
-useEffect(() => {
-  if (!textRef.current) return;
-  textRef.current.innerHTML = splitText("Hello World");
-
-  const ctx = gsap.context(() => {
-    tl.from(".char", {
-      opacity: 0,
-      y: 20,
-      rotationX: -90,
-      duration: 0.4,
-      stagger: 0.03,
-      ease: "back.out(1.7)",
-    });
-  }, textRef);
-
-  return () => ctx.revert();
-}, []);
-```
-
----
-
-## Number Counter Animation
-
-```tsx
-const counter = { val: 0 };
-
-tl.to(counter, {
-  val: 1500,
-  duration: 2,
-  ease: "power1.out",
-  onUpdate: () => {
-    document.querySelector(".counter")!.textContent = Math.round(counter.val).toLocaleString();
-  },
-});
-```
-
----
-
-## Color and Gradient Transitions
-
-```tsx
-// Background color morph
-tl.to(".panel", {
-  backgroundColor: "#3b82f6",
-  duration: 0.8,
-  ease: "power2.inOut",
-});
-
-// SVG fill transition
-tl.to(".shape", {
-  fill: "#60a5fa",
-  stroke: "#3b82f6",
-  duration: 0.6,
-});
-```
-
----
-
-## Easing Reference
-
-| Use case | Ease | Character |
-|----------|------|-----------|
-| Elements entering | `power2.out` | Decelerates naturally |
-| Elements exiting | `power2.in` | Accelerates out |
-| Emphasis / bounce | `back.out(1.7)` | Overshoots then settles |
-| Data flow / constant | `none` | Linear, mechanical |
-| Morphing / organic | `power2.inOut` | Smooth acceleration and deceleration |
-| Elastic pop | `elastic.out(1, 0.5)` | Spring effect |
-| Step reveal | `steps(5)` | Discrete steps |
-
----
-
-## Timeline Labels and Control
-
-```tsx
-const tl = gsap.timeline();
-
-tl.addLabel("intro")
-  .from(".title", { opacity: 0, y: -30, duration: 0.6 })
-  .addLabel("content")
-  .from(".items", { opacity: 0, stagger: 0.2 })
-  .addLabel("conclusion")
-  .from(".summary", { opacity: 0, scale: 0.9, duration: 0.8 });
-
-// Seek to a label
-tl.seek("content");
-
-// Play from a label
-tl.play("conclusion");
-```
-
----
-
-## Performance Tips
-
-1. **Animate transforms, not layout properties.** Use `x`, `y`, `scale`, `rotation` — not `width`, `height`, `top`, `left`.
-2. **Use `will-change: transform`** on elements that will be animated (GSAP adds this automatically for transform tweens).
-3. **Use `gsap.context()` for cleanup.** Always revert on component unmount.
-4. **Batch DOM reads before writes.** Use `gsap.set()` for initial states before `.from()` tweens.
-5. **Limit simultaneous animations** to ~20 elements for smooth 60fps.
+The [maintained fixture](https://github.com/valianx/team-harness/blob/main/tests/presentation/fixture/fixture.tsx) uses this registration contract with real timeline updates, loading and failure states. Browser checks must observe movement, pause stability, restart, completion and cleanup, including callback preservation, fullscreen and reduced motion. A changing progress label alone does not prove visible animation.

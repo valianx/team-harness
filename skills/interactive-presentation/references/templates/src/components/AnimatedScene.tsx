@@ -1,136 +1,160 @@
-import { useRef, useEffect, useState, useCallback } from "react";
-import gsap from "gsap";
-import type { AnimatedSceneData } from "../types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { AnimatedSceneData, AnimationRegistry, AnimationTimeline, RegisterSceneControls } from "../types";
 
-interface AnimatedSceneProps {
-  scene: AnimatedSceneData;
+interface Snapshot {
+  ready: boolean;
+  playing: boolean;
+  progress: number;
+  step: number;
+  totalSteps: number;
+  canNext: boolean;
+  canPrevious: boolean;
 }
 
-/**
- * GSAP-animated scene wrapper.
- *
- * Provides a container div with ref for GSAP timeline attachment,
- * plus play/pause/restart controls.
- *
- * Usage pattern for generated scenes:
- * 1. The agent creates a custom component (e.g., `DataFlowAnimation.tsx`)
- *    that accepts a `containerRef` and builds a GSAP timeline on mount.
- * 2. This wrapper renders that component and provides transport controls.
- *
- * The template ships with a placeholder — the agent replaces it with
- * the actual animated content when generating a scene.
- */
-export function AnimatedScene({ scene }: AnimatedSceneProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const timelineRef = useRef<gsap.core.Timeline | null>(null);
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [progress, setProgress] = useState(0);
+interface Registration {
+  timeline: AnimationTimeline;
+  times: number[];
+  detach: () => void;
+}
 
-  useEffect(() => {
-    if (!containerRef.current) return;
+const empty: Snapshot = {
+  ready: false, playing: false, progress: 0, step: 0, totalSteps: 0, canNext: false, canPrevious: false,
+};
+const epsilon = 0.001;
 
-    // Create a master timeline for the scene.
-    // Generated scene components append their tweens to this timeline.
-    const tl = gsap.timeline({
-      paused: false,
-      onUpdate: () => {
-        setProgress(tl.progress());
-      },
-      onComplete: () => {
-        setIsPlaying(false);
-      },
-    });
+/** Transport consumes the actual component timeline, preserving its callbacks and disposal. */
+export function AnimatedScene({ scene, animations, reducedMotion, registerControls }: {
+  scene: AnimatedSceneData;
+  animations: AnimationRegistry;
+  reducedMotion: boolean;
+  registerControls: RegisterSceneControls;
+}) {
+  const registered = useRef<Registration | null>(null);
+  const [snapshot, setSnapshot] = useState(empty);
+  const [error, setError] = useState("");
+  const Component = animations[scene.component];
 
-    timelineRef.current = tl;
-
-    return () => {
-      tl.kill();
-      timelineRef.current = null;
+  const refresh = useCallback(() => {
+    const value = registered.current;
+    if (!value) return;
+    const time = value.timeline.time();
+    const next: Snapshot = {
+      ready: true,
+      playing: !value.timeline.paused() && value.timeline.progress() < 1,
+      progress: Math.round(value.timeline.progress() * 100) / 100,
+      step: Math.max(0, value.times.filter((point) => point <= time + epsilon).length - 1),
+      totalSteps: value.times.length,
+      canNext: value.times.some((point) => point > time + epsilon),
+      canPrevious: time > epsilon,
     };
-  }, [scene.id]);
-
-  const togglePlay = useCallback(() => {
-    const tl = timelineRef.current;
-    if (!tl) return;
-    if (tl.progress() >= 1) {
-      tl.restart();
-      setIsPlaying(true);
-    } else if (isPlaying) {
-      tl.pause();
-      setIsPlaying(false);
-    } else {
-      tl.resume();
-      setIsPlaying(true);
-    }
-  }, [isPlaying]);
-
-  const restart = useCallback(() => {
-    const tl = timelineRef.current;
-    if (!tl) return;
-    tl.restart();
-    setIsPlaying(true);
+    setSnapshot((previous) => Object.keys(next).every((key) => previous[key as keyof Snapshot] === next[key as keyof Snapshot]) ? previous : next);
   }, []);
 
-  return (
-    <div className="relative w-full h-full flex flex-col">
-      {/* Scene title */}
-      <div className="px-6 pt-4">
-        <h2 className="text-lg font-semibold text-scene-text">{scene.title}</h2>
-        {scene.subtitle && (
-          <p className="text-sm text-scene-muted mt-0.5">{scene.subtitle}</p>
-        )}
-      </div>
+  const clear = useCallback(() => {
+    registered.current?.detach();
+    registered.current = null;
+    setSnapshot(empty);
+  }, []);
+  const reportError = useCallback((message: string) => {
+    clear();
+    setError(message || "The animation could not be loaded.");
+  }, [clear]);
 
-      {/* Animation container — generated components render here */}
-      <div
-        ref={containerRef}
-        className="flex-1 relative overflow-hidden mx-6 my-4 rounded-xl border border-scene-border bg-scene-surface"
-        data-scene-id={scene.id}
-      >
-        {/* Placeholder content — replaced by generated animation components */}
-        <div className="flex items-center justify-center h-full text-scene-muted">
-          <p>Animation: {scene.component}</p>
-        </div>
-      </div>
+  const registerTimeline = useCallback((timeline: AnimationTimeline, labels?: string[]) => {
+    clear();
+    const duration = timeline.duration();
+    const times = labels ? labels.map((label) => timeline.labels[label]) : [0, duration];
+    if (!(duration > 0) || times.length < 2 || times.some((time, index) =>
+      !Number.isFinite(time) || (index > 0 && time <= times[index - 1])) ||
+      Math.abs(times[0]) > epsilon || Math.abs(times[times.length - 1] - duration) > epsilon) {
+      timeline.pause();
+      setError("The animation needs a valid start, intermediate states and an ending.");
+      return () => timeline.pause();
+    }
 
-      {/* Transport controls */}
-      <div className="flex items-center gap-4 px-6 pb-4">
-        <button
-          onClick={togglePlay}
-          className="p-2 rounded-lg bg-scene-surface border border-scene-border text-scene-text hover:bg-scene-border transition-colors"
-          aria-label={isPlaying ? "Pause" : "Play"}
-        >
-          {isPlaying ? (
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <rect x="3" y="2" width="4" height="12" rx="1" />
-              <rect x="9" y="2" width="4" height="12" rx="1" />
-            </svg>
-          ) : (
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M4 2L14 8L4 14V2Z" />
-            </svg>
-          )}
-        </button>
+    const detachCallbacks: (() => void)[] = [];
+    const value: Registration = {
+      timeline,
+      times,
+      detach: () => {
+        timeline.pause();
+        detachCallbacks.forEach((detach) => detach());
+      },
+    };
+    registered.current = value;
+    for (const event of ["onUpdate", "onComplete", "onReverseComplete"] as const) {
+      const previous = timeline.eventCallback(event);
+      const callback = function(this: unknown, ...args: unknown[]) {
+        previous?.apply(this, args);
+        if (registered.current === value) refresh();
+      };
+      timeline.eventCallback(event, callback);
+      detachCallbacks.push(() => {
+        if (timeline.eventCallback(event) === callback) timeline.eventCallback(event, previous ?? null);
+      });
+    }
+    timeline.pause();
+    setError("");
+    refresh();
+    return () => {
+      value.detach();
+      if (registered.current === value) {
+        registered.current = null;
+        setSnapshot(empty);
+      }
+    };
+  }, [clear, refresh]);
 
-        <button
-          onClick={restart}
-          className="p-2 rounded-lg bg-scene-surface border border-scene-border text-scene-text hover:bg-scene-border transition-colors"
-          aria-label="Restart"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M2 8a6 6 0 1 1 1.5 4" strokeLinecap="round" />
-            <path d="M2 12V8h4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
+  const move = useCallback((direction: number) => {
+    const value = registered.current;
+    if (!value) return false;
+    const time = value.timeline.time();
+    const target = direction > 0
+      ? value.times.find((point) => point > time + epsilon)
+      : [...value.times].reverse().find((point) => point < time - epsilon);
+    if (target === undefined) return false;
+    value.timeline.pause().seek(target, false);
+    refresh();
+    return true;
+  }, [refresh]);
+  const togglePlayback = useCallback(() => {
+    const timeline = registered.current?.timeline;
+    if (!timeline || reducedMotion) return;
+    if (!timeline.paused() && timeline.progress() < 1) timeline.pause();
+    else if (timeline.progress() >= 1) timeline.restart();
+    else timeline.play();
+    refresh();
+  }, [reducedMotion, refresh]);
+  const restart = useCallback(() => {
+    registered.current?.timeline.pause().seek(0, false);
+    refresh();
+  }, [refresh]);
 
-        {/* Progress bar */}
-        <div className="flex-1 h-1.5 rounded-full bg-scene-border overflow-hidden">
-          <div
-            className="h-full bg-scene-accent rounded-full transition-all duration-100"
-            style={{ width: `${progress * 100}%` }}
-          />
-        </div>
-      </div>
+  useEffect(() => {
+    if (reducedMotion) {
+      registered.current?.timeline.pause();
+      refresh();
+    }
+  }, [reducedMotion, refresh]);
+
+  useEffect(() => {
+    registerControls({ ...snapshot, next: () => move(1), previous: () => move(-1),
+      animation: { ready: snapshot.ready, playing: snapshot.playing, progress: snapshot.progress, togglePlayback, restart },
+    });
+  }, [snapshot, move, togglePlayback, restart, registerControls]);
+  useEffect(() => () => {
+    registered.current?.detach();
+    registered.current = null;
+    registerControls(null);
+  }, [registerControls]);
+
+  const failure = error || (!Component ? "The animation component could not be loaded." : "");
+  return <div className="animation-stage" data-animation-status={failure ? "error" : snapshot.ready ? "ready" : "loading"}>
+    <div className="animation-component">
+      {Component && <Component reducedMotion={reducedMotion} registerTimeline={registerTimeline} reportError={reportError} />}
     </div>
-  );
+    {failure ? <p className="animation-caption" role="alert">{failure}</p>
+      : !snapshot.ready ? <p className="animation-caption" role="status">Animation controls are loading.</p>
+      : reducedMotion ? <p className="animation-caption">Reduced motion: use explicit steps to inspect the explanation.</p> : null}
+  </div>;
 }

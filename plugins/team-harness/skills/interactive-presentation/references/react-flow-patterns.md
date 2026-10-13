@@ -1,6 +1,6 @@
 # React Flow Patterns (@xyflow/react v12+)
 
-Reference for generating interactive graph scenes. Use context7 to verify API details when generating complex configurations.
+Reference for graph-specific composition. Use the presentation's semantic theme variables and the current official @xyflow/react documentation for API details. Fit nodes, edge labels and tooltips inside the shared scene safe area, then inspect readability at the meeting viewport; fitView alone is insufficient.
 
 ---
 
@@ -43,7 +43,7 @@ function DecisionNode({ data }: NodeProps) {
 /** A group/container node for visual grouping. */
 function GroupNode({ data }: NodeProps) {
   return (
-    <div className="p-4 min-w-[300px] min-h-[200px] rounded-xl border-2 border-dashed border-scene-border bg-scene-bg/50">
+    <div className="p-4 min-w-[300px] min-h-[200px] rounded-xl border-2 border-dashed border-scene-border bg-scene-surface">
       <span className="text-xs font-medium text-scene-muted uppercase tracking-wider">{data.label}</span>
     </div>
   );
@@ -66,8 +66,8 @@ const dataFlowEdge: Edge = {
   source: "node1",
   target: "node2",
   animated: true,
-  style: { stroke: "#3b82f6", strokeWidth: 2 },
-  markerEnd: { type: MarkerType.ArrowClosed, color: "#3b82f6" },
+  style: { stroke: "var(--scene-accent)", strokeWidth: 2 },
+  markerEnd: { type: MarkerType.ArrowClosed, color: "var(--scene-accent)" },
 };
 
 // Labeled edge
@@ -76,8 +76,8 @@ const labeledEdge: Edge = {
   source: "node2",
   target: "node3",
   label: "HTTP/REST",
-  labelStyle: { fill: "#94a3b8", fontSize: 11, fontFamily: "monospace" },
-  labelBgStyle: { fill: "#1e293b", fillOpacity: 0.9 },
+  labelStyle: { fill: "var(--scene-muted)", fontSize: 11, fontFamily: "monospace" },
+  labelBgStyle: { fill: "var(--scene-surface)", fillOpacity: 0.9 },
   labelBgPadding: [4, 8] as [number, number],
 };
 
@@ -87,7 +87,7 @@ const smoothEdge: Edge = {
   source: "node3",
   target: "node4",
   type: "smoothstep",
-  style: { stroke: "#64748b", strokeWidth: 1.5 },
+  style: { stroke: "var(--scene-muted)", strokeWidth: 1.5 },
 };
 ```
 
@@ -107,7 +107,7 @@ const highlightSteps: string[][] = [
 ];
 ```
 
-The `FlowScene` component applies the `.highlighted` class to nodes in the current step and dims others to 40% opacity. Edges between highlighted nodes get the `animated` flag.
+Use the template's active-scene step contract and preserve authored node/edge styles. The presentation advances available highlight steps before the next slide; graph-focused keys retain graph behavior. Respect reduced motion for animated edges.
 
 ---
 
@@ -161,10 +161,10 @@ const nodes: Node[] = [
 import { MiniMap } from "@xyflow/react";
 
 <MiniMap
-  nodeColor="#3b82f6"
-  maskColor="rgba(15, 23, 42, 0.8)"
+  nodeColor="var(--scene-accent)"
+  maskColor="var(--scene-bg)"
   className="!bg-scene-surface !border-scene-border"
 />
 ```
 
-Use when nodes > 10 or the graph does not fit the viewport at default zoom.
+A minimap supports exploration; it does not replace readable meeting composition. Split or recompose a crowded graph, and keep any minimap or graph controls away from essential labels and the audience overlay area.

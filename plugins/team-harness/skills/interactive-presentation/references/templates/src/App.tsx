@@ -1,112 +1,189 @@
-import { useEffect, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Deck, Slide } from "@revealjs/react";
+import type { RevealConfig } from "reveal.js";
+import RevealNotes from "reveal.js/plugin/notes";
+import "reveal.js/reveal.css";
 import { useScene } from "./hooks/useScene";
+import { useReducedMotion } from "./hooks/useReducedMotion";
 import { Scene } from "./components/Scene";
-import type { PresentationConfig } from "./types";
+import type { AnimationRegistry, PresentationConfig, SceneControls } from "./types";
 
-/**
- * Presentation shell.
- * Handles keyboard navigation (ArrowLeft/Right, Space) and renders the
- * navigation bar (dots + arrows) around the active scene.
- *
- * To add scenes, edit the `config` object below.
- */
-
-const config: PresentationConfig = {
+const defaultConfig: PresentationConfig = {
   title: "Interactive Presentation",
-  scenes: [
-    {
-      id: "intro",
-      type: "slide",
-      title: "Welcome",
-      subtitle: "Use arrow keys or click to navigate",
-      content: `
-        <div class="flex flex-col items-center justify-center h-full gap-6">
-          <h1 class="text-5xl font-bold text-scene-text">Interactive Presentation</h1>
-          <p class="text-xl text-scene-muted">Press <kbd class="px-2 py-1 rounded bg-scene-surface border border-scene-border font-mono text-sm">&rarr;</kbd> to begin</p>
-        </div>
-      `,
-    },
-  ],
+  scenes: [{
+    id: "intro",
+    type: "slide",
+    title: "A clear idea, room to explain it",
+    subtitle: "Replace this scene with the meeting's actual content.",
+    content: "<p>Use the arrow keys on the stage, or reveal the compact presentation controls.</p>",
+  }],
 };
 
-export default function App() {
-  const { currentIndex, currentScene, total, isFirst, isLast, next, prev, goTo } =
-    useScene(config.scenes);
+const interactiveSelector = "input, textarea, select, button, summary, a[href], audio, video, iframe, [contenteditable]:not([contenteditable='false']), [role='button'], [role='slider'], [role='combobox'], [role='textbox'], [role='listbox'], [role='menu'], [role='tab'], [role='tree'], [role='grid'], [role='spinbutton'], [data-presentation-interactive]";
+function hasInteractiveOwner(event: Event) {
+  return event.composedPath().some((target) => target instanceof Element && target.closest(interactiveSelector));
+}
+function activeElement() {
+  let active = document.activeElement;
+  while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+  return active;
+}
+const themeVariables = {
+  background: "--scene-bg", surface: "--scene-surface", text: "--scene-text",
+  muted: "--scene-muted", border: "--scene-border", accent: "--scene-accent",
+  accentLight: "--scene-accent-light", fontFamily: "--scene-font", monoFamily: "--scene-mono",
+};
 
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      switch (e.key) {
-        case "ArrowRight":
-        case " ":
-          e.preventDefault();
-          next();
-          break;
-        case "ArrowLeft":
-          e.preventDefault();
-          prev();
-          break;
-      }
-    },
-    [next, prev],
-  );
+/** The maintained engine owns slides; the mounted scene can consume an explicit step first. */
+export default function App({ config = defaultConfig, animations = {} }: {
+  config?: PresentationConfig;
+  animations?: AnimationRegistry;
+}) {
+  const { deck, ready, currentIndex, currentScene, total, onReady, sync } = useScene(config.scenes);
+  const reducedMotion = useReducedMotion();
+  const stage = useRef<HTMLDivElement>(null);
+  const controlArea = useRef<HTMLDivElement>(null);
+  const sceneControls = useRef<SceneControls | null>(null);
+  const hideTimer = useRef<number>();
+  const [controls, setControls] = useState<SceneControls | null>(null);
+  const [controlsVisible, setControlsVisible] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [fullscreenError, setFullscreenError] = useState("");
 
+  const publishControls = useCallback((value: SceneControls | null) => {
+    sceneControls.current = value;
+    setControls(value);
+  }, []);
+  const hideLater = useCallback(() => {
+    window.clearTimeout(hideTimer.current);
+    hideTimer.current = window.setTimeout(() => {
+      if (!controlArea.current?.contains(document.activeElement)) setControlsVisible(false);
+    }, 2400);
+  }, []);
+  const showControls = useCallback(() => {
+    setControlsVisible(true);
+    hideLater();
+  }, [hideLater]);
+
+  useEffect(() => () => window.clearTimeout(hideTimer.current), []);
   useEffect(() => {
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleKeyDown]);
+    const update = () => setFullscreen(Boolean(document.fullscreenElement));
+    const failure = () => setFullscreenError("Fullscreen is unavailable. The presentation remains usable in this window.");
+    document.addEventListener("fullscreenchange", update);
+    document.addEventListener("fullscreenerror", failure);
+    return () => {
+      document.removeEventListener("fullscreenchange", update);
+      document.removeEventListener("fullscreenerror", failure);
+    };
+  }, []);
+
+  const navigate = useCallback((direction: "next" | "previous") => {
+    showControls();
+    if (sceneControls.current?.[direction]()) return;
+    if (direction === "next") deck.current?.next();
+    else deck.current?.prev();
+  }, [deck, showControls]);
+  const keyboardCondition = useCallback((event: KeyboardEvent) => {
+    // Reveal's fullscreen button uses its native programmatic F binding.
+    if (!event.target && event.keyCode === 70) return true;
+    if (event.defaultPrevented || event.repeat || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return false;
+    const owner = activeElement();
+    if (owner instanceof Element && owner.closest(interactiveSelector)) return false;
+    if (hasInteractiveOwner(event) || window.getSelection()?.isCollapsed === false) return false;
+    const focusedRoot = document.activeElement;
+    if (focusedRoot !== document.body && focusedRoot !== document.documentElement && !stage.current?.contains(focusedRoot)) return false;
+    showControls();
+    return true;
+  }, [showControls]);
+
+  const engineConfig = useMemo<RevealConfig>(() => ({
+    width: config.stage?.width ?? 1280,
+    height: config.stage?.height ?? 720,
+    margin: 0,
+    minScale: 0.1,
+    maxScale: 4,
+    center: false,
+    controls: false,
+    progress: false,
+    slideNumber: false,
+    autoSlide: false,
+    autoAnimate: !reducedMotion,
+    transition: reducedMotion ? "none" : "fade",
+    backgroundTransition: "none",
+    touch: false,
+    mouseWheel: false,
+    loop: false,
+    hash: false,
+    respondToHashChanges: false,
+    overview: false,
+    scrollActivationWidth: 0,
+    keyboardCondition,
+    keyboard: {
+      32: (event) => navigate(event.shiftKey ? "previous" : "next"),
+      33: () => navigate("previous"), 34: () => navigate("next"),
+      37: () => navigate("previous"), 38: () => navigate("previous"),
+      39: () => navigate("next"), 40: () => navigate("next"),
+      72: () => navigate("previous"), 74: () => navigate("next"),
+      76: () => navigate("next"), 78: () => navigate("next"), 80: () => navigate("previous"),
+    },
+  }), [config.stage?.width, config.stage?.height, reducedMotion, keyboardCondition, navigate]);
+
+  const themeStyle = Object.fromEntries(Object.entries(config.theme ?? {}).map(([key, value]) =>
+    [themeVariables[key as keyof typeof themeVariables], value],
+  )) as CSSProperties;
+  const changeScene = useCallback(() => {
+    publishControls(null);
+    sync();
+  }, [publishControls, sync]);
+  const toggleFullscreen = () => {
+    setFullscreenError("");
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => setFullscreenError("Fullscreen could not be closed."));
+    } else deck.current?.triggerKey(70);
+    showControls();
+  };
+
+  if (!currentScene) return <main className="presentation-empty">Add presentation content before presenting this deck.</main>;
 
   return (
-    <div className="relative w-full h-full flex flex-col">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-3 border-b border-scene-border/50">
-        <span className="text-sm font-medium text-scene-muted">{config.title}</span>
-        <span className="text-xs text-scene-muted font-mono">
-          {currentIndex + 1} / {total}
-        </span>
-      </header>
-
-      {/* Scene area */}
-      <main className="flex-1 relative overflow-hidden">
-        <div key={currentScene.id} className="scene-enter w-full h-full">
-          <Scene scene={currentScene} />
-        </div>
-      </main>
-
-      {/* Navigation bar */}
-      <nav className="flex items-center justify-center gap-4 px-6 py-4 border-t border-scene-border/50">
-        <button
-          onClick={prev}
-          disabled={isFirst}
-          className="p-2 rounded-lg text-scene-muted hover:text-scene-text hover:bg-scene-surface disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          aria-label="Previous scene"
-        >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path d="M12 4L6 10L12 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-
-        <div className="flex items-center gap-2">
-          {config.scenes.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => goTo(i)}
-              className={`nav-dot ${i === currentIndex ? "active" : ""}`}
-              aria-label={`Go to scene ${i + 1}`}
-            />
-          ))}
-        </div>
-
-        <button
-          onClick={next}
-          disabled={isLast}
-          className="p-2 rounded-lg text-scene-muted hover:text-scene-text hover:bg-scene-surface disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          aria-label="Next scene"
-        >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path d="M8 4L14 10L8 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-      </nav>
+    <div ref={stage} className="presentation-stage" style={themeStyle} role="region" aria-label={config.title}
+      tabIndex={-1} data-active-scene={currentScene.id} data-engine-ready={ready}
+      data-reduced-motion={reducedMotion}
+      onPointerMove={(event) => {
+        if (event.clientY >= event.currentTarget.getBoundingClientRect().bottom - 112) showControls();
+      }}
+      onPointerDown={(event) => {
+        if (!hasInteractiveOwner(event.nativeEvent)) stage.current?.focus();
+      }}>
+      <Deck deckRef={deck} config={engineConfig} plugins={[RevealNotes]} onReady={onReady} onSlideChange={changeScene}>
+        {config.scenes.map((scene, index) => (
+          <Slide key={scene.id} data-scene-id={scene.id} notes={scene.notes}>
+            {ready && index === currentIndex && <Scene scene={scene} animations={animations}
+              reducedMotion={reducedMotion} registerControls={publishControls} />}
+          </Slide>
+        ))}
+      <div ref={controlArea} className="presentation-control-area" data-controls-state={controlsVisible ? "visible" : "hidden"}
+        onFocusCapture={showControls} onBlurCapture={hideLater}>
+        <button className="controls-trigger" aria-label="Show presentation controls" onClick={showControls}>···</button>
+        <nav className="presentation-controls" aria-label="Presentation controls" hidden={!controlsVisible}>
+          {currentScene.type === "animated" && <>
+            <button aria-label={controls?.animation?.playing ? "Pause animation" : "Play animation"}
+              disabled={!controls?.animation?.ready || reducedMotion} onClick={controls?.animation?.togglePlayback}>
+              {controls?.animation?.playing ? "Ⅱ" : "▷"}
+            </button>
+            <button aria-label="Restart animation" disabled={!controls?.animation?.ready} onClick={controls?.animation?.restart}>↺</button>
+          </>}
+          <button aria-label="Previous scene or step" disabled={currentIndex === 0 && !controls?.canPrevious}
+            onClick={() => navigate("previous")}>←</button>
+          <output aria-label="Scene position">{currentIndex + 1} / {total}</output>
+          {Boolean(controls?.totalSteps) && <output aria-label="Scene step">Step {controls!.step + 1} / {controls!.totalSteps}</output>}
+          <button aria-label="Next scene or step" disabled={currentIndex === total - 1 && !controls?.canNext}
+            onClick={() => navigate("next")}>→</button>
+          <button aria-label={fullscreen ? "Exit fullscreen" : "Enter fullscreen"} onClick={toggleFullscreen}>⛶</button>
+        </nav>
+      </div>
+      </Deck>
+      {fullscreenError && <p className="fullscreen-error" role="status">{fullscreenError}</p>}
     </div>
   );
 }
