@@ -125,7 +125,7 @@ test("T03: native text fields and editable content retain Arrow/Space and caret 
   await expect(page.locator(".presentation-stage")).toHaveAttribute("data-active-scene", "focus");
 });
 
-test("T04: buttons, native selectors, links and media own their focused keys", async ({ page }) => {
+test("T04: buttons, native selectors, disclosures, links and media own their focused keys", async ({ page }) => {
   await open(page);
   await scene(page, "focus");
   const action = page.getByRole("button", { name: "Record decision", exact: true });
@@ -166,6 +166,14 @@ test("T04: buttons, native selectors, links and media own their focused keys", a
   await media.press("Space");
   await expect.poll(() => media.evaluate((element) => element.paused)).toBe(true);
   await media.press("ArrowRight");
+  await expect(page.locator(".presentation-stage")).toHaveAttribute("data-active-scene", "focus");
+  const disclosure = page.getByText("Decision details", { exact: true });
+  await disclosure.focus();
+  await disclosure.press("Space");
+  await expect(page.locator("details")).toHaveAttribute("open", "");
+  await expect(page.locator(".presentation-stage")).toHaveAttribute("data-active-scene", "focus");
+  await disclosure.press("Space");
+  await expect(page.locator("details")).not.toHaveAttribute("open", "");
   await expect(page.locator(".presentation-stage")).toHaveAttribute("data-active-scene", "focus");
 });
 

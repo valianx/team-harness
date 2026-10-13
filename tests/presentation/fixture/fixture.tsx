@@ -106,6 +106,7 @@ const focusContent = `<section>
   <label data-measure="input-label">Native input <input aria-label="Native input" value="" /></label>
   <label data-measure="textarea-label">Native notes <textarea aria-label="Native notes">alpha beta</textarea></label>
   <div data-measure="editable-label" role="textbox" aria-label="Editable note" contenteditable="true">Editable words</div>
+  <details><summary>Decision details</summary><p>The native disclosure owns its focused keyboard interaction.</p></details>
 </section><section>
   <button data-measure="fixture-action" type="button" id="fixture-action"><span>Record decision</span></button>
   <output data-measure="fixture-action-count" id="fixture-action-count">0</output>

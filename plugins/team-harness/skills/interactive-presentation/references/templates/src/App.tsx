@@ -19,7 +19,7 @@ const defaultConfig: PresentationConfig = {
   }],
 };
 
-const interactiveSelector = "input, textarea, select, button, a[href], audio, video, iframe, [contenteditable]:not([contenteditable='false']), [role='button'], [role='slider'], [role='combobox'], [role='textbox'], [role='listbox'], [role='menu'], [role='tab'], [role='tree'], [role='grid'], [role='spinbutton'], [data-presentation-interactive]";
+const interactiveSelector = "input, textarea, select, button, summary, a[href], audio, video, iframe, [contenteditable]:not([contenteditable='false']), [role='button'], [role='slider'], [role='combobox'], [role='textbox'], [role='listbox'], [role='menu'], [role='tab'], [role='tree'], [role='grid'], [role='spinbutton'], [data-presentation-interactive]";
 function hasInteractiveOwner(event: Event) {
   return event.composedPath().some((target) => target instanceof Element && target.closest(interactiveSelector));
 }

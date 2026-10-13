@@ -80,10 +80,10 @@ Audience controls SHALL remain outside the content flow, use accessible names an
 - **THEN** they stay compact and within the reserved area without covering essential diagram labels or nodes
 
 ### Requirement: Navigation respects focus and scene interaction
-Slide and step navigation SHALL handle presentation shortcuts only when the presentation owns the interaction. Typing, editable content, buttons, selectors, links, media and interactive graph controls SHALL retain their native or component-specific keyboard behavior. Scene steps SHALL advance predictably before changing scenes, respect first/last boundaries and avoid changing inactive scenes or duplicating keyboard handlers.
+Slide and step navigation SHALL handle presentation shortcuts only when the presentation owns the interaction. Typing, editable content, buttons, selectors, native disclosures, links, media and interactive graph controls SHALL retain their native or component-specific keyboard behavior. Scene steps SHALL advance predictably before changing scenes, respect first/last boundaries and avoid changing inactive scenes or duplicating keyboard handlers.
 
 #### Scenario: An interactive element owns the key
-- **WHEN** focus is in an input, button, selector, editable region or graph control and Arrow or Space is pressed
+- **WHEN** focus is in an input, button, selector, native disclosure summary, editable region or graph control and Arrow or Space is pressed
 - **THEN** that element receives its intended interaction without unintended slide navigation
 
 #### Scenario: A stage-owned step or slide is advanced
