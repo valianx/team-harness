@@ -26,7 +26,9 @@ jobs:
       - name: Check browser harness failure semantics
         run: npm --prefix tests/presentation run test:harness
       - name: Prepare the real copied template
-        run: npm --prefix tests/presentation run prepare-fixture -- --workspace "${{ runner.temp }}/meeting-presentations" --candidate "${{ github.sha }}"
+        run: |
+          mkdir -p "${{ runner.temp }}/meeting-presentations"
+          npm --prefix tests/presentation run prepare-fixture -- --workspace "${{ runner.temp }}/meeting-presentations" --candidate "${{ github.sha }}"
       - name: Execute meeting content and interaction checks
         run: npm --prefix tests/presentation test -- --workspace "${{ runner.temp }}/meeting-presentations" --candidate "${{ github.sha }}"
       - name: Retain captures, bounds and execution reports
