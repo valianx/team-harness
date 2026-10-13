@@ -21,6 +21,7 @@ The current general agent selects and reads the relevant skill:
 | Review an existing pull request | [`review-pr`](skills/review-pr/SKILL.md) |
 | Assess architecture, relationships and technical debt | [`audit`](skills/audit/SKILL.md) |
 | Investigate functional defects in a project or module | [`find-bugs`](skills/find-bugs/SKILL.md) |
+| Study existing applications and derive project ideas with REA | [`research-app`](skills/research-app/SKILL.md) |
 | Prepare or publish a completed change | [`create-pr`](skills/create-pr/SKILL.md) |
 | Keep useful context across tasks, flows and sessions | [`workspace`](skills/workspace/SKILL.md) |
 

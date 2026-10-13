@@ -68,5 +68,5 @@ Implementation adds the canonical entry and routes, generates distributions and 
 
 ## Open Questions
 
-- The selected controlled packaged-taskboard fixture will demonstrate one static public CLI analysis and a portable summary. This synthetic integration target does not select the operator's application or constrain supported technologies; no application analysis has run yet.
-- Does the resolved upstream setup destination require an additional packaging-ownership fixture? Inspect the actual supported layout before adding a test or changing installer exclusions.
+- The controlled packaged-taskboard fixture demonstrated static CLI analysis and portable inline views. It does not select the operator's application or constrain supported technologies; runtime/MCP and other-host scenarios remain unexecuted.
+- The resolved upstream setup plan keeps the REA skill in its independently owned native destination. No demonstrated packaging-ownership gap requires an additional fixture or installer exclusion.

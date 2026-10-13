@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Research App"
+  short_description: "Team Harness Research App workflow"
+  default_prompt: "Use $team-harness:research-app for this request."

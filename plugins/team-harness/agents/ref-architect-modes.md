@@ -64,17 +64,16 @@ Table: options × criteria (performance, migration effort, community, learning c
 
 ## Audit Mode
 
-Produces a diagnostic report with severity-categorized findings and concrete
-file references — never a proposal or task breakdown. Output:
-`{workspace}/research/00-audit.md`.
+Report severity-categorized diagnostic findings with concrete file references,
+without proposals or task breakdowns, in `{workspace}/research/00-audit.md`.
+
+Follow the [audit coverage method](../skills/audit/references/coverage-method.md).
 
 1. **Scope** — full project, module, or layer.
-2. **Deep scan** with Glob/Grep/Read: structure, dependency graph, pattern
-   consistency, duplication and missing abstractions, layer violations, dead
-   code.
-3. **Documentation review** — README/CLAUDE.md/inline docs accuracy vs
-   reality.
-4. **Write the report:**
+2. **Scan** structure, dependencies, pattern consistency, duplication, missing
+   abstractions, layer violations and dead code.
+3. **Check README/CLAUDE.md/inline docs** against code.
+4. **Report:**
 
 ```markdown
 # Architecture Audit: {scope}
@@ -83,6 +82,10 @@ file references — never a proposal or task breakdown. Output:
 
 ## Summary
 {2-3 sentence executive summary}
+
+## Coverage and limits
+{Capability traces, scenario evidence, status, inspection owners and material
+missing observations per the coverage method.}
 
 ## Findings
 

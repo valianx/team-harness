@@ -59,6 +59,7 @@ text. Keep mode names and invocations exact.
 | `reload` | Activate installed resources and verify the current conversation's runtime components. | opencode + Codex |
 | `report-issue` | Prepare and file a guarded Team Harness GitHub issue. | Claude Code + opencode + Codex |
 | `research` | Investigate a technology, migration, or approach. | Claude Code + opencode + Codex |
+| `research-app` | Study existing applications with REA and derive project ideas from their evidence. | Claude Code + opencode + Codex |
 | `research-code` | Investigate a codebase with parallel, file-grounded evidence. | Claude Code + opencode + Codex |
 | `resume-session` | Read and summarize a saved session handoff without modifying state. | Claude Code + opencode + Codex |
 | `review-pr` | Review a PR against a fixed snapshot and return advisory findings. | Claude Code + opencode + Codex |

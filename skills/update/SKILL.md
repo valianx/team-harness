@@ -5,13 +5,13 @@ description: Update the th plugin — refresh catalog, download the new version,
 
 Refresh the `team-harness` plugin marketplace catalog, report whether a new `th` release is available, and keep the managed `~/.claude/CLAUDE.md` blocks aligned with the running plugin version. This is a standalone utility — it does NOT route through th:orchestrator. It is the repeatable update command; `/th:setup` is the one-time bootstrap and is never part of this flow.
 
-Usage: `/th:update [--force-blocks]` or `/th:update <openspec|superpowers|tea>`
+Usage: `/th:update [--force-blocks]` or `/th:update <openspec|superpowers|tea|rea>`
 
 Analyze the input: $ARGUMENTS
 
 ## Upstream provider updates
 
-Route the explicit targets `openspec`, `superpowers`, `tea`, `semgrep`,
+Route the explicit targets `openspec`, `superpowers`, `tea`, `rea`, `semgrep`,
 `dependency-cruiser`, `knip`, `sentry`, `quality` and `quality-tools`
 (also `bmad tea`)
 here before the TH update procedure. For a provider-only request, complete that
@@ -21,6 +21,10 @@ was also requested; provider names are not flags for the TH updater.
 Match provider names as complete words in the requested target, never as
 substrings: `team` and `team-harness` do not select `tea`. TH-only options apply
 only to a separately requested TH operation.
+
+For an explicit `rea` target, follow [REA application research](../spec/references/upstream-tools.md#rea-application-research)
+for the active client and return from this provider-only route. REA is separate
+from quality selection and is never prepared by full TH setup or update.
 
 Before routing a bare `find-bugs` target, resolve the owner from the live task:
 TH project/module diagnosis or Sentry's upstream captured-change method. If it

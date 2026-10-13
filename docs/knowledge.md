@@ -286,3 +286,4 @@ superseded unless a bullet explicitly records the current two-posture contract.
 - [constraint] Release preflight compares committed revisions, covers embedded installer payloads and published bootstrap scripts, and preserves local completion. → `tools/codex-runtime/version-preflight.mjs`
 - [constraint] Research specialists return advisory evidence through native transport; Main owns persistence and follow-up, while assigned writer roles retain writing tools.
 - [decision] PR footers state whether a necessary human check remains; sufficient automated checks and advisory agent reviews use false, independently of technical risk. → `skills/create-pr/SKILL.md`
+- [decision] Application research consumes official REA Evidence; audit and find-bugs remain independent native methods. → `skills/research-app/SKILL.md`

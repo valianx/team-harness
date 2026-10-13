@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.43.0] - 2026-10-12
+
+### Added
+- Research existing applications with REA Evidence and turn findings into project ideas through research-app.
+
+### Changed
+- Audit and find-bugs trace capabilities and state changes, reuse valid evidence and show unresolved observations.
+
 ## [3.42.11] - 2026-10-12
 
 ### Changed
