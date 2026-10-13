@@ -12,6 +12,6 @@
 ## 3. Acceptance and verification
 
 - [x] 3.1 Implementer: Inspect the complete candidate against AC-1–AC-8 and current installed/primary upstream evidence; reuse Main's isolated install/context smoke with its explicit discovery/render limits and keep evidence in the selected workspace, with no installation in the operator's live project.
-- [ ] 3.2 Main: Obtain the selected independent semantic/source review for AC-1–AC-8, resolve concrete findings, preserve operator/native authorization and inspect the final canonical and generated surface without introducing prose-regex or model-compliance tests.
+- [x] 3.2 Main: Obtain the selected independent semantic/source review for AC-1–AC-8, resolve concrete findings, preserve operator/native authorization and inspect the final canonical and generated surface without introducing prose-regex or model-compliance tests.
 - [x] 3.3 Implementer: Run `node tools/codex-runtime/sync-skills.mjs --check`, `bash tests/run-all.sh` and `openspec validate add-contextual-ui-design --strict`; retain actual results and any omitted coverage in the workspace, renewing affected checks after corrections and making no visual-quality claim (AC-1, AC-8).
-- [ ] 3.4 Main: Complete the installed OpenSpec verification against the delivered skill, acceptance/source review and test evidence; resolve actual intent mismatches before marking implementation complete, with no model benchmark.
+- [x] 3.4 Main: Complete the installed OpenSpec verification against the delivered skill, acceptance/source review and test evidence; resolve actual intent mismatches before marking implementation complete, with no model benchmark.
