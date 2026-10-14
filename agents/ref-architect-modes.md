@@ -196,11 +196,11 @@ direct cross-repo defaults to `{output-dir}/00-consolidated.md`.
 3. **Contract validation** (flow mode): per hop boundary, compare what hop N
    produces with what hop N+1 expects — field names, types, missing fields,
    formats — and identify undocumented dependencies.
-4. **Cross-cutting analysis:** use the
-   [shared finding method](../skills/audit/references/project-audit.md#findings-and-evidence)
+4. **Cross-cutting analysis:** use the caller-resolved finding method from the
+   installed `audit` skill's `references/project-audit.md`
    to deduplicate supported causes/IDs and preserve occurrences, status upgrades,
    business-rule gaps and failure-scenario limits; Main judges dispositions.
-5. **Write the report:**
+5. **Write the caller's report; the following is a direct cross-repo example:**
 
 ```markdown
 # Cross-Repo Analysis: {analysis name}

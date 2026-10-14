@@ -15,7 +15,7 @@ remains unverified rather than passed or not applicable.
 
 Use the existing methods for their questions: [audit](../audit/SKILL.md) and its
 [coverage method](../audit/references/coverage-method.md) for architecture and
-capability traces; [find-bugs](../find-bugs/SKILL.md) for functional mechanisms;
+capability traces; [find-bugs](../th-find-bugs/SKILL.md) for functional mechanisms;
 [security](../security/SKILL.md) for security; [ui-design](../ui-design/SKILL.md)
 for analysis-only UI/UX with maintained upstream methods; and
 [cross-repo](../cross-repo/SKILL.md) for contract/invariant seams. Select pertinent
@@ -23,7 +23,8 @@ testing, data/performance and actual-provider advice using their existing method
 `audit-security` is the TH-assets self-scan, not a general product-security audit.
 
 Dispatch bounded distinct questions to useful native specialists with explicit
-ownership, current evidence and the common report destination. Apply independent
+ownership, current evidence, resolved native method paths and the common report
+destination. Apply independent
 judgment to the relevant risks; no fixed role count or whole-audit pass per
 repository is required. Use available native slots, or inspect sequentially.
 Preserve successful evidence and report missing returns or timeouts. Reuse valid
