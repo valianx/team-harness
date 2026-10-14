@@ -36,7 +36,11 @@ Adapt judgment to the language and genre. Preserve useful technical terms. In Sp
 
 Read the result once: does it meet the need, can anything be removed, and did shortening lose necessary information? Correct justified problems and deliver one final version without a long account of the editorial process.
 
-Combine this guide with available format-specific tools when Word, PDF or another artifact is requested. Respect the selected destination; creation does not authorize external publication or sharing.
+Combine this guide with the format/provider owner's tools and the
+[artifact delivery method](references/delivery.md) for requested conversion,
+upload or sharing. Preserve principal outputs and annex treatment from intake,
+and verify content, format, location and requested access by readback. Creation
+does not authorize external publication or sharing.
 
 ---
 

@@ -34,7 +34,6 @@ export const codexOverrides = new Set([
 
 export const opencodeOverrides = new Set([
   "background",
-  "cross-repo",
   "recover",
   "setup",
   "tmux",

@@ -42,7 +42,7 @@ These two skills are DISTINCT and do NOT duplicate:
 |--|----------------------------------|-----------------|
 | **Question answered** | "What does this code actually do?" (evidence-gathering) | "Does this system obey its contracts/invariants?" (auditing) |
 | **Route** | Current general agent coordinates and persists `{workspace}/research/00-research.md` | Standalone audit utility; uses native bounded dispatch when useful |
-| **Output** | One `{workspace}/research/00-research.md` (hybrid code + web evidence, conflict detection) | Per-repo audit reports; `00-consolidated.md`; profile/contract validation |
+| **Output** | One `{workspace}/research/00-research.md` (hybrid code + web evidence, conflict detection) | `00-consolidated.md` or the caller's integral report; profile/contract evidence and useful annexes |
 | **Use when** | "How does the retry logic work across service A and service B?" | "Does service A honor the idempotency contract declared in the shared API profile?" |
 
 Use `/th:research-code --multi-repo` to understand how code works across multiple repos.

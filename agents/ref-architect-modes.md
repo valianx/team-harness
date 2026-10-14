@@ -186,22 +186,20 @@ time = sum of round times.
 
 ## Consolidation Mode
 
-Used by `/th:cross-repo` to synthesize N per-repo reports into one document.
-Works only from the per-repo reports — never analyzes codebases directly.
-Output: `{output-dir}/00-consolidated.md`.
+Used for bounded `/th:cross-repo` or `/th:full-audit` consolidation of supplied
+reports/evidence. Do not rescan repositories. Use the caller's assigned report;
+direct cross-repo defaults to `{output-dir}/00-consolidated.md`.
 
-1. **Load inputs:** `analysis-context.md`, all `*-summary.md`, all detailed
-   reports; the profile (invariants, expected topology) and flow definition
-   when present.
-2. **Invariant validation** (profile): per invariant, mark PASS/FAIL/WARN with
-   `file:line` evidence from the reports.
+1. **Load inputs:** supplied context/reports and relevant profile/flow definitions.
+2. **Invariant validation** (profile): retain evidence, observed/inferred status
+   and missing observations without converting gaps to passing controls.
 3. **Contract validation** (flow mode): per hop boundary, compare what hop N
    produces with what hop N+1 expects — field names, types, missing fields,
    formats — and identify undocumented dependencies.
-4. **Cross-cutting analysis:** systemic issues (same problem in 3+ repos =
-   organizational), inconsistent patterns, missing layers (observability,
-   circuit breakers, DLQs), business-rule gaps, and per-hop failure-scenario
-   tracing.
+4. **Cross-cutting analysis:** use the
+   [shared finding method](../skills/audit/references/project-audit.md#findings-and-evidence)
+   to deduplicate supported causes/IDs and preserve occurrences, status upgrades,
+   business-rule gaps and failure-scenario limits; Main judges dispositions.
 5. **Write the report:**
 
 ```markdown

@@ -68,7 +68,11 @@ helper artifacts keep their required formats; code, tests and deliverables keep
 their own formats and locations. Link them from notes rather than renaming or
 duplicating them as Markdown.
 
-Create only artifacts the task needs. Record the workspace's absolute location,
+Create only artifacts the task needs. For substantive artifact work, establish
+principal output grouping, annex treatment, format/destination and requested
+access in the existing context at intake; preserve them through delivery.
+
+Record the workspace's absolute location,
 project/source association (Git common directory for repository work, established
 working directory otherwise), objective, important decisions, progress, evidence
 links and next step in the flow's existing plan, report or handoff as applicable.

@@ -10,12 +10,13 @@ certification of the architecture.
 
 For the agreed project, module or layer, record the surfaces that matter and
 the relationships between them. Start each selected capability with the
-user/system outcome to assess. Trace its entry, effective configuration,
-implementing components and relevant runtime/dependency handoffs through to
-the resulting behavior. For each material interaction, connect:
+user/system outcome to assess. Trace its entry, actors, contracts, state/data,
+effective configuration, implementing components, actual consumers and relevant
+runtime/dependency handoffs across repositories through to the resulting behavior.
+For each material interaction, connect:
 
 - the component or boundary examined;
-- a relevant success, change or failure scenario;
+- material success and failure/recovery scenarios, and relevant change scenarios;
 - the evidence path, command result or report used;
 - `observed`, `inferred` or `unverified` status;
 - the inspection owner and any material limit.
@@ -38,4 +39,7 @@ assumption and the smallest missing observation that could resolve it.
 Reading every entry point or counting files is inventory evidence only.
 Inventory or phase completion does not prove that interactions work or that
 defects are absent. A missing host, unreadable source, skipped command or
-unexecuted behavior remains an explicit coverage limit in `research/00-audit.md`.
+unexecuted behavior remains an explicit coverage limit in the caller's report,
+normally `research/00-audit.md` for direct audit. Use the
+[project audit method](project-audit.md) for applicable shared finding/evidence
+records and project-wide consolidation; preserve the caller's output grouping.

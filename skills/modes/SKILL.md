@@ -26,7 +26,7 @@ text. Keep mode names and invocations exact.
 | `bootstrap` | Initialize repository conventions and its runtime-native instruction file. | Claude Code + opencode + Codex |
 | `clickup` | Configure, list, and route ClickUp tasks. | Claude Code + opencode + Codex |
 | `create-pr` | Prepare and publish a PR from direct, spec, or pipeline work. | Claude Code + opencode + Codex |
-| `cross-repo` | Analyze dependencies and changes across repositories. | Claude Code + opencode + Codex |
+| `cross-repo` | Analyze dependencies, contracts and invariants across repositories. | Claude Code + opencode + Codex |
 | `d2-diagram` | Create technical diagrams with the D2 language. | Claude Code + opencode + Codex |
 | `define-ac` | Define acceptance criteria for a feature or task. | Claude Code + opencode + Codex |
 | `deliver` | Prepare requested delivery from validated work using native authorization. | Claude Code + opencode + Codex |
@@ -36,6 +36,7 @@ text. Keep mode names and invocations exact.
 | `eval` | Evaluate and score agent or pipeline performance. | Claude Code + opencode + Codex |
 | `excalidraw-diagram` | Create Excalidraw JSON diagrams that make visual arguments. | Claude Code + opencode + Codex |
 | `find-bugs` | Investigate functional defects in a project or module with contextual evidence. | Claude Code + opencode + Codex |
+| `full-audit` | Audit a complete project and deliver one integral report of findings, improvements and optimizations. | Claude Code + opencode + Codex |
 | `gcp-costs` | Analyze GCP costs and optimization opportunities. | Claude Code + opencode + Codex |
 | `gcp-infra` | Inspect, plan and carry out authorized GCP changes. | Claude Code + opencode + Codex |
 | `hookify` | Report candidate deterministic hooks from observed session friction. | Claude Code + opencode + Codex |
