@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Full Audit"
+  short_description: "Team Harness Full Audit workflow"
+  default_prompt: "Use $team-harness:full-audit for this request."

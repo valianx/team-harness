@@ -1,6 +1,6 @@
 ---
 name: ui-design
-description: Create or refine product-grounded visual UI designs with Impeccable, or continue explicitly requested implementation.
+description: Create, refine or audit product-grounded UI with Impeccable; continue implementation only within the requested endpoint.
 ---
 
 # UI design
@@ -22,6 +22,12 @@ primary task, real content, constraints and requested endpoint from that context
   behavior, factual copy and status meanings within the requested surface.
 - **Redesign:** replace identity only when explicitly authorized; retain product
   truth, function, constraints and pinned brand commitments.
+- **Audit:** evaluate actual roles/tasks and loading, empty, error, success and
+  recovery states. Use relevant upstream critique/audit and existing
+  [UI testing guidance](../../agents/testing-refs/_index.md), including keyboard/
+  focus, responsive/browser/device and manual accessibility limits. Distinguish
+  expert hypotheses from participant-observed usability. Keep findings in the
+  caller's report; this analysis endpoint ends before redesign or product edits.
 
 Resolve missing material scope or identity decisions before dependent work;
 continue independent context preparation. Do not invent an example application
@@ -32,9 +38,12 @@ or infer redesign authority from a refinement request.
 Read [Impeccable preparation and invocation](references/impeccable.md). Reuse
 the usable active-runtime capability and follow its actual installed compiled
 instructions and matching playbooks. Pass the product context, target, objective,
-authorized effects, constraints and design-only or implementation endpoint.
+authorized effects, constraints and audit, design-only or implementation endpoint.
 Upstream owns visual methods and project design records; its advice grants no
 additional authority. Disclose unavailable capabilities and use supported fallbacks.
+
+An audit uses the applicable upstream analysis method and evidence/reporting
+below, without entering direction selection or design/implementation steps.
 
 ## Resolve the visual direction
 

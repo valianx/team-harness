@@ -10,6 +10,9 @@ Inspect code and relevant configuration without changing product behavior.
 Use current authoritative references when their version matters. Report concrete
 findings with evidence, reachable conditions, impact, suggested corrections and
 coverage limits. Distinguish a demonstrated problem from an unverified concern.
+Use the [shared finding/evidence method](../audit/references/project-audit.md#findings-and-evidence)
+for causal IDs, attributable reproductions and status upgrades. Preserve the
+caller's consolidated report when this is one lens of a full audit.
 
 Main judges recommendations in task context and retains a useful Markdown report,
 normally `reviews/04-security.md`, in the selected workspace. Use the operator's

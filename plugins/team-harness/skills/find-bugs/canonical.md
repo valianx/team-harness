@@ -14,6 +14,12 @@ when an analyzer reports no matches. For a supported defect, report its trigger,
 expected versus actual behavior, impact and source evidence, distinguishing
 reproduction from inference.
 
+Use the [shared diagnostic finding/evidence method](../audit/references/project-audit.md#findings-and-evidence)
+for material causes and reproductions: retain real versus simulated dependencies,
+the actual integration boundary and oracle, environment identity and measurement
+conditions. A reproduced defect is not a passed product regression. Preserve one
+cause/ID and linked occurrences when the caller consolidates several lenses.
+
 Use available history or version differences as optional leads, then check the
 current consumer contract. A difference alone proves neither a defect nor a
 regression; leave unsupported origin unknown. No diff, fetch or whole-history

@@ -21,6 +21,8 @@ The current general agent selects and reads the relevant skill:
 | Broader coordination and recoverable execution | [`pipeline`](skills/pipeline/SKILL.md) |
 | Review an existing pull request | [`review-pr`](skills/review-pr/SKILL.md) |
 | Assess architecture, relationships and technical debt | [`audit`](skills/audit/SKILL.md) |
+| Analyze a complete project in one integral report | [`full-audit`](skills/full-audit/SKILL.md) |
+| Check contracts and invariants across repositories | [`cross-repo`](skills/cross-repo/SKILL.md) |
 | Investigate functional defects in a project or module | [`find-bugs`](skills/find-bugs/SKILL.md) |
 | Study existing applications and derive project ideas with REA | [`research-app`](skills/research-app/SKILL.md) |
 | Prepare or publish a completed change | [`create-pr`](skills/create-pr/SKILL.md) |
@@ -30,6 +32,13 @@ The [four-phase method](skills/spec/references/development-phases.md) explains
 the inputs, expected work, tools, outputs and completion evidence. It is shared
 by `spec` and the explicitly selected `pipeline`; it does not activate a
 pipeline, add a permission gate or require every available tool.
+
+Use `/th:full-audit <project paths>` in Claude Code or
+`$team-harness:full-audit <project paths>` in Codex for a complete analysis.
+It coordinates applicable specialist questions and produces one `00-full-audit.md`
+with bugs, security findings, improvements, optimizations, evidence and limits.
+It reuses known project paths and ends at analysis; `cross-repo` remains the
+focused contract/invariant method. OpenCode discovers the native `full-audit` skill.
 
 `design` delivers one solution proposal: functional content first,
 then architecture and implementation detail. It includes affected

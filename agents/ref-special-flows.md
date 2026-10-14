@@ -137,8 +137,8 @@ For codebase behavior, subsystem traces or cross-file concerns:
 |-----------|----------------------------------|-----------------|
 | **Purpose** | Evidence-gathering research: "what does this code actually do, across these repos?" | Flow/invariant auditor: "does this system obey its contracts and invariants?" |
 | **Route** | Current general agent coordinates and persists `{workspace}/research/00-research.md` | Standalone audit utility; uses native bounded dispatch when useful |
-| **Output** | One `{workspace}/research/00-research.md` with hybrid evidence + conflict detection | Per-repo architect+security+qa+tester audits; `00-consolidated.md`; profile/contract validation |
-| **Agents** | Bounded `code-researcher` tasks when useful; optional web evidence, consolidator or architect analysis | `architect`, `security`, `qa`, `tester` (per repo); separate workspaces per repo |
+| **Output** | One `{workspace}/research/00-research.md` with hybrid evidence + conflict detection | `00-consolidated.md` or caller report; profile/contract evidence and useful annexes |
+| **Agents** | Bounded `code-researcher` tasks when useful; optional web evidence, consolidator or architect analysis | Bounded questions on owned repositories/seams; shared workspace and retained evidence |
 | **When to use** | "How does the retry logic work across the gateway and the worker services?" | "Does the payment service honor the idempotency contract declared in the API profile?" |
 
 Use `/th:research-code --multi-repo` when the question is about understanding code behavior. Use `/th:cross-repo` when the question is about contract compliance and invariant validation.

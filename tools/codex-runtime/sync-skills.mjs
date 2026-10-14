@@ -34,7 +34,6 @@ export const codexOverrides = new Set([
 
 export const opencodeOverrides = new Set([
   "background",
-  "cross-repo",
   "recover",
   "setup",
   "tmux",
@@ -162,6 +161,13 @@ function projectedSkillName(name, runtime) {
   return runtime === "opencode" && name === "find-bugs" ? "th-find-bugs" : name;
 }
 
+function projectSkillLinks(markdown, runtime) {
+  if (runtime !== "opencode") return markdown;
+  // Keep relative TH method links in the same namespace as their native skill.
+  return markdown.replace(/(\]\(<?(?:\.\.\/)+)find-bugs(?=\/)/g,
+    (_match, prefix) => `${prefix}${projectedSkillName("find-bugs", runtime)}`);
+}
+
 function renderAdapter(name, canonical, runtime) {
   const codex = runtime === "codex";
   const nativeName = projectedSkillName(name, runtime);
@@ -284,14 +290,16 @@ async function expectedProjection(rootDir, name, runtime) {
   const canonical = parseCanonicalSkill(canonicalBytes, name);
   const expected = new Map([
     ["SKILL.md", Buffer.from(renderAdapter(name, canonical, runtime))],
-    ["canonical.md", Buffer.from(`${canonical.body}\n`)],
+    ["canonical.md", Buffer.from(`${projectSkillLinks(canonical.body, runtime)}\n`)],
   ]);
   if (runtime === "codex") {
     expected.set("agents/openai.yaml", Buffer.from(renderOpenAI(name, canonical)));
   }
   for (const [rel, bytes] of sourceFiles) {
     if (rel === "SKILL.md" || rel === "agents/openai.yaml") continue;
-    expected.set(rel, bytes);
+    expected.set(rel, runtime === "opencode" && rel.endsWith(".md")
+      ? Buffer.from(projectSkillLinks(bytes.toString("utf8"), runtime))
+      : bytes);
   }
   return expected;
 }
