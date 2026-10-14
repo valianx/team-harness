@@ -33,13 +33,13 @@ text. Keep mode names and invocations exact.
 | `design` | Prepare a solution proposal with functional content before technical design. | Claude Code + opencode + Codex |
 | `diagram` | Create an Excalidraw diagram for a concept or workflow. | Claude Code + opencode + Codex |
 | `docs` | Generate Obsidian documentation through the documentation pipeline. | Claude Code + opencode + Codex |
-| `eval` | Evaluate and score agent or pipeline performance. | Claude Code + opencode + Codex |
+| `eval` | Assess completed workflow evidence or evaluate and score agent scenarios. | Claude Code + opencode + Codex |
 | `excalidraw-diagram` | Create Excalidraw JSON diagrams that make visual arguments. | Claude Code + opencode + Codex |
 | `find-bugs` | Investigate functional defects in a project or module with contextual evidence. | Claude Code + opencode + Codex |
 | `full-audit` | Audit a complete project and deliver one integral report of findings, improvements and optimizations. | Claude Code + opencode + Codex |
 | `gcp-costs` | Analyze GCP costs and optimization opportunities. | Claude Code + opencode + Codex |
 | `gcp-infra` | Inspect, plan and carry out authorized GCP changes. | Claude Code + opencode + Codex |
-| `hookify` | Report candidate deterministic hooks from observed session friction. | Claude Code + opencode + Codex |
+| `hookify` | Report recurring friction and workflow or native-runtime improvements. | Claude Code + opencode + Codex |
 | `implement` | Implement directly or continue an explicitly active pipeline after design approval. | Claude Code + opencode + Codex |
 | `init` | Load lightweight intake and bounded direct help without activating pipeline coordination. | Claude Code + opencode + Codex |
 | `inline` | Declare, exit, or query the operator-controlled inline posture. | Claude Code + opencode + Codex |

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.47.0] - 2026-10-14
+
+### Added
+
+- Add eval retrospective to assess completed workflow evidence, omissions and improvements without rerunning the effort.
+
 ## [3.46.0] - 2026-10-13
 
 ### Added

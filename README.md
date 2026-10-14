@@ -25,6 +25,7 @@ The current general agent selects and reads the relevant skill:
 | Check contracts and invariants across repositories | [`cross-repo`](skills/cross-repo/SKILL.md) |
 | Investigate functional defects in a project or module | [`find-bugs`](skills/find-bugs/SKILL.md) |
 | Study existing applications and derive project ideas with REA | [`research-app`](skills/research-app/SKILL.md) |
+| Assess a completed effort from its retained artifacts | [`eval --retrospective`](skills/eval/SKILL.md) |
 | Prepare or publish a completed change | [`create-pr`](skills/create-pr/SKILL.md) |
 | Keep useful context across tasks, flows and sessions | [`workspace`](skills/workspace/SKILL.md) |
 
