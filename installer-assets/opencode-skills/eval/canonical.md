@@ -2,13 +2,29 @@ name: eval
 
 Analyze the input: $ARGUMENTS
 
-**IMPORTANT:** This skill runs directly — do NOT invoke the `orchestrator` agent or any other agent. Execute all steps yourself using the tools available to you (Bash, Glob, Read, Grep, Agent).
+Main coordinates evaluation directly. Only the scenario modes below invoke the evaluated agent; retrospective assessment stays in the current thread.
 
 ## Voice
 
 See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" for the full
 voice and dialect-neutrality contract. It applies to every response this skill produces —
 chat replies, status blocks, error messages, and self-corrections alike.
+
+## Retrospective — existing effort
+
+Select `--retrospective [workspace-path]` or an unambiguous request to assess a
+completed effort before interpreting an agent name or entering scenario execution.
+A name or path alone does not select this route. Read the
+[retrospective method](references/retrospective.md) and use the existing effort's
+intent and artifacts. Reject combinations with an agent/scenario selector,
+`--all`, `--list`, `--create`, `--spec`, `--k` or `--baseline`; report the conflict
+without falling through to invocation. `--dry-run` previews this route's target,
+evidence and assessment without writing a result; help explains the route.
+
+Assess coverage, claim fidelity, duplicate work, consolidation, delivery and
+omissions. Return one evidence-linked report with limits and improvements; do not
+run evaluated agents, workflows, audits, tests, measurements or provider actions.
+This route does not generate scenarios/baselines or apply recommendations.
 
 ## Mode 1 — Agent name + scenario (or --all)
 
@@ -308,6 +324,7 @@ Show usage:
 /th:eval {agent-name} --spec X     — run scenario X as an authored spec (Mode 5)
 /th:eval {agent-name} --k N        — run the scenario N times and report pass-rate P/k
 /th:eval {agent-name} --baseline S — compare results against baseline SHA S
+/th:eval --retrospective [workspace-path] — assess a completed effort's artifacts
 ```
 
 ---
@@ -350,20 +367,20 @@ are satisfied is a **spec PASS**; otherwise it is a **spec FAIL**.
 - `N` must be a positive integer. If N > 1, the evaluation invokes the agent N
   times and records each result independently.
 
-**Cost:** the `--k N` agent-run path is PAID. Each run costs approximately $1
-(one agent invocation). Total cost: **N × ~$1**. Use `--dry-run` to see the
-plan and cost estimate without spending a single run.
+**Usage:** actual agent invocations consume the active provider's resources.
+Report available native usage and billing inputs; do not infer a fixed monetary
+cost. `--dry-run` previews the scenario plan and run count without invoking agents.
 
-**Cost-gated boundary:** the actual N agent invocations are NEVER part of
-`tests/run-all.sh`. They are operator-invoked only. Suite 95 (`run-all.sh`)
-tests the arg contract and report shape as text assertions — it never runs an
-agent.
+**Execution boundary:** actual agent invocations are never part of
+`tests/run-all.sh`. A live model benchmark requires an explicit operator run and
+trial limit. Maintained tests cover executable/distribution properties; scenario
+and report instructions need contextual review, not assertions of prose phrases.
 
 **Pipeline SHOULD-convention:** for tasks that change an agent's system prompt,
 authoring a `--spec` scenario as an acceptance criterion and running
 `/th:eval {agent} --spec {name} --k N` before shipping is recommended. This is
-a documented SHOULD, not a hard Stage-2 gate — a ≈$1–$5 non-deterministic run
-must not sit on the critical path of every agent-prompt PR.
+a documented SHOULD, not a mandatory completion gate. Model evaluation remains
+an explicitly selected run rather than an automatic step for every prompt change.
 
 ### pass@k report block
 

@@ -115,17 +115,15 @@ file matching the schema above.
 
 ---
 
-## Free vs paid
+## Verification scope
 
-| Layer | Free (Suite 95 / `run-all.sh`) | Paid (operator-invoked) |
-|-------|-------------------------------|------------------------|
-| Template + required sections | Text assertion | — |
-| Arg contract (`--spec`, `--k`, `--baseline`) | String presence in SKILL | — |
-| Report shape (pass-rate, pass@k verdict) | String presence in SKILL | — |
-| Baseline file schema | `json.loads` + key check | — |
-| Actual N agent runs | — | `/th:eval ... --k N` |
-| Recording a real baseline | — | Manual paid run |
-| Regression comparison vs baseline | — | Manual paid run |
+Scenario, argument and report instructions are assessed contextually; maintained
+tests cover the executable/distribution properties listed in
+[testing](../docs/testing.md). No phrase-presence suite validates these contracts.
 
-The paid run path is NEVER wired into `tests/run-all.sh`. Cost: ≈ N × $1 per
-`--k N`. Use `--dry-run` to see the plan and cost estimate without spending.
+Actual agent runs and recording real baseline results are operator-selected work,
+not part of `tests/run-all.sh`. A live model benchmark requires an explicit run and
+trial limit. Use `--dry-run` to preview the scenario plan and count; monetary cost
+requires real provider/billing inputs rather than a fixed estimate per invocation.
+`eval --retrospective` assesses an existing effort's artifacts and performs none of
+those runs or baseline writes.
