@@ -1,8 +1,9 @@
-## Purpose
+# full-project-audit Specification
 
+## Purpose
 Provide one project-wide analysis invocation and an integral report whose findings, improvement opportunities and coverage limits remain attributable across repositories and specialist lenses.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Full audit resolves one analysis effort
 TH SHALL provide `full-audit` for one or several project repositories. Main SHALL resolve an unambiguous target from the request or existing context, reuse the selected workspace, language and authorization, and record snapshots, environments, emphasis, principal output grouping and requested delivery. The invocation SHALL remain analysis-only and SHALL NOT activate a development pipeline, product repairs, production attacks/load or broader permissions.
