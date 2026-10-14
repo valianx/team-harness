@@ -10,5 +10,5 @@
 
 ## 3. Verification
 
-- [ ] 3.1 Review compatibility and the requirement scenarios; run reference, projection and maintained checks with source/environment identity and explicit limits.
-- [ ] 3.2 Complete the selected provider coverage/verification methods and account for their outcomes against the delivered implementation.
+- [x] 3.1 Review compatibility and the requirement scenarios; run reference, projection and maintained checks with source/environment identity and explicit limits.
+- [x] 3.2 Complete the selected provider coverage/verification methods and account for their outcomes against the delivered implementation.
