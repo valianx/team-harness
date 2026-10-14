@@ -1,8 +1,9 @@
-## Purpose
+# workflow-retrospective Specification
 
+## Purpose
 Assess a completed effort against its requested outcome using retained artifacts, with attributable conclusions, practical improvements and explicit limits instead of rerunning the effort.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Retrospective routing preserves scenario evaluation
 TH SHALL select retrospective assessment through `eval --retrospective [workspace-path]` or an unambiguous request to evaluate a completed effort. It SHALL resolve the existing target and accepted scope from supplied paths or context before scenario execution, requesting only material missing identity. Existing scenario, list, create, dry-run, spec, repetition and baseline modes SHALL retain their meanings. Retrospective selection SHALL reject incompatible scenario/execution arguments without falling through to agent invocation. Retrospective dry-run SHALL preview the target, evidence and assessment without writing a result.
