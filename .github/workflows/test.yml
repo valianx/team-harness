@@ -9,6 +9,34 @@ permissions:
   contents: read
 
 jobs:
+  pi-native:
+    name: native Pi package (${{ matrix.os }}, Node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['22.19.0', '24']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Provision the declared Pi compatibility target in an isolated directory
+        shell: bash
+        run: |
+          runtime_root="$RUNNER_TEMP/pi-native-fixture"
+          npm install --prefix "$runtime_root" --no-save --no-audit --no-fund @earendil-works/pi-coding-agent@1.3.0
+          echo "TH_PI_TEST_ROOT=$runtime_root/node_modules/@earendil-works/pi-coding-agent" >> "$GITHUB_ENV"
+      - name: Verify native install, discovery, reload and removal without model requests
+        run: node tests/test_pi_native.mjs
+      - run: node tests/test_pi_generation.mjs
+      - run: node tests/test_pi_settings.mjs
+      - run: node tests/test_pi_runtime.mjs
+      - name: Verify native worker sessions, capabilities and synthetic usage attribution
+        run: node tests/test_pi_native_workers.mjs
+
   presentation-browser:
     name: meeting presentation template (Chromium)
     runs-on: ubuntu-latest
@@ -79,6 +107,7 @@ jobs:
       - name: Verify portable workflow regressions on Windows
         run: python tests/test_inline_git_hardening.py
       - run: python tests/test_github_identity_routes.py
+      - run: python tests/test_pi_shared_routes.py
       - run: node tests/test_codex_usage.mjs
       - run: node tests/test_pipeline_control_plane.mjs
       - run: node tests/test_version_preflight.mjs
@@ -231,6 +260,7 @@ jobs:
           node tools/codex-runtime/generate.mjs --check
           node tools/codex-runtime/test_generate.mjs
           node tools/codex-runtime/sync-skills.mjs --check
+          node tools/pi-runtime/generate.mjs --check
       - name: Validate marketplace and plugin structure
         run: |
           node tools/codex-runtime/validate-marketplace.mjs

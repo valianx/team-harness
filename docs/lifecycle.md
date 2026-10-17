@@ -1,7 +1,8 @@
 # Multi-runtime lifecycle
 
-Team Harness ships one canonical role system to Claude Code (CC), Codex, and
-opencode. The table retains the detailed CC/opencode comparison; Codex uses the
+Team Harness ships one canonical role system to Claude Code (CC), Codex,
+opencode and Pi. Pi owns its native package, extension and generated skill
+lifecycle; see the [Pi runtime guide](./pi-runtime.md). The table retains the detailed CC/opencode comparison; Codex uses the
 same tag/version namespace, consumes the tagged Git tree through its repository
 marketplace whose `init` skill loads lightweight intake into a clean `Main`
 thread and whose `pipeline` skill explicitly loads full orchestration,

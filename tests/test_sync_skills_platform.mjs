@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { chmod, cp, lstat, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, cp, lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { syncSharedSetupAssets, syncSkills } from "../tools/codex-runtime/sync-skills.mjs";
 
 const rootDir = await mkdtemp(join(tmpdir(), "th-sync-skills-platform-"));
@@ -85,7 +85,7 @@ try {
   // projection must follow source changes instead of retaining a manual fork.
   const fixtureRoot = join(rootDir, "projection");
   const repository = fileURLToPath(new URL("..", import.meta.url));
-  for (const directory of ["skills", "plugins", "installer-assets", ".claude-plugin", "agents", "hooks", "docs"]) {
+  for (const directory of ["skills", "plugins", "installer-assets", ".claude-plugin", "agents", "hooks", "docs", "runtime"]) {
     await cp(join(repository, directory), join(fixtureRoot, directory), {
       recursive: true,
       filter: path => !path.split(/[\\/]/).some(part => ["node_modules", "__pycache__", ".venv"].includes(part)),
@@ -95,6 +95,16 @@ try {
   const projectedCanonical = join(projectedDirectory, "canonical.md");
   const resourceSource = join(fixtureRoot, "skills/cross-repo/references/fixture.bin");
   const projectedResource = join(projectedDirectory, "references/fixture.bin");
+  const piRoot = join(fixtureRoot, "installer-assets/pi-skills");
+  const piSetupSource = join(fixtureRoot, "runtime/pi/skill-overrides/setup.md");
+  const piOverrideBodies = new Map();
+  for (const name of ["setup", "update", "reload"]) {
+    const source = join(fixtureRoot, "runtime/pi/skill-overrides", `${name}.md`);
+    piOverrideBodies.set(name, (await readFile(source, "utf8")).trimEnd() + "\n");
+  }
+  const importSource = join(fixtureRoot, "skills/cross-repo/scripts/import-fixture.mjs");
+  await mkdir(dirname(importSource), { recursive: true });
+  await writeFile(importSource, 'import { selectWorkspacePreference } from "../../workspace/scripts/workspace-preference.mjs";\nexport const selection = selectWorkspacePreference({ "workspace-mode": "gpt-space" });\n');
   const manualAdapter = join(fixtureRoot, "installer-assets/opencode-skills/background/SKILL.md");
   const manualBytes = await readFile(manualAdapter);
   const upstreamAdapter = join(fixtureRoot, "installer-assets/opencode-skills/find-bugs/SKILL.md");
@@ -110,7 +120,29 @@ try {
   await mkdir(join(resourceSource, ".."), { recursive: true });
   await writeFile(resourceSource, Buffer.from([0, 1, 2, 255]));
   await rm(projectedDirectory, { recursive: true, force: true });
-  const { opencodeGenerated, codexGenerated } = await syncSkills({ rootDir: fixtureRoot });
+  const { opencodeGenerated, codexGenerated, piGenerated, names } = await syncSkills({ rootDir: fixtureRoot });
+  assert.ok(Array.isArray(piGenerated), "Pi must have an explicit native projection result");
+  assert.deepEqual(piGenerated, names, "every canonical skill receives a Pi projection, including lifecycle overrides");
+  const piCrossRepoSkill = await readFile(join(piRoot, "cross-repo/SKILL.md"), "utf8");
+  const piPlanSkill = await readFile(join(piRoot, "plan/SKILL.md"), "utf8");
+  assert.match(piCrossRepoSkill, /^---\nname: th-cross-repo\n/);
+  assert.match(piPlanSkill, /\ndisable-model-invocation: true\n/);
+  for (const [name, body] of piOverrideBodies) {
+    const projection = await readFile(join(piRoot, name, "SKILL.md"), "utf8");
+    assert.ok(projection.endsWith(body), `Pi ${name} projection preserves its actual lifecycle source body`);
+  }
+  assert.equal(await readFile(join(piRoot, "full-audit/canonical.md"), "utf8"),
+    (await readFile(routingSource, "utf8")).replace(/^---\n[\s\S]*?\n---\n?/, "").trimEnd() + "\n",
+    "Pi preserves canonical relative links and directory names");
+  const piFindBugsSkill = await readFile(join(piRoot, "find-bugs/SKILL.md"), "utf8");
+  assert.match(piFindBugsSkill, /\nname: th-find-bugs\n/);
+  assert.deepEqual(await readFile(join(piRoot, "cross-repo/references/fixture.bin")), await readFile(resourceSource));
+  const imported = await import(pathToFileURL(join(piRoot, "cross-repo/scripts/import-fixture.mjs")).href);
+  assert.equal(imported.selection.mode, "gpt-space", "cross-skill helper imports resolve under unchanged Pi directories");
+  const packagedSettings = await import(pathToFileURL(join(fixtureRoot, "runtime/pi/settings.mjs")).href);
+  assert.equal(typeof packagedSettings.readSettings, "function", "the lifecycle settings helper resolves its packaged dependencies");
+  assert.ok((await lstat(join(piRoot, "setup/scripts/manage_github_identities.py"))).isFile(),
+    "the lifecycle identity helper is present under the declared Pi skill path");
   assert.ok(opencodeGenerated.includes("cross-repo"), "cross-repo must receive a generated OpenCode projection");
   assert.ok(opencodeGenerated.includes("full-audit") && codexGenerated.includes("full-audit"), "full-audit must be discovered on both runtimes");
   const projectedRouting = join(fixtureRoot, "installer-assets/opencode-skills/full-audit/canonical.md");
@@ -133,6 +165,8 @@ try {
   const refreshedProjection = await readFile(projectedCanonical);
   assert.notDeepEqual(refreshedProjection, firstProjection, "source updates must reach OpenCode");
   assert.deepEqual(await readFile(projectedResource), await readFile(resourceSource), "source resources must reach OpenCode");
+  assert.deepEqual(await readFile(join(piRoot, "cross-repo/references/fixture.bin")), await readFile(resourceSource),
+    "canonical resource changes reach Pi");
   await writeFile(projectedCanonical, firstProjection);
   await assert.rejects(syncSkills({ check: true, rootDir: fixtureRoot }), /opencode skill projections are stale/);
   assert.deepEqual(await readFile(projectedCanonical), firstProjection, "check mode must not repair stale OpenCode bytes");
@@ -142,6 +176,26 @@ try {
   await syncSkills({ rootDir: fixtureRoot });
   assert.deepEqual(await readFile(projectedCanonical), refreshedProjection, "unchanged synchronization must be stable");
   assert.deepEqual(await readFile(manualAdapter), manualBytes, "native lifecycle overrides must remain untouched");
+
+  const otherHostOutputs = new Map();
+  for (const base of [join(fixtureRoot, "plugins/team-harness/skills"), join(fixtureRoot, "installer-assets/opencode-skills")]) {
+    for (const name of await readdir(base, { recursive: true })) {
+      const file = join(base, name);
+      if ((await lstat(file)).isFile()) otherHostOutputs.set(file, await readFile(file));
+    }
+  }
+  const firstPiSetup = await readFile(join(piRoot, "setup/SKILL.md"), "utf8");
+  await writeFile(piSetupSource, "# Native Pi setup\n\nRevised Pi-only setup fixture.\n");
+  await assert.rejects(syncSkills({ check: true, rootDir: fixtureRoot }), /pi skill projections are stale/);
+  assert.equal(await readFile(join(piRoot, "setup/SKILL.md"), "utf8"), firstPiSetup, "check mode does not repair Pi overrides");
+  await syncSkills({ rootDir: fixtureRoot });
+  assert.ok((await readFile(join(piRoot, "setup/SKILL.md"), "utf8"))
+    .endsWith((await readFile(piSetupSource, "utf8")).trimEnd() + "\n"),
+    "Pi setup regeneration preserves the supplied override body");
+  for (const [file, bytes] of otherHostOutputs) {
+    assert.deepEqual(await readFile(file), bytes, "Pi-only source changes preserve every existing host projection");
+  }
+  await syncSkills({ check: true, rootDir: fixtureRoot });
   process.stdout.write("sync-skills platform checks: PASS\n");
 } finally {
   await rm(rootDir, { recursive: true, force: true });

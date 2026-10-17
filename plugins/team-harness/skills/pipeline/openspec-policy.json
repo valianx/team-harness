@@ -26,12 +26,13 @@
       },
       "required_native_skills": {
         "claude": ["bmad-testarch-test-design", "bmad-testarch-test-review", "bmad-testarch-trace"],
-        "codex": ["bmad-testarch-test-design", "bmad-testarch-test-review", "bmad-testarch-trace"]
+        "codex": ["bmad-testarch-test-design", "bmad-testarch-test-review", "bmad-testarch-trace"],
+        "pi": ["bmad-testarch-test-design", "bmad-testarch-test-review", "bmad-testarch-trace"]
       },
       "required_command_pointers": {
         "opencode": ["bmad-testarch-test-design", "bmad-testarch-test-review", "bmad-testarch-trace"]
       },
-      "runtime_targets": ["claude", "codex", "opencode"]
+      "runtime_targets": ["claude", "codex", "opencode", "pi"]
     },
     "superpowers": {
       "id": "superpowers",
@@ -39,7 +40,7 @@
       "owner_url": "https://github.com/obra/superpowers",
       "baseline": "6.4.1",
       "required_native_skills": ["verification-before-completion"],
-      "runtime_targets": ["claude", "codex", "opencode"]
+      "runtime_targets": ["claude", "codex", "opencode", "pi"]
     }
   },
   "quality_references": {
@@ -238,6 +239,7 @@
   "runtime_targets": [
     "claude",
     "codex",
-    "opencode"
+    "opencode",
+    "pi"
   ]
 }

@@ -1,0 +1,2994 @@
+#!/usr/bin/env python3
+"""Capture and compare an immutable GitHub pull-request review context."""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import hashlib
+import json
+import os
+import re
+import secrets
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+from typing import Any, Iterable
+from urllib.parse import urlsplit, urlunsplit
+
+
+if os.name == "nt":
+    import importlib.util
+
+    _backend_spec = importlib.util.spec_from_file_location(
+        "_th_windows_artifact_fs", Path(__file__).with_name("windows_artifact_fs.py")
+    )
+    assert _backend_spec and _backend_spec.loader
+    artifact_fs = importlib.util.module_from_spec(_backend_spec)
+    sys.modules[_backend_spec.name] = artifact_fs
+    _backend_spec.loader.exec_module(artifact_fs)
+else:
+    artifact_fs = os
+
+
+SCHEMA_VERSION = 3
+COMMAND_TIMEOUT_SECONDS = 60
+_capture_deadline: float | None = None
+BOT_BODY_LIMIT = 500
+HUMAN_BODY_LIMIT = 2_000
+DETAILS_RE = re.compile(r"<details\b[^>]*>.*?</details>", re.IGNORECASE | re.DOTALL)
+HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+HTML_TAG_RE = re.compile(r"</?(?:summary|sub|sup|kbd|picture|source)\b[^>]*>", re.IGNORECASE)
+BOT_STATUS_PATTERNS = (
+    ("review limit reached", "Bot status: review limit reached."),
+    ("review skipped", "Bot status: review skipped."),
+    ("review paused", "Bot status: review paused."),
+    ("review in progress", "Bot status: review in progress."),
+)
+
+
+class ContextError(RuntimeError):
+    """Raised when a trustworthy context cannot be captured."""
+
+
+SAFE_LEAF_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+REVIEW_PARENT_RE = re.compile(r"^pr-review-([1-9][0-9]*)$")
+REVIEW_RUN_RE = re.compile(r"^run-([a-f0-9]{32})$")
+REVIEW_OWNER_FILE = ".team-harness-review-owner.json"
+NOFOLLOW = getattr(artifact_fs, "NOFOLLOW", getattr(os, "O_NOFOLLOW", 0))
+DIRECTORY = getattr(artifact_fs, "DIRECTORY", getattr(os, "O_DIRECTORY", 0))
+REPARSE_POINT = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+
+
+def _safe_leaf(name: str) -> str:
+    if name in {".", ".."} or not SAFE_LEAF_RE.fullmatch(name):
+        raise ContextError("artifact leaf name is not safe")
+    return name
+
+
+def _is_link(path: Path) -> bool:
+    try:
+        value = path.lstat()
+    except FileNotFoundError:
+        return False
+    return stat.S_ISLNK(value.st_mode) or bool(getattr(value, "st_file_attributes", 0) & REPARSE_POINT)
+
+
+def _open_directory(path: Path) -> tuple[Path, int]:
+    before = path.lstat()
+    if stat.S_ISLNK(before.st_mode) or getattr(before, "st_file_attributes", 0) & REPARSE_POINT:
+        raise ContextError("artifact directory must not be a symlink")
+    resolved = path.resolve(strict=True)
+    try:
+        fd = artifact_fs.open(resolved, os.O_RDONLY | DIRECTORY | NOFOLLOW)
+    except OSError as error:
+        raise ContextError("cannot open trusted artifact directory") from error
+    try:
+        opened = os.fstat(fd)
+    except OSError as error:
+        os.close(fd)
+        raise ContextError("cannot inspect trusted artifact directory") from error
+    if not stat.S_ISDIR(opened.st_mode):
+        os.close(fd)
+        raise ContextError("trusted artifact root is not a directory")
+    if (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
+        os.close(fd)
+        raise ContextError("artifact directory changed before secure open")
+    return resolved, fd
+
+
+def _regular_stat_at(directory_fd: int, name: str) -> os.stat_result:
+    try:
+        value = artifact_fs.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+    except OSError as error:
+        raise ContextError("cannot inspect artifact leaf") from error
+    if not stat.S_ISREG(value.st_mode):
+        raise ContextError("artifact leaf is not a regular file")
+    return value
+
+
+def safe_read_leaf(root: Path, name: str, *, limit: int = 2_000_000, require_unaliased: bool = False) -> bytes:
+    name = _safe_leaf(name)
+    _, directory_fd = _open_directory(root)
+    try:
+        before = _regular_stat_at(directory_fd, name)
+        if require_unaliased and before.st_nlink != 1:
+            raise ContextError("artifact leaf is hard-linked outside its ownership")
+        try:
+            leaf_fd = artifact_fs.open(name, os.O_RDONLY | NOFOLLOW, dir_fd=directory_fd)
+        except OSError as error:
+            raise ContextError("cannot open artifact leaf without following links") from error
+        try:
+            after = os.fstat(leaf_fd)
+            if not stat.S_ISREG(after.st_mode) or (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+                raise ContextError("artifact leaf changed before secure read")
+            if require_unaliased and after.st_nlink != 1:
+                raise ContextError("artifact leaf is hard-linked outside its ownership")
+            chunks: list[bytes] = []
+            total = 0
+            while True:
+                chunk = os.read(leaf_fd, min(65_536, limit + 1 - total))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                total += len(chunk)
+                if total > limit:
+                    raise ContextError("artifact leaf exceeds safe read limit")
+            return b"".join(chunks)
+        finally:
+            os.close(leaf_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def promote_artifact(root: Path, temporary_name: str, final_name: str, *, exclusive: bool = False) -> None:
+    temporary_name = _safe_leaf(temporary_name)
+    final_name = _safe_leaf(final_name)
+    _, directory_fd = _open_directory(root)
+    try:
+        before = _regular_stat_at(directory_fd, temporary_name)
+        try:
+            temporary_fd = artifact_fs.open(
+                temporary_name,
+                os.O_RDONLY | NOFOLLOW,
+                dir_fd=directory_fd,
+            )
+        except OSError as error:
+            raise ContextError("cannot pin temporary artifact without following links") from error
+        staging: str | None = None
+        try:
+            pinned = os.fstat(temporary_fd)
+            if not stat.S_ISREG(pinned.st_mode) or (before.st_dev, before.st_ino) != (pinned.st_dev, pinned.st_ino):
+                raise ContextError("temporary artifact changed before promotion")
+            try:
+                final = artifact_fs.stat(final_name, dir_fd=directory_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                final = None
+            except OSError as error:
+                raise ContextError("cannot inspect final artifact leaf") from error
+            if final is not None and not stat.S_ISREG(final.st_mode):
+                raise ContextError("final artifact leaf is not a regular file")
+            current = _regular_stat_at(directory_fd, temporary_name)
+            if (current.st_dev, current.st_ino) != (pinned.st_dev, pinned.st_ino):
+                raise ContextError("temporary artifact changed during promotion")
+            staging = f"tmp-pinned-{secrets.token_hex(16)}"
+            try:
+                artifact_fs.link(
+                    temporary_name,
+                    staging,
+                    src_dir_fd=directory_fd,
+                    dst_dir_fd=directory_fd,
+                    follow_symlinks=False,
+                )
+            except OSError as error:
+                raise ContextError("cannot link pinned temporary artifact") from error
+            staged = _regular_stat_at(directory_fd, staging)
+            if (staged.st_dev, staged.st_ino) != (pinned.st_dev, pinned.st_ino):
+                artifact_fs.unlink(staging, dir_fd=directory_fd)
+                raise ContextError("pinned staging artifact identity mismatch")
+            if exclusive:
+                artifact_fs.link(
+                    staging,
+                    final_name,
+                    src_dir_fd=directory_fd,
+                    dst_dir_fd=directory_fd,
+                    follow_symlinks=False,
+                )
+            else:
+                artifact_fs.replace(
+                    staging,
+                    final_name,
+                    src_dir_fd=directory_fd,
+                    dst_dir_fd=directory_fd,
+                )
+            promoted = _regular_stat_at(directory_fd, final_name)
+            if (promoted.st_dev, promoted.st_ino) != (pinned.st_dev, pinned.st_ino):
+                raise ContextError("promoted artifact identity mismatch")
+            try:
+                leftover = artifact_fs.stat(temporary_name, dir_fd=directory_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                leftover = None
+            if leftover is not None and (leftover.st_dev, leftover.st_ino) == (pinned.st_dev, pinned.st_ino):
+                artifact_fs.unlink(temporary_name, dir_fd=directory_fd)
+        except OSError as error:
+            raise ContextError("cannot atomically promote artifact leaf") from error
+        finally:
+            if staging is not None:
+                try:
+                    artifact_fs.unlink(staging, dir_fd=directory_fd)
+                except FileNotFoundError:
+                    pass
+            os.close(temporary_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def _git_local_exclude_path(repo_root: Path) -> Path:
+    """Resolve Git's local exclude without trusting a repository file path."""
+    env = command_environment({
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_COUNT": "0",
+        "GIT_OPTIONAL_LOCKS": "0",
+        "GIT_NO_LAZY_FETCH": "1",
+        "GIT_ALLOW_PROTOCOL": "",
+    })
+    # Resolve metadata from the explicitly requested repository.  Git honors
+    # these inherited overrides even when -C points at another worktree,
+    # which could otherwise redirect the local exclude write to another repo.
+    env.pop("GIT_DIR", None)
+    env.pop("GIT_COMMON_DIR", None)
+    try:
+        git_dir_result = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--git-common-dir"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=COMMAND_TIMEOUT_SECONDS,
+            env=env,
+        )
+        exclude_result = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--git-path", "info/exclude"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=COMMAND_TIMEOUT_SECONDS,
+            env=env,
+        )
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        raise ContextError("cannot resolve Git local exclude") from error
+    git_dir = Path(git_dir_result.stdout.strip())
+    if not git_dir.is_absolute():
+        git_dir = repo_root / git_dir
+    exclude = Path(exclude_result.stdout.strip())
+    if not exclude.is_absolute():
+        exclude = repo_root / exclude
+    try:
+        git_dir = git_dir.resolve(strict=True)
+        exclude_parent = exclude.parent.resolve(strict=True)
+    except OSError as error:
+        raise ContextError("cannot resolve Git local exclude") from error
+    if exclude_parent != git_dir / "info":
+        raise ContextError("Git local exclude is outside the repository metadata")
+    return exclude_parent / exclude.name
+
+
+def ensure_workspaces_ignored(repo_root: Path) -> None:
+    """Keep review artifacts ignored through Git's untracked local exclude."""
+    exclude = _git_local_exclude_path(repo_root)
+    resolved, directory_fd = _open_directory(exclude.parent)
+    del resolved
+    name = _safe_leaf(exclude.name)
+    try:
+        try:
+            current = safe_read_leaf(exclude.parent, name, limit=1_000_000)
+            mode = _regular_stat_at(directory_fd, name).st_mode & 0o777
+        except ContextError:
+            try:
+                existing = artifact_fs.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                current = b""
+                mode = 0o644
+            else:
+                if not stat.S_ISREG(existing.st_mode):
+                    raise ContextError("Git local exclude is not a regular non-symlink file")
+                raise
+        try:
+            text = current.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise ContextError("Git local exclude is not UTF-8 text") from error
+        if any(line in {"/workspaces", "/workspaces/"} for line in text.splitlines()):
+            return
+        updated = current
+        if updated and not updated.endswith(b"\n"):
+            updated += b"\n"
+        updated += b"/workspaces/\n"
+        temporary = f"exclude.team-harness-{secrets.token_hex(8)}"
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW
+        temporary_fd = artifact_fs.open(temporary, flags, mode, dir_fd=directory_fd)
+        try:
+            view = memoryview(updated)
+            while view:
+                view = view[os.write(temporary_fd, view):]
+            os.fsync(temporary_fd)
+        finally:
+            os.close(temporary_fd)
+        artifact_fs.replace(temporary, name, src_dir_fd=directory_fd, dst_dir_fd=directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def _review_owner(pr: int, token: str) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "kind": "team_harness_pr_review_run_owner",
+        "pr": pr,
+        "owner_token": token,
+    }
+
+
+def _review_parent(repo_root: Path, pr: int, *, create: bool) -> Path:
+    if pr <= 0:
+        raise ContextError("PR number must be positive")
+    root, root_fd = _open_directory(repo_root)
+    os.close(root_fd)
+    workspaces = root / "workspaces"
+    if create:
+        workspaces.mkdir(exist_ok=True)
+    workspaces_resolved, workspaces_fd = _open_directory(workspaces)
+    os.close(workspaces_fd)
+    if workspaces_resolved.parent != root:
+        raise ContextError("workspaces must be a direct child of the repository")
+    parent = workspaces_resolved / f"pr-review-{pr}"
+    if create:
+        parent.mkdir(exist_ok=True)
+    parent_resolved, parent_fd = _open_directory(parent)
+    os.close(parent_fd)
+    if parent_resolved.parent != workspaces_resolved:
+        raise ContextError("review parent must be a direct child of workspaces")
+    return parent_resolved
+
+
+def _load_review_owner(artifact_root: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(safe_read_leaf(artifact_root, REVIEW_OWNER_FILE, limit=4096))
+    except (ContextError, json.JSONDecodeError) as error:
+        raise ContextError("review run has no valid ownership marker") from error
+    expected_keys = {"schema_version", "kind", "pr", "owner_token"}
+    if (
+        not isinstance(value, dict)
+        or set(value) != expected_keys
+        or value.get("schema_version") != 1
+        or value.get("kind") != "team_harness_pr_review_run_owner"
+        or not isinstance(value.get("pr"), int)
+        or not re.fullmatch(r"[a-f0-9]{32}", value.get("owner_token", ""))
+    ):
+        raise ContextError("review run has no valid ownership marker")
+    return value
+
+
+def validate_owned_review_run(
+    repo_root: Path,
+    artifact_root: Path,
+    owner_token: str,
+    pr: int,
+) -> Path:
+    if not re.fullmatch(r"[a-f0-9]{32}", owner_token):
+        raise ContextError("invalid review run owner token")
+    run, run_fd = _open_directory(artifact_root)
+    os.close(run_fd)
+    if run.name != f"run-{owner_token}":
+        raise ContextError("review run path does not match its owner token")
+    expected_parent = _review_parent(repo_root, pr, create=False)
+    if run.parent != expected_parent:
+        raise ContextError("review run is outside the repository review parent")
+    if _load_review_owner(run) != _review_owner(pr, owner_token):
+        raise ContextError("review run ownership mismatch")
+    return run
+
+
+def create_review_run(repo_root: Path, pr: int) -> dict[str, Any]:
+    parent = _review_parent(repo_root, pr, create=True)
+    for _ in range(8):
+        token = secrets.token_hex(16)
+        artifact_root = parent / f"run-{token}"
+        try:
+            artifact_root.mkdir()
+        except FileExistsError:
+            continue
+        marker = json.dumps(_review_owner(pr, token), sort_keys=True).encode("utf-8") + b"\n"
+        directory, directory_fd = _open_directory(artifact_root)
+        try:
+            marker_fd = artifact_fs.open(
+                REVIEW_OWNER_FILE,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW,
+                0o600,
+                dir_fd=directory_fd,
+            )
+            try:
+                view = memoryview(marker)
+                while view:
+                    view = view[os.write(marker_fd, view):]
+                os.fsync(marker_fd)
+            finally:
+                os.close(marker_fd)
+        except Exception:
+            try:
+                artifact_fs.unlink(REVIEW_OWNER_FILE, dir_fd=directory_fd)
+            except FileNotFoundError:
+                pass
+            os.close(directory_fd)
+            artifact_root.rmdir()
+            raise
+        os.close(directory_fd)
+        return {"artifact_root": str(directory), "owner_token": token, "pr": pr}
+    raise ContextError("cannot allocate an isolated review run")
+
+
+def _temporary_leaf(artifact_root: Path, prefix: str, *, pin: bool = False) -> Path | tuple[Path, int]:
+    _safe_leaf(prefix)
+    _, directory_fd = _open_directory(artifact_root)
+    try:
+        for _ in range(8):
+            name = f"{prefix}.{secrets.token_hex(8)}"
+            try:
+                leaf_fd = artifact_fs.open(
+                    name,
+                    os.O_RDWR | os.O_CREAT | os.O_EXCL | NOFOLLOW,
+                    0o600,
+                    dir_fd=directory_fd,
+                )
+            except FileExistsError:
+                continue
+            if pin:
+                return artifact_root / name, leaf_fd
+            os.close(leaf_fd)
+            return artifact_root / name
+    finally:
+        os.close(directory_fd)
+    raise ContextError("cannot allocate a temporary review artifact")
+
+
+def _discard_artifact_leaf(
+    artifact_root: Path,
+    name: str,
+    *,
+    expected_identity: tuple[int, int] | None = None,
+    owned_names: tuple[str, ...] = (),
+) -> None:
+    name = _safe_leaf(name)
+    _, directory_fd = _open_directory(artifact_root)
+    try:
+        try:
+            metadata = artifact_fs.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        if not stat.S_ISREG(metadata.st_mode):
+            raise ContextError("temporary artifact is not a regular file")
+        if expected_identity is not None:
+            if (metadata.st_dev, metadata.st_ino) != expected_identity:
+                raise ContextError("capture artifact was replaced; preserve the current leaf")
+            owned_links = 0
+            for owned_name in set(owned_names or (name,)):
+                try:
+                    candidate = artifact_fs.stat(_safe_leaf(owned_name), dir_fd=directory_fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    continue
+                if stat.S_ISREG(candidate.st_mode) and (candidate.st_dev, candidate.st_ino) == expected_identity:
+                    owned_links += 1
+            if metadata.st_nlink != owned_links:
+                raise ContextError("capture artifact has links outside this attempt; preserve the leaf")
+        artifact_fs.unlink(name, dir_fd=directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def _write_existing_leaf(path: Path, content: bytes) -> None:
+    root, directory_fd = _open_directory(path.parent)
+    del root
+    name = _safe_leaf(path.name)
+    try:
+        before = _regular_stat_at(directory_fd, name)
+        leaf_fd = artifact_fs.open(name, os.O_WRONLY | os.O_TRUNC | NOFOLLOW, dir_fd=directory_fd)
+        try:
+            opened = os.fstat(leaf_fd)
+            if (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
+                raise ContextError("temporary artifact changed before write")
+            view = memoryview(content)
+            while view:
+                view = view[os.write(leaf_fd, view):]
+            os.fsync(leaf_fd)
+        finally:
+            os.close(leaf_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def promote_artifact_pair(
+    artifact_root: Path,
+    first_temporary_name: str,
+    first_final_name: str,
+    second_temporary_name: str,
+    second_final_name: str,
+) -> None:
+    names = [
+        _safe_leaf(first_temporary_name),
+        _safe_leaf(first_final_name),
+        _safe_leaf(second_temporary_name),
+        _safe_leaf(second_final_name),
+    ]
+    if len(set(names)) != len(names):
+        raise ContextError("artifact pair names must be distinct")
+
+    previous: list[bytes | None] = []
+    for final in (first_final_name, second_final_name):
+        try:
+            previous.append(safe_read_leaf(artifact_root, final))
+        except ContextError as error:
+            if not isinstance(error.__cause__, FileNotFoundError):
+                raise
+            previous.append(None)
+    rollback: list[Path | None] = []
+    try:
+        for index, content in enumerate(previous):
+            temporary = (
+                _temporary_leaf(artifact_root, f"tmp-artifact-pair-rollback-{index}")
+                if content is not None else None
+            )
+            rollback.append(temporary)
+            if temporary is not None:
+                _write_existing_leaf(temporary, content)
+        try:
+            promote_artifact(artifact_root, first_temporary_name, first_final_name)
+            promote_artifact(artifact_root, second_temporary_name, second_final_name)
+        except Exception as promotion_error:
+            rollback_errors: list[Exception] = []
+            for temporary, final in zip(
+                rollback, (first_final_name, second_final_name), strict=True
+            ):
+                try:
+                    if temporary is None:
+                        _discard_artifact_leaf(artifact_root, final)
+                    else:
+                        promote_artifact(artifact_root, temporary.name, final)
+                except Exception as rollback_error:
+                    rollback_errors.append(rollback_error)
+            if rollback_errors:
+                raise ContextError("artifact pair promotion and rollback failed") from promotion_error
+            raise
+    finally:
+        for temporary in rollback:
+            if temporary is not None:
+                _discard_artifact_leaf(artifact_root, temporary.name)
+
+
+def find_resumable_review_run(repo_root: Path, pr: int) -> dict[str, Any]:
+    parent = _review_parent(repo_root, pr, create=False)
+    candidates: list[dict[str, Any]] = []
+    for child in parent.iterdir():
+        if not REVIEW_RUN_RE.fullmatch(child.name) or _is_link(child) or not child.is_dir():
+            continue
+        try:
+            resolved, descriptor = _open_directory(child)
+            os.close(descriptor)
+            owner = _load_review_owner(resolved)
+            if owner["pr"] != pr or child.name != f"run-{owner['owner_token']}":
+                continue
+            context_leaf = safe_read_leaf(resolved, "pr-review-context.json")
+            draft_leaf = safe_read_leaf(resolved, "pr-review-final.md")
+            inline_leaf = safe_read_leaf(resolved, "pr-review-inline.json")
+            if not context_leaf or not draft_leaf or not inline_leaf:
+                continue
+        except (ContextError, OSError):
+            continue
+        candidates.append({
+            "artifact_root": str(resolved),
+            "owner_token": owner["owner_token"],
+            "pr": pr,
+        })
+    if len(candidates) != 1:
+        raise ContextError(
+            "resume requires exactly one complete isolated review run"
+        )
+    return candidates[0]
+
+
+def _remove_tree_contents(directory_fd: int) -> None:
+    with artifact_fs.scandir(directory_fd) as entries:
+        for entry in entries:
+            metadata = artifact_fs.stat(entry.name, dir_fd=directory_fd, follow_symlinks=False)
+            if stat.S_ISDIR(metadata.st_mode):
+                child_fd = artifact_fs.open(entry.name, os.O_RDONLY | DIRECTORY | NOFOLLOW, dir_fd=directory_fd)
+                try:
+                    _remove_tree_contents(child_fd)
+                finally:
+                    os.close(child_fd)
+                artifact_fs.rmdir(entry.name, dir_fd=directory_fd)
+            elif stat.S_ISREG(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
+                artifact_fs.unlink(entry.name, dir_fd=directory_fd)
+            else:
+                raise ContextError("review run contains an unexpected special file")
+
+
+def cleanup_review_run(repo_root: Path, artifact_root: Path, owner_token: str) -> None:
+    parent_match = REVIEW_PARENT_RE.fullmatch(artifact_root.parent.name)
+    if not parent_match:
+        raise ContextError("review run path does not match its owner token")
+    pr = int(parent_match.group(1))
+    run = validate_owned_review_run(repo_root, artifact_root, owner_token, pr)
+    expected_parent = run.parent
+
+    snapshot = run / "pr-review-snapshot.git"
+    worktree = run / "pr-review-worktree"
+    if worktree.exists() or _is_link(worktree):
+        if _is_link(worktree) or not snapshot.is_dir() or _is_link(snapshot):
+            raise ContextError("cannot prove ownership of the frozen worktree")
+        run_text([
+            "git", "--git-dir", str(snapshot), "worktree", "remove", str(worktree),
+        ])
+        if worktree.exists() or _is_link(worktree):
+            raise ContextError("frozen worktree cleanup did not complete")
+
+    parent_fd = artifact_fs.open(expected_parent, os.O_RDONLY | DIRECTORY | NOFOLLOW)
+    try:
+        pinned_fd = artifact_fs.open(run.name, os.O_RDONLY | DIRECTORY | NOFOLLOW, dir_fd=parent_fd)
+        try:
+            _remove_tree_contents(pinned_fd)
+        finally:
+            os.close(pinned_fd)
+        artifact_fs.rmdir(run.name, dir_fd=parent_fd)
+    finally:
+        os.close(parent_fd)
+
+
+def command_environment(extra_env: dict[str, str] | None = None) -> dict[str, str]:
+    environment = {
+        **os.environ,
+        "GH_PROMPT_DISABLED": "1",
+        "GIT_TERMINAL_PROMPT": "0",
+        **(extra_env or {}),
+    }
+    # A caller supplies the repository through an explicit cwd or Git argument.  Do not let
+    # ambient repository-selection variables redirect a helper-owned Git operation elsewhere.
+    for name in (
+        "GIT_DIR",
+        "GIT_WORK_TREE",
+        "GIT_COMMON_DIR",
+        "GIT_INDEX_FILE",
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_NAMESPACE",
+        "GIT_PREFIX",
+        "GIT_CEILING_DIRECTORIES",
+    ):
+        environment.pop(name, None)
+    return environment
+
+
+def _decode_command_output(
+    output: bytes | str | None,
+    command: list[str],
+    stream: str,
+    *,
+    replace_errors: bool = False,
+) -> str:
+    if output is None:
+        return ""
+    if isinstance(output, str):
+        return output
+    try:
+        return output.decode("utf-8", errors="replace" if replace_errors else "strict")
+    except UnicodeDecodeError as error:
+        raise ContextError(
+            f"{' '.join(command[:3])} returned invalid UTF-8 on {stream}"
+        ) from error
+
+
+def run_json(
+    command: list[str],
+    *,
+    cwd: Path | None = None,
+    extra_env: dict[str, str] | None = None,
+) -> Any:
+    timeout = command_timeout()
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            check=False,
+            capture_output=True,
+            text=False,
+            timeout=timeout,
+            env=command_environment(extra_env),
+        )
+    except subprocess.TimeoutExpired as error:
+        raise ContextError(
+            f"{' '.join(command[:3])} timed out within the {COMMAND_TIMEOUT_SECONDS}s capture limit"
+        ) from error
+    if result.returncode != 0:
+        detail = (
+            _decode_command_output(result.stderr, command, "stderr", replace_errors=True).strip()
+            or _decode_command_output(result.stdout, command, "stdout", replace_errors=True).strip()
+            or "unknown error"
+        )
+        raise ContextError(f"{' '.join(command[:3])} failed: {detail}")
+    output = _decode_command_output(result.stdout, command, "stdout")
+    try:
+        return json.loads(output)
+    except json.JSONDecodeError as error:
+        raise ContextError(f"{' '.join(command[:3])} returned invalid JSON") from error
+
+
+def run_text(
+    command: list[str],
+    *,
+    cwd: Path | None = None,
+    extra_env: dict[str, str] | None = None,
+) -> str:
+    timeout = command_timeout()
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            check=False,
+            capture_output=True,
+            text=False,
+            timeout=timeout,
+            env=command_environment(extra_env),
+        )
+    except subprocess.TimeoutExpired as error:
+        raise ContextError(
+            f"{' '.join(command[:3])} timed out within the {COMMAND_TIMEOUT_SECONDS}s capture limit"
+        ) from error
+    if result.returncode != 0:
+        detail = (
+            _decode_command_output(result.stderr, command, "stderr", replace_errors=True).strip()
+            or _decode_command_output(result.stdout, command, "stdout", replace_errors=True).strip()
+            or "unknown error"
+        )
+        raise ContextError(f"{' '.join(command[:3])} failed: {detail}")
+    return _decode_command_output(result.stdout, command, "stdout").strip()
+
+
+def command_timeout() -> float:
+    if _capture_deadline is None:
+        return float(COMMAND_TIMEOUT_SECONDS)
+    remaining = _capture_deadline - time.monotonic()
+    if remaining <= 0:
+        raise ContextError(
+            f"capture timed out within the {COMMAND_TIMEOUT_SECONDS}s capture limit"
+        )
+    return min(float(COMMAND_TIMEOUT_SECONDS), remaining)
+
+
+def configure_deadline(deadline_epoch: float | None = None) -> None:
+    global _capture_deadline
+    if deadline_epoch is None:
+        _capture_deadline = time.monotonic() + COMMAND_TIMEOUT_SECONDS
+        return
+    remaining = deadline_epoch - time.time()
+    _capture_deadline = time.monotonic() + max(0.0, remaining)
+
+
+def run_to_leaf(
+    artifact_root: Path,
+    name: str,
+    command: list[str],
+    *,
+    combine_stderr: bool = False,
+    allow_failure: bool = False,
+) -> int:
+    name = _safe_leaf(name)
+    _, directory_fd = _open_directory(artifact_root)
+    try:
+        before = _regular_stat_at(directory_fd, name)
+        try:
+            leaf_fd = artifact_fs.open(name, os.O_WRONLY | os.O_TRUNC | NOFOLLOW, dir_fd=directory_fd)
+        except OSError as error:
+            raise ContextError("cannot open temporary artifact without following links") from error
+        try:
+            opened = os.fstat(leaf_fd)
+            if (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
+                raise ContextError("temporary artifact changed before command write")
+            timeout = command_timeout()
+            try:
+                result = subprocess.run(
+                    command,
+                    check=False,
+                    stdout=leaf_fd,
+                    stderr=subprocess.STDOUT if combine_stderr else subprocess.PIPE,
+                    timeout=timeout,
+                    env=command_environment(),
+                )
+            except subprocess.TimeoutExpired as error:
+                raise ContextError(
+                    f"{' '.join(command[:3])} timed out within the "
+                    f"{COMMAND_TIMEOUT_SECONDS}s capture limit"
+                ) from error
+            if result.returncode != 0 and not allow_failure:
+                detail = (result.stderr or b"").decode(errors="replace").strip()
+                raise ContextError(
+                    f"{' '.join(command[:3])} failed: {detail or 'unknown error'}"
+                )
+            return result.returncode
+        finally:
+            os.close(leaf_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def is_bot(login: str) -> bool:
+    lowered = login.lower()
+    return lowered.endswith("[bot]") or lowered.endswith("-bot") or lowered in {
+        "coderabbitai",
+        "github-actions",
+    }
+
+
+def clean_body(body: str | None, login: str = "") -> str:
+    """Remove bot chrome and bound prose while retaining actionable content."""
+    text = body or ""
+    text = DETAILS_RE.sub(" ", text)
+    text = HTML_COMMENT_RE.sub(" ", text)
+    text = HTML_TAG_RE.sub(" ", text)
+    text = re.sub(r"</?details\b[^>]*>", " ", text, flags=re.IGNORECASE)
+    text = text.replace("\x00", "")
+    text = re.sub(r"[ \t]+\n", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    if is_bot(login):
+        lowered = text.lower()
+        for marker, summary in BOT_STATUS_PATTERNS:
+            if marker in lowered:
+                return summary
+        text = re.sub(
+            r"\n---\n.*?thanks for using \[?coderabbit.*$",
+            "",
+            text,
+            flags=re.IGNORECASE | re.DOTALL,
+        ).strip()
+    limit = BOT_BODY_LIMIT if is_bot(login) else HUMAN_BODY_LIMIT
+    if len(text) > limit:
+        text = text[: limit - 18].rstrip() + "\n[… body trimmed]"
+    return text
+
+
+def is_noise_issue_comment(comment: dict[str, Any]) -> bool:
+    body = (comment.get("body") or "").strip()
+    if body.startswith("Bot status:"):
+        return True
+    return bool(
+        re.fullmatch(
+            r"(?:@[\w-]+(?:\[bot\])?|https://github\.com/[\w-]+)\s+"
+            r"(?:review|re-review|full review)",
+            body,
+            flags=re.IGNORECASE,
+        )
+    )
+
+
+def flatten_pages(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    if value and all(isinstance(page, list) for page in value):
+        return [item for page in value for item in page if isinstance(item, dict)]
+    return [item for item in value if isinstance(item, dict)]
+
+
+def gh_pages(endpoint: str) -> list[dict[str, Any]]:
+    return flatten_pages(run_json(["gh", "api", "--paginate", "--slurp", endpoint]))
+
+
+def author_login(value: Any) -> str:
+    if isinstance(value, dict):
+        return str(value.get("login") or "")
+    return ""
+
+
+def capture_issue_comments(repo: str, number: int) -> list[dict[str, Any]]:
+    rows = gh_pages(f"repos/{repo}/issues/{number}/comments?per_page=100")
+    return [
+        {
+            "id": row.get("id"),
+            "author": author_login(row.get("user")),
+            "created_at": row.get("created_at"),
+            "updated_at": row.get("updated_at"),
+            "url": row.get("html_url"),
+            "body": clean_body(row.get("body"), author_login(row.get("user"))),
+        }
+        for row in rows
+    ]
+
+
+def capture_reviews(repo: str, number: int) -> list[dict[str, Any]]:
+    rows = gh_pages(f"repos/{repo}/pulls/{number}/reviews?per_page=100")
+    return [
+        {
+            "id": row.get("id"),
+            "author": author_login(row.get("user")),
+            "state": row.get("state"),
+            "submitted_at": row.get("submitted_at"),
+            "commit_id": row.get("commit_id"),
+            "body": clean_body(row.get("body"), author_login(row.get("user"))),
+        }
+        for row in rows
+    ]
+
+
+def capture_review_comments(repo: str, number: int) -> list[dict[str, Any]]:
+    rows = gh_pages(f"repos/{repo}/pulls/{number}/comments?per_page=100")
+    return [
+        {
+            "id": row.get("id"),
+            "review_id": row.get("pull_request_review_id"),
+            "reply_to_id": row.get("in_reply_to_id"),
+            "author": author_login(row.get("user")),
+            "path": row.get("path"),
+            "line": row.get("line"),
+            "original_line": row.get("original_line"),
+            "side": row.get("side"),
+            "commit_id": row.get("commit_id"),
+            "original_commit_id": row.get("original_commit_id"),
+            "created_at": row.get("created_at"),
+            "updated_at": row.get("updated_at"),
+            "url": row.get("html_url"),
+            "body": clean_body(row.get("body"), author_login(row.get("user"))),
+        }
+        for row in rows
+    ]
+
+
+THREADS_QUERY = """
+query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100, after: $cursor) {
+        nodes {
+          id isResolved isOutdated path line originalLine
+          comments(first: 100) {
+            nodes {
+              databaseId body createdAt updatedAt url
+              author { login }
+              commit { oid }
+              replyTo { databaseId }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+}
+"""
+
+THREAD_COMMENTS_QUERY = """
+query($threadId: ID!, $cursor: String!) {
+  node(id: $threadId) {
+    ... on PullRequestReviewThread {
+      comments(first: 100, after: $cursor) {
+        nodes {
+          databaseId body createdAt updatedAt url
+          author { login }
+          commit { oid }
+          replyTo { databaseId }
+        }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+}
+"""
+
+
+def normalize_thread_comment(comment: dict[str, Any]) -> dict[str, Any]:
+    login = author_login(comment.get("author"))
+    return {
+        "id": comment.get("databaseId"),
+        "reply_to_id": (comment.get("replyTo") or {}).get("databaseId"),
+        "author": login,
+        "created_at": comment.get("createdAt"),
+        "updated_at": comment.get("updatedAt"),
+        "commit_id": (comment.get("commit") or {}).get("oid"),
+        "url": comment.get("url"),
+        "body": clean_body(comment.get("body"), login),
+    }
+
+
+def capture_thread_comments(node: dict[str, Any]) -> list[dict[str, Any]]:
+    connection = node.get("comments") or {}
+    comments = [
+        normalize_thread_comment(comment)
+        for comment in connection.get("nodes") or []
+    ]
+    while (connection.get("pageInfo") or {}).get("hasNextPage"):
+        cursor = (connection.get("pageInfo") or {}).get("endCursor")
+        if not cursor:
+            raise ContextError("GitHub reported another comment page without a cursor")
+        data = run_json(
+            [
+                "gh",
+                "api",
+                "graphql",
+                "-f",
+                f"query={THREAD_COMMENTS_QUERY}",
+                "-f",
+                f"threadId={node.get('id')}",
+                "-f",
+                f"cursor={cursor}",
+            ]
+        )
+        connection = (data.get("data", {}).get("node") or {}).get("comments") or {}
+        comments.extend(
+            normalize_thread_comment(comment)
+            for comment in connection.get("nodes") or []
+        )
+    return comments
+
+
+def capture_threads(repo: str, number: int) -> list[dict[str, Any]]:
+    owner, name = repo.split("/", 1)
+    cursor: str | None = None
+    threads: list[dict[str, Any]] = []
+    while True:
+        command = [
+            "gh",
+            "api",
+            "graphql",
+            "-f",
+            f"query={THREADS_QUERY}",
+            "-F",
+            f"owner={owner}",
+            "-F",
+            f"name={name}",
+            "-F",
+            f"number={number}",
+        ]
+        if cursor:
+            command.extend(["-f", f"cursor={cursor}"])
+        data = run_json(command)
+        connection = (
+            data.get("data", {})
+            .get("repository", {})
+            .get("pullRequest", {})
+            .get("reviewThreads", {})
+        )
+        for node in connection.get("nodes") or []:
+            threads.append(
+                {
+                    "id": node.get("id"),
+                    "resolved": bool(node.get("isResolved")),
+                    "outdated": bool(node.get("isOutdated")),
+                    "path": node.get("path"),
+                    "line": node.get("line"),
+                    "original_line": node.get("originalLine"),
+                    "comments": capture_thread_comments(node),
+                }
+            )
+        page_info = connection.get("pageInfo") or {}
+        if not page_info.get("hasNextPage"):
+            break
+        cursor = page_info.get("endCursor")
+        if not cursor:
+            raise ContextError("GitHub reported another thread page without a cursor")
+    return threads
+
+
+def capture_commits(repo: str, number: int) -> list[dict[str, Any]]:
+    rows = gh_pages(f"repos/{repo}/pulls/{number}/commits?per_page=100")
+    return [
+        {
+            "oid": row.get("sha"),
+            "author": (
+                author_login(row.get("author"))
+                or ((row.get("commit") or {}).get("author") or {}).get("name")
+            ),
+            "authored_at": ((row.get("commit") or {}).get("author") or {}).get("date"),
+            "subject": (
+                ((row.get("commit") or {}).get("message") or "").strip().splitlines()
+                or [""]
+            )[0],
+        }
+        for row in rows
+    ]
+
+
+def git_snapshot(
+    source_repo: Path,
+    snapshot_dir: Path,
+    remote: str,
+    number: int,
+    base_oid: str,
+    head_oid: str,
+) -> dict[str, str]:
+    if _is_link(snapshot_dir):
+        raise ContextError("snapshot repository must not be a symlink")
+    if snapshot_dir.exists():
+        if not snapshot_dir.is_dir():
+            raise ContextError("snapshot repository must be a real directory")
+        is_bare = run_text(
+            ["git", "--git-dir", str(snapshot_dir), "rev-parse", "--is-bare-repository"]
+        )
+        if is_bare != "true":
+            raise ContextError("snapshot repository is not a bare Git repository")
+    else:
+        run_text(
+            ["git", "init", "--bare", "--quiet", "--template=", str(snapshot_dir)]
+        )
+
+    if os.name == "nt":
+        # The isolated review prefix can push ordinary repository paths past
+        # Windows' legacy limit. Keep this setting in the owned snapshot only.
+        run_text(["git", "--git-dir", str(snapshot_dir), "config", "core.longpaths", "true"])
+
+    fetch_source = run_text(
+        ["git", "remote", "get-url", remote],
+        cwd=source_repo,
+    )
+    source_objects = Path(
+        run_text(["git", "rev-parse", "--git-path", "objects"], cwd=source_repo)
+    )
+    if not source_objects.is_absolute():
+        source_objects = source_repo / source_objects
+    try:
+        source_objects = source_objects.resolve(strict=True)
+    except OSError as error:
+        raise ContextError("cannot resolve the operator checkout object database") from error
+    if not source_objects.is_dir():
+        raise ContextError("operator checkout object database is not a directory")
+    alternate_env = {
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES": str(source_objects),
+        "GIT_NO_REPLACE_OBJECTS": "1",
+    }
+    prefix = f"refs/team-harness/review-pr/{number}"
+    base_ref = f"{prefix}/base"
+    head_ref = f"{prefix}/head"
+    run_text(
+        [
+            "git",
+            "--git-dir",
+            str(snapshot_dir),
+            "fetch",
+            "--no-tags",
+            "--force",
+            fetch_source,
+            f"+{base_oid}:{base_ref}",
+            f"+refs/pull/{number}/head:{head_ref}",
+        ],
+        extra_env=alternate_env,
+    )
+    run_text(
+        ["git", "--git-dir", str(snapshot_dir), "repack", "-a", "-d"],
+        extra_env=alternate_env,
+    )
+    fetched_base = run_text(
+        ["git", "--git-dir", str(snapshot_dir), "rev-parse", base_ref]
+    )
+    fetched_head = run_text(
+        ["git", "--git-dir", str(snapshot_dir), "rev-parse", head_ref]
+    )
+    if fetched_base != base_oid or fetched_head != head_oid:
+        raise ContextError(
+            "PR changed while context was captured; retry before reviewing "
+            f"(expected {base_oid[:12]}..{head_oid[:12]}, "
+            f"fetched {fetched_base[:12]}..{fetched_head[:12]})"
+        )
+    merge_base = run_text(
+        ["git", "--git-dir", str(snapshot_dir), "merge-base", base_ref, head_ref]
+    )
+    return {
+        "base_ref": base_ref,
+        "head_ref": head_ref,
+        "merge_base_oid": merge_base,
+    }
+
+
+def stable_hash(value: Any) -> str:
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def semantic_conversation_identity(context: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "pr_metadata": {
+            "title": (context.get("pr") or {}).get("title"),
+            "body": (context.get("pr") or {}).get("body"),
+        },
+    }
+
+
+def review_state_identity(context: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "issue_comments": [
+            comment
+            for comment in context.get("issue_comments", [])
+            if not is_noise_issue_comment(comment)
+        ],
+        "review_comments": context.get("review_comments", []),
+        "review_threads": context.get("review_threads", []),
+        "reviews": context.get("reviews", []),
+    }
+
+
+def conversation_identity(context: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "semantic": semantic_conversation_identity(context),
+        "review_state": review_state_identity(context),
+    }
+
+
+def classify_mergeability(mergeable: Any, merge_state_status: Any) -> str:
+    mergeable_value = str(mergeable or "").upper()
+    state_value = str(merge_state_status or "").upper()
+    if mergeable_value == "CONFLICTING" or state_value == "DIRTY":
+        return "conflicting"
+    if mergeable_value == "MERGEABLE" and state_value == "CLEAN":
+        return "clean"
+    return "indeterminate"
+
+
+SENSITIVE_PATH_PARTS = {
+    "auth", "authorization", "crypto", "middleware", "permission", "security",
+    "secret", "session",
+}
+SENSITIVE_FILENAMES = {
+    "cargo.lock", "cargo.toml", "go.mod", "go.sum", "package-lock.json",
+    "package.json", "pnpm-lock.yaml", "poetry.lock", "pyproject.toml",
+    "requirements.txt", "yarn.lock",
+}
+NON_EXECUTABLE_SUFFIXES = {
+    ".adoc", ".avif", ".bmp", ".cfg", ".gif", ".ico", ".ini", ".jpeg", ".jpg",
+    ".json", ".md", ".pdf", ".png", ".properties", ".rst", ".svg", ".toml",
+    ".txt", ".webp", ".yaml", ".yml",
+}
+SENSITIVE_DIFF_TOKENS = re.compile(
+    r"\b(auth(?:entication|orization)?|crypt(?:o|ography)|eval|exec|password|"
+    r"permission|secret|session|subprocess|token)\b|(?:command|sql)\s*(?:build|construct)",
+    re.IGNORECASE,
+)
+
+
+DIFF_FILE_BOUNDARY = re.compile(r"(?=^diff --git )", re.MULTILINE)
+DIFF_HUNK_START = re.compile(r"^(?:--- |\+\+\+ |@@)")
+DIFF_BINARY_MARKER = re.compile(r"^(?:GIT binary patch|Binary files .+ differ)$")
+
+
+def _is_binary_section(section: str) -> bool:
+    # The marker is only authoritative in Git's own header block, before any hunk line —
+    # a hunk's readable content can otherwise contain the literal marker text as data.
+    for line in section.splitlines():
+        if DIFF_HUNK_START.match(line):
+            return False
+        if DIFF_BINARY_MARKER.match(line):
+            return True
+    return False
+
+
+def _readable_diff_text(diff: str) -> str:
+    """Diff text with each binary file's own section dropped, keeping every readable hunk
+    scannable even when another file in the same PR is binary."""
+    sections = DIFF_FILE_BOUNDARY.split(diff)
+    return "".join(section for section in sections if not _is_binary_section(section))
+
+
+def _is_workflow_path(path: Path) -> bool:
+    parts = [part.lower() for part in path.parts]
+    return any(left == ".github" and right == "workflows" for left, right in zip(parts, parts[1:]))
+
+
+def classify_security_change(changed_files: str, diff: str) -> str:
+    paths = [line.strip() for line in changed_files.splitlines() if line.strip()]
+    if not paths or not diff.strip():
+        return "indeterminate"
+    if any("\x00" in value for value in (changed_files, diff)):
+        return "indeterminate"
+
+    for raw_path in paths:
+        path = Path(raw_path)
+        parts = {part.lower() for part in path.parts}
+        if parts & SENSITIVE_PATH_PARTS or path.name.lower() in SENSITIVE_FILENAMES or _is_workflow_path(path):
+            return "known-sensitive"
+    if SENSITIVE_DIFF_TOKENS.search(_readable_diff_text(diff)):
+        return "known-sensitive"
+    if all(Path(path).suffix.lower() in NON_EXECUTABLE_SUFFIXES for path in paths):
+        return "known-non-executable"
+    return "unmatched-executable"
+
+
+def finalize_hashes(context: dict[str, Any]) -> None:
+    code = {
+        "base_oid": context["base_oid"],
+        "head_oid": context["head_oid"],
+        "merge_base_oid": context["merge_base_oid"],
+    }
+    context["code_hash"] = stable_hash(code)
+    context["technical_hash"] = stable_hash(
+        {"code_hash": context["code_hash"], "commits": context.get("commits", [])}
+    )
+    context["semantic_conversation_hash"] = stable_hash(
+        semantic_conversation_identity(context)
+    )
+    context["review_state_hash"] = stable_hash(review_state_identity(context))
+    context["conversation_hash"] = stable_hash(conversation_identity(context))
+    context["context_hash"] = stable_hash(
+        {
+            "technical_hash": context["technical_hash"],
+            "conversation_hash": context["conversation_hash"],
+        }
+    )
+
+
+def capture_metadata(repo: str, number: int) -> dict[str, Any]:
+    return run_json(
+        [
+            "gh",
+            "pr",
+            "view",
+            str(number),
+            "--repo",
+            repo,
+            "--json",
+            (
+                "number,title,body,author,baseRefName,headRefName,baseRefOid,"
+                "headRefOid,isCrossRepository,additions,deletions,changedFiles,url,files,"
+                "mergeable,mergeStateStatus"
+            ),
+        ]
+    )
+
+
+def capture(
+    repo: str,
+    number: int,
+    source_repo: Path,
+    remote: str,
+    snapshot_dir: Path,
+) -> dict[str, Any]:
+    metadata = capture_metadata(repo, number)
+    base_oid = metadata.get("baseRefOid")
+    head_oid = metadata.get("headRefOid")
+    if not base_oid or not head_oid:
+        raise ContextError("GitHub did not return baseRefOid and headRefOid")
+
+    refs = git_snapshot(
+        source_repo,
+        snapshot_dir,
+        remote,
+        number,
+        base_oid,
+        head_oid,
+    )
+    context: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "fetched_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "repository": repo,
+        "pr": {
+            "number": metadata.get("number"),
+            "title": metadata.get("title"),
+            "body": metadata.get("body") or "",
+            "author": author_login(metadata.get("author")),
+            "base_ref": metadata.get("baseRefName"),
+            "head_ref": metadata.get("headRefName"),
+            "is_cross_repository": bool(metadata.get("isCrossRepository")),
+            "additions": metadata.get("additions"),
+            "deletions": metadata.get("deletions"),
+            "changed_files": metadata.get("changedFiles"),
+            "url": metadata.get("url"),
+            "files": metadata.get("files") or [],
+        },
+        "base_oid": base_oid,
+        "head_oid": head_oid,
+        "merge_base_oid": refs["merge_base_oid"],
+        "git_refs": {"base": refs["base_ref"], "head": refs["head_ref"]},
+        "mergeability": {
+            "status": classify_mergeability(
+                metadata.get("mergeable"), metadata.get("mergeStateStatus")
+            ),
+            "mergeable": metadata.get("mergeable"),
+            "merge_state_status": metadata.get("mergeStateStatus"),
+        },
+        "commits": capture_commits(repo, number),
+        "issue_comments": capture_issue_comments(repo, number),
+        "review_comments": capture_review_comments(repo, number),
+        "review_threads": capture_threads(repo, number),
+        "reviews": capture_reviews(repo, number),
+    }
+    final_metadata = capture_metadata(repo, number)
+    for field in (
+        "baseRefOid", "headRefOid", "title", "body", "mergeable", "mergeStateStatus"
+    ):
+        if (metadata.get(field) or "") != (final_metadata.get(field) or ""):
+            raise ContextError(
+                f"PR {field} changed while context was captured; retry before reviewing"
+            )
+    finalize_hashes(context)
+    return context
+
+
+def load_context(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ContextError(f"cannot read context {path}: {error}") from error
+    if value.get("schema_version") != SCHEMA_VERSION:
+        raise ContextError(f"unsupported context schema in {path}")
+    return value
+
+
+CODE_IDENTITY_FIELDS = ("base_oid", "head_oid", "merge_base_oid")
+FULL_OID_RE = re.compile(r"^[0-9a-f]{40}(?:[0-9a-f]{24})?$")
+
+
+def is_full_oid(value: Any) -> bool:
+    """Return whether value is a complete SHA-1 or SHA-256 Git object ID."""
+    return isinstance(value, str) and FULL_OID_RE.fullmatch(value) is not None
+
+
+def derived_code_hash(context: dict[str, Any]) -> str:
+    return stable_hash({field: context.get(field) for field in CODE_IDENTITY_FIELDS})
+
+
+def derived_technical_hash(context: dict[str, Any], code_hash: str) -> str:
+    return stable_hash({"code_hash": code_hash, "commits": context.get("commits", [])})
+
+
+def compare_contexts(expected: dict[str, Any], actual: dict[str, Any]) -> dict[str, Any]:
+    # OIDs are the source identity.  Stored hashes are useful evidence, but must not be
+    # trusted as the only freshness signal: a stale or edited context can retain equal hashes.
+    expected_code_hash = derived_code_hash(expected)
+    actual_code_hash = derived_code_hash(actual)
+    expected_technical_hash = derived_technical_hash(expected, expected_code_hash)
+    actual_technical_hash = derived_technical_hash(actual, actual_code_hash)
+    expected_hash_consistent = (
+        all(is_full_oid(expected.get(field)) for field in CODE_IDENTITY_FIELDS)
+        and (expected.get("code_hash") is None or expected.get("code_hash") == expected_code_hash)
+        and (expected.get("technical_hash") is None or expected.get("technical_hash") == expected_technical_hash)
+    )
+    actual_hash_consistent = (
+        all(is_full_oid(actual.get(field)) for field in CODE_IDENTITY_FIELDS)
+        and (actual.get("code_hash") is None or actual.get("code_hash") == actual_code_hash)
+        and (actual.get("technical_hash") is None or actual.get("technical_hash") == actual_technical_hash)
+    )
+    target_changed = (
+        expected.get("repository") != actual.get("repository")
+        or expected.get("pr", {}).get("number") != actual.get("pr", {}).get("number")
+    )
+    commits_changed = expected.get("commits") != actual.get("commits")
+    expected_semantic_hash = expected.get("semantic_conversation_hash") or stable_hash(
+        semantic_conversation_identity(expected)
+    )
+    actual_semantic_hash = actual.get("semantic_conversation_hash") or stable_hash(
+        semantic_conversation_identity(actual)
+    )
+    expected_review_state_hash = expected.get("review_state_hash") or stable_hash(
+        review_state_identity(expected)
+    )
+    actual_review_state_hash = actual.get("review_state_hash") or stable_hash(
+        review_state_identity(actual)
+    )
+    semantic_conversation_changed = expected_semantic_hash != actual_semantic_hash
+    review_state_changed = expected_review_state_hash != actual_review_state_hash
+    conversation_changed = semantic_conversation_changed or review_state_changed
+    mergeability_changed = expected.get("mergeability") != actual.get("mergeability")
+    changed_fields = [
+        key
+        for key in CODE_IDENTITY_FIELDS
+        if expected.get(key) != actual.get(key)
+    ]
+    code_changed = bool(changed_fields) or commits_changed or expected_code_hash != actual_code_hash
+    context_integrity_changed = not expected_hash_consistent or not actual_hash_consistent
+    invalid_context = context_integrity_changed or target_changed
+    return {
+        "status": (
+            "invalid-context"
+            if invalid_context
+            else "code-changed"
+            if code_changed
+            else "conversation-changed"
+            if conversation_changed
+            else "current"
+        ),
+        "code_changed": code_changed,
+        "conversation_changed": conversation_changed,
+        "conversation_change_kind": (
+            "semantic"
+            if semantic_conversation_changed
+            else "review-state"
+            if review_state_changed
+            else "none"
+        ),
+        "next_action": (
+            "recover-context"
+            if invalid_context
+            else "reconcile-review"
+            if code_changed
+            else "reconcile-conversation"
+            if conversation_changed
+            else "continue"
+        ),
+        # Reuse describes the captured snapshot, never automatic coverage of a newer head.
+        "technical_results_reusable": not invalid_context,
+        "context_integrity_changed": context_integrity_changed,
+        "target_changed": target_changed,
+        "mergeability_changed": mergeability_changed,
+        "changed_fields": changed_fields,
+        "expected_head_oid": expected.get("head_oid"),
+        "actual_head_oid": actual.get("head_oid"),
+        "expected_context_hash": expected.get("context_hash"),
+        "actual_context_hash": actual.get("context_hash"),
+        "expected_technical_hash": expected_technical_hash,
+        "actual_technical_hash": actual_technical_hash,
+    }
+
+
+def latest_same_author(context: dict[str, Any], login: str) -> dict[str, Any] | None:
+    root_comment_review_ids = {
+        comment.get("review_id")
+        for comment in context.get("review_comments", [])
+        if comment.get("author") == login
+        and not comment.get("reply_to_id")
+        and (comment.get("body") or "").strip()
+    }
+    candidates = [
+        review
+        for review in context.get("reviews", [])
+        if review.get("author") == login and review.get("state") != "DISMISSED"
+        and (
+            review.get("state") in {"APPROVED", "CHANGES_REQUESTED"}
+            or (review.get("body") or "").strip()
+            or review.get("id") in root_comment_review_ids
+        )
+    ]
+    if not candidates:
+        return None
+    return max(
+        candidates,
+        key=lambda review: (review.get("submitted_at") or "", int(review.get("id") or 0)),
+    )
+
+
+def body_lines(body: str, indent: str = "  ") -> Iterable[str]:
+    for line in body.splitlines() or ["(empty)"]:
+        yield f"{indent}{line}"
+
+
+def render_context(context: dict[str, Any]) -> str:
+    mergeability = context.get("mergeability") or {}
+    lines = [
+        f"Reviewed snapshot: `{context['head_oid']}`",
+        f"Base snapshot: `{context['base_oid']}`",
+        f"Merge base: `{context['merge_base_oid']}`",
+        f"Captured at: `{context.get('fetched_at', 'unknown')}`",
+        f"Mergeability: **{mergeability.get('status', 'indeterminate')}**",
+        f"Raw mergeable: `{mergeability.get('mergeable')}`",
+        f"Raw merge state: `{mergeability.get('merge_state_status')}`",
+        "",
+        "## Commits",
+    ]
+    for commit in context.get("commits", []):
+        subject = commit.get("subject") or commit.get("message") or ""
+        lines.append(f"- `{str(commit.get('oid') or '')[:12]}` {subject}")
+    if not context.get("commits"):
+        lines.append("- None")
+
+    lines.extend(["", "## Open review threads"])
+    open_threads = [
+        thread
+        for thread in context.get("review_threads", [])
+        if not thread.get("resolved") and not thread.get("outdated")
+    ]
+    for thread in open_threads:
+        lines.append(
+            f"- Thread `{thread.get('id')}` at "
+            f"`{thread.get('path')}:{thread.get('line') or thread.get('original_line') or '?'}`"
+        )
+        for comment in thread.get("comments", []):
+            lines.append(
+                f"  - @{comment.get('author')} ({comment.get('updated_at') or comment.get('created_at')}):"
+            )
+            lines.extend(body_lines(comment.get("body") or "", "    "))
+    if not open_threads:
+        lines.append("- None")
+
+    recent_threads = sorted(
+        [
+            thread
+            for thread in context.get("review_threads", [])
+            if thread.get("resolved") or thread.get("outdated")
+        ],
+        key=lambda thread: max(
+            [
+                comment.get("updated_at") or comment.get("created_at") or ""
+                for comment in thread.get("comments", [])
+            ]
+            or [""]
+        ),
+        reverse=True,
+    )[:10]
+    lines.extend(["", "## Recently closed or outdated threads"])
+    for thread in recent_threads:
+        disposition = "resolved" if thread.get("resolved") else "outdated"
+        latest = (thread.get("comments") or [{}])[-1]
+        lines.append(
+            f"- [{disposition}] `{thread.get('path')}:{thread.get('line') or thread.get('original_line') or '?'}` "
+            f"latest @{latest.get('author')}: {latest.get('body') or '(empty)'}"
+        )
+    if not recent_threads:
+        lines.append("- None")
+
+    all_issue_comments = sorted(
+        [
+            comment
+            for comment in context.get("issue_comments", [])
+            if (comment.get("body") or "").strip() and not is_noise_issue_comment(comment)
+        ],
+        key=lambda comment: comment.get("updated_at") or comment.get("created_at") or "",
+        reverse=True,
+    )
+    issue_comments = [
+        comment for comment in all_issue_comments if not is_bot(comment.get("author") or "")
+    ][:20]
+    issue_comments.extend(
+        [
+            comment
+            for comment in all_issue_comments
+            if is_bot(comment.get("author") or "")
+        ][:5]
+    )
+    issue_comments.sort(
+        key=lambda comment: comment.get("updated_at") or comment.get("created_at") or "",
+        reverse=True,
+    )
+    lines.extend(["", "## Recent PR conversation"])
+    for comment in issue_comments:
+        lines.append(
+            f"- ID {comment.get('id')} @{comment.get('author')} "
+            f"({comment.get('updated_at') or comment.get('created_at')}):"
+        )
+        lines.extend(body_lines(comment.get("body") or ""))
+    if not issue_comments:
+        lines.append("- None")
+
+    reviews = sorted(
+        context.get("reviews", []),
+        key=lambda review: review.get("submitted_at") or "",
+        reverse=True,
+    )[:20]
+    lines.extend(["", "## Prior formal reviews"])
+    for review in reviews:
+        lines.append(
+            f"- ID {review.get('id')} @{review.get('author')} [{review.get('state')}] "
+            f"on `{str(review.get('commit_id') or '')[:12]}` ({review.get('submitted_at')}):"
+        )
+        lines.extend(body_lines(review.get("body") or ""))
+    if not reviews:
+        lines.append("- None")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def write_json(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(value, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+
+def resolve_snapshot_dir(artifact_root: Path, requested_snapshot: Path) -> Path:
+    try:
+        snapshot_parent = requested_snapshot.parent.resolve(strict=True)
+    except OSError as error:
+        raise ContextError(
+            "snapshot repository parent does not exist; pass --snapshot-dir "
+            "inside the artifact root"
+        ) from error
+    if snapshot_parent != artifact_root:
+        raise ContextError("snapshot repository must be a direct child of the artifact root")
+    _safe_leaf(requested_snapshot.name)
+    return artifact_root / requested_snapshot.name
+
+
+def command_deadline(args: argparse.Namespace) -> int:
+    if args.seconds <= 0 or args.seconds > COMMAND_TIMEOUT_SECONDS:
+        raise ContextError(
+            f"deadline must be between 1 and {COMMAND_TIMEOUT_SECONDS} seconds"
+        )
+    print(f"{time.time() + args.seconds:.6f}")
+    return 0
+
+
+def capture_to_path(
+    *,
+    repo: str,
+    pr: int,
+    output: Path,
+    git_dir: Path,
+    snapshot_dir: Path | None,
+    deadline_epoch: float | None,
+    remote: str = "origin",
+) -> dict[str, Any]:
+    global _capture_deadline
+    artifact_root, artifact_fd = _open_directory(output.parent)
+    os.close(artifact_fd)
+    requested_snapshot = snapshot_dir or artifact_root / "pr-review-snapshot.git"
+    snapshot_dir = resolve_snapshot_dir(artifact_root, requested_snapshot)
+    configure_deadline(deadline_epoch)
+    try:
+        context = capture(
+            repo,
+            pr,
+            git_dir.resolve(),
+            remote,
+            snapshot_dir,
+        )
+    finally:
+        _capture_deadline = None
+    write_json(output, context)
+    return context
+
+
+def command_capture(args: argparse.Namespace) -> int:
+    context = capture_to_path(
+        repo=args.repo,
+        pr=args.pr,
+        output=args.output,
+        git_dir=args.git_dir,
+        snapshot_dir=args.snapshot_dir,
+        deadline_epoch=args.deadline_epoch,
+        remote=args.remote,
+    )
+    print(
+        json.dumps(
+            {
+                "status": "captured",
+                "head_oid": context["head_oid"],
+                "base_oid": context["base_oid"],
+                "merge_base_oid": context["merge_base_oid"],
+                "technical_hash": context["technical_hash"],
+                "conversation_hash": context["conversation_hash"],
+                "context_hash": context["context_hash"],
+                "mergeability": context.get("mergeability"),
+                "output": str(args.output),
+            }
+        )
+    )
+    return 0
+
+
+def materialize_review_artifacts(
+    *,
+    repo: str,
+    pr: int,
+    context_path: Path,
+    artifact_root_value: Path,
+    snapshot_dir_value: Path,
+    diff_name: str,
+    files_name: str,
+    checks_name: str,
+    worktree: Path,
+    deadline_epoch: float,
+) -> None:
+    global _capture_deadline
+    artifact_root, artifact_fd = _open_directory(artifact_root_value)
+    os.close(artifact_fd)
+    snapshot_dir = resolve_snapshot_dir(artifact_root, snapshot_dir_value)
+    context = load_context(context_path)
+    git_refs = context.get("git_refs") or {}
+    base_ref = git_refs.get("base")
+    head_ref = git_refs.get("head")
+    head_oid = context.get("head_oid")
+    if not all(isinstance(value, str) and value for value in (base_ref, head_ref, head_oid)):
+        raise ContextError("context is missing immutable Git refs for materialization")
+    if _is_link(worktree) or worktree.exists():
+        raise ContextError("frozen worktree path already exists; remove it before retrying")
+
+    configure_deadline(deadline_epoch)
+    try:
+        run_to_leaf(
+            artifact_root,
+            diff_name,
+            ["git", "--git-dir", str(snapshot_dir), "diff", f"{base_ref}...{head_ref}"],
+        )
+        run_to_leaf(
+            artifact_root,
+            files_name,
+            [
+                "git",
+                "--git-dir",
+                str(snapshot_dir),
+                "diff",
+                "--name-only",
+                f"{base_ref}...{head_ref}",
+            ],
+        )
+        run_to_leaf(
+            artifact_root,
+            checks_name,
+            ["gh", "pr", "checks", str(pr), "--repo", repo],
+            combine_stderr=True,
+            allow_failure=True,
+        )
+        run_text(
+            [
+                "git",
+                "--git-dir",
+                str(snapshot_dir),
+                "worktree",
+                "add",
+                "--detach",
+                str(worktree),
+                head_oid,
+            ]
+        )
+    except Exception as error:
+        cleanup_error: str | None = None
+        try:
+            cleanup_timeout = command_timeout()
+        except ContextError:
+            cleanup_timeout = None
+            cleanup_error = (
+                "shared deadline exhausted before partial worktree cleanup; "
+                f"inspect {worktree} and {snapshot_dir}"
+            )
+        if (
+            cleanup_timeout is not None
+            and worktree.exists()
+            and not _is_link(worktree)
+        ):
+            try:
+                cleanup = subprocess.run(
+                    [
+                        "git",
+                        "--git-dir",
+                        str(snapshot_dir),
+                        "worktree",
+                        "remove",
+                        str(worktree),
+                    ],
+                    check=False,
+                    capture_output=True,
+                    timeout=cleanup_timeout,
+                    env=command_environment(),
+                )
+                if cleanup.returncode != 0:
+                    cleanup_error = (
+                        "partial worktree cleanup failed within the shared deadline; "
+                        f"inspect {worktree} and {snapshot_dir}"
+                    )
+            except (OSError, subprocess.TimeoutExpired):
+                cleanup_error = (
+                    "partial worktree cleanup did not complete within the shared "
+                    f"deadline; inspect {worktree} and {snapshot_dir}"
+                )
+        if cleanup_error is not None:
+            raise ContextError(f"{error}; {cleanup_error}") from error
+        raise
+    finally:
+        _capture_deadline = None
+
+
+def command_materialize(args: argparse.Namespace) -> int:
+    materialize_review_artifacts(
+        repo=args.repo,
+        pr=args.pr,
+        context_path=args.context,
+        artifact_root_value=args.artifact_root,
+        snapshot_dir_value=args.snapshot_dir,
+        diff_name=args.diff_name,
+        files_name=args.files_name,
+        checks_name=args.checks_name,
+        worktree=args.worktree,
+        deadline_epoch=args.deadline_epoch,
+    )
+    print(json.dumps({"status": "materialized", "worktree": str(args.worktree)}))
+    return 0
+
+
+def command_compare(args: argparse.Namespace) -> int:
+    result = compare_contexts(load_context(args.expected), load_context(args.actual))
+    print(json.dumps(result))
+    return 20 if result["next_action"] == "recover-context" else 0
+
+
+def command_render(args: argparse.Namespace) -> int:
+    rendered = render_context(load_context(args.context))
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(rendered, encoding="utf-8")
+    else:
+        sys.stdout.write(rendered)
+    return 0
+
+
+def command_same_author(args: argparse.Namespace) -> int:
+    review = latest_same_author(load_context(args.context), args.login)
+    print(json.dumps(review))
+    return 0
+
+
+REASONS_RECOMMENDING_SECURITY = {"known-sensitive", "unmatched-executable"}
+REASONS_WITHOUT_SECURITY_SIGNAL = {"known-non-executable", "indeterminate"}
+
+
+def resolve_security_required(reason: str, triggers: list[str]) -> bool:
+    """Compatibility helper: only an explicit operator request selects security.
+
+    Risk classification is advisory. Keep this name for callers of older helper
+    versions, but do not let a path/content category become a mandatory lens.
+    """
+    if reason not in REASONS_RECOMMENDING_SECURITY | REASONS_WITHOUT_SECURITY_SIGNAL:
+        raise ContextError("unknown security classification")
+    return "explicit" in triggers
+
+
+def command_select_security(args: argparse.Namespace) -> int:
+    # Decode with replacement rather than strict UTF-8 so a non-UTF-8 hunk never
+    # skips classification; only a real read failure fails closed below.
+    try:
+        changed_files = args.changed_files.read_bytes().decode("utf-8", errors="replace")
+        diff = args.diff.read_bytes().decode("utf-8", errors="replace")
+        if "\x00" in changed_files or "\x00" in diff or bool(changed_files.strip()) != bool(diff.strip()):
+            raise ContextError("security selection requires consistent captured text artifacts")
+        reason = classify_security_change(changed_files, diff)
+    except OSError as error:
+        raise ContextError("security selection requires readable captured artifacts") from error
+    triggers = []
+    if args.explicit_security:
+        triggers.append("explicit")
+    if args.tier == 4:
+        triggers.append("tier-4")
+    explicit = resolve_security_required(reason, triggers)
+    print(json.dumps({
+        "reason": reason,
+        "security_recommended": reason in REASONS_RECOMMENDING_SECURITY or bool(triggers),
+        "security_selected": explicit,
+        # Backward-compatible field; it now means explicitly selected, never
+        # automatically required by classification.
+        "security_required": explicit,
+        "triggers": triggers,
+    }))
+    return 0
+
+
+VERIFICATION_MODES = ("blocking-only", "all", "off")
+DEFAULT_MAX_SUGGESTIONS = 5
+POLICY_YAML_BLOCK_RE = re.compile(r"```ya?ml[ \t]*\n(.*?)\n```", re.DOTALL)
+POLICY_KEY_RE = re.compile(r"^\s*(verification|max_suggestions)\s*:\s*([^#\n]*?)\s*(?:#.*)?$")
+BLOCKING_PREFIX_RE = re.compile(r"^\s*\*\*Blocking:\s*", re.IGNORECASE)
+SUGGESTION_PREFIX_RE = re.compile(r"^\s*\*\*Suggestion:\s*", re.IGNORECASE)
+MAX_SUGGESTIONS_RE = re.compile(r"^[0-9]+$")
+REVIEW_AGENT_NAMES = (
+    "reviewer",
+    "pr-review-qa",
+    "pr-review-security",
+    "pr-review-verifier",
+    "reviewer-consolidator",
+)
+
+
+def read_review_policy(policy_path: Path | None) -> dict[str, Any]:
+    """Read the verification bar and suggestion cap from the optional review policy."""
+    policy = {
+        "verification": "blocking-only",
+        "max_suggestions": DEFAULT_MAX_SUGGESTIONS,
+        "source": "default",
+    }
+    if policy_path is None:
+        return policy
+    try:
+        text = policy_path.read_text(encoding="utf-8")
+    except OSError as error:
+        raise ContextError(f"review policy could not be read: {policy_path}") from error
+    block = POLICY_YAML_BLOCK_RE.search(text)
+    if block is not None:
+        for line in block.group(1).splitlines():
+            match = POLICY_KEY_RE.match(line)
+            if not match:
+                continue
+            key, value = match.group(1), match.group(2).strip().strip("'\"")
+            if key == "verification":
+                if value not in VERIFICATION_MODES:
+                    raise ContextError(f"review policy verification must be one of {', '.join(VERIFICATION_MODES)}")
+                policy["verification"] = value
+            else:
+                if not MAX_SUGGESTIONS_RE.fullmatch(value):
+                    raise ContextError("review policy max_suggestions must be a non-negative integer")
+                policy["max_suggestions"] = int(value)
+            policy["source"] = "policy"
+    return policy
+
+
+def read_base_review_policy(snapshot_git: Path, base_oid: str) -> dict[str, Any]:
+    """Read the policy from the base commit so the reviewed PR cannot set its own bar."""
+    if not re.fullmatch(r"[0-9a-f]{40}", base_oid):
+        raise ContextError("base oid must be a full commit SHA")
+    git = ["git", "--git-dir", str(snapshot_git)]
+    if not run_text([*git, "ls-tree", base_oid, "--", ".team-harness/review-policy.md"]):
+        return read_review_policy(None)
+    shown = run_text([*git, "show", f"{base_oid}:.team-harness/review-policy.md"])
+    with tempfile.TemporaryDirectory() as directory:
+        policy_path = Path(directory) / "review-policy.md"
+        policy_path.write_text(shown, encoding="utf-8")
+        policy = read_review_policy(policy_path)
+    policy["source"] = "base-commit" if policy["source"] == "policy" else policy["source"]
+    return policy
+
+
+def command_policy(args: argparse.Namespace) -> int:
+    if args.snapshot_git is not None or args.base_oid is not None:
+        if args.snapshot_git is None or args.base_oid is None:
+            raise ContextError("policy needs both --snapshot-git and --base-oid")
+        print(json.dumps(read_base_review_policy(args.snapshot_git, args.base_oid), sort_keys=True))
+        return 0
+    policy_path = None if args.policy in (None, "none") else Path(args.policy)
+    print(json.dumps(read_review_policy(policy_path), sort_keys=True))
+    return 0
+
+
+def _finding_key(finding: dict[str, Any]) -> tuple[str, int, str]:
+    try:
+        return (str(finding["path"]), int(finding["line"]), str(finding["side"]))
+    except (KeyError, TypeError, ValueError) as error:
+        raise ContextError("inline finding lacks a complete path/line/side anchor") from error
+
+
+def _is_blocking(finding: dict[str, Any]) -> bool:
+    """Anything not explicitly labelled a Suggestion is verified as blocking."""
+    return not SUGGESTION_PREFIX_RE.match(str(finding.get("body", "")))
+
+
+def apply_verification(
+    inline: list[dict[str, Any]],
+    verifier: dict[str, Any] | None,
+    mode: str,
+) -> dict[str, Any]:
+    """Validate advisory assessments without changing any finding or disposition.
+
+    Main owns the final inline payload and ledger. A present verifier must cover exactly
+    the selected findings; absence remains a coverage gap that forces COMMENT.
+    """
+    if mode not in VERIFICATION_MODES:
+        raise ContextError("unknown verification mode")
+    if not isinstance(inline, list) or not all(isinstance(item, dict) for item in inline):
+        raise ContextError("inline findings must be a JSON array of objects")
+    if mode == "off":
+        return {
+            "inline": inline,
+            "ledger": [],
+            "assessments": [],
+            "coverage": "verification off (policy)",
+            "forced_event": None,
+            "confirmed": 0,
+            "selected": 0,
+        }
+    selected = [finding for finding in inline if mode == "all" or _is_blocking(finding)]
+    selected_keys = [_finding_key(finding) for finding in selected]
+    inline_keys = [_finding_key(finding) for finding in inline]
+    if len(set(inline_keys)) != len(inline_keys):
+        raise ContextError("inline findings share one path:line side anchor, so verifier statuses would be ambiguous")
+    if verifier is None:
+        return {
+            "inline": inline,
+            "ledger": [],
+            "assessments": [],
+            "coverage": f"verified 0/{len(selected)} (verifier absent)",
+            "forced_event": "COMMENT",
+            "confirmed": 0,
+            "selected": len(selected),
+        }
+    if not isinstance(verifier, dict) or not isinstance(verifier.get("findings"), list):
+        raise ContextError("verifier findings must be a JSON array")
+    statuses: dict[tuple[str, int, str], dict[str, Any]] = {}
+    for result in verifier["findings"]:
+        if not isinstance(result, dict):
+            raise ContextError("verifier finding must be an object")
+        if result.get("status") not in {"confirmed", "unconfirmed", "refuted"}:
+            raise ContextError("verifier status must be confirmed, unconfirmed, or refuted")
+        required_field = "reason" if result["status"] == "unconfirmed" else "evidence"
+        if not isinstance(result.get(required_field), str) or not result[required_field].strip():
+            raise ContextError(f"verifier {result['status']} assessment requires non-empty {required_field}")
+        key = _finding_key(result)
+        if key in statuses:
+            raise ContextError(f"verifier returned two statuses for {key[0]}:{key[1]} {key[2]}")
+        statuses[key] = result
+    if set(statuses) != set(selected_keys):
+        missing = len(set(selected_keys) - set(statuses))
+        unexpected = len(set(statuses) - set(selected_keys))
+        raise ContextError(
+            f"verifier coverage does not match the selected findings ({missing} missing, {unexpected} unexpected)"
+        )
+    assessments = [statuses[key] for key in selected_keys]
+    confirmed = sum(result["status"] == "confirmed" for result in assessments)
+    return {
+        "inline": inline,
+        "ledger": [],
+        "assessments": assessments,
+        "coverage": f"verified {confirmed}/{len(selected)}",
+        "forced_event": None,
+        "confirmed": confirmed,
+        "selected": len(selected),
+    }
+
+
+def write_artifact_leaf(root: Path, name: str, content: bytes) -> None:
+    """Write one artifact leaf through an exclusive temporary and atomic promotion."""
+    name = _safe_leaf(name)
+    temporary = f"tmp-{secrets.token_hex(8)}-{name}"
+    _, directory_fd = _open_directory(root)
+    try:
+        leaf_fd = artifact_fs.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | NOFOLLOW, 0o600, dir_fd=directory_fd)
+        try:
+            view = memoryview(content)
+            while view:
+                view = view[os.write(leaf_fd, view):]
+            os.fsync(leaf_fd)
+        finally:
+            os.close(leaf_fd)
+    finally:
+        os.close(directory_fd)
+    promote_artifact(root, temporary, name)
+
+
+PAGE_CAPTURE_LIMIT = 2_000_000
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+PAGE_WORKSPACE_MANIFEST = "pr-review-workspace.json"
+
+
+def _capture_text(value: Any, maximum: int = 4096) -> bool:
+    return (isinstance(value, str) and bool(value) and value.strip() == value
+            and len(value.encode("utf-8")) <= maximum and not re.search(r"[\x00-\x1f\x7f]", value))
+
+
+def _capture_id(value: Any) -> bool:
+    return _capture_text(value, 512) and not re.search(r"[\s/\\:]", value) and value not in {".", ".."}
+
+
+def _capture_check_no_userinfo_marker(reference: str) -> None:
+    # Percent escapes must not hide userinfo in retained source references.
+    decoded = reference
+    while True:
+        if "@" in decoded:
+            raise ContextError("Page capture source reference is invalid")
+        next_decoded = re.sub(r"%([0-9A-Fa-f]{2})", lambda match: chr(int(match.group(1), 16)), decoded)
+        if next_decoded == decoded:
+            return
+        decoded = next_decoded
+
+
+def _capture_source_reference(value: Any, *, identity: bool = False) -> str:
+    if not _capture_text(value, 1024 if identity else 4096):
+        raise ContextError("Page capture source reference is invalid")
+    origin = re.match(r"^(?:origin:)+", value, re.IGNORECASE)
+    prefix = origin.group() if origin is not None else ""
+    reference = value[len(prefix):]
+    if not reference or any(character.isspace() or character == "\ufeff"
+                            for character in (reference[0], reference[-1])):
+        raise ContextError("Page capture source reference is invalid")
+    if identity and (not _capture_text(reference, 1024) or reference.startswith(("/", "\\"))
+                     or re.match(r"^(?:[A-Za-z]:|file:)", reference, re.IGNORECASE)):
+        raise ContextError("Page capture source identity must be portable")
+    url_looking = re.match(r"^(?:[A-Za-z][A-Za-z0-9+.-]*://|(?:https?|ssh):)", reference, re.IGNORECASE) is not None
+    if url_looking:
+        if "\\" in reference or not re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://[^/?#]+", reference):
+            raise ContextError("Page capture source reference is invalid")
+        try:
+            parsed = urlsplit(reference)
+            if not parsed.hostname:
+                raise ValueError("URL hostname is missing")
+            _ = parsed.port  # urlsplit defers validation of malformed authority ports.
+            host = parsed.netloc.rsplit("@", 1)[-1]
+            _capture_check_no_userinfo_marker(host)
+            return prefix + urlunsplit((parsed.scheme, host, parsed.path, "", ""))
+        except ValueError:
+            raise ContextError("Page capture source reference is invalid") from None
+    retained = reference
+    scp = re.fullmatch(r"[^@:/\\?#\s]+@(\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9._-]+):([^@]+)", reference)
+    if scp is not None:
+        host, remote_path = scp.groups()
+        if host.startswith("["):
+            try:
+                urlsplit("ssh://" + host + "/")
+            except ValueError:
+                raise ContextError("Page capture source reference is invalid") from None
+        source_path = re.split(r"[?#]", remote_path, maxsplit=1)[0]
+        if not source_path:
+            raise ContextError("Page capture source reference is invalid")
+        retained = host + ":" + source_path
+    if re.search(r"[?#]", retained):
+        raise ContextError("Page capture source reference is invalid")
+    _capture_check_no_userinfo_marker(retained)
+    return prefix + retained
+
+
+def _capture_sources(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list) or not 1 <= len(value) <= 128:
+        raise ContextError("Page capture requires verified source associations")
+    result = []
+    identities: set[tuple[str, str]] = set()
+    for source in value:
+        if (not isinstance(source, dict) or source.get("kind") not in ("repository", "projectless")
+                or source.get("role") not in ("writable-owner", "evidence-only")
+                or source.get("verified") is not True
+                or (source["kind"] == "projectless" and source["role"] != "writable-owner")):
+            raise ContextError("Page capture source association is unverified")
+        item = {"kind": source["kind"], "identity": _capture_source_reference(source.get("identity"), identity=True),
+                "role": source["role"], "verified": True}
+        key = (item["kind"], item["identity"])
+        if key in identities:
+            raise ContextError("Page capture source association is duplicated")
+        identities.add(key)
+        if "canonical_source" in source:
+            item["canonical_source"] = _capture_source_reference(source["canonical_source"])
+        if "aliases" in source:
+            if not isinstance(source["aliases"], list) or len(source["aliases"]) > 128:
+                raise ContextError("Page capture source aliases are invalid")
+            aliases = []
+            for alias in source["aliases"]:
+                if not isinstance(alias, dict) or alias.get("verified") is not True:
+                    raise ContextError("Page capture source alias is unverified")
+                aliases.append({"identity": _capture_source_reference(alias.get("identity"), identity=True),
+                                "evidence": _capture_source_reference(alias.get("evidence")), "verified": True})
+            item["aliases"] = sorted(aliases, key=lambda alias: (alias["identity"], alias["evidence"]))
+        result.append(item)
+    if not any(source["role"] == "writable-owner" for source in result):
+        raise ContextError("Page capture requires an owning source association")
+    return sorted(result, key=lambda source: (source["kind"], source["identity"], source["role"]))
+
+
+def _page_capture_value(snapshot: Any, reviewed_head: str, technical_hash: str) -> tuple[dict[str, Any], list[bytes]]:
+    if not is_full_oid(reviewed_head) or not isinstance(technical_hash, str) or not SHA256_RE.fullmatch(technical_hash):
+        raise ContextError("Page capture requires reviewed head and technical hash")
+    try:
+        if len(json.dumps(snapshot, ensure_ascii=False).encode("utf-8")) > PAGE_CAPTURE_LIMIT:
+            raise ContextError("Page capture exceeds the supplied JSON limit")
+    except (TypeError, ValueError, UnicodeError, RecursionError) as error:
+        raise ContextError("Page capture must be bounded JSON") from error
+    if not isinstance(snapshot, dict) or not _capture_id(snapshot.get("page_id")):
+        raise ContextError("Page capture requires an expected Page identity")
+    page_id = snapshot["page_id"]
+    url = snapshot.get("url")
+    if url != f"https://chatgpt.com/space/{page_id}" or urlsplit(url).path != f"/space/{page_id}":
+        raise ContextError("Page capture URL does not match its Page")
+    stream = snapshot.get("stream_kind")
+    if stream not in ("content", "scratch"):
+        raise ContextError("Page capture requires the selected stream")
+    selected = snapshot.get("selected_block_ids")
+    if (not isinstance(selected, list) or not 1 <= len(selected) <= 64
+            or not all(_capture_id(block_id) for block_id in selected) or len(set(selected)) != len(selected)):
+        raise ContextError("Page capture requires explicit selected block IDs")
+    captured_at = snapshot.get("captured_at")
+    try:
+        if not _capture_text(captured_at, 64) or dt.datetime.fromisoformat(captured_at.replace("Z", "+00:00")).utcoffset() is None:
+            raise ValueError("timezone required")
+    except ValueError as error:
+        raise ContextError("Page capture requires a timestamp with timezone") from error
+    sources = _capture_sources(snapshot.get("source_associations"))
+    if sources != _capture_sources(snapshot.get("expected_source_associations")):
+        raise ContextError("Page capture source association does not match the bound effort")
+    read = snapshot.get("native_read")
+    if not isinstance(read, dict) or read.get("isError"):
+        raise ContextError("Page capture requires a successful native read")
+    read = read.get("structuredContent", read)
+    if (not isinstance(read, dict) or "error" in read or read.get("view") not in (None, "editing", "full")
+            or "block_excerpts" in read or any(read.get(key) for key in ("truncated", "incomplete", "content_truncated"))):
+        raise ContextError("Page capture requires complete native blocks")
+    metadata, content = read.get("metadata"), read.get("content")
+    if (not isinstance(metadata, dict) or not isinstance(content, dict)
+            or metadata.get("page_id") != page_id or content.get("page_id") != page_id
+            or metadata.get("url") != url or metadata.get("stream_kind", "content") != stream
+            or metadata.get("drive_scope") not in (None, "space")
+            or type(content.get("schema_version")) is not int or content["schema_version"] not in (1, 2)):
+        raise ContextError("Page capture native Page or stream identity disagrees")
+    sequence = content.get("through_sequence")
+    if "through_sequence" in content and (type(sequence) is not int or sequence < 0):
+        raise ContextError("Page capture sequence is invalid")
+    blocks = content.get("blocks")
+    if not isinstance(blocks, list) or not 1 <= len(blocks) <= 4096:
+        raise ContextError("Page capture requires complete native blocks")
+    captured_blocks, payloads, seen = [], [], set()
+    for block in blocks:
+        if (not isinstance(block, dict) or not _capture_id(block.get("id")) or block["id"] in seen
+                or block.get("kind") not in ("markdown", "agent_instructions") or not isinstance(block.get("markdown"), str)
+                or not isinstance(block.get("hash"), str) or not SHA256_RE.fullmatch(block["hash"])):
+            raise ContextError("Page capture block metadata is invalid")
+        seen.add(block["id"])
+        payload = block["markdown"].encode("utf-8")
+        if hashlib.sha256(payload).hexdigest() != block["hash"]:
+            raise ContextError("Page capture block hash does not match its complete content")
+        if block["id"] in selected:
+            captured_blocks.append({key: block[key] for key in ("id", "kind", "hash", "markdown")})
+            payloads.append(payload)
+    if not set(selected).issubset(seen):
+        raise ContextError("Page capture selected blocks are missing")
+    if "selection" in read:
+        selection = read["selection"]
+        if (not isinstance(selection, dict) or selection.get("selection_complete") is not True
+                or selection.get("missing_block_ids") != [] or selection.get("returned_block_count") != len(blocks)
+                or not isinstance(selection.get("blocks"), list)
+                or [item.get("block_id") if isinstance(item, dict) else None for item in selection["blocks"]] != [block["id"] for block in blocks]):
+            raise ContextError("Page capture native selection is incomplete or inconsistent")
+    files = [{"block_id": block["id"], "kind": block["kind"], "native_hash": block["hash"],
+              "captured_leaf": f"pr-review-workspace-page-{index:03d}.md", "sha256": block["hash"]}
+             for index, block in enumerate(captured_blocks, 1)]
+    manifest = {"schema_version": 1, "provider": "gpt-space", "page_id": page_id, "url": url,
+                "stream_kind": stream, "source_associations": sources, "captured_at": captured_at,
+                "reviewed_head": reviewed_head, "technical_hash": technical_hash,
+                "content_sha256": stable_hash(captured_blocks), "files": files}
+    if "through_sequence" in content:
+        manifest["through_sequence"] = sequence
+    return manifest, payloads
+
+
+def _owned_page_capture_root(artifact_root: Path) -> Path:
+    root, descriptor = _open_directory(artifact_root)
+    os.close(descriptor)
+    owner = _load_review_owner(root)
+    return validate_owned_review_run(root.parent.parent.parent, root, owner["owner_token"], owner["pr"])
+
+
+def _capture_cleanup_note(error: Exception, message: str) -> None:
+    add_note = getattr(error, "add_note", None)
+    if callable(add_note):
+        add_note(message)
+    else:
+        print(f"review-context: {message}", file=sys.stderr)
+
+
+def _pin_capture_alias(root: Path, name: str, pinned: int) -> int:
+    name = _safe_leaf(name)
+    _, directory_fd = _open_directory(root)
+    try:
+        alias = artifact_fs.open(name, os.O_RDONLY | NOFOLLOW, dir_fd=directory_fd)
+        try:
+            original = os.fstat(pinned)
+            observed = os.fstat(alias)
+            if not stat.S_ISREG(observed.st_mode) or (observed.st_dev, observed.st_ino) != (original.st_dev, original.st_ino):
+                raise ContextError("capture alias is not the same pinned artifact")
+            return alias
+        except Exception:
+            os.close(alias)
+            raise
+    finally:
+        os.close(directory_fd)
+
+
+def capture_page_workspace(artifact_root: Path, snapshot: dict[str, Any], *, reviewed_head: str, technical_hash: str) -> dict[str, Any]:
+    """Freeze selected complete native Page blocks in an existing owned review run."""
+    root = _owned_page_capture_root(artifact_root)
+    manifest, payloads = _page_capture_value(snapshot, reviewed_head, technical_hash)
+    _, descriptor = _open_directory(root)
+    try:
+        for name in [PAGE_WORKSPACE_MANIFEST, *(file["captured_leaf"] for file in manifest["files"])]:
+            try:
+                artifact_fs.stat(name, dir_fd=descriptor, follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            raise ContextError("workspace capture output already exists; preserve frozen evidence in this run")
+    finally:
+        os.close(descriptor)
+    encoded = (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+    staged: list[tuple[Path, str, int]] = []
+    attempted: list[tuple[str, tuple[int, int]]] = []
+    capture_error: Exception | None = None
+    try:
+        outputs = [(file["captured_leaf"], payload) for file, payload in zip(manifest["files"], payloads)]
+        outputs.append((PAGE_WORKSPACE_MANIFEST, encoded))
+        for final_name, payload in outputs:
+            temporary, pinned = _temporary_leaf(root, f"tmp-{final_name}", pin=True)
+            staged.append((temporary, final_name, pinned))
+            _write_existing_leaf(temporary, payload)
+        for temporary, final_name, pinned in staged:
+            metadata = os.fstat(pinned)
+            attempted.append((final_name, (metadata.st_dev, metadata.st_ino)))
+            promote_artifact(root, temporary.name, final_name, exclusive=True)
+    except Exception as error:
+        capture_error = error
+        cleanup_errors = []
+        cleanup = []
+        published_names = {name for name, _ in attempted}
+        # Windows stage deletion may remain pending until its original handle closes.
+        # Keep the inode pinned through its verified final alias before releasing that handle.
+        for index, (temporary, final_name, pinned) in enumerate(staged):
+            if final_name not in published_names:
+                continue
+            try:
+                alias = _pin_capture_alias(root, final_name, pinned)
+                staged[index] = (temporary, final_name, alias)
+                os.close(pinned)
+            except FileNotFoundError:
+                continue
+            except Exception as cleanup_error:
+                cleanup_errors.append(f"{final_name}: {cleanup_error}")
+        for temporary, _, pinned in staged:
+            try:
+                metadata = os.fstat(pinned)
+                cleanup.append((temporary.name, (metadata.st_dev, metadata.st_ino)))
+            except Exception as cleanup_error:
+                cleanup_errors.append(f"{temporary.name}: {cleanup_error}")
+        cleanup.extend(attempted)
+        owned_names: dict[tuple[int, int], list[str]] = {}
+        for name, identity in cleanup:
+            owned_names.setdefault(identity, []).append(name)
+        # Remove staged links before final links when promotion failed after replacement.
+        for name, identity in cleanup:
+            try:
+                _discard_artifact_leaf(root, name, expected_identity=identity, owned_names=tuple(owned_names[identity]))
+            except Exception as cleanup_error:
+                cleanup_errors.append(f"{name}: {cleanup_error}")
+        if cleanup_errors:
+            _capture_cleanup_note(error, "Page workspace capture cleanup incomplete; preserve remaining leaves for owned recovery before retry: " + "; ".join(cleanup_errors))
+        raise
+    finally:
+        for temporary, _, pinned in staged:
+            try:
+                os.close(pinned)
+            except OSError as close_error:
+                if capture_error is None:
+                    raise
+                _capture_cleanup_note(capture_error, f"Page workspace capture cleanup could not close {temporary.name}: {close_error}")
+    return {"provider": "gpt-space", "manifest": str(root / PAGE_WORKSPACE_MANIFEST),
+            "manifest_sha256": hashlib.sha256(encoded).hexdigest(), "content_sha256": manifest["content_sha256"],
+            "reviewed_head": reviewed_head, "technical_hash": technical_hash,
+            "workspace_files": [str(root / file["captured_leaf"]) for file in manifest["files"]]}
+
+
+def validate_page_workspace(artifact_root: Path, *, reviewed_head: str, technical_hash: str, manifest_sha256: str) -> dict[str, Any]:
+    """Validate frozen Page bytes against the manifest digest retained before dispatch."""
+    root = _owned_page_capture_root(artifact_root)
+    encoded = safe_read_leaf(root, PAGE_WORKSPACE_MANIFEST, limit=PAGE_CAPTURE_LIMIT, require_unaliased=True)
+    if not isinstance(manifest_sha256, str) or not SHA256_RE.fullmatch(manifest_sha256) or hashlib.sha256(encoded).hexdigest() != manifest_sha256:
+        raise ContextError("workspace capture manifest changed; dependent review evidence is not reusable")
+    try:
+        manifest = json.loads(encoded)
+    except (ValueError, UnicodeError) as error:
+        raise ContextError("workspace capture manifest is invalid") from error
+    if (not isinstance(manifest, dict) or manifest.get("provider") != "gpt-space" or manifest.get("schema_version") != 1
+            or manifest.get("reviewed_head") != reviewed_head or manifest.get("technical_hash") != technical_hash
+            or not isinstance(manifest.get("files"), list) or not 1 <= len(manifest["files"]) <= 64):
+        raise ContextError("workspace capture identity does not match the reviewed snapshot")
+    blocks = []
+    for index, file in enumerate(manifest["files"], 1):
+        if not isinstance(file, dict) or file.get("captured_leaf") != f"pr-review-workspace-page-{index:03d}.md":
+            raise ContextError("workspace capture leaf is invalid")
+        payload = safe_read_leaf(root, file["captured_leaf"], limit=PAGE_CAPTURE_LIMIT, require_unaliased=True)
+        if hashlib.sha256(payload).hexdigest() != file.get("sha256"):
+            raise ContextError("workspace capture bytes changed; dependent review evidence is not reusable")
+        try:
+            markdown = payload.decode("utf-8")
+        except UnicodeError as error:
+            raise ContextError("workspace capture is not UTF-8") from error
+        blocks.append({"id": file.get("block_id"), "kind": file.get("kind"), "hash": file.get("native_hash"), "markdown": markdown})
+    content = {"page_id": manifest.get("page_id"), "schema_version": 2, "blocks": blocks}
+    if "through_sequence" in manifest:
+        content["through_sequence"] = manifest["through_sequence"]
+    expected, _ = _page_capture_value({"page_id": manifest.get("page_id"), "url": manifest.get("url"),
+        "stream_kind": manifest.get("stream_kind"), "selected_block_ids": [block["id"] for block in blocks],
+        "captured_at": manifest.get("captured_at"), "source_associations": manifest.get("source_associations"),
+        "expected_source_associations": manifest.get("source_associations"),
+        "native_read": {"metadata": {"page_id": manifest.get("page_id"), "url": manifest.get("url"),
+                                     "stream_kind": manifest.get("stream_kind")}, "content": content}}, reviewed_head, technical_hash)
+    if expected != manifest:
+        raise ContextError("workspace capture provenance or content digest is inconsistent")
+    return manifest
+
+
+def command_capture_page_workspace(args: argparse.Namespace) -> int:
+    root = _owned_page_capture_root(args.artifact_root)
+    try:
+        snapshot = json.loads(safe_read_leaf(root, args.snapshot_name, limit=PAGE_CAPTURE_LIMIT))
+    except (ValueError, UnicodeError) as error:
+        raise ContextError("supplied Page capture JSON is invalid") from error
+    print(json.dumps(capture_page_workspace(root, snapshot, reviewed_head=args.reviewed_head, technical_hash=args.technical_hash), sort_keys=True))
+    return 0
+
+
+def command_verify_page_workspace(args: argparse.Namespace) -> int:
+    manifest = validate_page_workspace(args.artifact_root, reviewed_head=args.reviewed_head,
+                                       technical_hash=args.technical_hash, manifest_sha256=args.manifest_sha256)
+    print(json.dumps({"status": "current", "provider": manifest["provider"], "manifest_sha256": args.manifest_sha256,
+                      "content_sha256": manifest["content_sha256"]}, sort_keys=True))
+    return 0
+
+
+def command_apply_verification(args: argparse.Namespace) -> int:
+    inline = json.loads(safe_read_leaf(args.artifact_root, args.inline_name))
+    verifier = None
+    if args.verifier_name not in (None, "none"):
+        verifier = json.loads(safe_read_leaf(args.artifact_root, args.verifier_name))
+    result = apply_verification(inline, verifier, args.verification)
+    if args.output_name:
+        write_artifact_leaf(args.artifact_root, args.output_name, json.dumps(result["inline"], indent=2).encode("utf-8") + b"\n")
+    print(json.dumps(result, sort_keys=True))
+    return 0
+
+
+def format_lenses_line(lenses: list[str], verification: str | None) -> str:
+    """Compose the coordinator-owned coverage line."""
+    entries = [entry.strip() for entry in lenses if entry and entry.strip()]
+    if not entries:
+        raise ContextError("at least one lens outcome is required")
+    if verification:
+        entries.append(verification.strip())
+    return "Lenses: " + ", ".join(entries)
+
+
+def command_lenses_line(args: argparse.Namespace) -> int:
+    print(format_lenses_line(args.lens, args.verification))
+    return 0
+
+
+DEFAULT_PREFLIGHT_AGENTS = ("reviewer", "pr-review-verifier")
+
+
+def _codex_agent_set_status(agents_dir: Path, selected_agents: tuple[str, ...] = DEFAULT_PREFLIGHT_AGENTS) -> dict[str, Any]:
+    missing: list[str] = []
+    invalid: list[str] = []
+    for name in selected_agents:
+        toml_path = agents_dir / f"{name}.toml"
+        if _is_link(agents_dir) or _is_link(agents_dir.parent):
+            invalid.append(name)
+            continue
+        if _is_link(toml_path) or not toml_path.is_file():
+            missing.append(name)
+            continue
+        try:
+            text = toml_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            invalid.append(name)
+            continue
+        markers = (
+            f'name = "{name}"',
+            'sandbox_mode = "read-only"',
+            f"# Semantic source: agents/{name}.md",
+            f"# Instruction source: runtime/codex/instructions/{name}.md",
+            "# Projection tier:",
+        )
+        if not all(marker in text for marker in markers):
+            invalid.append(name)
+    if not missing and not invalid:
+        status = "complete"
+    elif len(missing) == len(selected_agents):
+        status = "missing"
+    else:
+        status = "mixed"
+    return {"status": status, "missing": missing, "invalid": invalid, "agents_dir": str(agents_dir)}
+
+
+def _codex_agent_dirs(repo_root: Path, agents_dir: Path | None) -> list[Path]:
+    if agents_dir is not None:
+        return [agents_dir]
+    codex_home = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
+    return [repo_root / ".codex" / "agents", codex_home / "agents"]
+
+
+def _codex_agents_status(repo_root: Path, agents_dir: Path | None, selected_agents: tuple[str, ...] = DEFAULT_PREFLIGHT_AGENTS) -> dict[str, Any]:
+    """Check each effective role, respecting project overrides of global definitions."""
+    directories = _codex_agent_dirs(repo_root, agents_dir)
+    missing: list[str] = []
+    invalid: list[str] = []
+    sources: dict[str, str] = {}
+    for name in selected_agents:
+        directory = next((d for d in directories if os.path.lexists(d / f"{name}.toml")), directories[0])
+        result = _codex_agent_set_status(directory, (name,))
+        missing.extend(result["missing"])
+        invalid.extend(result["invalid"])
+        sources[name] = str(directory)
+    status = "complete" if not missing and not invalid else "missing" if len(missing) == len(selected_agents) else "mixed"
+    return {"status": status, "missing": missing, "invalid": invalid,
+            "agents_dir": next(iter(sources.values()), str(directories[0])),
+            "sources": sources, "searched": [str(d) for d in directories]}
+
+
+def preflight(repo_root: Path, runtime: str, agents_dir: Path | None,
+              selected_agents: list[str] | None = None, prerequisites_only: bool = False) -> dict[str, Any]:
+    """Check the review prerequisites once and report every blocker."""
+    if prerequisites_only and selected_agents:
+        raise ContextError("prerequisites-only cannot select agents")
+    selected = () if prerequisites_only else tuple(dict.fromkeys(DEFAULT_PREFLIGHT_AGENTS if selected_agents is None else selected_agents))
+    if not prerequisites_only and (not selected or any(name not in REVIEW_AGENT_NAMES for name in selected)):
+        raise ContextError("select at least one known PR-review agent")
+    blockers: list[str] = []
+    try:
+        completed = subprocess.run(["gh", "auth", "status"], capture_output=True, text=False, timeout=COMMAND_TIMEOUT_SECONDS)
+        gh_status = "authenticated" if completed.returncode == 0 else "unauthenticated"
+    except (OSError, subprocess.TimeoutExpired):
+        gh_status = "unavailable"
+    if gh_status != "authenticated":
+        blockers.append(f"gh {gh_status}")
+    exclude = _git_local_exclude_path(repo_root)
+    if _is_link(exclude):
+        raise ContextError("Git local exclude must not be a symlink")
+    try:
+        exclude_text = safe_read_leaf(exclude.parent, exclude.name, limit=1_000_000).decode(
+            "utf-8", errors="replace"
+        )
+    except ContextError:
+        exclude_text = ""
+    ignored_before = any(
+        line.strip() in {"/workspaces", "/workspaces/"} for line in exclude_text.splitlines()
+    )
+    ensure_workspaces_ignored(repo_root)
+    codex_agents: dict[str, Any] | None = None
+    if runtime == "codex" and not prerequisites_only:
+        codex_agents = _codex_agents_status(repo_root, agents_dir, selected)
+        if codex_agents["status"] != "complete":
+            blockers.append(f"codex review agents {codex_agents['status']}")
+    return {
+        "ok": not blockers,
+        "gh": gh_status,
+        "workspaces_ignore": "present" if ignored_before else "local-exclude-added",
+        "codex_agents": codex_agents,
+        "review_agents": list(selected),
+        "agent_check": "not-run" if prerequisites_only else "native-check-required",
+        "blockers": blockers,
+    }
+
+
+def command_preflight(args: argparse.Namespace) -> int:
+    result = preflight(args.repo_root, args.runtime, args.agents_dir,
+                       getattr(args, "agent", None), getattr(args, "prerequisites_only", False))
+    print(json.dumps(result, sort_keys=True))
+    return 0 if result["ok"] else 30
+
+
+def command_ensure_workspaces_ignore(args: argparse.Namespace) -> int:
+    ensure_workspaces_ignored(args.repo_root)
+    return 0
+
+
+def refresh_review_context(
+    repo_root: Path,
+    repo: str,
+    pr: int,
+    artifact_root: Path,
+    owner_token: str,
+) -> dict[str, Any]:
+    run = validate_owned_review_run(repo_root, artifact_root, owner_token, pr)
+    context_path = run / "pr-review-context.json"
+    conversation_path = run / "pr-review-conversation.md"
+    latest_context = run / "pr-review-latest-context.json"
+    latest_conversation = run / "pr-review-latest-conversation.md"
+    # Keep earlier observations usable even when a later capture or promotion fails.
+    snapshot = run / f"pr-review-latest-snapshot-{secrets.token_hex(16)}.git"
+    safe_read_leaf(run, context_path.name)
+    safe_read_leaf(run, conversation_path.name)
+    previous = load_context(context_path)
+    context_tmp = _temporary_leaf(run, "tmp-pr-review-context-refresh")
+    conversation_tmp: Path | None = None
+    try:
+        current = capture_to_path(
+            repo=repo,
+            pr=pr,
+            output=context_tmp,
+            git_dir=repo_root,
+            snapshot_dir=snapshot,
+            deadline_epoch=time.time() + COMMAND_TIMEOUT_SECONDS,
+        )
+        comparison = compare_contexts(previous, current)
+        captured_latest = comparison["next_action"] != "recover-context"
+        if captured_latest:
+            current = {**current, "snapshot_dir": str(snapshot)}
+            _write_existing_leaf(
+                context_tmp,
+                (json.dumps(current, indent=2, ensure_ascii=False) + "\n").encode("utf-8"),
+            )
+            conversation_tmp = _temporary_leaf(
+                run, "tmp-pr-review-conversation-refresh"
+            )
+            _write_existing_leaf(
+                conversation_tmp, render_context(current).encode("utf-8")
+            )
+            promote_artifact_pair(
+                run,
+                conversation_tmp.name,
+                latest_conversation.name,
+                context_tmp.name,
+                latest_context.name,
+            )
+        return {
+            **comparison,
+            "status": comparison["status"],
+            "technical_hash": previous.get("technical_hash") or comparison["expected_technical_hash"],
+            "conversation_hash": previous["conversation_hash"],
+            "context_hash": previous["context_hash"],
+            "promoted": False,
+            "context": str(context_path),
+            "conversation": str(conversation_path),
+            "latest_context": str(latest_context) if captured_latest else None,
+            "latest_conversation": str(latest_conversation) if captured_latest else None,
+            "latest_snapshot": str(snapshot) if captured_latest else None,
+        }
+    finally:
+        _discard_artifact_leaf(run, context_tmp.name)
+        if conversation_tmp is not None:
+            _discard_artifact_leaf(run, conversation_tmp.name)
+
+
+def command_refresh_context(args: argparse.Namespace) -> int:
+    result = refresh_review_context(
+        args.repo_root,
+        args.repo,
+        args.pr,
+        args.artifact_root,
+        args.owner_token,
+    )
+    print(json.dumps(result, sort_keys=True))
+    return 20 if result["next_action"] == "recover-context" else 0
+
+
+def prepare_review_run(repo_root: Path, repo: str, pr: int) -> dict[str, Any]:
+    ensure_workspaces_ignored(repo_root)
+    run = create_review_run(repo_root, pr)
+    artifact_root = Path(run["artifact_root"])
+    owner_token = run["owner_token"]
+    try:
+        ignored = subprocess.run(
+            ["git", "-C", str(repo_root), "check-ignore", "-q", "--", str(artifact_root)],
+            check=False,
+            capture_output=True,
+            timeout=COMMAND_TIMEOUT_SECONDS,
+            env=command_environment(),
+        )
+        if ignored.returncode != 0:
+            raise ContextError("created review run is not ignored by Git")
+
+        deadline = time.time() + COMMAND_TIMEOUT_SECONDS
+        snapshot = artifact_root / "pr-review-snapshot.git"
+        context_path = artifact_root / "pr-review-context.json"
+        conversation_path = artifact_root / "pr-review-conversation.md"
+        diff_path = artifact_root / "pr-review-diff.patch"
+        files_path = artifact_root / "pr-review-files.txt"
+        checks_path = artifact_root / "pr-review-checks.txt"
+        worktree = artifact_root / "pr-review-worktree"
+
+        context_tmp = _temporary_leaf(artifact_root, "tmp-pr-review-context")
+        conversation_tmp = _temporary_leaf(artifact_root, "tmp-pr-review-conversation")
+        context = capture_to_path(
+            repo=repo,
+            pr=pr,
+            output=context_tmp,
+            git_dir=repo_root,
+            snapshot_dir=snapshot,
+            deadline_epoch=deadline,
+        )
+        _write_existing_leaf(conversation_tmp, render_context(context).encode("utf-8"))
+        promote_artifact(artifact_root, context_tmp.name, context_path.name)
+        promote_artifact(artifact_root, conversation_tmp.name, conversation_path.name)
+
+        diff_tmp = _temporary_leaf(artifact_root, "tmp-pr-review-diff")
+        files_tmp = _temporary_leaf(artifact_root, "tmp-pr-review-files")
+        checks_tmp = _temporary_leaf(artifact_root, "tmp-pr-review-checks")
+        materialize_review_artifacts(
+            repo=repo,
+            pr=pr,
+            context_path=context_path,
+            artifact_root_value=artifact_root,
+            snapshot_dir_value=snapshot,
+            diff_name=diff_tmp.name,
+            files_name=files_tmp.name,
+            checks_name=checks_tmp.name,
+            worktree=worktree,
+            deadline_epoch=deadline,
+        )
+        promote_artifact(artifact_root, diff_tmp.name, diff_path.name)
+        promote_artifact(artifact_root, files_tmp.name, files_path.name)
+        promote_artifact(artifact_root, checks_tmp.name, checks_path.name)
+        return {
+            **run,
+            "status": "prepared",
+            "head_oid": context["head_oid"],
+            "base_oid": context["base_oid"],
+            "merge_base_oid": context["merge_base_oid"],
+            "technical_hash": context["technical_hash"],
+            "conversation_hash": context["conversation_hash"],
+            "context_hash": context["context_hash"],
+            "context": str(context_path),
+            "conversation": str(conversation_path),
+            "snapshot": str(snapshot),
+            "diff": str(diff_path),
+            "files": str(files_path),
+            "checks": str(checks_path),
+            "worktree": str(worktree),
+        }
+    except Exception as error:
+        try:
+            cleanup_review_run(repo_root, artifact_root, owner_token)
+        except Exception as cleanup_error:
+            raise ContextError(
+                f"{error}; owned review-run cleanup incomplete: {cleanup_error}"
+            ) from error
+        if isinstance(error, ContextError):
+            raise
+        raise ContextError("cannot prepare the isolated review run") from error
+
+
+def command_prepare_run(args: argparse.Namespace) -> int:
+    print(json.dumps(prepare_review_run(args.repo_root, args.repo, args.pr), sort_keys=True))
+    return 0
+
+
+def command_create_run(args: argparse.Namespace) -> int:
+    print(json.dumps(create_review_run(args.repo_root, args.pr), sort_keys=True))
+    return 0
+
+
+def command_resume_run(args: argparse.Namespace) -> int:
+    print(json.dumps(find_resumable_review_run(args.repo_root, args.pr), sort_keys=True))
+    return 0
+
+
+def command_cleanup_run(args: argparse.Namespace) -> int:
+    cleanup_review_run(args.repo_root, args.artifact_root, args.owner_token)
+    print(json.dumps({"status": "cleaned", "artifact_root": str(args.artifact_root)}))
+    return 0
+
+
+def command_promote_artifact(args: argparse.Namespace) -> int:
+    promote_artifact(args.artifact_root, args.temporary_name, args.final_name)
+    return 0
+
+
+def command_safe_read(args: argparse.Namespace) -> int:
+    sys.stdout.buffer.write(safe_read_leaf(args.artifact_root, args.name, limit=args.max_bytes))
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    deadline_parser = subparsers.add_parser("deadline")
+    deadline_parser.add_argument(
+        "--seconds", type=float, default=float(COMMAND_TIMEOUT_SECONDS)
+    )
+    deadline_parser.set_defaults(func=command_deadline)
+
+    capture_parser = subparsers.add_parser("capture")
+    capture_parser.add_argument("--repo", required=True)
+    capture_parser.add_argument("--pr", required=True, type=int)
+    capture_parser.add_argument("--output", required=True, type=Path)
+    capture_parser.add_argument("--git-dir", default=Path("."), type=Path)
+    capture_parser.add_argument("--snapshot-dir", type=Path)
+    capture_parser.add_argument("--deadline-epoch", type=float)
+    capture_parser.add_argument("--remote", default="origin")
+    capture_parser.set_defaults(func=command_capture)
+
+    page_capture_parser = subparsers.add_parser("capture-page-workspace")
+    page_capture_parser.add_argument("--artifact-root", required=True, type=Path)
+    page_capture_parser.add_argument("--snapshot-name", required=True)
+    page_capture_parser.add_argument("--reviewed-head", required=True)
+    page_capture_parser.add_argument("--technical-hash", required=True)
+    page_capture_parser.set_defaults(func=command_capture_page_workspace)
+
+    page_verify_parser = subparsers.add_parser("verify-page-workspace")
+    page_verify_parser.add_argument("--artifact-root", required=True, type=Path)
+    page_verify_parser.add_argument("--reviewed-head", required=True)
+    page_verify_parser.add_argument("--technical-hash", required=True)
+    page_verify_parser.add_argument("--manifest-sha256", required=True)
+    page_verify_parser.set_defaults(func=command_verify_page_workspace)
+
+    materialize_parser = subparsers.add_parser("materialize")
+    materialize_parser.add_argument("--repo", required=True)
+    materialize_parser.add_argument("--pr", required=True, type=int)
+    materialize_parser.add_argument("--context", required=True, type=Path)
+    materialize_parser.add_argument("--artifact-root", required=True, type=Path)
+    materialize_parser.add_argument("--snapshot-dir", required=True, type=Path)
+    materialize_parser.add_argument("--diff-name", required=True)
+    materialize_parser.add_argument("--files-name", required=True)
+    materialize_parser.add_argument("--checks-name", required=True)
+    materialize_parser.add_argument("--worktree", required=True, type=Path)
+    materialize_parser.add_argument("--deadline-epoch", required=True, type=float)
+    materialize_parser.set_defaults(func=command_materialize)
+
+    compare_parser = subparsers.add_parser("compare")
+    compare_parser.add_argument("--expected", required=True, type=Path)
+    compare_parser.add_argument("--actual", required=True, type=Path)
+    compare_parser.set_defaults(func=command_compare)
+
+    refresh_parser = subparsers.add_parser("refresh-context")
+    refresh_parser.add_argument("--repo-root", required=True, type=Path)
+    refresh_parser.add_argument("--repo", required=True)
+    refresh_parser.add_argument("--pr", required=True, type=int)
+    refresh_parser.add_argument("--artifact-root", required=True, type=Path)
+    refresh_parser.add_argument("--owner-token", required=True)
+    refresh_parser.set_defaults(func=command_refresh_context)
+
+    render_parser = subparsers.add_parser("render")
+    render_parser.add_argument("--context", required=True, type=Path)
+    render_parser.add_argument("--output", type=Path)
+    render_parser.set_defaults(func=command_render)
+
+    author_parser = subparsers.add_parser("same-author")
+    author_parser.add_argument("--context", required=True, type=Path)
+    author_parser.add_argument("--login", required=True)
+    author_parser.set_defaults(func=command_same_author)
+
+    security_parser = subparsers.add_parser("select-security")
+    security_parser.add_argument("--changed-files", required=True, type=Path)
+    security_parser.add_argument("--diff", required=True, type=Path)
+    security_parser.add_argument("--explicit-security", action="store_true")
+    security_parser.add_argument("--tier", type=int)
+    security_parser.set_defaults(func=command_select_security)
+
+    policy_parser = subparsers.add_parser("policy")
+    policy_parser.add_argument("--policy", default="none")
+    policy_parser.add_argument("--snapshot-git", type=Path)
+    policy_parser.add_argument("--base-oid")
+    policy_parser.set_defaults(func=command_policy)
+
+    verification_parser = subparsers.add_parser("apply-verification")
+    verification_parser.add_argument("--artifact-root", required=True, type=Path)
+    verification_parser.add_argument("--inline-name", required=True)
+    verification_parser.add_argument("--verifier-name", default="none")
+    verification_parser.add_argument("--verification", choices=list(VERIFICATION_MODES), required=True)
+    verification_parser.add_argument("--output-name")
+    verification_parser.set_defaults(func=command_apply_verification)
+
+    lenses_parser = subparsers.add_parser("lenses-line")
+    lenses_parser.add_argument("--lens", action="append", required=True)
+    lenses_parser.add_argument("--verification")
+    lenses_parser.set_defaults(func=command_lenses_line)
+
+    preflight_parser = subparsers.add_parser("preflight")
+    preflight_parser.add_argument("--repo-root", required=True, type=Path)
+    preflight_parser.add_argument("--runtime", choices=["claude", "codex", "opencode", "pi"], required=True)
+    preflight_parser.add_argument("--agents-dir", type=Path)
+    preflight_parser.add_argument("--agent", action="append", choices=REVIEW_AGENT_NAMES)
+    preflight_parser.add_argument("--prerequisites-only", action="store_true")
+    preflight_parser.set_defaults(func=command_preflight)
+
+    ignore_parser = subparsers.add_parser("ensure-workspaces-ignore")
+    ignore_parser.add_argument("--repo-root", required=True, type=Path)
+    ignore_parser.set_defaults(func=command_ensure_workspaces_ignore)
+
+    prepare_run_parser = subparsers.add_parser("prepare-run")
+    prepare_run_parser.add_argument("--repo-root", required=True, type=Path)
+    prepare_run_parser.add_argument("--repo", required=True)
+    prepare_run_parser.add_argument("--pr", required=True, type=int)
+    prepare_run_parser.set_defaults(func=command_prepare_run)
+
+    create_run_parser = subparsers.add_parser("create-run")
+    create_run_parser.add_argument("--repo-root", required=True, type=Path)
+    create_run_parser.add_argument("--pr", required=True, type=int)
+    create_run_parser.set_defaults(func=command_create_run)
+
+    resume_run_parser = subparsers.add_parser("resume-run")
+    resume_run_parser.add_argument("--repo-root", required=True, type=Path)
+    resume_run_parser.add_argument("--pr", required=True, type=int)
+    resume_run_parser.set_defaults(func=command_resume_run)
+
+    cleanup_run_parser = subparsers.add_parser("cleanup-run")
+    cleanup_run_parser.add_argument("--repo-root", required=True, type=Path)
+    cleanup_run_parser.add_argument("--artifact-root", required=True, type=Path)
+    cleanup_run_parser.add_argument("--owner-token", required=True)
+    cleanup_run_parser.set_defaults(func=command_cleanup_run)
+
+    promote_parser = subparsers.add_parser("promote-artifact")
+    promote_parser.add_argument("--artifact-root", required=True, type=Path)
+    promote_parser.add_argument("--temporary-name", required=True)
+    promote_parser.add_argument("--final-name", required=True)
+    promote_parser.set_defaults(func=command_promote_artifact)
+
+    read_parser = subparsers.add_parser("safe-read")
+    read_parser.add_argument("--artifact-root", required=True, type=Path)
+    read_parser.add_argument("--name", required=True)
+    read_parser.add_argument("--max-bytes", type=int, default=2_000_000)
+    read_parser.set_defaults(func=command_safe_read)
+    return parser
+
+
+def main() -> int:
+    args = build_parser().parse_args()
+    try:
+        return args.func(args)
+    except ContextError as error:
+        print(f"review-context: {error}", file=sys.stderr)
+        for note in getattr(error, "__notes__", ()):
+            print(f"review-context: {note}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -165,7 +165,7 @@ the current session.
 At spec entry or resumption, reuse [workspace](../../workspace/SKILL.md), read the
 [policy](../../pipeline/openspec-policy.json), and resolve OpenSpec, TEA and
 Superpowers for the active host, including each provider's declared native skills
-or command pointers for that host. TEA requires native skills for Claude/Codex and
+or command pointers for that host. TEA requires native skills for Claude/Codex/Pi and
 command pointers for OpenCode; verify the selected entry kind without requiring
 another host's integration.
 Selecting spec includes preparing these declared dependencies within that task;
@@ -192,8 +192,41 @@ With BMAD 6.12 on Windows, use project-relative settings resolving to that same
 absolute operational directory. Inspect remembered configuration before install/update:
 directory creation reads it before `--set` overrides and mishandles absolute
 Windows paths. Correct only affected local path settings, then verify outputs.
-Superpowers is installed as the official plugin for the active
+Superpowers is installed through its official distribution for the active
 host, then the required verification skill is selected from that installation.
+
+### Pi provider ownership and discovery
+
+The existing policy baselines support Pi: OpenSpec 1.9.0, Superpowers 6.4.1 and
+BMAD 6.12.0 with TEA 1.27.2. Select these providers' native Pi routes without
+upgrading unrelated baselines or installing another host's integration.
+
+- OpenSpec: for a new selected target, use `openspec init --tools pi`; preserve
+  the selected profile/workflows and use `openspec update` for an existing
+  target. Verify the resulting project `.pi/skills/openspec-*` and
+  `.pi/prompts/opsx-*` entries in the active Pi session.
+- Superpowers: use its upstream Pi package, for example
+  `pi install git:github.com/obra/superpowers@v6.4.1` at the authorized scope.
+  Follow the selected installed revision's instructions and resolve its native
+  `verification-before-completion` skill. TH does not copy its methods or
+  provide another bootstrap implementation.
+- TEA: use BMAD's official `npx bmad-method install` route, selecting the Pi
+  target and the requested TEA module/capabilities. Verify its generated
+  project `.agents/skills/bmad-testarch-*` entries through Pi discovery. Do not
+  treat another coding-agent runner as Pi execution; use the selected native
+  skill when no verified Pi runner is available.
+
+Use Pi's actual agent directory (`PI_CODING_AGENT_DIR` or `~/.pi/agent`) and
+selected project root. Native project discovery includes `.pi/skills` and
+`.agents/skills`. Skills CLI 1.7.0 supports `--agent pi`: its project route uses
+`.pi/skills`, and its global route normally uses `~/.pi/agent/skills`. A custom
+agent directory does not prove that an upstream installer redirected its
+output there. Verify the actual destination and loaded entry; if necessary,
+use Pi's supported explicit `--skill <path>` or native resource registration
+within the authorized selected scope. Report an unresolved discovery gap
+instead of borrowing a personal/default or another host's installation.
+Keep installed, discoverable and usable states separate. Reuse valid evidence
+for unchanged providers; do not prepare every provider as a Pi prerequisite.
 
 ## When each capability is used
 
@@ -290,7 +323,8 @@ append corrections and Main's disposition instead of silently rewriting a verdic
 These are evidence handoffs, not TH copies of upstream schemas or scoring logic.
 
 Use the runtime's installed entry. OpenSpec's researched entries are Claude
-`/opsx:verify`, Codex `$openspec-verify-change`, and OpenCode `/opsx-verify`;
+`/opsx:verify`, Codex `$openspec-verify-change`, OpenCode `/opsx-verify`, and
+Pi `/skill:openspec-verify-change`;
 they are agent workflows, not a shell command named `openspec verify`.
 Superpowers uses its native plugin skills. TEA uses BMAD-generated native skills
 or pointers; a supported upstream CLI runner may be used when headless execution
@@ -320,7 +354,7 @@ Reuse authority already covering the dependency operation and native permissions
 
 TEA's observed native names are `bmad-testarch-test-design`,
 `bmad-testarch-test-review` and `bmad-testarch-trace`. The official BMAD installer
-generates skills for Claude/Codex and command pointers for OpenCode. TEA 1.27.2
+generates skills for Claude/Codex/Pi and command pointers for OpenCode. TEA 1.27.2
 declares Node >=22.20.0; this provider prerequisite does not change TH's own floor.
 For additional selected work, resolve the installed `bmad-testarch-atdd`,
 `bmad-testarch-automate`, `bmad-testarch-framework`, `bmad-testarch-ci` or

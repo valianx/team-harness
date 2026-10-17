@@ -10,10 +10,10 @@
 - [ ] Commits follow conventional-commit format (`feat(area): …`)
 - [ ] If this touches a distributed runtime input (`agents/`, `skills/`, `hooks/`,
       `plugins/team-harness/`, `.agents/`, `.codex/`, `runtime/`, `tools/codex-runtime/`,
-      `assets.go`, `installer-assets/`, published `bin/` scripts, or production `cmd/install/`): bumped the version once in all four
+      `tools/pi-runtime/`, `assets.go`, `installer-assets/`, published `bin/` scripts, or production `cmd/install/`): bumped the version once in all five
       current sites — `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`
       `plugins[0].version`, `plugins/team-harness/.codex-plugin/plugin.json`,
-      and `cmd/install/main.go` `var version` (matched semver) — and added the
+      `cmd/install/main.go` `var version`, and root `package.json` (matched semver) — and added the
       `## [X.Y.Z]` CHANGELOG section directly in this PR. If it does not touch a
       distributed asset, no bump is needed.
 - [ ] Used a `changelog.d/{slug}.md` fragment instead of the direct CHANGELOG

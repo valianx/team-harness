@@ -5,7 +5,7 @@ distributed skills and their native instruction guides.
 
 ## Purpose and workflows
 
-TH supplies shared development workflows for Claude Code, Codex and OpenCode.
+TH supplies shared development workflows for Claude Code, Codex, OpenCode and Pi.
 Use the host's native execution, permissions, sandboxing, approvals and session
 controls. The current general agent coordinates; specialists provide evidence
 and recommendations, and Main owns scope and final dispositions.

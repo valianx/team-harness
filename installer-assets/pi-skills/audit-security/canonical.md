@@ -1,0 +1,97 @@
+name: audit-security
+
+Run the six-check security self-scan over this repo's shipped assets (`agents/`, `skills/`, `hooks/`, `.claude-plugin/`) and present the severity-tagged report. REPORT-only — no auto-fix action is taken on any audited file.
+
+**IMPORTANT:** This skill runs directly — do NOT invoke the `orchestrator` agent or any other agent. Execute the scanner yourself using Bash and present the output verbatim.
+
+## Voice
+
+See `agents/_shared/operational-rules.md` § "Voice" and § "Language register" for the full
+voice and dialect-neutrality contract. It applies to every response this skill produces —
+chat replies, status blocks, error messages, and self-corrections alike.
+
+## Arguments
+
+| Argument | Description |
+|----------|-------------|
+| (none)   | Run the full 6-check scan and present the report. |
+| `--help` | Print the check list, severity legend, and exit-code contract; do not run the scan. |
+
+---
+
+## Execution
+
+### `--help` path
+
+If `$ARGUMENTS` contains `--help`, print the following and exit without running the scan:
+
+```
+/th:audit-security — security self-scan (6-check MVP)
+
+Checks:
+  0 (FAIL) — rostered agents resolve to real files and read-only rosters are coherent
+  1 (FAIL) — read-only agents exclude Bash; no-mutation roles exclude Bash/Edit/Write and PR-review allowlists match
+  2 (FAIL) — Codex PR-review projections are read-only and omit unsupported capability tables
+  3 (FAIL) — hooks/*.sh injection anti-pattern (eval/$(), curl|bash, rm -rf $VAR)
+  4 (WARN) — hook manifest non-canonical command / over-permissive .* matcher
+  5 (FAIL) — concrete high-confidence secret in shipped assets
+
+Severity legend:
+  [FAIL] — FAIL-severity finding: process exits 1, CI is blocked
+  [WARN] — WARN-severity finding: process exits 0, advisory only
+  [PASS] — no finding for this check
+
+Exit codes:
+  0 — all FAIL checks passed (WARN findings may still be present)
+  1 — at least one FAIL finding
+
+REPORT-only: no --fix, no write, no auto-remediation.
+```
+
+### Scan path (no `--help`)
+
+1. Resolve the scanner in this order and run it with `python3`:
+   1. `scripts/security_scan.py` resolved against this skill's own directory
+      (the directory containing this document) — the packaged copy on every
+      installed runtime
+   2. `tests/test_security_scan.py` — the repo wrapper, when the working
+      directory is a team-harness checkout
+
+   The scanner scans the asset tree it lives in by default; pass
+   `--root <asset-root>` to target a different tree.
+2. Capture and present the full stdout verbatim — do not truncate or reformat.
+3. After the output, state the exit code: `Exit code: {N}`
+4. If exit code is 0: state "All FAIL-severity checks passed."
+5. If exit code is 1: state "FAIL findings present. Manual remediation required — the scanner is REPORT-only and takes no corrective action."
+
+---
+
+## Severity Contract
+
+| Severity | Meaning | CI effect |
+|----------|---------|-----------|
+| `[FAIL]` | A security invariant is violated | Exit 1 — blocks CI |
+| `[WARN]` | An advisory finding (check 4 only) | Exit 0 — advisory |
+| `[PASS]` | Check passed, no finding | Contributes to exit 0 |
+
+---
+
+## Report Shape
+
+The scanner prints one tagged line per finding, followed by a summary:
+
+```
+[FAIL] check-N — file — reason (names the pattern CLASS, never the matched value)
+[WARN] check-4 — manifest entry — reason
+[PASS] check-N — N targets clean
+---
+security self-scan: X FAIL / Y WARN
+```
+
+The reason strings name the secret or permission CLASS — they never reproduce a matched secret value.
+
+---
+
+## Output Discipline
+
+Each tool call (Bash) runs silently. Only the scanner's stdout and the concluding exit-code statement are presented to the operator. No intermediate narrative, no tool-call commentary.

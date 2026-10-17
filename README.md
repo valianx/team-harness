@@ -1,7 +1,7 @@
 # Team Harness — Shared Development Workflows
 
 Team Harness contributes a shared way of working to **Claude Code**, **Codex**,
-and **OpenCode** through four visible phases: Spec, Implementation, Validation
+**OpenCode** and **Pi** through four visible phases: Spec, Implementation, Validation
 and Publication. The native general agent coordinates the work, while the
 selected skills provide the methods and evidence for each phase.
 
@@ -66,7 +66,7 @@ for brief conversations and read-only status requests.
 [![Version](https://img.shields.io/github/v/release/valianx/team-harness?label=version&color=blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
-> Team Harness runs under **Claude Code**, **Codex** (POSIX-only beta), and **opencode**. See [`docs/lifecycle.md`](./docs/lifecycle.md) and the [Codex runtime guide](./docs/codex-runtime.md).
+> Team Harness runs under **Claude Code**, **Codex** (POSIX-only beta), **opencode** and **Pi**. See [`docs/lifecycle.md`](./docs/lifecycle.md), the [Codex runtime guide](./docs/codex-runtime.md) and the [Pi runtime guide](./docs/pi-runtime.md).
 
 [OpenSpec](./docs/openspec-integration.md) owns proposal, spec, design, and task
 artifacts for work that needs written intent. Completed changes are archived in
@@ -176,8 +176,8 @@ skill mention with `$team-harness`, or invoke the alphabetical catalog:
 $team-harness:modes
 ```
 
-The same canonical capability catalog is shipped to Claude Code, Codex, and
-opencode. Runtime adapters translate native paths, tools, permissions, and
+The same canonical capability catalog is shipped to Claude Code, Codex,
+opencode and Pi. Runtime adapters translate native paths, tools, permissions, and
 delegation without maintaining separate feature lists.
 
 The native general agent selects the current skill. `init` helps frame the task;
@@ -201,6 +201,17 @@ roster are documented in [`docs/codex-runtime.md`](./docs/codex-runtime.md).
 For routine upgrades invoke `$team-harness:update` from a Codex thread.
 Use `$team-harness:modes` in Codex, `/th:modes` in Claude Code, or
 `/th-modes` in opencode for an alphabetical, read-only capability catalog.
+
+### Pi
+
+With Pi 1.3.0 and Node 22.19 or newer:
+
+```sh
+pi install git:github.com/valianx/team-harness
+```
+
+Reload Pi, then invoke `/skill:th-setup`. See the [Pi runtime guide](./docs/pi-runtime.md)
+for selected directories, specialist tools and package maintenance.
 
 ### Install into opencode
 
@@ -378,7 +389,7 @@ Full contract: docs/dev-mode.md.
 ## Requirements
 
 **Required:**
-- [Claude Code](https://docs.claude.com/en/docs/claude-code) — the primary runtime team-harness depends on. opencode is also supported through projected agents, skills, and rules plus its native permission model. See [`docs/lifecycle.md`](./docs/lifecycle.md) for the stage-by-stage maturity of each runtime and the [migration guide](./docs/opencode-migration-guide.md)
+- A supported native host: Claude Code, Codex, OpenCode or Pi. See [`docs/lifecycle.md`](./docs/lifecycle.md) for distribution ownership and the [Pi runtime guide](./docs/pi-runtime.md) for Pi requirements.
 - The selected native host and the tools needed by the chosen workflow. Context7 and a personal knowledge service are optional.
 
 **Recommended:**

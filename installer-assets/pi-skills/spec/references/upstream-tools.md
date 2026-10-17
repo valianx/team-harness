@@ -1,0 +1,444 @@
+# External tools in the TH workflow
+
+Use this shared reference for provider invocation and preparation; the
+[development phases](development-phases.md) own the stage sequence. Reuse the
+effort's resolved provider entries; availability in one host does not prove
+activation in another.
+
+TH coordinates the objective, workspace and delivery. OpenSpec, Superpowers and
+TEA supply their own maintained methods. TH selects an installed capability,
+passes the relevant context, follows its current instructions and uses its result.
+The capability's algorithm, checklist, templates and scoring remain upstream.
+
+Tools, agents and workflows contribute evidence and recommendations. Main and
+the operator decide how to proceed: a finding, score or verdict does not invalidate
+completed work, order a correction or create an automatic delivery block. Main
+may accept, reject or defer a recommendation with its reason. Preserve original
+results and disclose missing evidence; proceeding does not turn an unrun check
+into a pass. Native permissions and the operator's scope still govern execution.
+
+## REA application research
+
+Select REA at `research-app` entry/resumption or for explicit `setup rea` / `update rea`.
+It is outside `quality_providers`, ordinary spec/pipeline preparation, direct `audit`,
+`find-bugs` and `review-pr`. Complete-source repository analysis follows the upstream
+ordinary research route without REA readiness or provider commands.
+
+The owner is [morluto/rea](https://github.com/morluto/rea), package `rea-agents`;
+public entries are `rea` / `rea-agents`, `rea mcp` and the upstream native
+`reverse-engineer-anything` workflow. Do not import internal JavaScript modules or
+copy its skill, algorithms, schemas, scanner or tool catalog into TH.
+Observed release `6.4.0` (2026-10-12) requires Node `^22.19.0 || ^24.11.0 || >=26.0.0`
+and bundles workflow version `37`; repository-main instructions may be newer.
+Resolve the actual package/revision, matching instructions, public help or connected
+schemas and only the capabilities needed by the selected target. Reuse healthy
+capabilities without routine setup or diagnostics; unrelated engines are not a gate.
+
+### Scoped lifecycle
+
+Prefer an existing working CLI. If acquisition is authorized and it is absent,
+use the official `npx -y rea-agents@<resolved-version>` package-runner in its place.
+The CLI can perform supported work without global installation or host-config changes.
+For authorized preparation/repair, use the official setup route for the active client
+only; obtain its supported client identifier from current help:
+
+```text
+rea setup --client <active-client> --dry-run --json
+rea setup --client <active-client> --yes --json
+```
+
+Review the concrete plan's paths, backups, registration and matching skill before
+authorized apply. Preserve unrelated configuration and independently owned files;
+do not select all detected clients or install every engine. Setup does not install
+unrelated prerequisites. An instructions-only [skill route](https://github.com/morluto/rea/blob/main/docs/installation.md#skill-only-installation)
+does not register MCP, install engines or activate tools in a running conversation.
+`rea update` updates the owning npm/Bun global installation and returns a maintenance
+plan; refresh a package-runner copy by resolving the official package again.
+Refresh persistent registration/instructions through current setup at the same
+selected-client scope. REA maintenance is separate from TH installation/update.
+
+Report `installed`, `discoverable` and `usable` separately. Use current `doctor`
+options only for an observed blocker; check the selected engine/operation rather than
+requiring an audit-wide healthy result. File presence or a setup plan cannot prove
+live activation. Reload/reconnect only when required by the host's actual change.
+If a required capability is unavailable, retain partial evidence, report its specific
+pending scope and supported recovery, and continue independent supported work.
+
+### Evidence and execution ownership
+
+Keep complete original JSON/artifacts in declared local `research/rea/` storage;
+Main retains interpretation in the bound context (`research/00-research.md` in file modes), linking identities, profiles, provenance,
+limits, omissions and diagnostics. Views/exports link their parent original; these
+paths add no TH Evidence schema. Verify output destinations and complete results.
+A standalone CLI Evidence record is portable through supported inline inputs for
+views/traces; separate CLI processes share no retained IDs. CLI Evidence import/export
+consume canonical upstream bundles, not bare records or handwritten wrappers.
+MCP retained IDs are connection-local: export a supported canonical Evidence bundle
+before closing when later reuse needs it, or retain complete inline Evidence when
+references are unavailable. Use supported summaries/views without rerunning the producer;
+an output preview is not a complete record. Preserve static/runtime and coverage limits.
+Main or a scoped native executor owns effects and session lifecycle; research roles
+remain read/search. Follow installed upstream passive/active, readiness, visible-outcome
+and owned/external-session cleanup requirements under the existing authorized scope.
+
+Primary guidance: [matching workflow](https://github.com/morluto/rea/blob/a56f7bb668ab23fec8d33f7af353ac7ed2fe1895/.agents/skills/reverse-engineer-anything/SKILL.md),
+[installation and updates](https://github.com/morluto/rea/blob/main/docs/installation.md),
+[public CLI](https://github.com/morluto/rea/blob/main/docs/cli.md) and
+[MCP Evidence contracts](https://github.com/morluto/rea/blob/main/docs/mcp-contracts.md).
+
+## Quality capability preparation
+
+Quality providers are selected by the consuming objective, project stack, active host and
+available project configuration. They are declared separately in the policy's
+`quality_providers` map; their presence does not make them mandatory for every spec, pipeline or
+review. At entry or resumption of `audit`, `find-bugs` or `review-pr`, Main checks the selected
+provider's installed, discoverable and usable states and uses the existing native setup route to
+install or repair only the selected capability when the task is authorized. A healthy provider is
+reused. An unavailable selected provider leaves that analysis pending with a concrete recovery;
+an unselected provider or inactive host is not installed merely because it appears in the catalog.
+
+The current observed baselines are compatibility references, not TH-pinned releases. Recheck the
+policy and the official owner before installation/update, record the resolved version or commit,
+and verify the actual executable/skill and output configuration on the active host.
+
+| Capability | Select it for | Official owner/lifecycle | Native entry on Codex, Claude Code and OpenCode | Evidence/output |
+| --- | --- | --- | --- | --- |
+| Semgrep CE `1.177.0` (observed 2026-09-21; Python `>=3.10`) | Concrete bug candidates in `find-bugs` and applicable captured PR source | [Semgrep](https://github.com/semgrep/semgrep); PyPI/Brew/uv/pipx routes in the policy; local CE by default | `semgrep` executable resolved in the selected environment | Explicit rule/config and captured scope; raw JSON or SARIF under `research/quality-tools/semgrep/`, with version, invocation, skipped files and errors |
+| dependency-cruiser `18.4.0` (observed 2026-09-21; Node `^22 \|\| ^24 \|\| >=26`) | Dependency relationships and architecture questions in applicable JS/TS audits | [sverweij/dependency-cruiser](https://github.com/sverweij/dependency-cruiser); npm project or approved tool-cache route | `dependency-cruiser`/`depcruise` project executable | JSON/text/HTML report under `research/quality-tools/dependency-cruiser/`, with entry points, aliases/resolution and omissions |
+| Knip `6.37.0` (observed 2026-09-21; Node `^20.19.0 \|\| >=22.12.0`) | Unused files, exports and dependencies in applicable JS/TS audits | [webpro-nl/knip](https://github.com/webpro-nl/knip); npm project or approved tool-cache route, including peer TypeScript dependencies when needed | `knip` project executable | JSON/text report under `research/quality-tools/knip/`, with entry points, framework config, external-consumer checks and errors |
+| Sentry `find-bugs` (upstream `main`, resolved commit recorded per run) | Explicit request or scoped contextual bug investigation over a captured PR | [getsentry/skills](https://github.com/getsentry/skills); install/update through the official [Vercel Skills CLI](https://github.com/vercel-labs/skills), observed CLI baseline `1.7.0`, Node `>=22.20.0` | Native `find-bugs` skill selected for the active agent; no TH copy or rewritten checklist | Markdown assessment in the existing PR review artifact destination, linked from the finding ledger and verifier evidence, bound to captured base/head and scope |
+
+arc42 and ATAM remain non-installable references. They guide architecture questions and scenario
+coverage; they are not provider entries or command-line dependencies. dependency-cruiser and Knip
+are audit-only in this change and are not selected for ordinary `review-pr`. Sentry `find-bugs`
+is the existing general reviewer's optional upstream method, not a second TH reviewer. Provider
+scores, exit codes or recommendations remain evidence for Main; they do not grant delivery
+authority.
+
+### Official routes and compatibility checks
+
+For diagnostic audit/find-bugs, use a project-managed executable first when the selected project
+already owns the tool. For ordinary `review-pr`, resolve an official host/tool-cache executable
+outside the reviewed project and snapshot; never execute a project-provided binary, dependency
+or executable configuration. Follow [captured PR evidence](../../review-pr/references/external-evidence.md)
+for that route. A tool-only
+installation may use the official package manager into the approved task/tool cache, outside the
+repository and workspace evidence. Adding a development dependency or analysis configuration to a
+project is a separate product change and requires that scope; do not modify manifests merely to
+hide preparation. Verify the resolved command, version, prerequisites and output destination
+before use.
+
+- **Semgrep CE:** on macOS use `brew install semgrep`; on Windows/Linux use the official Python
+  route `python3 -m pip install semgrep`, or an isolated `uv tool`/`pipx` installation. Update
+  with the matching owner mechanism (`brew upgrade`, `uv tool upgrade`, `pipx upgrade` or pip
+  upgrade). Local CE does not require login or upload; do not silently select account-backed
+  rules or CI.
+- **dependency-cruiser:** the owner documents `npm install --save-dev dependency-cruiser` for a
+  project. If the task selects a tool-only install, use npm with an approved prefix/cache and
+  resolve the resulting `dependency-cruiser`/`depcruise` executable. Check Node engine compatibility
+  and the project's entry points, tsconfig/aliases and framework resolution before scanning.
+- **Knip:** the owner documents `npm install -D knip typescript @types/node` for a project. A
+  tool-only route uses npm with an approved prefix/cache and verifies the `knip` executable plus
+  any project peer dependencies. Check entry points and framework configuration before treating
+  unused output as a candidate.
+- **Sentry `find-bugs`:** use `npx --yes skills@1.7.0 add getsentry/skills --skill find-bugs
+  --agent <active-agent> --global --yes` for an authorized global/native installation, or the
+  corresponding project scope when explicitly requested. Refresh only this selected upstream
+  skill with the official targeted update command `npx --yes skills@1.7.0 update find-bugs
+  --global --yes`; never run a bare all-skills update for this selection. Verify the source/ref and
+  native discovery. Symlink is the CLI's preferred install mode where supported; use its documented
+  copy fallback only when the native host cannot use symlinks. The provider remains outside TH
+  packaging. Resolve by owner/source and objective before installation or update: `getsentry/skills`
+  is the captured-branch method; TH's project/module diagnosis uses `/th:find-bugs` in Claude Code,
+  `$team-harness:find-bugs` in Codex and `th-find-bugs` in OpenCode. Sentry retains the native
+  `find-bugs` name. If a bare setup/update target remains ambiguous, ask which owner the operator
+  intends before changing either installation. Verify the destination and active native entry;
+  report any remaining collision without overwriting another owner's files.
+
+Setup/update should report `installed`, `discoverable` and `usable` separately. A provider update
+does not imply that an interactive session needs a restart: report active versus pending state and
+request reload/reconnect only when the host documents that the changed entry cannot be activated in
+the current session.
+
+## Spec dependency preparation
+
+At spec entry or resumption, reuse [workspace](../../workspace/SKILL.md), read the
+[policy](../../pipeline/openspec-policy.json), and resolve OpenSpec, TEA and
+Superpowers for the active host, including each provider's declared native skills
+or command pointers for that host. TEA requires native skills for Claude/Codex/Pi and
+command pointers for OpenCode; verify the selected entry kind without requiring
+another host's integration.
+Selecting spec includes preparing these declared dependencies within that task;
+honor explicit read-only/no-install scope and native permission prompts. Ask only
+when an operation needs authority beyond that preparation, not for each provider.
+Reuse healthy installations without an automatic update or reinstall. If a
+declared capability is missing or incomplete, and the task is authorized with
+native permissions, use the existing [setup provider route](../../setup/SKILL.md)
+and the provider's official owner to install or repair it. Preparation only makes
+dependencies available; it does not run future stages or configure inactive hosts.
+
+Pass the bound context and separate real local operational directory where file
+settings require one; report installed, discoverable and active states separately. Check a resolved
+version against the policy baseline and its prerequisites; validate compatibility
+for another version instead of forcing a downgrade or pinning an unavailable
+marketplace release. A failed action or pending activation gets a concrete recovery,
+not a generic restart. Updating TH does not reinstall these providers.
+
+TEA preparation uses BMAD's official module installer (`npx bmad-method install`),
+which generates project-local native entries and uses `uv` for shared scripts.
+Its optional CLI runners invoke a supported coding agent. Check each configured
+file destination, including derived paths, against declared operational storage.
+With BMAD 6.12 on Windows, use project-relative settings resolving to that same
+absolute operational directory. Inspect remembered configuration before install/update:
+directory creation reads it before `--set` overrides and mishandles absolute
+Windows paths. Correct only affected local path settings, then verify outputs.
+Superpowers is installed through its official distribution for the active
+host, then the required verification skill is selected from that installation.
+
+### Pi provider ownership and discovery
+
+The existing policy baselines support Pi: OpenSpec 1.9.0, Superpowers 6.4.1 and
+BMAD 6.12.0 with TEA 1.27.2. Select these providers' native Pi routes without
+upgrading unrelated baselines or installing another host's integration.
+
+- OpenSpec: for a new selected target, use `openspec init --tools pi`; preserve
+  the selected profile/workflows and use `openspec update` for an existing
+  target. Verify the resulting project `.pi/skills/openspec-*` and
+  `.pi/prompts/opsx-*` entries in the active Pi session.
+- Superpowers: use its upstream Pi package, for example
+  `pi install git:github.com/obra/superpowers@v6.4.1` at the authorized scope.
+  Follow the selected installed revision's instructions and resolve its native
+  `verification-before-completion` skill. TH does not copy its methods or
+  provide another bootstrap implementation.
+- TEA: use BMAD's official `npx bmad-method install` route, selecting the Pi
+  target and the requested TEA module/capabilities. Verify its generated
+  project `.agents/skills/bmad-testarch-*` entries through Pi discovery. Do not
+  treat another coding-agent runner as Pi execution; use the selected native
+  skill when no verified Pi runner is available.
+
+Use Pi's actual agent directory (`PI_CODING_AGENT_DIR` or `~/.pi/agent`) and
+selected project root. Native project discovery includes `.pi/skills` and
+`.agents/skills`. Skills CLI 1.7.0 supports `--agent pi`: its project route uses
+`.pi/skills`, and its global route normally uses `~/.pi/agent/skills`. A custom
+agent directory does not prove that an upstream installer redirected its
+output there. Verify the actual destination and loaded entry; if necessary,
+use Pi's supported explicit `--skill <path>` or native resource registration
+within the authorized selected scope. Report an unresolved discovery gap
+instead of borrowing a personal/default or another host's installation.
+Keep installed, discoverable and usable states separate. Reuse valid evidence
+for unchanged providers; do not prepare every provider as a Pi prerequisite.
+
+## When each capability is used
+
+Use [the four development phases](development-phases.md) for the shared journey
+and the plan's selection/execution view. This reference owns provider invocation
+and preparation details; TEA supplies testing architecture throughout the work.
+
+In spec, Main invokes these methods with the existing intent and evidence. Select
+the provider's supported sequential mode for bounded work; do not map each method
+to a new agent. Preserve its current upstream instructions and useful outputs,
+passing the bound context and required operational paths, reusing assessments. Test-design,
+test-review and trace answer different questions about the same tests; they do
+not each require another full analysis or test run. When additional expertise is
+useful, give that reviewer the unanswered question and existing results.
+
+| Tool / capability | When TH selects it | How it is applied and what it contributes |
+| --- | --- | --- |
+| OpenSpec author/apply | A bounded development objective needs written intent and tasks; or the user selects spec | Use the upstream workflow to maintain the existing proposal, requirements, design and tasks. This is the development intent shared with the other tools. |
+| OpenSpec implementation verify | Every relevant OpenSpec change reaches completion, before its completed archive | Invoke the installed verify workflow with that change, implementation and test evidence. It examines implementation against intent. Main resolves actual defects before claiming completion. Structural validate remains a separate check. |
+| Superpowers verification-before-completion | At the completion stage of spec; elsewhere when a concrete success claim needs supporting evidence or the user requests it | Load the installed skill with the intended claim, current candidate and available evidence. Follow its current instructions to obtain missing or outdated evidence. Use the existing project commands; do not create a TH verification engine. |
+| TEA test-design | At the design stage of spec; elsewhere when behavior needs a testing strategy or the user requests it | Invoke the installed workflow with requirements, architecture and existing tests. Use its design to guide the existing implementation/testing work, without starting another development plan. |
+| TEA ATDD / automate | During Implementation when test-design or the objective selects acceptance-first tests or expanded automation | Resolve and execute the installed upstream method with the current requirements, tests and workspace; preserve the existing OpenSpec task plan. |
+| TEA framework / CI | During Implementation only when the objective includes missing test or CI infrastructure | Use the installed upstream setup workflow for that bounded infrastructure work. Existing sufficient infrastructure needs no reinstall or scaffold. |
+| TEA NFR | During Validation when relevant non-functional requirements need assessment | Execute the installed method with actual implementation evidence; retain missing evidence and recommendations without treating thresholds as delivery authority. |
+| TEA test-review | After implementation and relevant test execution in spec; elsewhere when tests need quality review or the user requests it | Invoke the installed workflow over the relevant tests and results. Its report supplies that testing-quality lens; another TH agent does not repeat the same review merely because TEA produced it. |
+| TEA trace | Before completing a spec change; elsewhere when requirement coverage needs explanation or the user requests it | Invoke the installed trace workflow with the current requirements and test evidence. Use its coverage analysis to find gaps and feed OpenSpec verify or acceptance review. |
+| Semgrep CE | When `find-bugs` needs rule-based candidates, or `review-pr` has selected a captured-source scan | Run the prepared local executable with explicit rules/configuration and scope. Retain raw JSON/SARIF, version, skipped/error scope and candidate identity; an empty result is not a clean bill. |
+| dependency-cruiser | When `audit` asks about dependency relationships or architecture in an applicable JS/TS project | Run the project/tool-cache executable with actual entry points and resolution configuration. Investigate dynamic/external consumers and generated ownership before recommending removal. Do not select it for ordinary `review-pr`. |
+| Knip | When `audit` asks about unused files, exports or dependencies in an applicable JS/TS project | Run the project/tool-cache executable with entry points/framework configuration and peer dependencies as needed. Treat output as candidates until contextual consumer checks complete. Do not select it for ordinary `review-pr`. |
+| Sentry `find-bugs` | When Main explicitly selects an installed upstream change-review method for a captured PR or scoped contextual bug investigation | Assign the existing general reviewer the captured base/head and permitted evidence. Reuse its bounded assessment; do not run a second equivalent TH checklist or allow a live default-branch lookup. |
+
+Execute spec's declared methods at the stages in the shared development phases.
+Quality providers are
+optional: when a spec stage or consuming flow selects one by objective, stack and
+active host, prepare and use that provider and retain its evidence; otherwise leave
+it unselected. These integrations are part of the selected workflow, not a
+requirement to install every quality provider. The user need not invoke each
+selected upstream capability separately.
+
+A small documentation correction with no relevant OpenSpec change does not
+automatically run these tools. An explicit request for a capability still applies.
+Outside spec, contextual selection remains available. If a declared capability required by
+the current spec stage is unavailable, report it as pending and continue independent
+authorized work. Do not declare that stage fully verified or silently replace the
+provider with a TH imitation. An upstream assessment that establishes no applicable
+tests or scenarios is reported with its reason, not mislabeled as a passing test
+run. Missing mandatory OpenSpec verify prevents a completion claim for the change.
+
+## How this fits spec, pipeline and direct work
+
+Pipeline and direct work reuse the same invocation,
+workspace and evidence methods for their selected capabilities; invoking a tool
+does not activate a second top-level workflow. OpenSpec verification remains
+mandatory for relevant completed changes in any entry point.
+
+Reaching design does not execute future completion stages. A planning-only request
+stops at its authorized scope; it does not need implementation results that do not
+yet exist. A resumed stage reuses its completed applicable assessment. New stages
+consume that evidence and execute their own upstream method, rerunning project
+commands only when required by the current candidate and upstream instructions.
+
+Audit, find-bugs and review-pr use the same preparation and workspace contract when selected
+outside the spec lane. Their entry/resume step selects only applicable quality capabilities, and
+the active host's setup/update route performs any authorized official installation or repair. The
+quality tools add evidence to the selected flow; they do not create a second top-level workflow or
+replace the native general agent.
+
+For example, a spec feature adding a third-party API uses test-design for failure
+cases, test-review for its assertions, trace for requirement coverage, Superpowers
+for completion evidence, and OpenSpec verify for correspondence with intent. The
+tools share one effort and its evidence instead of reproducing each other's work.
+
+## Invocation and shared context
+
+Main or a bounded native specialist reads and executes the installed upstream
+skill. The request carries the objective, relevant spec/tasks, code and test scope,
+candidate identity, known findings, bound context and repository/worktree, plus a
+real absolute operational directory only for required file inputs/outputs.
+A delegated agent uses the provider as its method for that question; TH does not
+run a second equivalent local method afterward.
+Include the question, evidence boundary, supported output destinations and the
+installed method's completion outputs in that assignment. Inspect the returned
+artifacts before reporting completion; if a required output is missing, finish
+that step or report it pending while reusing completed analysis. A prose report
+alone does not complete a method that also requires native machine artifacts.
+
+Keep source inspection, controlled examples, executed tests and live-host evidence
+distinct. Apply the installed provider's coverage semantics, not a desired passing
+score: mappings to scenarios are not executed tests. Missing scope,
+counts, snapshot identity or time remain unknown in the provider's supported form.
+Record actual run time when available; never substitute midnight or a base commit
+for an unobserved timestamp or dirty candidate. Preserve original assessments and
+append corrections and Main's disposition instead of silently rewriting a verdict.
+These are evidence handoffs, not TH copies of upstream schemas or scoring logic.
+
+Use the runtime's installed entry. OpenSpec's researched entries are Claude
+`/opsx:verify`, Codex `$openspec-verify-change`, OpenCode `/opsx-verify`, and
+Pi `/skill:openspec-verify-change`;
+they are agent workflows, not a shell command named `openspec verify`.
+Superpowers uses its native plugin skills. TEA uses BMAD-generated native skills
+or pointers; a supported upstream CLI runner may be used when headless execution
+helps. Resolve actual entries from the installed version.
+
+Resolve each provider's installed entry and version once for the effort through
+native discovery or an explicitly bound official installation. Load each distinct
+method when first needed and reuse its unchanged instructions and applicable
+results across handoffs. Refresh the affected binding after an update, activation
+change, missing entry or failure, or when the upstream method explicitly requires
+a fresh read. A newer cache directory alone does not select it.
+An official package may expose a skill root for direct native-agent execution:
+read and follow its upstream entry and referenced steps with the actual project
+root. Loading those instructions does not prove plugin activation or a CLI run.
+Pass the stage and existing authorization so upstream menus do not ask again for
+a decision already supplied. Follow upstream config/customization precedence.
+
+OpenSpec's tested baseline and required workflow list are in
+`../../pipeline/openspec-policy.json`. Check the actual CLI version, Node/npm and
+generated host entry before depending on them. If verify is omitted by the current
+profile, use upstream `openspec config profile` to retain existing choices and add
+the missing workflows, then `openspec update`. For a new target use
+`openspec init --tools <target>` with its selected profile. Preserve other host
+targets and workflow selections; do not replace a global profile wholesale.
+The CLI package update and generated-instruction refresh are separate operations.
+Reuse authority already covering the dependency operation and native permissions.
+
+TEA's observed native names are `bmad-testarch-test-design`,
+`bmad-testarch-test-review` and `bmad-testarch-trace`. The official BMAD installer
+generates skills for Claude/Codex/Pi and command pointers for OpenCode. TEA 1.27.2
+declares Node >=22.20.0; this provider prerequisite does not change TH's own floor.
+For additional selected work, resolve the installed `bmad-testarch-atdd`,
+`bmad-testarch-automate`, `bmad-testarch-framework`, `bmad-testarch-ci` or
+`bmad-testarch-nfr` entry as applicable. Prepare only selected missing entries
+through the official route; reading the catalog does not select them all.
+Use native skill execution for interactive work. The optional runner's
+`--agent none` only resolves inputs and emits a prompt; it is not a completed
+test review. Check the installed runner's help before selecting its adapter.
+Verify the runner consumed the supplied context. If its supported file interface
+cannot use a Page, execute the installed skill natively with selected context and
+the declared operational directory. Never pass a URL/opaque ID as a path.
+
+Main retains useful test designs, assessments and review returns in the same effort
+Page, preserving source, scope and outcome. File modes retain established Markdown
+names in their selected home. Conversational returns need no local report mirror
+or Page per specialist. File-output flags, required JSON, captures and render
+sources use explicit real local operational storage and keep native formats.
+Link actual portable evidence from the plan; unsupported upload remains pending,
+and a bare local path is not a remote attachment. Verify output/readback rather
+than populating an empty report tree.
+
+Canonical OpenSpec proposals, tasks, deltas and archives stay under openspec/ in
+their owning repository. Product code, maintained tests and durable documentation
+stay in their normal repository locations. Provider installation metadata stays
+at the location managed by its installer. Workspace notes link to these sources
+without duplicating them.
+
+Reuse current evidence when the upstream workflow accepts it and rerun checks
+when the candidate or evidence requires it. Verify actual provider output paths.
+If a required capability cannot honor the selected context through a supported
+route, report the integration limitation and pending action; do not silently switch
+modes, create a second workspace or claim the output was retained there.
+
+Main interprets findings with the whole task context, documents material
+dispositions and continues authorized work. Provider recommendations and scores
+do not grant or revoke delivery authority. Native host permissions govern actions.
+
+## Verification after archive
+
+Verify the active change before archive. A path-only relocation reuses applicable
+implementation evidence after links and structural validation are refreshed.
+An intent change uses a bounded new amendment; retain the original history.
+
+For a code-only correction, OpenSpec 1.9 supports active context but has no
+archive/reopen implementation-verification command. Use a disposable native
+checkout of the corrected committed candidate. Place an exact copy of the
+archived change's own artifacts under an unused active change name there, and
+run upstream status/instructions and the installed verify workflow in that
+checkout. These are temporary task artifacts, not copied upstream instructions.
+Record the candidate commit, original archive paths and content identity with
+the report in the real workspace. Confirm that implementation and input artifacts
+still match those sources before reusing the result.
+
+Do not archive this temporary context, apply its deltas again, publish it or
+change the original archive location. Missing artifacts or a context that the
+installed upstream version cannot consume leave verification pending with the
+specific recovery needed. This is temporary context preparation using existing
+tools, not an upstream reopen API or a second durable spec.
+
+## Installation, updates and documentation ownership
+
+| Tool | Upstream owner and lifecycle | Integration details maintained by TH |
+| --- | --- | --- |
+| OpenSpec | [OpenSpec](https://github.com/Fission-AI/OpenSpec); official package-manager install/update, then upstream profile/init/update for generated workflows | Tested compatibility policy, required verify availability and where the workflow enters TH completion |
+| Superpowers | [Superpowers](https://github.com/obra/superpowers); official plugin installation and host-managed updates | Selected completion capability, native discovery and relevant host/bootstrap limitations |
+| TEA | [BMAD TEA](https://github.com/bmad-code-org/bmad-method-test-architecture-enterprise); BMAD module install/update and optional official runner distribution | Selected testing capabilities, workspace destinations and supported native entries |
+
+This is the single TH reference for tool purpose, selection, context, results and
+integration boundaries. Consumer skills link to the relevant section. Setup/update
+documentation may describe host-specific steps but links to upstream installation
+instructions instead of maintaining a parallel copy of provider manuals.
+
+Authorized updates use the installation owner's mechanism, verify the resolved
+version and refresh the next invocation's instructions. Updating TH does not
+implicitly reinstall every provider. Installation and session activation are
+reported separately; no restart is requested solely because an update occurred.
+
+Research found relevant limits that must be checked for the installed versions:
+Superpowers has bootstrap behavior in some hosts, and its OpenCode installation
+guide specifies a restart; TEA's documented test-review runner has no dedicated
+OpenCode adapter, so use BMAD's generated native entry there. No skills-only
+installer, custom adapter or hot-reload guarantee is implied. The implementation
+must establish exact compatibility before claiming support.
+
+The maintained TH integration includes selection, context transfer, native
+invocation and consumption of evidence. Provider skills, verification algorithms,
+test frameworks, scoring, templates, hooks and update engines remain external.

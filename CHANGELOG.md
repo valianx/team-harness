@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.49.0] - 2026-10-17
+
+### Added
+
+- Use Team Harness workflows and bounded native specialists in Pi with retained sessions, workspace preferences and usage receipts.
+
 ## [3.48.0] - 2026-10-17
 
 ### Added

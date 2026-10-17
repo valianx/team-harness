@@ -1,0 +1,115 @@
+# Optional author review
+
+When the implementation is ready to prepare its PR, offer one concise choice in the operator's
+language, after classifying the candidate: review it with agents, or skip the optional review and
+continue publication. State the proposed lenses (`tester`, `qa`, `security`) and any advisory risk
+signals, and that results stay in chat and the configured workspace. An existing live acceptance
+or refusal for this delivery settles the choice; do not ask again per repository. Silence is not
+acceptance or refusal. While the choice is pending, continue independent preparation but hold PR
+publication. If optional review is declined, record it as skipped, not passed; no separate
+security choice is required.
+
+Acceptance authorizes this local review and ordinary fixes within the approved scope. It does
+not authorize GitHub review/comment publication, merge, deployment, or a broader specification.
+This offer targets the author's committed candidate before publication. A separate request to
+review an existing PR by number or URL still uses `review-pr` and its own approval contract.
+
+## Review and report
+
+Use `../../verify/SKILL.md` and its shared inline-review guidance to package the
+committed candidate with the exact OpenSpec change and selected lenses. Reuse an
+applicable review and provider assessments. Give each native read-only reviewer
+the specific question, relevant intent and existing test evidence, including named
+relevant skips. Risk signals inform Main's selection without adding a mandatory
+lens. A checker-verified empty surface needs no dispatch; an unavailable reviewer
+is a disclosed limit, never a pass.
+
+Preserve reused native assessments with their original target, scope, evidence,
+findings and limits; do not send a formatting-only re-review. For a packaged fan,
+collect its returns and run `review-fan.mjs summary` (`gate` remains a compatibility alias).
+Main accounts for reused and newly requested coverage together in the existing
+report without inventing helper returns or a new reviewer pass.
+Main consolidates duplicate findings and checks their supporting evidence against the anchored candidate before changing code. Preserve unresolved
+disagreements and coverage limits. The summary is factual evidence; it does not decide closure or publication. Reviewers do not edit files or publish anything. Main writes
+the logical review in the bound Page and links it from the plan; file modes retain
+`reviews/pre-pr-review.md` and `01-plan.md`. File-only review helpers/captures use
+declared local operational storage; reviewers receive pinned excerpts or captures.
+
+For a failed reviewer, diagnose the observed cause and preserve useful work. Use a
+supported focused recovery when likely to help; a separate CLI run is optional.
+Do not restart the same review across execution paths without new evidence. Keep
+native permissions, the original target and precise remaining coverage limits.
+
+A complete review requires trusted, correctly anchored returns for every selected lens. Failed,
+unavailable, malformed, stale or incomplete returns never become a pass through patches or a
+publication decision. Preserve their coverage limits and original outcomes. The `fully_verified:
+true` checker-only path reports checker evidence without empty dispatch.
+
+Main decides publication from confirmed defects, relevant validation and explicit coverage limits
+under the operator's existing authorization. An unavailable lens or non-pass verdict alone does
+not revoke that authorization or require another choice between publishing and keeping work local.
+An explicit operator condition such as "publish only after the review completes" remains binding;
+if recovery cannot satisfy it, ask only for that missing decision. Actual unresolved blockers and
+native permission limits remain applicable to the affected action.
+A scoped repair advancing the head does not make the original review stale. Bind `reviewed_head`
+and `corrected_head`, inspect their entire diff, and hold publication if it contains unrelated
+changes; only verified repairs and authorized spec amendments are in scope. Record each finding's
+disposition and, when fixed or closed, its targeted written-intent criterion or regression check
+plus relevant suite evidence at `corrected_head`. Residual nonblocking concerns may remain in the
+PR. The helper summary is evidence for Main's decision, not a separate publication authority.
+
+Security and adversary findings are evaluated like other selected lens findings. Main may choose
+those lenses when the operator requests them or when a concrete risk signal makes their evidence
+useful; the signal itself never holds publication. Missing selected coverage must be explained
+in the report and delivery summary, never silently treated as reviewed or declined.
+
+The report names each repository and reviewed base/head, lens outcomes, coverage/limitations, findings with severity and file/line evidence, and their dispositions. Show the concise result in
+chat before repairs. Keep original findings and append closure evidence and corrected commit references; never relabel a newer commit as reviewed by agents that inspected the old one.
+
+## Optional fix evidence
+
+For a bounded fix, Main may run the same assertion or probe against the exact base
+and candidate revisions using native execution in disposable isolated copies.
+Keep the operator's checkout intact. Select a safe probe, explicit input, bounded
+output and a process timeout before executing either revision; this adds no runner,
+dependency installation, specialist dispatch or universal acceptance gate.
+The assertion must be runnable at both revisions: use an existing test or supply
+the same reproducible external probe to both copies. A test missing at base is
+inconclusive, not a failure caused by the bug.
+
+Record both revisions, the identical probe/command and assertion, relevant environment,
+exit/result and bounded diagnostics in the existing plan or review report. Only
+base FAIL caused by the target bug followed by candidate PASS supports a demonstrated
+fix. Both PASS means no reproduction; both FAIL means no demonstrated fix.
+Infrastructure errors, unrelated failures or unrelated timeouts are inconclusive.
+A timeout is target evidence only when the probe specifically reproduces that hang.
+
+The PR `regression-evidence.mjs` helper classifies base PASS / head FAIL as a possible
+introduced regression; head PASS alone does not demonstrate a fix. Do not fabricate
+its required PR context or owner token to use it as a standalone fix verifier.
+
+## Repair
+
+Fix confirmed in-scope defects directly, including useful nonblocking corrections; record why a
+finding is rejected or deferred instead of mechanically accepting every suggestion. For a blocker
+covered by written intent, execute its scenario and relevant deterministic suites to close it.
+Before amending or reopening a spec, tell the operator which finding requires it, why a code-only
+fix is insufficient, and what intent, criteria or plan steps will change. Record that explanation
+and the revised status in the common plan; never silently reopen a spec.
+If the repair changes intended behavior, acceptance or authority, author the appropriate
+bounded amendment through the upstream change workflow, validate it and obtain only
+missing scope approval. Reuse live authorization already covering that revision.
+For an archived code correction, follow the shared lifecycle's supported verification
+context and preserve history; no upstream reopen command is assumed. Neither a
+reviewer finding nor the workspace report grants scope authority.
+
+Repair dependencies first and then consumers, updating canonical tasks and the common plan.
+Preserve original lens verdicts and the helper summary as evidence: deterministic closure does
+not manufacture a reviewer pass or rewrite an unchanged return; it can support Main's closure
+decision above without changing the review's recorded completeness. Record concerns, per-finding
+dispositions, targeted checks, suite results and final commit references before resuming authorized
+publication. An unresolved actual blocker or unmet explicit operator condition holds the affected
+action; advisory coverage limits follow Main's publication decision above. Do not automatically
+dispatch another full review after fixes. Use finding-specific checks for closure; a reviewed delta
+requires a new live request and the prior review anchor. No step here writes a review or comment to
+GitHub.

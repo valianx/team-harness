@@ -42,6 +42,12 @@ def runtime_root(runtime: str) -> Path:
             xdg = os.environ.get("XDG_CONFIG_HOME", "").strip()
             base = Path(xdg).expanduser() if xdg else home / ".config"
             root = base / "opencode"
+    elif runtime == "pi":
+        raw = os.environ.get("PI_CODING_AGENT_DIR", "")
+        root = Path(raw).expanduser() if raw else home / ".pi" / "agent"
+        if not root.is_absolute():
+            raise ValueError("pi config root must be absolute")
+        return root.resolve(strict=False)
     else:
         raise ValueError(f"unsupported runtime: {runtime}")
     if not root.is_absolute():
@@ -268,7 +274,7 @@ def resolve_identity(runtime: str, repo_root: str, host_value: str) -> int:
 
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser()
-    root.add_argument("--runtime", choices=("claude", "codex", "opencode"), required=True)
+    root.add_argument("--runtime", choices=("claude", "codex", "opencode", "pi"), required=True)
     commands = root.add_subparsers(dest="command", required=True)
     commands.add_parser("show")
     configure_parser = commands.add_parser("configure")
