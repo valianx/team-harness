@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { PiRpcTransport, WorkerManager, resolveLauncher, workerFailureCode, workerConfiguration } from '../runtime/pi/worker.mjs';
 import { inspectPiWorkspace } from '../runtime/pi/context.mjs';
 
@@ -111,8 +111,19 @@ test('headless dialogs receive matching cancellation and notifications cannot bl
 });
 
 test('EOF and unterminated frames reject every affected pending command', async t => {
+  const python = execFileSync(process.platform === 'win32' ? 'python' : 'python3',
+    ['-I', '-S', '-c', 'import sys; print(sys.executable)'],
+    { encoding: 'utf8', shell: false, windowsHide: true, timeout: limits.startup_ms, killSignal: 'SIGKILL', maxBuffer: 4096 }).trim();
+  assert.ok(path.isAbsolute(python), 'Python must report its actual absolute interpreter path');
+  const executable = await fs.realpath(python);
+  const eofFixture = fileURLToPath(new URL('./fixtures/pi-rpc-eof.py', import.meta.url));
   for (const truncated of [false, true]) {
-    const { client } = await transport(t, 'eof');
+    const setup = await isolated(t);
+    const client = new PiRpcTransport({ executable, args: ['-I', '-S', eofFixture] }, { ...setup.options, args: [] });
+    setup.defer(() => client.stop());
+    assert.deepEqual(await client.request({ type: 'get_state' }, limits.startup_ms), {
+      sessionId: 'eof-fixture', sessionFile: path.join(setup.directory, 'eof-session.jsonl'), isStreaming: false, isCompacting: false,
+    });
     const pending = [client.request({ type: 'eof', truncated }), client.request({ type: 'stall' })];
     const results = await Promise.allSettled(pending);
     assert.deepEqual(results.map(result => result.status), ['rejected', 'rejected']);
