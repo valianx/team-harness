@@ -372,7 +372,12 @@ async function syncProjection({ check, rootDir, names, runtime, targetRoot, over
 
 export async function syncSharedSetupAssets({ check, rootDir }) {
   const source = join(rootDir, "skills/setup/scripts/manage_github_identities.py");
-  const bytes = await readFile(source);
+  const [bytes, sourceStat] = await Promise.all([readFile(source), lstat(source)]);
+  // Git records the owner execute bit; other permission bits depend on umask.
+  // Windows does not expose that bit, so content remains its portable check.
+  if (process.platform !== "win32" && (sourceStat.mode & 0o100) === 0) {
+    throw new Error(`shared setup asset source is not executable: ${relative(rootDir, source)}`);
+  }
   const targets = [
     join(rootDir, "plugins/team-harness/skills/setup/scripts/manage_github_identities.py"),
     join(rootDir, "installer-assets/opencode-skills/setup/scripts/manage_github_identities.py"),
@@ -392,10 +397,7 @@ export async function syncSharedSetupAssets({ check, rootDir }) {
       if (error?.code !== "ENOENT") throw error;
     }
     const bytesMatch = current?.equals(bytes) ?? false;
-    // Windows does not expose Git's executable bit through Node's POSIX mode
-    // field. Keep the mode assertion on POSIX hosts, while still checking
-    // bytes on every platform.
-    const modeMatches = process.platform === "win32" || currentMode === 0o755;
+    const modeMatches = process.platform === "win32" || (currentMode & 0o100) !== 0;
     if (bytesMatch && modeMatches) continue;
     stale = true;
     if (check) {

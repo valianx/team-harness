@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.47.1] - 2026-10-17
+
+### Fixed
+
+- Isolate OpenCode ownership across configuration roots and reject invalid configuration before installation writes.
+- Honor scoped and provider-specific OpenCode updates when the global installation is already current.
+- Align delivery preparation and Codex setup guidance with their actual native capabilities and model settings.
+- Accept executable setup assets under group-writable POSIX checkout permissions.
+
+### Security
+
+- Lock hook build dependencies and use reproducible local compiler commands in CI.
+- Reject symlink redirection through literal-backslash POSIX paths during installer writes and ownership checks.
+
 ## [3.47.0] - 2026-10-14
 
 ### Added

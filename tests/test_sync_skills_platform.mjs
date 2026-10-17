@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, cp, lstat, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +19,7 @@ try {
   await mkdir(join(rootDir, "skills/setup/scripts"), { recursive: true });
   for (const target of targets) await mkdir(join(target, ".."), { recursive: true });
   await writeFile(source, content, { mode: 0o755 });
+  await chmod(source, 0o755);
   for (const target of targets) {
     await writeFile(target, content, { mode: 0o755 });
     // Fixture modes must not inherit a developer's restrictive umask.
@@ -30,6 +31,34 @@ try {
   // executable-bit assertion on POSIX hosts.
   await syncSharedSetupAssets({ check: true, rootDir });
 
+  if (process.platform !== "win32") {
+    // Git tracks the owner execute bit, not an exact POSIX permission mask.
+    // A normal checkout under umask 0002 creates 0775 executable files.
+    for (const mode of [0o775, 0o755, 0o700]) {
+      await chmod(source, mode);
+      for (const target of targets) await chmod(target, mode);
+      await syncSharedSetupAssets({ check: true, rootDir });
+      await syncSharedSetupAssets({ check: false, rootDir });
+      for (const path of [source, ...targets]) {
+        assert.equal((await lstat(path)).mode & 0o777, mode, "valid checkout permissions must remain unchanged");
+      }
+    }
+
+    for (const mode of [0o644, 0o655]) {
+      await chmod(source, mode);
+      for (const check of [true, false]) {
+        await assert.rejects(
+          syncSharedSetupAssets({ check, rootDir }),
+          /source.*not executable/,
+          "a canonical source without its Git executable bit must be rejected",
+        );
+      }
+      assert.equal((await lstat(source)).mode & 0o777, mode, "source validation must not repair permissions");
+    }
+    await chmod(source, 0o755);
+    for (const target of targets) await chmod(target, 0o755);
+  }
+
   await writeFile(targets[0], "changed fixture\n");
   await assert.rejects(
     syncSharedSetupAssets({ check: true, rootDir }),
@@ -39,12 +68,15 @@ try {
   await writeFile(targets[0], content);
 
   if (process.platform !== "win32") {
-    await chmod(targets[1], 0o644);
-    await assert.rejects(
-      syncSharedSetupAssets({ check: true, rootDir }),
-      /shared setup assets are stale/,
-      "POSIX executable-bit drift must remain visible",
-    );
+    for (const mode of [0o644, 0o655]) {
+      await chmod(targets[1], mode);
+      await assert.rejects(
+        syncSharedSetupAssets({ check: true, rootDir }),
+        /shared setup assets are stale/,
+        "POSIX executable-bit drift must remain visible",
+      );
+      assert.equal((await lstat(targets[1])).mode & 0o777, mode, "check mode must not repair permissions");
+    }
   }
 
   assert.equal(await readFile(source, "utf8"), content);

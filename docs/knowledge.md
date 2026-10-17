@@ -3,6 +3,8 @@
 
 ## Current workflow guidance
 
+- [constraint] Shared executable assets follow Git's owner-executable bit on POSIX; checkout umask differences are not content drift.
+
 - [pattern] Native plan-review assignments receive the canonical plan-reviewer guidance without registering a separate Codex role.
 
 - [pattern] Development follows Spec, Implementation, Validation and Publication in one workspace; implementation continues directly into applicable validation unless the operator explicitly requests an earlier stop. → `skills/spec/references/development-phases.md`

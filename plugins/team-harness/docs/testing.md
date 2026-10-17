@@ -113,16 +113,24 @@ behavior remains covered by its executable suites.
 
 | Suite | Covers |
 |---|---|
-| `go test ./cmd/install/` | The Go installer — preservation, mode transform, import candidates, platform behaviour |
+| `go test ./cmd/install/` | Installer preservation, root-isolated ownership, nonobject preflight, mode transforms, imports and platform behavior |
 | OpenCode native-guide installer tests | Guide registration, managed-path deduplication, and preservation of user instructions and agent selection. |
 | `test_th_update_block_sync.sh` | The `/th:update` managed-block sync matrix |
-| `test_update_opencode_sh.sh` | `update-opencode.sh` non-interactive pre-check |
+| `test_update_opencode_sh.sh` | Cheap confirmation pre-check and literal forwarding of scope, directory, provider and empty-tier requests |
 | `test_bin_tty_execbit.py`, `test_bin_tty_behavioral.sh` | `bin/` TTY openability and exec bit (#473) |
 | `test_github_identity_routes.py` | Cross-runtime GitHub route validation, longest-prefix resolution, isolated/account-switch strategies, config preservation, secret rejection, and generated-helper byte/mode identity |
 | `test_plan_review_benchmark.py`, `test_plan_review_analysis.py` | Maintained plan-review A/B preparation, bounded execution adapters, resume, provenance, native usage and study-bound adjudication with hermetic Git/process/event fixtures; no model calls. |
 | `tools/harness-migrate/test_harness_migrate.mjs`, `test_transform_conformance.mjs` | The bidirectional transform and its cross-language conformance |
 
 **Runners.** `tests/run-all.sh` runs ordinary development verification and exits non-zero if any behavioral or structural check fails; `TH_REQUIRE_RUNTIMES=1` (set in CI) converts a missing-runtime SKIP into a FAIL. `TH_RELEASE_TESTS=1` adds release-only version coordination. `tests/run-behavioral.sh` runs slower end-to-end tests that need environment the default run cannot guarantee.
+
+Install the locked hook build tooling before running the full suite. The hook
+scripts use local compilers and perform no dependency download during a build:
+
+```bash
+npm ci --prefix hooks/ts --no-audit --no-fund
+npm --prefix hooks/ts run typecheck
+```
 
 `node tests/test_version_preflight.mjs` validates committed release metadata with isolated Git repositories; it invokes no models.
 

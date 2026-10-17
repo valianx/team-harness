@@ -269,6 +269,32 @@ func historicalPluginOwnershipMatches(component, cleanPath string) bool {
 	return false
 }
 
+// matchingLedgerRoot retains exact bindings even before a root exists. A
+// different casing is accepted only when both existing, link-free directories
+// have the same filesystem identity; case-distinct roots remain independent.
+func matchingLedgerRoot(first, second string) bool {
+	first, second = filepath.Clean(first), filepath.Clean(second)
+	if first == second {
+		return true
+	}
+	// Unrelated foreign records must not trigger filesystem or network I/O.
+	if !strings.EqualFold(first, second) {
+		return false
+	}
+	if err := lstatWalkNoOwnershipCheck(first); err != nil {
+		return false
+	}
+	if err := lstatWalkNoOwnershipCheck(second); err != nil {
+		return false
+	}
+	firstInfo, err := os.Stat(first)
+	if err != nil || !firstInfo.IsDir() {
+		return false
+	}
+	secondInfo, err := os.Stat(second)
+	return err == nil && secondInfo.IsDir() && os.SameFile(firstInfo, secondInfo)
+}
+
 // readLedger reads the ownership ledger and returns the set of well-formed
 // entries plus any parse errors encountered. Malformed lines (including
 // schemaVersion != 1) are collected into []ledgerError and skipped — never
@@ -324,14 +350,28 @@ func readLedger() ([]LedgerEntry, []ledgerError) {
 			errs = append(errs, ledgerError{Line: lineNum, Reason: fmt.Sprintf("invalid op %q (want install|update|remove)", entry.Op)})
 			continue
 		}
+		// The OpenCode ledger is shared by configuration roots. Validate every
+		// record before filtering so a foreign binding cannot hide corruption
+		// or a forged ownership claim from the fail-closed lifecycle checks.
+		if err := validateLedgerOwnership(entry); err != nil {
+			errs = append(errs, ledgerError{Line: lineNum, Reason: fmt.Sprintf("invalid ownership: %v", err)})
+			continue
+		}
+		if entry.ConfigRoot != "" && !filepath.IsAbs(entry.ConfigRoot) {
+			errs = append(errs, ledgerError{Line: lineNum, Reason: "config root must be absolute"})
+			continue
+		}
 		if activeLedgerConfigRoot != "" {
-			if entry.ConfigRoot != "" && filepath.Clean(entry.ConfigRoot) != activeLedgerConfigRoot {
+			if entry.ConfigRoot != "" && !matchingLedgerRoot(entry.ConfigRoot, activeLedgerConfigRoot) {
+				if activeLedgerFilename == ledgerFilenameOpencode {
+					continue // valid ownership belongs exclusively to another root
+				}
 				errs = append(errs, ledgerError{Line: lineNum, Reason: "config root does not match this installation"})
 				continue
 			}
 			if entry.ConfigRoot == "" && activeLedgerFilename == ledgerFilenameOpencode {
 				globalRoot, rootErr := opencodeGlobalConfigDir()
-				if rootErr != nil || filepath.Clean(globalRoot) != activeLedgerConfigRoot {
+				if rootErr != nil || !matchingLedgerRoot(globalRoot, activeLedgerConfigRoot) {
 					errs = append(errs, ledgerError{Line: lineNum, Reason: "legacy ledger entry has no config-root binding and cannot be replayed against a non-default root"})
 					continue
 				}
@@ -341,11 +381,6 @@ func readLedger() ([]LedgerEntry, []ledgerError) {
 				continue
 			}
 		}
-		if err := validateLedgerOwnership(entry); err != nil {
-			errs = append(errs, ledgerError{Line: lineNum, Reason: fmt.Sprintf("invalid ownership: %v", err)})
-			continue
-		}
-
 		entries = append(entries, entry)
 	}
 	if err := scanner.Err(); err != nil {

@@ -44,6 +44,10 @@ boundaries. A new role ABI manifest SHALL NOT be required.
 - **WHEN** semantic contract and effective adapter expose different authority, ownership, or lifecycle behavior
 - **THEN** parity validation fails before release
 
+#### Scenario: Delivery material is delegated
+- **WHEN** Main assigns the delivery role to prepare a reviewed candidate
+- **THEN** the role returns artifacts and coordinates through its declared tools while Main owns Git and outward publication
+
 ### Requirement: Review artifacts stay inside the workspace
 The frozen review worktree SHALL live under the git-ignored `workspaces/` tree and SHALL be pruned at flow close. Snapshot creation on Windows SHALL support nested paths beyond the legacy 260-character limit without changing the operator's Git configuration.
 
@@ -152,6 +156,10 @@ Skill synchronization SHALL compare shared setup asset content on every supporte
 #### Scenario: Wrong executable mode on POSIX
 - **WHEN** a matching distributed setup asset loses its expected executable mode on POSIX
 - **THEN** the check reports mode drift
+
+#### Scenario: A checkout has a group-writable umask
+- **WHEN** matching source and distributed setup assets retain their owner-executable bit with mode 0775 rather than 0755
+- **THEN** synchronization and its check mode accept them without changing ownership or requiring exact permission equality
 
 ### Requirement: Pipeline checks native role availability when needed
 Main SHALL check the native roles and capabilities needed for the current assignment, not require a separate TH core preflight. Generated-role freshness remains a distribution check, not an authorization system. A missing or incompatible required capability SHALL produce a concrete limitation and supported recovery while preserving completed work. Retired roles SHALL remain absent from the active registry and distribution.

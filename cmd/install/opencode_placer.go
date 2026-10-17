@@ -16,8 +16,8 @@ type opencodePlacer struct {
 }
 
 // newOpencodePlacer creates an opencodePlacer with the resolved config root.
-// scope must be "global" or "project". override may be "" (uses scope),
-// a path from OPENCODE_CONFIG_DIR, or the --opencode-dir flag value.
+// scope must be "global" or "project". override is the --opencode-dir flag;
+// when absent, OPENCODE_CONFIG_DIR takes precedence over scope.
 func newOpencodePlacer(scope, override string) (*opencodePlacer, error) {
 	root, err := opencodeConfigRoot(scope, override)
 	if err != nil {
@@ -65,19 +65,24 @@ func (p *opencodePlacer) SettingsDocPath() string {
 // opencodeConfigRoot resolves the opencode configuration root directory.
 //
 // Resolution order:
-//  1. override — from OPENCODE_CONFIG_DIR env var or --opencode-dir flag.
-//  2. scope == "project" — <cwd>/.opencode
-//  3. scope == "global" — OS-specific opencode global config dir:
+//  1. override — the explicit --opencode-dir flag.
+//  2. OPENCODE_CONFIG_DIR — the environment root override.
+//  3. scope == "project" — <cwd>/.opencode
+//  4. scope == "global" — OS-specific opencode global config dir:
 //     Windows:      %APPDATA%\opencode
 //     Linux/macOS:  $XDG_CONFIG_HOME/opencode (else ~/.config/opencode)
 //
 // The resolved path is validated (absolute, no "..", no symlinks).
 func opencodeConfigRoot(scope, override string) (string, error) {
 	var raw string
+	envRoot := os.Getenv("OPENCODE_CONFIG_DIR")
 
 	switch {
 	case override != "":
 		raw = override
+
+	case envRoot != "":
+		raw = envRoot
 
 	case scope == "project":
 		cwd, err := os.Getwd()
@@ -209,13 +214,13 @@ func lstatWalkNoOwnershipCheck(normalized string) error {
 	return nil
 }
 
-// splitSegmentsPath splits a path string by the OS separator, similar to
-// datahome_unix.go:splitSegments but using filepath.Separator for portability.
+// splitSegmentsPath splits on native path separators, preserving literal
+// backslashes in POSIX filenames while accepting both separators on Windows.
 func splitSegmentsPath(p string) []string {
 	var segs []string
 	start := 0
 	for i := 0; i <= len(p); i++ {
-		if i == len(p) || p[i] == '/' || p[i] == '\\' {
+		if i == len(p) || os.IsPathSeparator(p[i]) {
 			if i > start {
 				segs = append(segs, p[start:i])
 			}

@@ -86,9 +86,9 @@ Refresh the flag when the candidate or evidence changes. Keep template content a
 it; the footer contains only the flag. It adds no approval step or publication/merge authority.
 
 This preparation/publication method is shared by direct, spec and pipeline work.
-Main normally executes it. A pipeline delivery specialist can perform the assigned
-checkpoint with the same evidence and endpoint; it does not need a second acceptance
-matrix or legacy report layout. Main retains decisions and coordinates Git writes.
+Main executes publication and Git writes. A delivery specialist may prepare
+artifacts from the same evidence and endpoint; it returns them to Main without
+a second acceptance matrix or legacy report layout.
 
 ## Checkpoint 2: publish or resume
 
