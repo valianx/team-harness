@@ -268,5 +268,32 @@ test("native Pi workers preserve role/session identity and attribute synthetic u
     assert.deepEqual((await parent.request("get_session_stats")).tokens, twice);
     assert.equal((await probe()).external_requests, 0);
   });
+
+  await t.test("R5 idle reclamation admits another native conversation and rebinds the original without duplicate usage", async () => {
+    const replacement = (await tool("th_worker_dispatch", { role: "reviewer", task: "native replacement conversation" })).details;
+    assert.ok(replacement.worker_id);
+    assert.notEqual(replacement.worker_id, worker.worker_id);
+    const dormant = (await tool("th_worker_control", { operation: "status" })).details.workers.find(item => item.worker_id === worker.worker_id);
+    assert.equal(dormant.state, "dormant");
+    assert.equal(dormant.cleanup_complete, true);
+    assert.equal(dormant.session_id, worker.session_id);
+    assert.equal(dormant.session_file, worker.session_file);
+    const finished = (await tool("th_worker_control", { worker_id: replacement.worker_id, operation: "wait", timeout_ms: 15000 })).details;
+    assert.equal(finished.operation.status, "completed");
+    assert.deepEqual((await tool("th_worker_control", { worker_id: replacement.worker_id, operation: "collect" })).usage, expectedUsage);
+    assert.deepEqual((await parent.request("get_session_stats")).tokens, { input: 33, output: 21, cacheRead: 15, cacheWrite: 9, total: 78 });
+    await tool("th_worker_control", { worker_id: worker.worker_id, operation: "follow_up", task: "native original after idle reclamation" });
+    const resumed = (await tool("th_worker_control", { worker_id: worker.worker_id, operation: "wait", timeout_ms: 15000 })).details;
+    assert.equal(resumed.operation.status, "completed");
+    assert.equal(resumed.session_id, worker.session_id);
+    assert.equal(resumed.session_file, worker.session_file);
+    assert.equal(JSON.parse(resumed.operation.text).task.split("\n").at(-1), "native original after idle reclamation");
+    assert.equal(assistantMessages(await nativeEntries(worker.session_file)).length, 3);
+    assert.equal(assistantMessages(await nativeEntries(replacement.session_file)).length, 1);
+    assert.deepEqual((await tool("th_worker_control", { worker_id: worker.worker_id, operation: "collect" })).usage, expectedUsage);
+    assert.equal((await tool("th_worker_control", { worker_id: worker.worker_id, operation: "collect" })).usage, undefined);
+    assert.deepEqual((await parent.request("get_session_stats")).tokens, { input: 44, output: 28, cacheRead: 20, cacheWrite: 12, total: 104 });
+    assert.equal((await probe()).external_requests, 0);
+  });
   t.diagnostic("Synthetic native Pi provider only; external requests/model inference: 0. Node launcher, not a compiled-binary activation claim.");
 });

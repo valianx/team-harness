@@ -106,6 +106,16 @@ process.stdin.on('data', chunk => {
       response(command, { commands: [{ name: 'th-worker-capabilities', source: 'extension' }] });
     } else if (command.type === 'get_entries') {
       entryReads++;
+      if (scenario === 'held-collection' && entryReads === 3) {
+        const barrier = process.env.TH_PI_FIXTURE_COLLECTION_BARRIER;
+        fs.writeFileSync(barrier + '.waiting', command.id);
+        const release = () => {
+          if (fs.existsSync(barrier)) response(command, { entries: [...entries], leafId: entries.at(-1)?.id || null });
+          else pendingTimer = setTimeout(release, 5);
+        };
+        release();
+        continue;
+      }
       const index = command.since === undefined ? -1 : entries.findIndex(entry => entry.id === command.since);
       if (command.since !== undefined && index < 0) emit({ id: command.id, type: 'response', command: command.type, success: false, error: 'cursor unavailable' });
       else if (scenario === 'slow-prepare' && entryReads === 2)
@@ -131,7 +141,7 @@ process.stdin.on('data', chunk => {
       response(command, { disposition: scenario === 'queued' ? 'queued' : 'started' });
       if (scenario === 'fault-stubborn') { pendingTimer = setTimeout(() => process.stdout.write('not-json\n'), 30); continue; }
       if (scenario === 'crash-after-ack') { setTimeout(() => process.exit(44), 10); continue; }
-      if (scenario === 'hang' || scenario === 'fast-settle') continue;
+      if (scenario === 'hang' || scenario === 'fast-settle' || (scenario === 'hold-replacements' && command.message.includes('replacement'))) continue;
       if (scenario === 'retry') emit({ type: 'agent_end', messages: [], willRetry: true });
       if (scenario === 'cumulative-stream') for (let index = 0; index < 4; index++)
         emit({ type: 'message_update', message: { role: 'assistant', usage: { input: 999, output: 999 } } });

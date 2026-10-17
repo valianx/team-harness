@@ -431,7 +431,8 @@ export class WorkerManager {
 
   #state(worker) {
     return { worker_id: worker.id, role: worker.role.name, state: worker.active || worker.draining ? 'running'
-      : worker.cleanupComplete === false ? 'unavailable' : worker.connecting ? 'starting' : worker.transport ? 'ready' : 'dormant',
+      : worker.cleanupComplete === false ? 'unavailable' : worker.reclaiming ? 'stopping'
+      : worker.connecting ? 'starting' : worker.transport ? 'ready' : 'dormant',
       queued: worker.queue.length, session_id: worker.sessionId, session_file: worker.sessionFile,
       operation: worker.latest ? clone(worker.latest) : null, cleanup_complete: worker.cleanupComplete ?? null };
   }
@@ -451,13 +452,33 @@ export class WorkerManager {
 
   async #connect(worker, resume = false) {
     if (this.#closed) throw publicFailure('RUNTIME_CLOSED', 'Worker runtime is closed');
+    if (worker.reclaiming) await worker.reclaiming;
+    if (this.#closed) throw publicFailure('RUNTIME_CLOSED', 'Worker runtime is closed');
     if (worker.connecting) return worker.connecting;
     if (worker.cleanupComplete === false) throw publicFailure('CLEANUP_INCOMPLETE', 'The previous owned worker cleanup is unconfirmed');
     if (worker.transport) return;
-    if ([...this.#workers.values()].filter(value => value.ownedTransport || value.connecting || value.cleanupComplete === false).length >= this.#limits.max_workers)
-      throw publicFailure('POOL_LIMIT', 'Worker pool limit reached');
-    worker.connecting = this.#open(worker, resume);
-    try { await worker.connecting; } finally { worker.connecting = null; }
+    worker.connecting = this.#reserveAndOpen(worker, resume || !!worker.sessionFile);
+    try { await worker.connecting; } finally { worker.connecting = null; worker.reserved = false; }
+  }
+
+  #occupiedSlots() {
+    return [...this.#workers.values()].filter(value => value.ownedTransport || value.reserved || value.cleanupComplete === false).length;
+  }
+
+  async #reserveAndOpen(worker, resume) {
+    if (this.#occupiedSlots() >= this.#limits.max_workers) {
+      const idle = [...this.#workers.values()].find(value => value !== worker && value.transport && value.ownedTransport
+        && !value.active && !value.connecting && !value.collecting && !value.draining && !value.preparingRun
+        && !value.queue.length && !value.cancelling && !value.reclaiming && value.cleanupComplete !== false
+        && ['completed', 'handled', 'failed', 'aborted', 'interrupted'].includes(value.latest?.status));
+      if (!idle) throw publicFailure('POOL_LIMIT', 'Worker pool limit reached');
+      idle.reclaiming = (async () => { await this.#stopTransport(idle); await this.#persist(idle); })();
+      try { await idle.reclaiming; } finally { idle.reclaiming = null; }
+    }
+    if (this.#closed) throw publicFailure('RUNTIME_CLOSED', 'Worker runtime is closed');
+    if (this.#occupiedSlots() >= this.#limits.max_workers) throw publicFailure('POOL_LIMIT', 'Worker pool limit reached');
+    worker.reserved = true;
+    return this.#open(worker, resume);
   }
 
   async #stopTransport(worker, client = worker.ownedTransport) {
@@ -597,16 +618,20 @@ export class WorkerManager {
   }
 
   async #run(worker, task, operationId = randomUUID(), epoch = worker.epoch || 0) {
-    await this.#connect(worker, !worker.transport && !!worker.sessionFile);
-    if (!this.#closed && epoch !== (worker.epoch || 0) && worker.latest?.id === operationId && worker.latest.status === 'aborted')
-      return this.#state(worker);
-    if (this.#closed || worker.cancelling || epoch !== (worker.epoch || 0)) throw publicFailure('RUNTIME_CLOSED', 'Worker context changed before task delivery');
-    if (worker.active) throw publicFailure('WORKER_BUSY', 'Worker already has an active operation');
-    const active = { id: operationId, disposition: null, text: '', settled: false, aborted: false, from_entry_id: null };
-    worker.active = active;
-    worker.initialOperationId = null;
-    worker.draining = false;
-    worker.latest = { id: operationId, status: 'accepted', disposition: null, text: '', from_entry_id: active.from_entry_id };
+    let active;
+    worker.preparingRun = (worker.preparingRun || 0) + 1;
+    try {
+      await this.#connect(worker, !worker.transport && !!worker.sessionFile);
+      if (!this.#closed && epoch !== (worker.epoch || 0) && worker.latest?.id === operationId && worker.latest.status === 'aborted')
+        return this.#state(worker);
+      if (this.#closed || worker.cancelling || epoch !== (worker.epoch || 0)) throw publicFailure('RUNTIME_CLOSED', 'Worker context changed before task delivery');
+      if (worker.active) throw publicFailure('WORKER_BUSY', 'Worker already has an active operation');
+      active = { id: operationId, disposition: null, text: '', settled: false, aborted: false, from_entry_id: null };
+      worker.active = active;
+      worker.initialOperationId = null;
+      worker.draining = false;
+      worker.latest = { id: operationId, status: 'accepted', disposition: null, text: '', from_entry_id: active.from_entry_id };
+    } finally { worker.preparingRun--; }
     active.timer = setTimeout(() => {
       active.error = { code: 'OPERATION_TIMEOUT', message: 'Worker operation deadline expired' };
       void this.cancel(worker.id).catch(() => {});

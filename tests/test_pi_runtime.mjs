@@ -13,8 +13,20 @@ const limits = { startup_ms: 2000, request_ms: 500, shutdown_ms: 200, operation_
   max_stderr_bytes: 4000, max_workers: 2, max_followups: 1, max_result_bytes: 4000 };
 
 async function isolated(t, scenario = 'normal') {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'th-pi Unicode 研究 '));
-  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const directory = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'th-pi Unicode 研究 ')));
+  const cleanups = [];
+  const defer = cleanup => { assert.ok(cleanups.length < 64); cleanups.push(cleanup); };
+  t.after(async () => {
+    const errors = [];
+    for (const cleanup of cleanups.reverse()) {
+      try {
+        const result = await cleanup();
+        assert.notEqual(result?.cleanup_complete, false, 'Owned child cleanup must finish before removing its directory');
+      } catch (error) { errors.push(error); }
+    }
+    if (errors.length) throw new AggregateError(errors, 'Owned fixture cleanup failed; temporary directory retained');
+    await fs.rm(directory, { recursive: true, force: true });
+  });
   const sdk = path.join(directory, 'native sdk');
   await fs.mkdir(sdk);
   await fs.copyFile(fixture, path.join(sdk, 'rpc.mjs'));
@@ -23,13 +35,13 @@ async function isolated(t, scenario = 'normal') {
   const descriptor = { kind: 'node', executable: process.execPath, sdk_root: sdk };
   const options = { cwd: directory, env: { ...process.env, TH_PI_FIXTURE_SCENARIO: scenario }, limits,
     args: ['--session-dir', path.join(directory, 'sessions')] };
-  return { directory, sdk, descriptor, options };
+  return { directory, sdk, descriptor, options, defer };
 }
 
 async function transport(t, scenario) {
   const setup = await isolated(t, scenario);
   const client = await PiRpcTransport.start(setup.descriptor, setup.options);
-  t.after(() => client.stop());
+  setup.defer(() => client.stop());
   return { ...setup, client };
 }
 
@@ -120,7 +132,7 @@ test('frame and diagnostic byte limits accept the boundary and refuse boundary p
     const setup = await isolated(t);
     const selected = { ...limits, [key]: 1024 };
     const client = await PiRpcTransport.start(setup.descriptor, { ...setup.options, limits: selected });
-    t.after(() => client.stop());
+    setup.defer(() => client.stop());
     await client.request({ type, bytes: 1024 });
     await assert.rejects(client.request({ type, bytes: type === 'diagnostics' ? 1 : 1025 }), /limit/i);
   }
@@ -130,7 +142,7 @@ test('paused child input exercises drained writes while stdout and stderr stay c
   const setup = await isolated(t);
   const client = await PiRpcTransport.start(setup.descriptor, { ...setup.options,
     limits: { ...limits, max_frame_bytes: 2_000_000, request_ms: 3000 } });
-  t.after(() => client.stop());
+  setup.defer(() => client.stop());
   await client.request({ type: 'pause_input' });
   const started = Date.now();
   const values = Array.from({ length: 3 }, (_, index) => String(index) + 'x'.repeat(524288));
@@ -141,7 +153,8 @@ test('paused child input exercises drained writes while stdout and stderr stay c
 
 test('owned shutdown escalates within finite deadlines and leaves unrelated processes running', async t => {
   const unrelated = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
-  t.after(() => { unrelated.kill(); });
+  const unrelatedClosed = new Promise(resolve => unrelated.once('close', resolve));
+  t.after(async () => { unrelated.kill(); await unrelatedClosed; });
   const { client } = await transport(t, 'stubborn');
   const started = Date.now();
   const result = await client.stop();
@@ -205,7 +218,7 @@ test('binary descriptor uses an explicit literal executable with version and sta
   await fs.writeFile(executable, '#!' + process.execPath + '\n' + await fs.readFile(fixture, 'utf8'));
   await fs.chmod(executable, 0o700);
   const client = await PiRpcTransport.start({ kind: 'binary', executable }, setup.options);
-  t.after(() => client.stop());
+  setup.defer(() => client.stop());
   const echoed = await client.request({ type: 'echo', value: 'literal $(stay); é' });
   assert.equal(echoed.value, 'literal $(stay); é');
   assert.deepEqual(echoed.argv.slice(0, 2), ['--mode', 'rpc']);
@@ -221,7 +234,7 @@ for (const scenario of ['startup-exit', 'malformed', 'oversized', 'stderr-limit'
     const setup = await isolated(t, scenario);
     await assert.rejects((async () => {
       const client = await PiRpcTransport.start(setup.descriptor, setup.options);
-      t.after(() => client.stop());
+      setup.defer(() => client.stop());
       return client;
     })(), /worker|protocol|frame|response|diagnostic|exit|timeout/i);
   });
@@ -246,6 +259,7 @@ test('explicit invalid worker preferences cannot silently select a default launc
 test('the pending request limit rejects boundary plus one and cleanup rejects both held requests', async t => {
   const setup = await isolated(t);
   const client = await PiRpcTransport.start(setup.descriptor, { ...setup.options, limits: { ...limits, max_pending: 2 } });
+  setup.defer(() => client.stop());
   const held = [client.request({ type: 'stall' }), client.request({ type: 'stall' })];
   const settled = Promise.allSettled(held);
   await assert.rejects(client.request({ type: 'stall' }), /limit/i);
@@ -267,7 +281,10 @@ async function manager(t, scenario = 'normal', overrides = {}) {
     ] }, parent: { session_id: 'primary-session', cwd: setup.directory, model: { provider: 'fixture', id: 'fixture-model' }, thinking_level: 'high' },
     parentEntries: () => entries, onReference: reference => references.push(reference), ...overrides };
   const value = new WorkerManager(options);
-  t.after(() => value.shutdown());
+  setup.defer(async () => {
+    await value.shutdown();
+    assert.equal(value.list().some(worker => worker.cleanup_complete === false), false);
+  });
   return { ...setup, value, options, entries, references };
 }
 
@@ -335,6 +352,102 @@ test('concurrent dispatch reaches the pool boundary and never creates a boundary
   assert.equal(result.filter(item => item.status === 'rejected' && item.reason.code === 'POOL_LIMIT').length, 1);
   const records = (await fs.readFile(log, 'utf8')).trim().split('\n').map(JSON.parse);
   assert.equal(records.filter(item => item.kind === 'launch').length, 2);
+});
+
+test('five sequential conversations reclaim idle capacity while preserving pending receipts and native follow-up identity', async t => {
+  const { value, entries } = await manager(t, 'normal', { limits: { ...limits, max_workers: 4 } });
+  const workers = [];
+  let original;
+  for (let index = 0; index < 5; index++) {
+    if (index === 4) t.diagnostic('Before fifth dispatch: ' + JSON.stringify(value.list().map(item => ({
+      state: item.state, operation: item.operation.status, queued: item.queued,
+    }))));
+    const launched = await value.dispatch({ role: 'reviewer', task: 'sequential conversation ' + index });
+    const completed = await value.wait(launched.worker_id, { timeout_ms: 1000 });
+    assert.equal(completed.operation.status, 'completed');
+    workers.push(completed);
+    if (index === 0) original = await value.collect(completed.worker_id);
+    assert.ok(value.list().filter(item => ['ready', 'running', 'starting'].includes(item.state)).length <= 4);
+  }
+  assert.equal(value.list().length, 5);
+  assert.equal(value.status(workers[0].worker_id).state, 'dormant');
+  assert.equal(value.status(workers[0].worker_id).cleanup_complete, true);
+  const unconfirmed = await value.collect(workers[0].worker_id);
+  assert.equal(unconfirmed.usage_status, 'awaiting_confirmation');
+  assert.equal(unconfirmed.usage, undefined);
+  assert.equal(unconfirmed.session_id, workers[0].session_id);
+  assert.equal(unconfirmed.session_file, workers[0].session_file);
+  const confirm = result => entries.push({ type: 'message', message: { role: 'toolResult', usage: result.usage,
+    details: { th_worker_receipt: result.receipt } } });
+  confirm(original);
+  const reconnected = await value.collect(workers[0].worker_id);
+  assert.equal(reconnected.usage, undefined);
+  confirm(reconnected);
+  await value.followUp(workers[0].worker_id, { task: 'follow-up in reclaimed native conversation' });
+  const final = await value.wait(workers[0].worker_id, { timeout_ms: 1000 });
+  assert.equal(final.operation.status, 'completed');
+  assert.equal(final.session_id, workers[0].session_id);
+  assert.equal(final.session_file, workers[0].session_file);
+  const next = await value.collect(workers[0].worker_id);
+  assert.equal(next.usage.input, 5);
+  confirm(next);
+  assert.equal((await value.collect(workers[0].worker_id)).usage, undefined);
+});
+
+test('an in-progress collection cannot be reclaimed to admit another conversation', async t => {
+  const { value, options, directory } = await manager(t, 'held-collection', { limits: { ...limits, max_workers: 1 } });
+  const barrier = path.join(directory, 'release-collection');
+  options.env.TH_PI_FIXTURE_COLLECTION_BARRIER = barrier;
+  const first = await value.dispatch({ role: 'reviewer', task: 'completed before collection' });
+  await value.wait(first.worker_id, { timeout_ms: 1000 });
+  const pending = value.collect(first.worker_id);
+  pending.catch(() => {});
+  const deadline = Date.now() + 1000;
+  let held = false;
+  while (!held && Date.now() < deadline) {
+    held = await fs.access(barrier + '.waiting').then(() => true, () => false);
+    if (!held) await new Promise(resolve => setTimeout(resolve, 5));
+  }
+  try {
+    assert.equal(held, true);
+    await assert.rejects(value.dispatch({ role: 'reviewer', task: 'must not evict collection' }), error => error.code === 'POOL_LIMIT');
+    assert.equal(value.status(first.worker_id).state, 'ready');
+  } finally { await fs.writeFile(barrier, 'release'); }
+  assert.equal((await pending).usage.input, 5);
+  const next = await value.dispatch({ role: 'reviewer', task: 'replacement after collection' });
+  assert.notEqual(next.worker_id, first.worker_id);
+});
+
+test('competing replacements reserve only confirmed reclaimed capacity and preserve an active winner', async t => {
+  const { value, options, directory } = await manager(t, 'hold-replacements', { limits: { ...limits, max_workers: 1 } });
+  const log = path.join(directory, 'reclaim-race.jsonl');
+  options.env.TH_PI_FIXTURE_LOG = log;
+  const first = await value.dispatch({ role: 'reviewer', task: 'initial idle conversation' });
+  await value.wait(first.worker_id, { timeout_ms: 1000 });
+  const results = await Promise.allSettled([0, 1].map(index => value.dispatch({ role: 'reviewer', task: 'replacement ' + index })));
+  assert.equal(results.filter(item => item.status === 'fulfilled').length, 1);
+  assert.equal(results.filter(item => item.status === 'rejected' && item.reason.code === 'POOL_LIMIT').length, 1);
+  const records = (await fs.readFile(log, 'utf8')).trim().split('\n').map(JSON.parse);
+  assert.equal(records.filter(item => item.kind === 'launch').length, 2);
+  assert.equal(value.status(first.worker_id).state, 'dormant');
+  assert.equal(value.list().filter(item => item.operation.status === 'running').length, 1);
+});
+
+test('idle reclamation never releases a process slot when owned cleanup is unconfirmed', async t => {
+  const { value } = await manager(t, 'normal', { limits: { ...limits, max_workers: 1 } });
+  const first = await value.dispatch({ role: 'reviewer', task: 'idle cleanup proof' });
+  await value.wait(first.worker_id, { timeout_ms: 1000 });
+  const original = PiRpcTransport.prototype.stop;
+  const owned = new Set();
+  PiRpcTransport.prototype.stop = function () { owned.add(this); return Promise.resolve({ stopped: false, cleanup_complete: false }); };
+  try {
+    await assert.rejects(value.dispatch({ role: 'reviewer', task: 'replacement must remain refused' }), error => error.code === 'POOL_LIMIT');
+    assert.equal(value.status(first.worker_id).cleanup_complete, false);
+    await assert.rejects(value.followUp(first.worker_id, { task: 'no unconfirmed reconnect' }), error => error.code === 'CLEANUP_INCOMPLETE');
+  } finally {
+    PiRpcTransport.prototype.stop = original;
+    await Promise.all([...owned].map(client => original.call(client)));
+  }
 });
 
 test('cancellation during native preparation cannot submit the task after abort acknowledgement', async t => {
@@ -517,7 +630,7 @@ test('completed native results survive reload and confirmed usage is never charg
   setup.entries.push({ type: 'message', message: { role: 'toolResult', usage: first.usage, details: { th_worker_receipt: first.receipt } } });
   await setup.value.shutdown();
   const restored = new WorkerManager(setup.options);
-  t.after(() => restored.shutdown());
+  setup.defer(() => restored.shutdown());
   await restored.restore([setup.references.at(-1)]);
   const result = await restored.collect(launched.worker_id);
   assert.equal(result.operation.status, 'completed');
@@ -553,7 +666,7 @@ test('reload restores owned native sessions, refuses different owners, and never
   await setup.value.shutdown();
   const reference = setup.references.at(-1);
   const restored = new WorkerManager(setup.options);
-  t.after(() => restored.shutdown());
+  setup.defer(() => restored.shutdown());
   await restored.restore([reference]);
   assert.equal(restored.status(launched.worker_id).operation.status, 'interrupted');
   const before = await fs.readFile(reference.session_file, 'utf8');
@@ -561,7 +674,7 @@ test('reload restores owned native sessions, refuses different owners, and never
   assert.equal(collected.operation.status, 'interrupted');
   assert.equal((await fs.readFile(reference.session_file, 'utf8')).split('do not replay').length, before.split('do not replay').length);
   const foreign = new WorkerManager({ ...setup.options, parent: { ...setup.options.parent, session_id: 'another-owner' } });
-  t.after(() => foreign.shutdown());
+  setup.defer(() => foreign.shutdown());
   await assert.rejects(foreign.restore([reference]), /owner|session/i);
 });
 
@@ -630,7 +743,7 @@ test('crashes before and after acknowledgement retain interrupted ownership with
     assert.equal(stopped.operation.status, 'interrupted');
     await setup.value.shutdown();
     const fresh = new WorkerManager(setup.options);
-    t.after(() => fresh.shutdown());
+    setup.defer(() => fresh.shutdown());
     await fresh.restore([setup.references.at(-1)]);
     const result = await fresh.collect(launched.worker_id);
     assert.equal(result.operation.status, 'interrupted');
