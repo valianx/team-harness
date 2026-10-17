@@ -75,6 +75,7 @@ IMPORT_EXCLUDED_KEYS = {
 }
 TOKEN_RE = re.compile(r"(?:gh[pousr]_|github_pat_|sk-[A-Za-z0-9_-]{20,})")
 GLOB_RE = re.compile(r"[*?\[\]]")
+CONTROL_CHAR_RE = re.compile(r"[\x00-\x1f\x7f]")
 SENSITIVE_KEY_RE = re.compile(r"(?:token|secret|password|api[_-]?key|authorization|bearer)", re.I)
 
 
@@ -197,6 +198,20 @@ def resolve_workspace_preference(doc: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _valid_obsidian_subfolder(value: Any) -> bool:
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        size = len(value.encode("utf-8"))
+    except UnicodeEncodeError:
+        return False
+    return (
+        size <= 1024 and not Path(value).is_absolute() and "\\" not in value
+        and re.match(r"[A-Za-z]:", value) is None and CONTROL_CHAR_RE.search(value) is None
+        and all(part not in {"", ".", ".."} and re.search(r"[*?\[\]{}]", part) is None for part in value.split("/"))
+    )
+
+
 def validate_workspace_destination(doc: dict[str, Any]) -> dict[str, Any]:
     """Validate destination data; native access and identity verification are separate."""
     preference = resolve_workspace_preference(doc)
@@ -215,13 +230,11 @@ def validate_workspace_destination(doc: dict[str, Any]) -> dict[str, Any]:
             if not isinstance(base, str) or not isinstance(subfolder, str) or not base or not subfolder:
                 reason = "invalid_obsidian_destination"
             else:
-                path, child = Path(base), Path(subfolder)
+                path = Path(base)
                 if (
                     not path.is_absolute() or path == Path(path.anchor)
-                    or path == Path.home() or child.is_absolute()
-                    or any(part in {"", ".", ".."} for part in re.split(r"[/\\]", subfolder))
-                    or ".." in path.parts or GLOB_RE.search(base + subfolder)
-                    or any(ord(char) < 32 for char in base + subfolder)
+                    or path == Path.home() or not _valid_obsidian_subfolder(subfolder)
+                    or ".." in path.parts or GLOB_RE.search(base) or CONTROL_CHAR_RE.search(base)
                 ):
                     reason = "invalid_obsidian_destination"
     return {"status": "invalid" if reason else "valid", "mode": mode, "reason_code": reason}
@@ -423,6 +436,8 @@ def validate(key: str, value: Any) -> None:
     if key == "logs-path":
         if not isinstance(value, str) or not value:
             raise ValueError("logs-path must be a non-empty absolute path")
+        if CONTROL_CHAR_RE.search(value):
+            raise ValueError("logs-path cannot contain control characters")
         path = Path(value).expanduser()
         resolved = path.resolve(strict=False)
         if not path.is_absolute() or resolved in {Path(resolved.anchor), Path.home().resolve()}:
@@ -430,10 +445,8 @@ def validate(key: str, value: Any) -> None:
         if ".." in path.parts or GLOB_RE.search(value):
             raise ValueError("logs-path cannot contain traversal or glob syntax")
     if key == "logs-subfolder":
-        if not isinstance(value, str) or not value or Path(value).is_absolute():
-            raise ValueError("logs-subfolder must be a non-empty relative path")
-        if ".." in Path(value).parts or GLOB_RE.search(value):
-            raise ValueError("logs-subfolder cannot contain traversal or glob syntax")
+        if not _valid_obsidian_subfolder(value):
+            raise ValueError("logs-subfolder must be a relative path of at most 1024 UTF-8 bytes without control, traversal, glob or Windows path syntax")
     if key == "language" and (
         not isinstance(value, str) or re.fullmatch(r"[a-z]{2}", value) is None
     ):
@@ -450,6 +463,12 @@ def validate(key: str, value: Any) -> None:
         raise ValueError("clickup.workspace_id must be a string")
     if key == "agent-scope" and value not in {"project", "global"}:
         raise ValueError("agent-scope must be project or global")
+
+
+def _json_document_text(value: dict[str, Any]) -> str:
+    """Escape unencodable persisted text without changing its JSON value."""
+    text = json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True)
+    return text.encode("utf-8", errors="backslashreplace").decode("utf-8")
 
 
 def write_atomic(path: Path, before: dict[str, Any], after: dict[str, Any]) -> bool:
@@ -470,7 +489,7 @@ def write_atomic(path: Path, before: dict[str, Any], after: dict[str, Any]) -> b
     try:
         os.fchmod(fd, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as stream:
-            json.dump(after, stream, ensure_ascii=False, indent=2, sort_keys=True)
+            stream.write(_json_document_text(after))
             stream.write("\n")
             stream.flush()
             os.fsync(stream.fileno())
@@ -514,7 +533,7 @@ def show() -> int:
             | {"format_version", "installed_version", "updated_at", "migration"}
         ),
     }
-    print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    print(_json_document_text(result))
     return 0
 
 

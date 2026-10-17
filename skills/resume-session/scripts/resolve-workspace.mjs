@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { lstat, readdir } from "node:fs/promises";
+import { lstat, readdir, realpath } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
@@ -14,6 +14,16 @@ async function realDirectory(candidate) {
   try {
     const value = await lstat(candidate);
     return value.isDirectory() && !value.isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+async function retainedDirectory(candidate) {
+  if (!(await realDirectory(candidate))) return false;
+  try {
+    // Native comparison retains Windows casing rules without adopting a redirected target.
+    return path.relative(candidate, await realpath(candidate)) === "";
   } catch {
     return false;
   }
@@ -83,7 +93,7 @@ export async function resolveContextWorkspace({ binding, remoteCandidates, listi
     const workspace = path.resolve(context.path);
     const base = path.dirname(workspace);
     const feature = path.basename(workspace);
-    if (!(await realDirectory(workspace))) {
+    if (!(await retainedDirectory(workspace))) {
       return { status: "not-found", reason_code: "WORKSPACE_NOT_FOUND", base, feature, candidates: [] };
     }
     return resolveWorkspaceHandoff({ base, feature, workspace, candidates: [feature] });

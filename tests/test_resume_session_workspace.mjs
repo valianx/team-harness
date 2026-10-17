@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { chmod, lstat, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdtemp, mkdir, readFile, readdir, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -9,10 +9,11 @@ import { fileURLToPath } from "node:url";
 
 import * as resolver from "../skills/resume-session/scripts/resolve-workspace.mjs";
 import { validateContextBinding } from "../skills/workspace/scripts/workspace-context.mjs";
+import { resolveWorkspaceIdentity } from "../skills/pipeline/scripts/workspace-identity.mjs";
 
 const { resolveWorkspace } = resolver;
 
-const root = await mkdtemp(path.join(tmpdir(), "th-resume-session-"));
+const root = await realpath(await mkdtemp(path.join(tmpdir(), "th-resume-session-")));
 try {
   const feature = "payin-orchestration-services";
   const dated = path.join(root, `2026-08-24_${feature}`);
@@ -104,6 +105,60 @@ try {
   } finally {
     await chmod(readOnlyBound, 0o755);
     await chmod(readOnlyHandoff, 0o644);
+  }
+
+  for (const nested of [[], ["nested", "deep"]]) {
+    const caseRoot = path.join(root, nested.length === 0 ? "ancestor-redirect" : "nested-ancestor-redirect");
+    const ancestor = path.join(caseRoot, "retained");
+    const retainedWorkspace = path.join(ancestor, ...nested, "foo");
+    await mkdir(retainedWorkspace, { recursive: true });
+    await writeFile(path.join(retainedWorkspace, "00-session-handoff.md"), "Original retained context\n", "utf8");
+    const retainedBinding = bindFile(retainedWorkspace);
+    const unchanged = await resolver.resolveContextWorkspace({ binding: retainedBinding });
+    assert.equal(unchanged.status, "resolved", "an unchanged physical ancestor chain remains reusable");
+    assert.equal(unchanged.workspace, retainedWorkspace);
+
+    const preservedAncestor = path.join(caseRoot, "preserved");
+    await rename(ancestor, preservedAncestor);
+    const redirectedAncestor = path.join(caseRoot, "elsewhere");
+    const redirectedWorkspace = path.join(redirectedAncestor, ...nested, "foo");
+    await mkdir(redirectedWorkspace, { recursive: true });
+    await writeFile(path.join(redirectedWorkspace, "00-session-handoff.md"), "Different effort\n", "utf8");
+    await symlink(redirectedAncestor, ancestor, process.platform === "win32" ? "junction" : "dir");
+    const redirected = await resolver.resolveContextWorkspace({ binding: retainedBinding });
+    assert.equal(redirected.status, "not-found", "a retained ancestor symlink or junction cannot redirect context, including through nested directories");
+    assert.deepEqual(redirected.candidates, []);
+    assert.equal(Object.hasOwn(redirected, "handoff"), false);
+    assert.equal(retainedBinding.context.path, retainedWorkspace, "the bound locator is preserved instead of adopting its resolved target");
+    assert.equal((await lstat(ancestor)).isSymbolicLink(), true);
+    assert.equal(await readFile(path.join(preservedAncestor, ...nested, "foo", "00-session-handoff.md"), "utf8"),
+      "Original retained context\n");
+    assert.equal(await readFile(path.join(redirectedWorkspace, "00-session-handoff.md"), "utf8"), "Different effort\n");
+    assert.deepEqual(await readdir(redirectedWorkspace), ["00-session-handoff.md"], "redirected destinations receive no state or handoff writes");
+  }
+
+  const canonicalSources = path.join(root, "canonical-sources");
+  const canonicalRepository = path.join(canonicalSources, "service");
+  await mkdir(canonicalRepository, { recursive: true });
+  const hostAlias = path.join(root, "host-source-alias");
+  await symlink(canonicalSources, hostAlias, process.platform === "win32" ? "junction" : "dir");
+  const canonicalIdentity = await resolveWorkspaceIdentity({ repositories: [{ service: "service",
+    root: path.join(hostAlias, "service"), identity: "origin:service", role: "writable-owner" }],
+  feature: "canonical-resume", date: "2026-10-17" });
+  assert.equal(canonicalIdentity.services[0].root, canonicalRepository, "v1 binding canonicalizes host aliases before retaining identity");
+  await mkdir(canonicalIdentity.coordinator_root, { recursive: true });
+  await writeFile(path.join(canonicalIdentity.coordinator_root, "00-session-handoff.md"), "Canonical v1 effort\n", "utf8");
+  const canonicalBinding = bindFile(canonicalIdentity.coordinator_root);
+  canonicalBinding.context.identity = canonicalIdentity;
+  const canonicalBytes = JSON.stringify(canonicalBinding);
+  const canonicalResult = await resolver.resolveContextWorkspace({ binding: canonicalBinding });
+  assert.equal(canonicalResult.status, "resolved", "canonical v1 paths remain valid after being selected through a host alias");
+  assert.equal(canonicalResult.workspace, canonicalIdentity.coordinator_root);
+  assert.equal(JSON.stringify(canonicalBinding), canonicalBytes);
+  if (process.platform === "win32") {
+    const differentCase = canonicalIdentity.coordinator_root.toUpperCase();
+    assert.equal((await resolver.resolveContextWorkspace({ binding: bindFile(differentCase) })).status, "resolved",
+      "physical path comparison follows native Windows casing semantics");
   }
 
   const missingFeature = "missing-handoff";

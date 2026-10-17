@@ -6,6 +6,7 @@ from __future__ import annotations
 import contextlib
 import importlib.util
 import io
+from itertools import product
 import json
 import os
 from pathlib import Path
@@ -61,7 +62,8 @@ class WorkspaceConfigTests(unittest.TestCase):
     def run_helper(self, *args: str) -> subprocess.CompletedProcess:
         return subprocess.run(
             [sys.executable, str(HELPER), *args],
-            text=True, capture_output=True, check=False, timeout=20,
+            encoding="utf-8", capture_output=True, check=False, timeout=20,
+            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
         )
 
     def set_values(self, values: dict) -> dict:
@@ -69,6 +71,19 @@ class WorkspaceConfigTests(unittest.TestCase):
         result = self.run_helper("set", *args)
         self.assertEqual(result.returncode, 0, result.stderr)
         return json.loads(result.stdout)
+
+    def invalid_obsidian_fields(self) -> list[tuple[str, str, str]]:
+        return [
+            ("base-del", "logs-path", str(self.base / "vault") + "\x7f"),
+            ("subfolder-del", "logs-subfolder", "notes\x7f"),
+            ("subfolder-backslash", "logs-subfolder", r"notes\archive"),
+            ("subfolder-drive-relative", "logs-subfolder", "C:notes"),
+            ("subfolder-open-brace", "logs-subfolder", "notes{archive"),
+            ("subfolder-close-brace", "logs-subfolder", "notes}archive"),
+            ("subfolder-ascii-byte-limit", "logs-subfolder", "a" * 1025),
+            ("subfolder-unicode-byte-limit", "logs-subfolder", "é" * 512 + "a"),
+            ("subfolder-invalid-unicode", "logs-subfolder", "notes\ud800"),
+        ]
 
     def test_selector_contract_matches_shared_fixture_without_mutating_input(self) -> None:
         fixture = json.loads(PREFERENCES.read_text(encoding="utf-8"))
@@ -104,6 +119,73 @@ class WorkspaceConfigTests(unittest.TestCase):
             self.assertEqual(CONFIG.validate_workspace_destination(document), {
                 "status": "valid", "mode": "obsidian", "reason_code": None,
             })
+
+    def test_obsidian_destination_rejects_runtime_invalid_fields_without_mutation(self) -> None:
+        for name, key, value in self.invalid_obsidian_fields():
+            with self.subTest(case=name):
+                document = {"workspace-mode": "obsidian", "logs-path": str(self.base / "vault"), "logs-subfolder": "notes", key: value}
+                before = json.dumps(document, sort_keys=True)
+                self.assertEqual(CONFIG.validate_workspace_destination(document), {
+                    "status": "invalid", "mode": "obsidian", "reason_code": "invalid_obsidian_destination",
+                })
+                self.assertEqual(json.dumps(document, sort_keys=True), before)
+
+    def test_obsidian_field_rejections_leave_settings_backup_and_directory_unchanged(self) -> None:
+        backup = self.settings.with_name(self.settings.name + ".bak")
+        for mode, (name, key, value) in product(("local", "obsidian"), self.invalid_obsidian_fields()):
+            with self.subTest(mode=mode, case=name):
+                before = self.write({"workspace-mode": "local", "logs-mode": "local", "custom": {"keep": [1, True]}})
+                backup.write_bytes(b"existing backup bytes\n")
+                values = {"workspace-mode": mode, "logs-path": str(self.base / "vault"), "logs-subfolder": "notes", key: value}
+                args = [item for field, selected in values.items() for item in ("--set", f"{field}={json.dumps(selected)}")]
+                result = self.run_helper("set", *args)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn("manage_config:", result.stderr)
+                self.assertNotIn("Traceback", result.stderr)
+                self.assertEqual(self.settings.read_bytes(), before)
+                self.assertEqual(backup.read_bytes(), b"existing backup bytes\n")
+                self.assertEqual(set(self.codex_home.iterdir()), {self.settings, backup})
+
+    def test_show_diagnoses_existing_invalid_obsidian_fields_without_writes(self) -> None:
+        for name, key, value in self.invalid_obsidian_fields():
+            with self.subTest(case=name):
+                destination = {"workspace-mode": "obsidian", "logs-path": str(self.base / "vault"), "logs-subfolder": "notes", key: value}
+                before = self.write({**destination, "custom": {"keep": True}})
+                result = self.run_helper("show")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                shown = json.loads(result.stdout)
+                self.assertEqual(shown["workspaceDiagnostics"], ["invalid_obsidian_destination"])
+                self.assertEqual({field: shown["config"][field] for field in destination}, destination)
+                self.assertEqual(self.settings.read_bytes(), before)
+                self.assertEqual(set(self.codex_home.iterdir()), {self.settings})
+
+    def test_obsidian_unicode_byte_boundary_and_existing_base_syntax_remain_valid(self) -> None:
+        boundary = "/".join(["é" * 100] * 4 + ["é" * 100 + "n" * 20])
+        self.assertEqual(len(boundary.encode("utf-8")), 1024)
+        documents = [
+            {"workspace-mode": "obsidian", "logs-path": str(self.base / "Vúlt_資料"), "logs-subfolder": "équipe/調査"},
+            {"workspace-mode": "obsidian", "logs-path": str(self.base / r"vault\personal"), "logs-subfolder": "notes"},
+            {"workspace-mode": "obsidian", "logs-path": str(self.base / "vault{archive}"), "logs-subfolder": boundary},
+        ]
+        for document in documents:
+            with self.subTest(destination=document):
+                self.assertEqual(CONFIG.validate_workspace_destination(document), {
+                    "status": "valid", "mode": "obsidian", "reason_code": None,
+                })
+                self.write({"workspace-mode": "local", "custom": {"keep": True}})
+                self.set_values(document)
+                persisted = self.read()
+                self.assertEqual({key: persisted[key] for key in document}, document)
+                self.assertEqual(persisted["custom"], {"keep": True})
+                self.assertEqual(self.settings.read_text(encoding="utf-8"), json.dumps(persisted, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+                shown = self.run_helper("show")
+                self.assertEqual(shown.returncode, 0, shown.stderr)
+                self.assertEqual(shown.stdout, json.dumps(json.loads(shown.stdout), ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+        long_base = str(self.base / "vault") + "/segment" * 600
+        self.assertGreater(len(long_base.encode("utf-8")), 4096)
+        self.assertEqual(CONFIG.validate_workspace_destination({
+            "workspace-mode": "obsidian", "logs-path": long_base, "logs-subfolder": "notes",
+        }), {"status": "valid", "mode": "obsidian", "reason_code": None})
 
     def test_explicit_file_selection_writes_both_selectors(self) -> None:
         vault = self.base / "vault"
@@ -264,6 +346,25 @@ class WorkspaceConfigTests(unittest.TestCase):
         self.assertEqual(persisted["logs-mode"], "obsidian")
         self.assertEqual(persisted["custom"], {"source": 9})
 
+    def test_import_preserves_existing_invalid_obsidian_fields_and_reports_them(self) -> None:
+        source = self.base / "source.json"
+        source.write_text(json.dumps({
+            "workspace-mode": "gpt-space", "workspace-space-id": "space_source",
+            "workspace-container-page-id": "page_source", "language": "es", "custom": {"source": True},
+        }), encoding="utf-8")
+        for name, key, value in self.invalid_obsidian_fields():
+            with self.subTest(case=name):
+                destination = {"workspace-mode": "obsidian", "logs-path": str(self.base / "vault"), "logs-subfolder": "notes", key: value}
+                self.write({**destination, "custom": {"keep": [1, True]}})
+                output = io.StringIO()
+                with mock.patch.object(CONFIG, "import_sources", return_value={"claude": source}), contextlib.redirect_stdout(output):
+                    self.assertEqual(CONFIG.import_config("claude", None), 0)
+                self.assertEqual(json.loads(output.getvalue())["workspaceDiagnostics"], ["invalid_obsidian_destination"])
+                persisted = self.read()
+                self.assertEqual({field: persisted[field] for field in WORKSPACE_KEYS if field in persisted}, destination)
+                self.assertEqual(persisted["custom"], {"keep": [1, True], "source": True})
+                self.assertEqual(persisted["language"], "es")
+
     def test_ensure_preserves_existing_workspace_representations_and_is_idempotent(self) -> None:
         cases = [
             ({"logs-mode": "obsidian", "logs-path": str(self.base / "old-vault"), "logs-subfolder": "notes"}, []),
@@ -274,6 +375,9 @@ class WorkspaceConfigTests(unittest.TestCase):
             ({"logs-mode": None}, ["invalid_logs_mode"]),
             ({"workspace-mode": "obsidian", "logs-path": "~__th_no_such_user__/vault", "logs-subfolder": "notes"}, ["invalid_obsidian_destination"]),
         ]
+        cases.extend(({
+            "workspace-mode": "obsidian", "logs-path": str(self.base / "vault"), "logs-subfolder": "notes", key: value,
+        }, ["invalid_obsidian_destination"]) for _, key, value in self.invalid_obsidian_fields())
         for preference, diagnostics in cases:
             with self.subTest(preference=preference):
                 self.write({**preference, "custom": {"keep": [1, {"nested": True}]}})
