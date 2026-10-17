@@ -111,6 +111,9 @@ contracts listed below.
 | `test_retired_phrases.py` | The closed retired-phrase list behind `/th:lint` Check 12 — a contract that restates a helper's flags, decision procedure, or attempt ordinals, plus the shrink-only exemption map |
 | `test_authoring_budgets.py` | Advisory word/line/contents health signals, plus the shrink-only word ceilings recorded in `tests/fixtures/authoring-baseline.json`. Three things fail: a contents link pointing to no real heading, a ceiling raised above (or an entry dropped from) the fixture at the base ref, and a ceiling violation — a file over its ceiling, or a ceiling left more than 2% above a file's current count |
 
+The Pi RPC EOF fixture requires Python 3 to close stdout while keeping stdin open;
+the native Pi CI matrix provisions Python 3.13 explicitly.
+
 **Installer, runtime, and tooling.**
 
 The fixed workspace-artifact registry and its prose mention check were retired
