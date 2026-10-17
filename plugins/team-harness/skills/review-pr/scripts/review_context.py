@@ -419,7 +419,7 @@ def create_review_run(repo_root: Path, pr: int) -> dict[str, Any]:
     raise ContextError("cannot allocate an isolated review run")
 
 
-def _temporary_leaf(artifact_root: Path, prefix: str) -> Path:
+def _temporary_leaf(artifact_root: Path, prefix: str, *, pin: bool = False) -> Path | tuple[Path, int]:
     _safe_leaf(prefix)
     _, directory_fd = _open_directory(artifact_root)
     try:
@@ -434,6 +434,8 @@ def _temporary_leaf(artifact_root: Path, prefix: str) -> Path:
                 )
             except FileExistsError:
                 continue
+            if pin:
+                return artifact_root / name, leaf_fd
             os.close(leaf_fd)
             return artifact_root / name
     finally:
@@ -441,7 +443,13 @@ def _temporary_leaf(artifact_root: Path, prefix: str) -> Path:
     raise ContextError("cannot allocate a temporary review artifact")
 
 
-def _discard_artifact_leaf(artifact_root: Path, name: str) -> None:
+def _discard_artifact_leaf(
+    artifact_root: Path,
+    name: str,
+    *,
+    expected_identity: tuple[int, int] | None = None,
+    owned_names: tuple[str, ...] = (),
+) -> None:
     name = _safe_leaf(name)
     _, directory_fd = _open_directory(artifact_root)
     try:
@@ -451,6 +459,19 @@ def _discard_artifact_leaf(artifact_root: Path, name: str) -> None:
             return
         if not stat.S_ISREG(metadata.st_mode):
             raise ContextError("temporary artifact is not a regular file")
+        if expected_identity is not None:
+            if (metadata.st_dev, metadata.st_ino) != expected_identity:
+                raise ContextError("capture artifact was replaced; preserve the current leaf")
+            owned_links = 0
+            for owned_name in set(owned_names or (name,)):
+                try:
+                    candidate = artifact_fs.stat(_safe_leaf(owned_name), dir_fd=directory_fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    continue
+                if stat.S_ISREG(candidate.st_mode) and (candidate.st_dev, candidate.st_ino) == expected_identity:
+                    owned_links += 1
+            if metadata.st_nlink != owned_links:
+                raise ContextError("capture artifact has links outside this attempt; preserve the leaf")
         artifact_fs.unlink(name, dir_fd=directory_fd)
     finally:
         os.close(directory_fd)
@@ -2118,10 +2139,12 @@ def _capture_id(value: Any) -> bool:
 def _capture_source_reference(value: Any, *, identity: bool = False) -> str:
     if not _capture_text(value, 1024 if identity else 4096):
         raise ContextError("Page capture source reference is invalid")
-    if identity and (value.startswith(("/", "\\")) or re.match(r"^[A-Za-z]:[\\/]", value)):
-        raise ContextError("Page capture source identity must be portable")
-    prefix = "origin:" if value.startswith("origin:") else ""
+    origin = re.match(r"^(?:origin:)+", value, re.IGNORECASE)
+    prefix = origin.group() if origin is not None else ""
     reference = value[len(prefix):]
+    if identity and (not _capture_text(reference, 1024) or reference.startswith(("/", "\\"))
+                     or re.match(r"^(?:[A-Za-z]:|file:)", reference, re.IGNORECASE)):
+        raise ContextError("Page capture source identity must be portable")
     try:
         parsed = urlsplit(reference)
         if parsed.hostname:
@@ -2258,6 +2281,14 @@ def _owned_page_capture_root(artifact_root: Path) -> Path:
     return validate_owned_review_run(root.parent.parent.parent, root, owner["owner_token"], owner["pr"])
 
 
+def _capture_cleanup_note(error: Exception, message: str) -> None:
+    add_note = getattr(error, "add_note", None)
+    if callable(add_note):
+        add_note(message)
+    else:
+        print(f"review-context: {message}", file=sys.stderr)
+
+
 def capture_page_workspace(artifact_root: Path, snapshot: dict[str, Any], *, reviewed_head: str, technical_hash: str) -> dict[str, Any]:
     """Freeze selected complete native Page blocks in an existing owned review run."""
     root = _owned_page_capture_root(artifact_root)
@@ -2272,10 +2303,52 @@ def capture_page_workspace(artifact_root: Path, snapshot: dict[str, Any], *, rev
             raise ContextError("workspace capture output already exists; preserve frozen evidence in this run")
     finally:
         os.close(descriptor)
-    for file, payload in zip(manifest["files"], payloads):
-        write_artifact_leaf(root, file["captured_leaf"], payload)
     encoded = (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
-    write_artifact_leaf(root, PAGE_WORKSPACE_MANIFEST, encoded)
+    staged: list[tuple[Path, str, int]] = []
+    attempted: list[tuple[str, tuple[int, int]]] = []
+    capture_error: Exception | None = None
+    try:
+        outputs = [(file["captured_leaf"], payload) for file, payload in zip(manifest["files"], payloads)]
+        outputs.append((PAGE_WORKSPACE_MANIFEST, encoded))
+        for final_name, payload in outputs:
+            temporary, pinned = _temporary_leaf(root, f"tmp-{final_name}", pin=True)
+            staged.append((temporary, final_name, pinned))
+            _write_existing_leaf(temporary, payload)
+        for temporary, final_name, pinned in staged:
+            metadata = os.fstat(pinned)
+            attempted.append((final_name, (metadata.st_dev, metadata.st_ino)))
+            promote_artifact(root, temporary.name, final_name)
+    except Exception as error:
+        capture_error = error
+        cleanup_errors = []
+        cleanup = []
+        for temporary, _, pinned in staged:
+            try:
+                metadata = os.fstat(pinned)
+                cleanup.append((temporary.name, (metadata.st_dev, metadata.st_ino)))
+            except Exception as cleanup_error:
+                cleanup_errors.append(f"{temporary.name}: {cleanup_error}")
+        cleanup.extend(attempted)
+        owned_names: dict[tuple[int, int], list[str]] = {}
+        for name, identity in cleanup:
+            owned_names.setdefault(identity, []).append(name)
+        # Remove staged links before final links when promotion failed after replacement.
+        for name, identity in cleanup:
+            try:
+                _discard_artifact_leaf(root, name, expected_identity=identity, owned_names=tuple(owned_names[identity]))
+            except Exception as cleanup_error:
+                cleanup_errors.append(f"{name}: {cleanup_error}")
+        if cleanup_errors:
+            _capture_cleanup_note(error, "Page workspace capture cleanup incomplete; preserve remaining leaves for owned recovery before retry: " + "; ".join(cleanup_errors))
+        raise
+    finally:
+        for temporary, _, pinned in staged:
+            try:
+                os.close(pinned)
+            except OSError as close_error:
+                if capture_error is None:
+                    raise
+                _capture_cleanup_note(capture_error, f"Page workspace capture cleanup could not close {temporary.name}: {close_error}")
     return {"provider": "gpt-space", "manifest": str(root / PAGE_WORKSPACE_MANIFEST),
             "manifest_sha256": hashlib.sha256(encoded).hexdigest(), "content_sha256": manifest["content_sha256"],
             "reviewed_head": reviewed_head, "technical_hash": technical_hash,
@@ -2833,6 +2906,8 @@ def main() -> int:
         return args.func(args)
     except ContextError as error:
         print(f"review-context: {error}", file=sys.stderr)
+        for note in getattr(error, "__notes__", ()):
+            print(f"review-context: {note}", file=sys.stderr)
         return 2
 
 

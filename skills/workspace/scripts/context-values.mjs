@@ -28,8 +28,8 @@ function isPortableHostDirectory(value) {
 
 function sourceReference(value) {
   if (!safeText(value)) throw new Error("source reference invalid");
-  const prefix = value.startsWith("origin:") ? "origin:" : "";
-  const reference = prefix ? value.slice(prefix.length) : value;
+  const prefix = value.match(/^(?:origin:)+/i)?.[0] ?? "";
+  const reference = value.slice(prefix.length);
   try {
     const parsed = new URL(reference);
     if (parsed.hostname) {
@@ -44,7 +44,10 @@ function sourceReference(value) {
 }
 
 function portableIdentity(value) {
-  if (!safeText(value, 1024) || path.isAbsolute(value) || /^[A-Za-z]:[\\/]/.test(value)) {
+  if (!safeText(value, 1024)) throw new Error("source identity invalid");
+  const reference = value.replace(/^(?:origin:)+/i, "");
+  if (!safeText(reference, 1024) || path.posix.isAbsolute(reference) || path.win32.isAbsolute(reference)
+    || /^(?:[A-Za-z]:|file:)/i.test(reference)) {
     throw new Error("source identity invalid");
   }
   return sourceReference(value);

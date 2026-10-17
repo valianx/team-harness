@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.util
 import copy
+import errno
 import hashlib
 import io
 import json
@@ -15,7 +16,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import contextmanager, redirect_stdout
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
+from itertools import product
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -299,6 +301,229 @@ class PageWorkspaceTests(unittest.TestCase):
             result = subprocess.run(args, text=True, capture_output=True)
             self.assertEqual(result.returncode, 2)
             self.assertIn("safe read limit", result.stderr)
+
+    def test_source_identities_and_aliases_refuse_host_local_forms(self):
+        local_forms = ["/srv/repos/th", "C:\\repos\\th", "C:/repos/th", "C:repo", "\\\\server\\share\\th",
+                       "\\repos\\th", "//server/share/th", "file:///srv/repos/th", "FiLe:///C:/repos/th", "file://server/share/th"]
+        for prefix, local, field in product(["", "origin:", "ORIGIN:", "origin:origin:"], local_forms, ["source", "alias"]):
+            with self.subTest(identity=prefix + local, field=field), tempfile.TemporaryDirectory() as directory:
+                root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
+                snapshot = page_workspace_snapshot()
+                source = snapshot["source_associations"][0]
+                if field == "source":
+                    source["identity"] = prefix + local
+                else:
+                    source["aliases"] = [{"identity": prefix + local, "verified": True,
+                                          "evidence": "https://github.com/owner/repo"}]
+                snapshot["expected_source_associations"] = copy.deepcopy(snapshot["source_associations"])
+                with self.assertRaisesRegex(MODULE.ContextError, "identity must be portable"):
+                    self.capture(root, snapshot)
+                self.assertEqual([file.name for file in root.iterdir()], [MODULE.REVIEW_OWNER_FILE])
+
+    def test_portable_sources_strip_wrapped_credentials_and_keep_host_paths_out_of_identity(self):
+        references = [
+            ("repository:owner/repo", "repository:owner/repo"), ("project:release", "project:release"),
+            ("https://user:secret@github.com/owner/repo?token=secret#ref", "https://github.com/owner/repo"),
+            ("ssh://git:secret@github.com/owner/repo", "ssh://github.com/owner/repo"),
+            ("origin:https://user:secret@github.com/owner/repo", "origin:https://github.com/owner/repo"),
+            ("ORIGIN:https://user:secret@github.com/owner/repo", "ORIGIN:https://github.com/owner/repo"),
+            ("origin:ORIGIN:ssh://git:secret@github.com/owner/repo", "origin:ORIGIN:ssh://github.com/owner/repo"),
+            ("ORIGIN:origin:git@github.com:owner/repo.git", "ORIGIN:origin:github.com:owner/repo.git"),
+        ]
+        for identity, expected in references:
+            with self.subTest(identity=identity), tempfile.TemporaryDirectory() as directory:
+                root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
+                snapshot = page_workspace_snapshot()
+                source = snapshot["source_associations"][0]
+                source.update({"identity": identity, "aliases": [{"identity": identity, "verified": True,
+                               "evidence": "origin:ORIGIN:https://user:secret@github.com/owner/repo"}],
+                               "host_paths": [{"host": "linux", "path": "/srv/repos/th"},
+                                              {"host": "windows", "path": "C:\\repos\\th"}]})
+                snapshot["expected_source_associations"] = copy.deepcopy(snapshot["source_associations"])
+                receipt = self.capture(root, snapshot)
+                captured_source = self.verify(root, receipt)["source_associations"][0]
+                self.assertEqual(captured_source["identity"], expected)
+                self.assertEqual(captured_source["aliases"][0]["identity"], expected)
+                self.assertEqual(captured_source["aliases"][0]["evidence"], "origin:ORIGIN:https://github.com/owner/repo")
+                self.assertNotIn("host_paths", captured_source)
+                self.assertNotIn("secret", MODULE.safe_read_leaf(root, "pr-review-workspace.json").decode())
+
+    def _assert_write_failure_recovers(self, failure_index):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
+            MODULE.write_artifact_leaf(root, "native-read.json", json.dumps(page_workspace_snapshot()).encode())
+            before = {file.name: file.read_bytes() for file in root.iterdir()}
+            failure = OSError(errno.ENOSPC, "injected Page capture write failure")
+            real_write = MODULE.os.write
+            writes = 0
+
+            def fail_write(descriptor, content):
+                nonlocal writes
+                writes += 1
+                if writes == failure_index:
+                    raise failure
+                return real_write(descriptor, content)
+
+            with patch.object(MODULE.os, "write", side_effect=fail_write), self.assertRaises(OSError) as caught:
+                self.capture(root)
+            self.assertIs(caught.exception, failure)
+            self.assertEqual({file.name: file.read_bytes() for file in root.iterdir()}, before)
+            receipt = self.capture(root)
+            self.assertEqual(len(self.verify(root, receipt)["files"]), 2)
+            self.assertEqual(MODULE.safe_read_leaf(root, "native-read.json"), before["native-read.json"])
+
+    def test_capture_rolls_back_later_block_write_failure_for_retry(self):
+        self._assert_write_failure_recovers(2)
+
+    def test_capture_rolls_back_manifest_write_failure_for_retry(self):
+        self._assert_write_failure_recovers(3)
+
+    def test_capture_rolls_back_publication_then_failure_for_retry(self):
+        for failed_leaf in ["pr-review-workspace-page-002.md", "pr-review-workspace.json"]:
+            with self.subTest(leaf=failed_leaf), tempfile.TemporaryDirectory() as directory:
+                root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
+                before = {file.name: file.read_bytes() for file in root.iterdir()}
+                failure = OSError(errno.ENOSPC, "injected after actual publication")
+                real_promote = MODULE.promote_artifact
+
+                def publish_then_fail(root, temporary, final):
+                    real_promote(root, temporary, final)
+                    if final == failed_leaf:
+                        raise failure
+
+                with patch.object(MODULE, "promote_artifact", side_effect=publish_then_fail), self.assertRaises(OSError) as caught:
+                    self.capture(root)
+                self.assertIs(caught.exception, failure)
+                self.assertEqual({file.name: file.read_bytes() for file in root.iterdir()}, before)
+                receipt = self.capture(root)
+                self.assertEqual(len(self.verify(root, receipt)["files"]), 2)
+
+    def test_capture_rolls_back_post_replace_stat_failure_with_both_owned_links(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
+            before = {file.name: file.read_bytes() for file in root.iterdir()}
+            failure = OSError(errno.ENOSPC, "injected post-replace stat failure")
+            real_stat = MODULE.artifact_fs.stat
+            injected = False
+
+            def fail_post_replace_stat(name, *args, **kwargs):
+                nonlocal injected
+                result = real_stat(name, *args, **kwargs)
+                if name == "pr-review-workspace-page-002.md" and not injected:
+                    injected = True
+                    raise failure
+                return result
+
+            with patch.object(MODULE.artifact_fs, "stat", side_effect=fail_post_replace_stat), self.assertRaises(MODULE.ContextError) as caught:
+                self.capture(root)
+            self.assertIs(caught.exception.__cause__, failure)
+            self.assertEqual({file.name: file.read_bytes() for file in root.iterdir()}, before)
+            receipt = self.capture(root)
+            self.assertEqual(len(self.verify(root, receipt)["files"]), 2)
+
+    def test_capture_rollback_preserves_replaced_or_externally_linked_output(self):
+        for kind in ["replacement", "hardlink"]:
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
+                external = Path(directory) / "external"
+                external.write_bytes(b"foreign capture bytes")
+                failure = OSError(errno.ENOSPC, "injected publication failure")
+                real_promote = MODULE.promote_artifact
+
+                def replace_owned_output_then_fail(root, temporary, final):
+                    real_promote(root, temporary, final)
+                    if final == "pr-review-workspace-page-002.md":
+                        target = root / "pr-review-workspace-page-001.md"
+                        target.unlink()
+                        if kind == "hardlink":
+                            os.link(external, target)
+                        else:
+                            replacement = Path(directory) / "replacement"
+                            replacement.write_bytes(external.read_bytes())
+                            os.replace(replacement, target)
+                        raise failure
+
+                with patch.object(MODULE, "promote_artifact", side_effect=replace_owned_output_then_fail), self.assertRaises(OSError) as caught:
+                    self.capture(root)
+                self.assertIs(caught.exception, failure)
+                self.assertEqual((root / "pr-review-workspace-page-001.md").read_bytes(), b"foreign capture bytes")
+                self.assertEqual(external.read_bytes(), b"foreign capture bytes")
+                self.assertFalse((root / "pr-review-workspace-page-002.md").exists())
+                self.assertFalse((root / "pr-review-workspace.json").exists())
+                self.assertIn("pr-review-workspace-page-001.md", " ".join(getattr(caught.exception, "__notes__", [])))
+                with self.assertRaisesRegex(MODULE.ContextError, "already exists"):
+                    self.capture(root)
+
+    def test_capture_cleanup_error_preserves_primary_exception_and_reports_remaining(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
+            failure = OSError(errno.ENOSPC, "injected after publication")
+            real_promote = MODULE.promote_artifact
+
+            def publish_then_fail(root, temporary, final):
+                real_promote(root, temporary, final)
+                if final == "pr-review-workspace-page-002.md":
+                    raise failure
+
+            with patch.object(MODULE, "promote_artifact", side_effect=publish_then_fail), \
+                    patch.object(MODULE, "_discard_artifact_leaf", side_effect=OSError(errno.EACCES, "injected cleanup denial")), \
+                    self.assertRaises(OSError) as caught:
+                self.capture(root)
+            self.assertIs(caught.exception, failure)
+            notes = " ".join(getattr(caught.exception, "__notes__", []))
+            self.assertIn("cleanup", notes)
+            self.assertIn("pr-review-workspace-page-001.md", notes)
+            self.assertTrue((root / "pr-review-workspace-page-001.md").exists())
+            self.assertFalse((root / "pr-review-workspace.json").exists())
+            with self.assertRaisesRegex(MODULE.ContextError, "already exists"):
+                self.capture(root)
+
+    def test_capture_rollback_preserves_new_external_alias_to_owned_inode(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
+            external_alias = Path(directory) / "external-alias"
+            target = root / "pr-review-workspace-page-001.md"
+            failure = OSError(errno.ENOSPC, "injected publication failure")
+            real_promote = MODULE.promote_artifact
+
+            def alias_owned_output_then_fail(root, temporary, final):
+                real_promote(root, temporary, final)
+                if final == "pr-review-workspace-page-002.md":
+                    os.link(target, external_alias)
+                    raise failure
+
+            with patch.object(MODULE, "promote_artifact", side_effect=alias_owned_output_then_fail), self.assertRaises(OSError) as caught:
+                self.capture(root)
+            self.assertIs(caught.exception, failure)
+            self.assertEqual(target.read_bytes(), b"# Plan\n\nReview the change.\n")
+            self.assertEqual(external_alias.read_bytes(), b"# Plan\n\nReview the change.\n")
+            self.assertFalse((root / "pr-review-workspace-page-002.md").exists())
+            self.assertIn(target.name, " ".join(getattr(caught.exception, "__notes__", [])))
+            with self.assertRaisesRegex(MODULE.ContextError, "already exists"):
+                self.capture(root)
+
+    def test_capture_cleanup_note_fallback_preserves_legacy_exception(self):
+        class LegacyContextError(MODULE.ContextError):
+            add_note = None
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
+            failure = LegacyContextError("injected primary failure")
+            real_promote = MODULE.promote_artifact
+
+            def publish_then_fail(root, temporary, final):
+                real_promote(root, temporary, final)
+                if final == "pr-review-workspace-page-002.md":
+                    raise failure
+
+            diagnostic = io.StringIO()
+            with patch.object(MODULE, "promote_artifact", side_effect=publish_then_fail), \
+                    patch.object(MODULE, "_discard_artifact_leaf", side_effect=OSError(errno.EACCES, "injected cleanup denial")), \
+                    redirect_stderr(diagnostic), self.assertRaises(LegacyContextError) as caught:
+                self.capture(root)
+            self.assertIs(caught.exception, failure)
+            self.assertIn("cleanup", diagnostic.getvalue())
+            self.assertIn("pr-review-workspace-page-001.md", diagnostic.getvalue())
 
 
 def seed_review_artifacts(root: Path, original: dict, latest: dict | None = None):

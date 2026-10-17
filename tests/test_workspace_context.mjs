@@ -148,6 +148,45 @@ const unprovenAlias = { ...remote, source_associations: [{ ...remote.source_asso
 assert.equal(resolveContextBinding({ preference: selectedRemote, remoteIdentity: unprovenAlias }).status, "invalid",
   "changed source identities need verified alias evidence");
 
+const hostLocalIdentities = [
+  "\\\\server\\repos\\th", "file:///srv/repos/th", "/srv/repos/th", "C:\\repos\\th", "C:/repos/th",
+  "C:repo", "\\repos\\th", "//server/repos/th", "FiLe:///C:/repos/th", "file://server/repos/th",
+];
+for (const localIdentity of hostLocalIdentities) {
+  for (const prefix of ["", "origin:", "ORIGIN:", "origin:origin:"]) {
+    const identity = `${prefix}${localIdentity}`;
+    for (const field of ["identity", "alias"]) {
+      const association = { ...remote.source_associations[0], ...(field === "identity" ? { identity } : {
+        aliases: [{ identity, verified: true, evidence: "verified source transfer" }],
+      }) };
+      const result = resolveContextBinding({ preference: selectedRemote,
+        remoteIdentity: { ...remote, source_associations: [association] } });
+      assert.equal(result.status, "invalid", `${field} cannot be a host-local coordinate: ${identity}`);
+    }
+  }
+}
+
+for (const [identity, expected] of [
+  ["repository:merchant", "repository:merchant"],
+  ["project:annual-review", "project:annual-review"],
+  ["origin:merchant", "origin:merchant"],
+  ["https://user:secret@github.example/org/merchant.git", "https://github.example/org/merchant.git"],
+  ["ssh://git:secret@github.example/org/merchant.git", "ssh://github.example/org/merchant.git"],
+  ["git@github.example:org/merchant.git", "github.example:org/merchant.git"],
+  ["origin:https://user:secret@github.example/org/merchant.git", "origin:https://github.example/org/merchant.git"],
+  ["origin:ssh://git:secret@github.example/org/merchant.git", "origin:ssh://github.example/org/merchant.git"],
+  ["ORIGIN:https://user:secret@github.example/org/merchant.git", "ORIGIN:https://github.example/org/merchant.git"],
+  ["origin:ORIGIN:ssh://git:secret@github.example/org/merchant.git", "origin:ORIGIN:ssh://github.example/org/merchant.git"],
+]) {
+  const association = { ...remote.source_associations[0], identity,
+    aliases: [{ identity, verified: true, evidence: "verified source transfer" }] };
+  const result = resolveContextBinding({ preference: selectedRemote,
+    remoteIdentity: { ...remote, source_associations: [association] } });
+  assert.equal(result.status, "ready", `portable identity remains supported: ${identity}`);
+  assert.equal(result.binding.context.source_associations[0].identity, expected);
+  assert.equal(result.binding.context.source_associations[0].aliases[0].identity, expected);
+}
+
 const root = await realpath(await mkdtemp(path.join(tmpdir(), "th-workspace-context-")));
 try {
   const first = path.join(root, "projects", "merchant");
