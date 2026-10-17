@@ -200,6 +200,20 @@ const sourceReferenceLocations = [
   ] }), association => association.aliases[0].evidence],
 ];
 const originPrefixes = ["", "origin:", "ORIGIN:", "origin:ORIGIN:"];
+for (const emptyReference of ["origin:", "ORIGIN:", "origin:origin:", "origin:ORIGIN:"]) {
+  for (const [field, makeAssociation] of sourceReferenceLocations) {
+    const association = makeAssociation(emptyReference);
+    const before = structuredClone(association);
+    const result = resolveContextBinding({ preference: selectedRemote,
+      remoteIdentity: { ...remote, source_associations: [association] } });
+    assert.equal(result.status, "invalid", `${field} requires source content after origin wrappers`);
+    assert.equal(result.binding, null, "empty source content cannot enter retained context");
+    assert.deepEqual(association, before, "empty reference rejection preserves supplied source metadata");
+    assert.throws(() => normalizeSourceAssociations([association]), {
+      name: "Error", message: /^source (?:identity|reference) invalid$/,
+    }, "empty source diagnostics are generic");
+  }
+}
 const invalidSourceReferences = [
   `https://user:${credentialCanary}@[broken/owner/repo`,
   `https://user:${credentialCanary}@/owner/repo`,
@@ -266,6 +280,7 @@ for (const [index, invalidReference] of invalidSourceReferences.entries()) {
 }
 for (const [reference, expected] of [
   ["repository:merchant", "repository:merchant"],
+  ["origin:origin:repository:merchant", "origin:origin:repository:merchant"],
   ["project:annual-review", "project:annual-review"],
   ["github.example:owner/repo.git", "github.example:owner/repo.git"],
   ["git@github.example:owner/repo.git", "github.example:owner/repo.git"],

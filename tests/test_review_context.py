@@ -420,6 +420,10 @@ class PageWorkspaceTests(unittest.TestCase):
     def test_ambiguous_sources_and_alias_evidence_refuse_credentials_without_outputs(self):
         canary = "synthetic-credential-canary"
         malformed = [
+            ("empty-origin", "origin:"),
+            ("empty-uppercase-origin", "ORIGIN:"),
+            ("empty-repeated-origin", "origin:origin:"),
+            ("empty-mixed-origin", "origin:ORIGIN:"),
             ("https-bracket", f"https://user:{canary}@[broken/owner/repo"),
             ("ssh-bracket", f"ssh://user:{canary}@[broken/owner/repo"),
             ("https-empty-host", f"https://user:{canary}@/owner/repo"),
@@ -510,6 +514,8 @@ class PageWorkspaceTests(unittest.TestCase):
     def test_portable_sources_strip_wrapped_credentials_and_keep_host_paths_out_of_identity(self):
         references = [
             ("repository:owner/repo", "repository:owner/repo"), ("project:release", "project:release"),
+            ("origin:repository:owner/repo", "origin:repository:owner/repo"),
+            ("ORIGIN:origin:project:release", "ORIGIN:origin:project:release"),
             ("github.example:owner/repo.git", "github.example:owner/repo.git"),
             ("https://user:secret@github.com/owner/repo?token=secret#ref", "https://github.com/owner/repo"),
             ("http://user:secret@github.com/owner/repo?token=secret#ref", "http://github.com/owner/repo"),
@@ -545,6 +551,7 @@ class PageWorkspaceTests(unittest.TestCase):
                                "host_paths": [{"host": "linux", "path": "/srv/repos/th"},
                                               {"host": "windows", "path": "C:\\repos\\th"}]})
                 snapshot["expected_source_associations"] = copy.deepcopy(snapshot["source_associations"])
+                original = copy.deepcopy(snapshot)
                 receipt = self.capture(root, snapshot)
                 captured_source = self.verify(root, receipt)["source_associations"][0]
                 self.assertEqual(captured_source["identity"], expected)
@@ -553,6 +560,7 @@ class PageWorkspaceTests(unittest.TestCase):
                 self.assertEqual(captured_source["aliases"][0]["evidence"], expected)
                 self.assertNotIn("host_paths", captured_source)
                 self.assertNotIn("secret", MODULE.safe_read_leaf(root, "pr-review-workspace.json").decode())
+                self.assertEqual(snapshot, original)
 
     def _assert_write_failure_recovers(self, failure_index):
         with tempfile.TemporaryDirectory() as directory:

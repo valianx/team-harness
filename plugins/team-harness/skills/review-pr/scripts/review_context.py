@@ -2163,6 +2163,8 @@ def _capture_source_reference(value: Any, *, identity: bool = False) -> str:
     origin = re.match(r"^(?:origin:)+", value, re.IGNORECASE)
     prefix = origin.group() if origin is not None else ""
     reference = value[len(prefix):]
+    if not reference:
+        raise ContextError("Page capture source reference is invalid")
     if identity and (not _capture_text(reference, 1024) or reference.startswith(("/", "\\"))
                      or re.match(r"^(?:[A-Za-z]:|file:)", reference, re.IGNORECASE)):
         raise ContextError("Page capture source identity must be portable")
