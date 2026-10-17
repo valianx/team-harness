@@ -107,7 +107,7 @@ export function normalizeSourceAssociations(values) {
         || !safeText(mapping.host, 255) || !isPortableHostDirectory(mapping.path))) throw new Error("host mapping invalid");
     }
     if (value.aliases !== undefined) {
-      if (!Array.isArray(value.aliases)) throw new Error("source aliases invalid");
+      if (!Array.isArray(value.aliases) || value.aliases.length > 128) throw new Error("source aliases invalid");
       normalized.aliases = value.aliases.map(alias => {
         if (!isRecord(alias) || alias.verified !== true || !safeText(alias.evidence)) throw new Error("source alias unverified");
         return { ...structuredClone(alias), identity: portableIdentity(alias.identity), evidence: sourceReference(alias.evidence) };

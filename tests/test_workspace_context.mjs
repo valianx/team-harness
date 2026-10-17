@@ -148,6 +148,18 @@ const unprovenAlias = { ...remote, source_associations: [{ ...remote.source_asso
   aliases: [{ identity: "repository:old-name", verified: false, evidence: "" }] }] };
 assert.equal(resolveContextBinding({ preference: selectedRemote, remoteIdentity: unprovenAlias }).status, "invalid",
   "changed source identities need verified alias evidence");
+for (const [count, status] of [[128, "ready"], [129, "invalid"]]) {
+  const association = { ...remote.source_associations[0], aliases: Array.from({ length: count }, (_, index) => ({
+    identity: `repository:previous-${index}`, verified: true, evidence: "verified source transfer",
+  })) };
+  const before = structuredClone(association);
+  const result = resolveContextBinding({ preference: selectedRemote,
+    remoteIdentity: { ...remote, source_associations: [association] } });
+  assert.equal(result.status, status, "source aliases share the Page capture limit");
+  if (status === "ready") assert.equal(result.binding.context.source_associations[0].aliases.length, count);
+  else assert.equal(result.binding, null, "an uncapturable alias list cannot become retained context");
+  assert.deepEqual(association, before, "alias cardinality validation preserves input metadata");
+}
 
 const hostLocalIdentities = [
   "\\\\server\\repos\\th", "file:///srv/repos/th", "/srv/repos/th", "C:\\repos\\th", "C:/repos/th",
