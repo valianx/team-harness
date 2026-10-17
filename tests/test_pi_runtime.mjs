@@ -111,11 +111,16 @@ test('headless dialogs receive matching cancellation and notifications cannot bl
 });
 
 test('EOF and unterminated frames reject every affected pending command', async t => {
-  const python = execFileSync(process.platform === 'win32' ? 'python' : 'python3',
-    ['-I', '-S', '-c', 'import sys; print(sys.executable)'],
-    { encoding: 'utf8', shell: false, windowsHide: true, timeout: limits.startup_ms, killSignal: 'SIGKILL', maxBuffer: 4096 }).trim();
-  assert.ok(path.isAbsolute(python), 'Python must report its actual absolute interpreter path');
-  const executable = await fs.realpath(python);
+  let executable;
+  for (const [command, args] of [['python3', []], ['python', []], ['py', ['-3']]]) {
+    try {
+      const python = execFileSync(command, [...args, '-I', '-S', '-c', 'import sys; assert sys.version_info.major == 3; print(sys.executable)'],
+        { encoding: 'utf8', shell: false, windowsHide: true, timeout: limits.startup_ms, killSignal: 'SIGKILL', maxBuffer: 4096,
+          stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+      if (path.isAbsolute(python)) { executable = await fs.realpath(python); break; }
+    } catch { /* Try the next runner-supported interpreter name. */ }
+  }
+  assert.ok(executable, 'Python 3 is required for the EOF fixture (tried python3, python, py -3)');
   const eofFixture = fileURLToPath(new URL('./fixtures/pi-rpc-eof.py', import.meta.url));
   for (const truncated of [false, true]) {
     const setup = await isolated(t);
