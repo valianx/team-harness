@@ -131,8 +131,9 @@ export function classifySpaceWrite({ operation, receipt, observedPageIds = [] } 
     observed_page_ids: observedIds(observedPageIds, value, error?.details) };
   if (!["create", "patch", "edit"].includes(kind) || !isRecord(value)) return result;
   const commitUnknown = commitStatus === "unknown" || (commitStatus != null && !["not_committed", "committed"].includes(commitStatus));
+  const envelopeUncertain = receipt?.isError === true && !["not_committed", "committed"].includes(commitStatus);
   if (kind === "create") {
-    if (!error && receipt?.isError !== true && !commitUnknown && commitStatus !== "not_committed"
+    if (!error && !envelopeUncertain && !commitUnknown && commitStatus !== "not_committed"
       && observedIds([], value).length > 0) {
       result.status = "applied";
       result.applied_indices = [0];
@@ -152,7 +153,7 @@ export function classifySpaceWrite({ operation, receipt, observedPageIds = [] } 
     }
     return result;
   }
-  let unknown = commitUnknown || receipt?.isError === true || (Boolean(error) && commitStatus !== "not_committed" && commitStatus !== "committed");
+  let unknown = envelopeUncertain || commitUnknown || (Boolean(error) && commitStatus !== "not_committed" && commitStatus !== "committed");
   const seen = new Set();
   for (const entry of operations) {
     const index = entry?.operation_index;
@@ -167,6 +168,7 @@ export function classifySpaceWrite({ operation, receipt, observedPageIds = [] } 
   if (expectedCount !== undefined && (!Number.isSafeInteger(expectedCount) || expectedCount < 1
     || seen.size !== expectedCount || [...seen].some(index => index >= expectedCount))) unknown = true;
   if (commitStatus === "not_committed" && result.applied_indices.length > 0) unknown = true;
+  if (error && commitStatus === "committed" && result.applied_indices.length === 0) unknown = true;
   for (const key of ["applied_indices", "ignored_indices", "rejected_indices"]) result[key].sort((a, b) => a - b);
   if (unknown) return result;
   result.status = result.rejected_indices.length > 0 ? (result.applied_indices.length > 0 || result.ignored_indices.length > 0 ? "partial" : "rejected")

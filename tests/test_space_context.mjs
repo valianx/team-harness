@@ -131,6 +131,78 @@ for (const status of [undefined, "applied"]) {
   assert.equal(result.reconcile_required, true);
 }
 
+const rejectedEdit = { error: { code: "validation_error", commit_status: "not_committed",
+  details: { operation_results: [{ operation_index: 0, status: "rejected" }] } } };
+const editOperation = { kind: "edit", operation_count: 1 };
+const directRejected = classifySpaceWrite({ operation: editOperation, receipt: rejectedEdit });
+assert.equal(directRejected.status, "rejected");
+assert.equal(directRejected.reconcile_required, true);
+assert.deepEqual(directRejected.rejected_indices, [0]);
+assert.deepEqual(classifySpaceWrite({ operation: editOperation,
+  receipt: { isError: true, structuredContent: rejectedEdit } }), directRejected,
+  "an MCP error wrapper cannot erase a definitive structured not_committed result");
+
+for (const [receipt, expectedStatus, expectedReconcile] of [
+  [writes.schema_rejected, "rejected", false],
+  [writes.not_committed_conflict, "rejected", true],
+  [writes.unknown_conflict, "unknown", true],
+  [writes.unknown_error, "unknown", true],
+]) {
+  const direct = classifySpaceWrite({ operation: editOperation, receipt });
+  const wrapped = classifySpaceWrite({ operation: editOperation, receipt: { isError: true, structuredContent: receipt } });
+  assert.equal(direct.status, expectedStatus);
+  assert.equal(direct.reconcile_required, expectedReconcile);
+  assert.deepEqual(wrapped, direct, "structured error commit metadata has the same meaning with or without the MCP wrapper");
+}
+for (const commitMetadata of [{}, { commit_status: "unknown" }]) {
+  const receipt = { error: { code: "validation_error", details: rejectedEdit.error.details, ...commitMetadata } };
+  for (const supplied of [receipt, { isError: true, structuredContent: receipt }]) {
+    const result = classifySpaceWrite({ operation: editOperation, receipt: supplied });
+    assert.equal(result.status, "unknown", "rejected operations cannot prove an error's absent or unknown commit state");
+    assert.equal(result.reconcile_required, true);
+    assert.deepEqual(result.rejected_indices, [0]);
+  }
+}
+for (const operation_results of [
+  [{ operation_index: 0, status: "rejected" }],
+  [{ operation_index: 0, status: "applied", ignored_reason: "block_deleted" }],
+]) {
+  const receipt = { error: { code: "validation_error", commit_status: "committed", details: { operation_results } } };
+  for (const supplied of [receipt, { isError: true, structuredContent: receipt }]) {
+    const result = classifySpaceWrite({ operation: editOperation, receipt: supplied });
+    assert.equal(result.status, "unknown", "a committed error contradicts receipts describing no applied changes");
+    assert.equal(result.reconcile_required, true);
+  }
+}
+const committedPartial = { error: { code: "partial_failure", commit_status: "committed",
+  details: { operation_results: writes.partial_patch.operation_results } } };
+for (const receipt of [committedPartial, { isError: true, structuredContent: committedPartial }]) {
+  assert.deepEqual(classifySpaceWrite({ operation: { kind: "patch", operation_count: 3 }, receipt }), partial,
+    "consistent committed partial receipts retain applied and ignored operations so they cannot be replayed");
+}
+for (const operation_results of [
+  [{ operation_index: 0, status: "unfamiliar" }],
+  [{ operation_index: 0, status: "rejected" }, { operation_index: 0, status: "rejected" }],
+]) {
+  const receipt = { error: { ...rejectedEdit.error, details: { operation_results } } };
+  for (const supplied of [receipt, { isError: true, structuredContent: receipt }]) {
+    assert.equal(classifySpaceWrite({ operation: editOperation, receipt: supplied }).status, "unknown",
+      "definitive commit metadata does not make malformed operation receipts trustworthy");
+  }
+}
+for (const [operation, receipt] of [["create", writes.create_success], ["patch", writes.legacy_applied],
+  [{ kind: "patch", operation_count: 3 }, writes.partial_patch]]) {
+  for (const commitMetadata of [{}, { commit_status: "unknown" }]) {
+    const uncertain = classifySpaceWrite({ operation,
+      receipt: { isError: true, structuredContent: { ...receipt, ...commitMetadata } } });
+    assert.equal(uncertain.status, "unknown", "an error wrapper without definitive structured commit status remains uncertain");
+    assert.equal(uncertain.reconcile_required, true);
+  }
+  assert.deepEqual(classifySpaceWrite({ operation,
+    receipt: { isError: true, structuredContent: { ...receipt, commit_status: "committed" } } }),
+    classifySpaceWrite({ operation, receipt }), "a definitive committed wrapper preserves the structured operation results");
+}
+
 const remoteReady = { status: "ready", space_id: native.space_id, container_page_id: native.container.page_id,
   accessible: true, readable: true, writable: true, readback_verified: true, observed_page_ids: [native.container.page_id] };
 const configReady = { exit_code: 0, readback: { "workspace-mode": "gpt-space", "workspace-space-id": native.space_id,

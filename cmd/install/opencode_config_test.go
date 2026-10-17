@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -424,6 +425,10 @@ func TestOpencodeConfigWriters_DiagnoseInvalidOrConflictingPreferenceOnce(t *tes
 }
 
 func TestOpencodeConfigWriters_DiagnoseWorkspaceDestinationsWithoutRepair(t *testing.T) {
+	windowsDestinationCodes := []string{"invalid_obsidian_destination"}
+	if runtime.GOOS == "windows" {
+		windowsDestinationCodes = nil
+	}
 	for _, operation := range []struct {
 		name  string
 		write func(string, *opencodePlacer) error
@@ -460,7 +465,7 @@ func TestOpencodeConfigWriters_DiagnoseWorkspaceDestinationsWithoutRepair(t *tes
 			{"canonical Obsidian missing vault", `{"workspace-mode":"obsidian","logs-subfolder":"work-logs"}`, []string{"incomplete_obsidian_destination"}},
 			{"Obsidian wrong type", `{"workspace-mode":"obsidian","logs-path":null,"logs-subfolder":"work-logs"}`, []string{"invalid_obsidian_destination"}},
 			{"Obsidian empty subfolder", `{"logs-mode":"obsidian","logs-path":"/private-value/vault","logs-subfolder":""}`, []string{"invalid_obsidian_destination"}},
-			{"Obsidian Windows destination", `{"logs-mode":"obsidian","logs-path":"C:/private-value/Vault","logs-subfolder":"work-logs"}`, nil},
+			{"Obsidian native Windows destination", `{"logs-mode":"obsidian","logs-path":"C:/private-value/Vault","logs-subfolder":"work-logs"}`, windowsDestinationCodes},
 			{"local ignores unused remote destination", `{"workspace-mode":"local","workspace-space-id":null}`, nil},
 		} {
 			t.Run(operation.name+"/"+tc.name, func(t *testing.T) {
@@ -527,6 +532,186 @@ func TestOpencodeConfigWriters_DiagnoseWorkspaceDestinationsWithoutRepair(t *tes
 					t.Errorf("destination or metadata was repaired: %s, want %s", actual, before)
 				}
 			})
+		}
+	}
+}
+
+type obsidianDestinationCase struct {
+	name, base, subfolder, reason string
+}
+
+func obsidianDestinationCases(t *testing.T) []obsidianDestinationCase {
+	t.Helper()
+	home := filepath.Join(t.TempDir(), "private-value", "home")
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	vault := filepath.Join(t.TempDir(), "private-value", "Vault")
+	root := filepath.VolumeName(vault) + string(filepath.Separator)
+	windowsReason := "invalid_obsidian_destination"
+	literalBackslashReason := ""
+	homeCaseReason := ""
+	if runtime.GOOS == "windows" {
+		windowsReason = ""
+		literalBackslashReason = "invalid_obsidian_destination"
+		homeCaseReason = "invalid_obsidian_destination"
+	}
+	return []obsidianDestinationCase{
+		{"parent subfolder", vault, "../notes", "invalid_obsidian_destination"},
+		{"nested parent subfolder", vault, "notes/../archive", "invalid_obsidian_destination"},
+		{"current subfolder", vault, "./notes", "invalid_obsidian_destination"},
+		{"nested current subfolder", vault, "notes/./archive", "invalid_obsidian_destination"},
+		{"empty subfolder segment", vault, "notes//archive", "invalid_obsidian_destination"},
+		{"trailing subfolder separator", vault, "notes/", "invalid_obsidian_destination"},
+		{"absolute subfolder", vault, "/notes", "invalid_obsidian_destination"},
+		{"backslash subfolder", vault, `notes\archive`, "invalid_obsidian_destination"},
+		{"Windows absolute subfolder", vault, "C:/notes", "invalid_obsidian_destination"},
+		{"Windows drive-relative subfolder", vault, "C:notes", "invalid_obsidian_destination"},
+		{"star subfolder", vault, "notes*", "invalid_obsidian_destination"},
+		{"question subfolder", vault, "notes?", "invalid_obsidian_destination"},
+		{"open bracket subfolder", vault, "notes[archive", "invalid_obsidian_destination"},
+		{"close bracket subfolder", vault, "notes]archive", "invalid_obsidian_destination"},
+		{"open brace subfolder", vault, "notes{archive", "invalid_obsidian_destination"},
+		{"close brace subfolder", vault, "notes}archive", "invalid_obsidian_destination"},
+		{"control subfolder", vault, "notes\x00", "invalid_obsidian_destination"},
+		{"DEL subfolder", vault, "notes\x7f", "invalid_obsidian_destination"},
+		{"oversized ASCII subfolder", vault, strings.Repeat("a", 1025), "invalid_obsidian_destination"},
+		{"oversized Unicode subfolder", vault, strings.Repeat("é", 512) + "a", "invalid_obsidian_destination"},
+		{"relative base", "private-value/Vault", "notes", "invalid_obsidian_destination"},
+		{"unexpanded home base", "~private-value/Vault", "notes", "invalid_obsidian_destination"},
+		{"root base", root, "notes", "invalid_obsidian_destination"},
+		{"normalized root base", root + ".", "notes", "invalid_obsidian_destination"},
+		{"home base", home, "notes", "invalid_obsidian_destination"},
+		{"normalized home base", home + string(filepath.Separator), "notes", "invalid_obsidian_destination"},
+		{"native home case base", strings.ToUpper(home), "notes", homeCaseReason},
+		{"parent base", vault + string(filepath.Separator) + "../outside", "notes", "invalid_obsidian_destination"},
+		{"star base", vault + "*", "notes", "invalid_obsidian_destination"},
+		{"question base", vault + "?", "notes", "invalid_obsidian_destination"},
+		{"bracket base", vault + "[archive]", "notes", "invalid_obsidian_destination"},
+		{"control base", vault + "\x00", "notes", "invalid_obsidian_destination"},
+		{"DEL base", vault + "\x7f", "notes", "invalid_obsidian_destination"},
+		{"unavailable native vault", vault, "notes", ""},
+		{"nested subfolder", vault, "notes/archive", ""},
+		{"literal space subfolder", vault, " ", ""},
+		{"literal spaced segments", filepath.Join(vault, " personal "), " team / notes ", ""},
+		{"literal parent prefix", filepath.Join(vault, "..personal"), "..notes", ""},
+		{"Unicode destination", filepath.Join(vault, "Vúlt_資料"), "équipe/調査", ""},
+		{"Unicode byte boundary", vault, strings.Repeat("é", 512), ""},
+		{"ASCII byte boundary", vault, strings.Repeat("a", 1024), ""},
+		{"base braces remain valid", vault + "{archive}", "notes", ""},
+		{"base backslash remains valid", filepath.Join(vault, `vault\personal`), "notes", ""},
+		{"literal POSIX backslash base", vault + `\..\personal`, "notes", literalBackslashReason},
+		{"long base remains valid", vault + strings.Repeat(string(filepath.Separator)+"segment", 600), "notes", ""},
+		{"home child remains valid", filepath.Join(home, "Vault"), "notes", ""},
+		{"native Windows drive base", `C:\private-value\Vault`, "notes", windowsReason},
+		{"native Windows slash base", "C:/private-value/Vault", "notes", windowsReason},
+		{"native Windows UNC base", `\\server\share\private-value\Vault`, "notes", windowsReason},
+		{"native Windows UNC root", `\\server\share`, "notes", "invalid_obsidian_destination"},
+		{"native Windows drive-relative base", `C:private-value`, "notes", "invalid_obsidian_destination"},
+	}
+}
+
+func TestWorkspaceDestinationDiagnosis_ObsidianPathContract(t *testing.T) {
+	for _, tc := range obsidianDestinationCases(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			encoded, err := json.Marshal(map[string]string{"logs-path": tc.base, "logs-subfolder": tc.subfolder})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var raw map[string]json.RawMessage
+			if err := json.Unmarshal(encoded, &raw); err != nil {
+				t.Fatal(err)
+			}
+			diagnosis := workspaceDestinationDiagnosis(raw, "obsidian")
+			if reason := strings.SplitN(diagnosis, ":", 2)[0]; reason != tc.reason {
+				t.Errorf("diagnosis reason = %q, want %q", reason, tc.reason)
+			}
+			after, err := json.Marshal(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(after, encoded) {
+				t.Error("destination validator changed its input")
+			}
+		})
+	}
+}
+
+func TestOpencodeConfigWriters_PreserveObsidianPathContract(t *testing.T) {
+	cases := obsidianDestinationCases(t)
+	for _, operation := range []struct {
+		name  string
+		write func(string, *opencodePlacer) error
+	}{
+		{"apply", func(path string, p *opencodePlacer) error {
+			return writeOpencodeTeamHarnessConfig(path, opencodeSetupValues{LogsMode: "local"}, p)
+		}},
+		{"update", refreshManagedConfigKeys},
+	} {
+		for _, selector := range []string{"workspace-mode", "logs-mode"} {
+			for _, tc := range cases {
+				t.Run(operation.name+"/"+selector+"/"+tc.name, func(t *testing.T) {
+					root := t.TempDir()
+					path := opencodeSettingsConfigPath(root)
+					seed := map[string]interface{}{
+						selector: "obsidian", "logs-path": tc.base, "logs-subfolder": tc.subfolder,
+						"operator-metadata": map[string]interface{}{"private-value": []interface{}{nil, true, 1}},
+					}
+					before, err := json.Marshal(seed)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(path, before, 0o600); err != nil {
+						t.Fatal(err)
+					}
+					wantLines := 0
+					if tc.reason != "" {
+						wantLines = 1
+					}
+					capture, err := os.CreateTemp(t.TempDir(), "stderr")
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer capture.Close()
+					originalStderr := os.Stderr
+					os.Stderr = capture
+					defer func() { os.Stderr = originalStderr }()
+					if err := operation.write(path, newOpencodePlacerAt(root)); err != nil {
+						t.Fatal(err)
+					}
+					os.Stderr = originalStderr
+					output, err := os.ReadFile(capture.Name())
+					if err != nil {
+						t.Fatal(err)
+					}
+					if (len(output) == 0) != (tc.reason == "") {
+						t.Errorf("diagnosis emptiness does not match reason %q: %q", tc.reason, output)
+					}
+					if strings.Count(string(output), "\n") != wantLines || !strings.Contains(string(output), tc.reason) {
+						t.Errorf("diagnosis = %q, want %d lines with reason %q", output, wantLines, tc.reason)
+					}
+					if strings.Contains(string(output), "private-value") || len(output) > 512 {
+						t.Error("diagnosis disclosed a value or exceeded its bound")
+					}
+					after, err := os.ReadFile(path)
+					if err != nil {
+						t.Fatal(err)
+					}
+					var got map[string]json.RawMessage
+					if err := json.Unmarshal(after, &got); err != nil {
+						t.Fatal(err)
+					}
+					for _, key := range []string{"format_version", "installed_version", "updated_at"} {
+						delete(got, key)
+					}
+					actual, err := json.Marshal(got)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if !bytes.Equal(actual, before) {
+						t.Error("apply/update changed the destination or unrelated values")
+					}
+				})
+			}
 		}
 	}
 }

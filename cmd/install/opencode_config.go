@@ -114,14 +114,52 @@ func workspaceDestinationDiagnosis(m map[string]json.RawMessage, mode string) st
 		if !hasPath || !hasSubfolder {
 			return "incomplete_obsidian_destination: logs-path and logs-subfolder are required"
 		}
-		for _, key := range []string{"logs-path", "logs-subfolder"} {
-			value := extractStringFromRaw(m, key)
-			if strings.TrimSpace(value) == "" || hasControlChar(value) {
-				return "invalid_obsidian_destination: logs-path and logs-subfolder must be nonempty strings without control characters"
-			}
+		if !validObsidianBasePath(extractStringFromRaw(m, "logs-path")) ||
+			!validObsidianSubfolder(extractStringFromRaw(m, "logs-subfolder")) {
+			return "invalid_obsidian_destination: logs-path must be an absolute non-root vault and logs-subfolder a safe relative path"
 		}
 	}
 	return ""
+}
+
+func validObsidianBasePath(value string) bool {
+	if !filepath.IsAbs(value) || hasControlChar(value) || strings.ContainsAny(value, "*?[]") {
+		return false
+	}
+	parts := strings.FieldsFunc(value, func(char rune) bool {
+		return char == '/' || filepath.Separator == '\\' && char == '\\'
+	})
+	for _, part := range parts {
+		if part == ".." {
+			return false
+		}
+	}
+	cleaned := filepath.Clean(value)
+	if filepath.Dir(cleaned) == cleaned {
+		return false
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		if relative, err := filepath.Rel(home, cleaned); err == nil && relative == "." {
+			return false
+		}
+	}
+	return true
+}
+
+func validObsidianSubfolder(value string) bool {
+	if value == "" || len(value) > 1024 || hasControlChar(value) || strings.ContainsAny(value, `\*?[]{}`) {
+		return false
+	}
+	if len(value) >= 2 && value[1] == ':' &&
+		(value[0] >= 'a' && value[0] <= 'z' || value[0] >= 'A' && value[0] <= 'Z') {
+		return false
+	}
+	for _, part := range strings.Split(value, "/") {
+		if part == "" || part == "." || part == ".." {
+			return false
+		}
+	}
+	return true
 }
 
 func isWorkspaceOpaqueID(value string) bool {
