@@ -2166,7 +2166,31 @@ def _capture_source_reference(value: Any, *, identity: bool = False) -> str:
             return prefix + urlunsplit((parsed.scheme, host, parsed.path, "", ""))
     except ValueError:
         raise ContextError("Page capture source reference is invalid") from None
-    return prefix + re.sub(r"^[^/@:]+@(?=[^/:]+:)", "", reference)
+    retained = reference
+    scp = re.fullmatch(r"[^@:/\\?#\s]+@(\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9._-]+):([^@]+)", reference)
+    if scp is not None:
+        host, remote_path = scp.groups()
+        if host.startswith("["):
+            try:
+                urlsplit("ssh://" + host + "/")
+            except ValueError:
+                raise ContextError("Page capture source reference is invalid") from None
+        source_path = re.split(r"[?#]", remote_path, maxsplit=1)[0]
+        if not source_path:
+            raise ContextError("Page capture source reference is invalid")
+        retained = host + ":" + source_path
+    if re.search(r"[?#]", retained):
+        raise ContextError("Page capture source reference is invalid")
+    # Nested percent escapes must not hide userinfo in otherwise opaque references.
+    decoded = retained
+    while True:
+        if "@" in decoded:
+            raise ContextError("Page capture source reference is invalid")
+        next_decoded = re.sub(r"%([0-9A-Fa-f]{2})", lambda match: chr(int(match.group(1), 16)), decoded)
+        if next_decoded == decoded:
+            break
+        decoded = next_decoded
+    return prefix + retained
 
 
 def _capture_sources(value: Any) -> list[dict[str, Any]]:

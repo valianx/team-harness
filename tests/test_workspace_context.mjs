@@ -9,6 +9,7 @@ import {
   validateContextBinding,
   resolveContextBinding,
 } from "../skills/workspace/scripts/workspace-context.mjs";
+import { normalizeSourceAssociations } from "../skills/workspace/scripts/context-values.mjs";
 import {
   WORKSPACE_IDENTITY_SCHEMA_VERSION,
   discoverWorkspaceIdentity,
@@ -199,7 +200,7 @@ const sourceReferenceLocations = [
   ] }), association => association.aliases[0].evidence],
 ];
 const originPrefixes = ["", "origin:", "ORIGIN:", "origin:ORIGIN:"];
-const malformedSourceReferences = [
+const invalidSourceReferences = [
   `https://user:${credentialCanary}@[broken/owner/repo`,
   `https://user:${credentialCanary}@/owner/repo`,
   `ssh:///user:${credentialCanary}@broken/owner/repo`,
@@ -207,24 +208,59 @@ const malformedSourceReferences = [
   `https:user:${credentialCanary}@[broken/owner/repo`,
   `https:/user:${credentialCanary}@[broken/owner/repo`,
   `ssh:/user:${credentialCanary}@[broken/owner/repo`,
+  `git+ssh:user:${credentialCanary}@[broken/repo`,
+  `user:${credentialCanary}@host:path`,
+  `first@user:${credentialCanary}@host:path`,
+  `repository:owner/repo?auth=user:${credentialCanary}@host:path`,
+  `project:annual-review#user:${credentialCanary}@host:path`,
+  `git@host:owner/repo?auth=user:${credentialCanary}@other:path`,
+  `git@host:owner/repo#user:${credentialCanary}@other:path`,
+  `user:${credentialCanary}%40host:path`,
+  `user%3A${credentialCanary}%40host:path`,
+  `user:${credentialCanary}%2540host:path`,
+  `user:${credentialCanary}%25%34%30host:path`,
+  `git@host:owner/${credentialCanary}%40other:path`,
+  "git@[broken]:owner/repo",
+  "git@host:",
+  `git@host:?token=${credentialCanary}`,
+  `git@host:#${credentialCanary}`,
+  `git/alias:${credentialCanary}@host:path`,
+  `git\\alias:${credentialCanary}@host:path`,
+  `host:owner/repo?token=${credentialCanary}`,
+  `host:owner/repo#${credentialCanary}`,
+  `repository:merchant?token=${credentialCanary}`,
+  `project:annual-review#${credentialCanary}`,
 ];
-for (const [index, malformed] of malformedSourceReferences.entries()) {
+for (const [index, invalidReference] of invalidSourceReferences.entries()) {
   for (const prefix of originPrefixes) {
     for (const [field, makeAssociation] of sourceReferenceLocations) {
-      const association = makeAssociation(`${prefix}${malformed}`);
+      const association = makeAssociation(`${prefix}${invalidReference}`);
       const result = resolveContextBinding({ preference: selectedRemote,
         remoteIdentity: { ...remote, source_associations: [association] } });
-      assert.equal(result.status, "invalid", `${field} rejects malformed URL reference ${index}`);
+      assert.equal(result.status, "invalid", `${field} rejects invalid source reference ${index}`);
       assert.equal(result.binding, null, "invalid source references cannot enter retained context");
+      assert.throws(() => normalizeSourceAssociations([association]), {
+        name: "Error", message: "source reference invalid",
+      }, "source reference diagnostics omit supplied userinfo");
     }
   }
 }
 for (const [reference, expected] of [
   ["repository:merchant", "repository:merchant"],
   ["project:annual-review", "project:annual-review"],
+  ["github.example:owner/repo.git", "github.example:owner/repo.git"],
   ["git@github.example:owner/repo.git", "github.example:owner/repo.git"],
+  ["git@build_host-1:owner/repo.git", "build_host-1:owner/repo.git"],
+  ["git@[2001:db8::1]:owner/repo.git", "[2001:db8::1]:owner/repo.git"],
+  [`user%3A${credentialCanary}@github.example:owner/repo.git`, "github.example:owner/repo.git"],
+  [`user%40${credentialCanary}@github.example:owner/repo.git`, "github.example:owner/repo.git"],
+  [`git@github.example:owner/repo.git?token=${credentialCanary}#fragment`, "github.example:owner/repo.git"],
+  [`git@github.example:owner/repo.git#${credentialCanary}`, "github.example:owner/repo.git"],
   [`https://user:${credentialCanary}@github.example/owner/repo.git?access=synthetic-query#fragment`, "https://github.example/owner/repo.git"],
   [`ssh://git:${credentialCanary}@github.example/owner/repo.git?access=synthetic-query#fragment`, "ssh://github.example/owner/repo.git"],
+  [`https://first@user:${credentialCanary}@github.example/owner/repo.git`, "https://github.example/owner/repo.git"],
+  [`ssh://user%3A${credentialCanary}%40extra@github.example/owner/repo.git`, "ssh://github.example/owner/repo.git"],
+  [`git+ssh://user:${credentialCanary}@github.example/owner/repo.git?access=synthetic-query#fragment`, "git+ssh://github.example/owner/repo.git"],
 ]) {
   for (const prefix of originPrefixes) {
     for (const [field, makeAssociation, readReference] of sourceReferenceLocations) {

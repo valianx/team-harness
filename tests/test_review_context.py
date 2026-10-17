@@ -398,7 +398,7 @@ class PageWorkspaceTests(unittest.TestCase):
                     self.capture(root, snapshot)
                 self.assertEqual([file.name for file in root.iterdir()], [MODULE.REVIEW_OWNER_FILE])
 
-    def test_malformed_url_sources_and_alias_evidence_refuse_credentials_without_outputs(self):
+    def test_ambiguous_sources_and_alias_evidence_refuse_credentials_without_outputs(self):
         canary = "synthetic-credential-canary"
         malformed = [
             ("https-bracket", f"https://user:{canary}@[broken/owner/repo"),
@@ -411,6 +411,33 @@ class PageWorkspaceTests(unittest.TestCase):
             ("https-one-slash", f"HtTpS:/user:{canary}@[broken/owner/repo"),
             ("https-no-slash", f"https:user:{canary}@[broken/owner/repo"),
             ("custom-empty-host", f"git+ssh://user:{canary}@/owner/repo"),
+            ("custom-opaque-userinfo", f"git+ssh:user:{canary}@[broken/repo"),
+            ("scp-password", f"user:{canary}@host:path"),
+            ("multiple-at", f"first@user:{canary}@host:path"),
+            ("opaque-encoded-at", f"user:{canary}%40host:path"),
+            ("opaque-encoded-userinfo", f"user%3A{canary}%40host:path"),
+            ("opaque-nested-encoded-at", f"user:{canary}%2540host:path"),
+            ("opaque-split-encoded-at", f"user:{canary}%25%34%30host:path"),
+            ("scp-path-encoded-at", f"git@host:owner/repo%40user:{canary}"),
+            ("scp-path-nested-encoded-at", f"git@host:owner/repo%2540user:{canary}"),
+            ("scp-query-at", f"git@host:owner/repo?token={canary}@other:path"),
+            ("scp-fragment-at", f"git@host:owner/repo#{canary}@other:path"),
+            ("opaque-userinfo", f"repository:{canary}@host/path"),
+            ("opaque-query-userinfo", f"repository:owner/repo?auth=user:{canary}@host:path"),
+            ("opaque-fragment-userinfo", f"project:review#user:{canary}@host:path"),
+            ("scp-malformed-bracket", f"git@[broken:path?token={canary}"),
+            ("scp-invalid-ipv6", f"git@[not-ipv6]:path?token={canary}"),
+            ("scp-empty-path", "git@host:"),
+            ("scp-query-only-path", f"git@host:?token={canary}"),
+            ("scp-fragment-only-path", f"git@host:#{canary}"),
+            ("scp-backslash-user", f"user\\{canary}@host:path"),
+            ("scp-slash-user", f"user/{canary}@host:path"),
+            ("scp-query-user", f"user?token={canary}@host:path"),
+            ("scp-fragment-user", f"user#{canary}@host:path"),
+            ("bare-scp-query", f"host:repo?token={canary}"),
+            ("bare-scp-fragment", f"host:repo#{canary}"),
+            ("opaque-query", f"repository:merchant?token={canary}"),
+            ("opaque-fragment", f"project:review#{canary}"),
         ]
         fields = {
             "identity": lambda source, value: source.update(identity=value),
@@ -430,7 +457,7 @@ class PageWorkspaceTests(unittest.TestCase):
                 assign(snapshot["source_associations"][0], prefix + reference)
                 snapshot["expected_source_associations"] = copy.deepcopy(snapshot["source_associations"])
                 original = copy.deepcopy(snapshot)
-                with self.assertRaisesRegex(MODULE.ContextError, "source reference is invalid") as caught:
+                with self.assertRaisesRegex(MODULE.ContextError, "^Page capture source reference is invalid$") as caught:
                     self.capture(root, snapshot)
                 self.assertNotIn(canary, str(caught.exception))
                 self.assertNotIn(canary, "".join(traceback.format_exception(caught.exception)))
@@ -440,10 +467,19 @@ class PageWorkspaceTests(unittest.TestCase):
     def test_portable_sources_strip_wrapped_credentials_and_keep_host_paths_out_of_identity(self):
         references = [
             ("repository:owner/repo", "repository:owner/repo"), ("project:release", "project:release"),
+            ("github.example:owner/repo.git", "github.example:owner/repo.git"),
             ("https://user:secret@github.com/owner/repo?token=secret#ref", "https://github.com/owner/repo"),
             ("http://user:secret@github.com/owner/repo?token=secret#ref", "http://github.com/owner/repo"),
             ("ssh://git:secret@github.com/owner/repo", "ssh://github.com/owner/repo"),
             ("git@github.com:owner/repo.git", "github.com:owner/repo.git"),
+            ("secret@host_alias:owner/repo.git", "host_alias:owner/repo.git"),
+            ("user%3Asecret%40team@host:owner/repo.git", "host:owner/repo.git"),
+            ("git@[2001:db8::1]:owner/repo.git", "[2001:db8::1]:owner/repo.git"),
+            ("git@host:owner/repo?token=secret#ref", "host:owner/repo"),
+            ("git@host:owner/repo#secret", "host:owner/repo"),
+            ("git+ssh://user:secret@github.com/owner/repo?token=secret#ref", "git+ssh://github.com/owner/repo"),
+            ("https://user%3Asecret%40team@github.com/owner/repo?token=secret", "https://github.com/owner/repo"),
+            ("https://user:secret@team@github.com/owner/repo?token=secret", "https://github.com/owner/repo"),
             ("origin:https://user:secret@github.com/owner/repo", "origin:https://github.com/owner/repo"),
             ("ORIGIN:https://user:secret@github.com/owner/repo", "ORIGIN:https://github.com/owner/repo"),
             ("origin:ORIGIN:ssh://git:secret@github.com/owner/repo", "origin:ORIGIN:ssh://github.com/owner/repo"),

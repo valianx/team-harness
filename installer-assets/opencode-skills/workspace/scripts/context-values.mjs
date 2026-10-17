@@ -44,7 +44,30 @@ function sourceReference(value) {
     if (urlLooking) throw new Error("source reference invalid");
   }
   if (urlLooking) throw new Error("source reference invalid");
-  return `${prefix}${reference.replace(/^[^/@:]+@(?=[^/:]+:)/, "")}`;
+  let retained = reference;
+  const scp = reference.match(/^[^@:/\\?#\s]+@(\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9._-]+):([^@]+)$/);
+  if (scp) {
+    const [, host, remotePath] = scp;
+    if (host.startsWith("[")) {
+      try {
+        new URL(`ssh://${host}/`);
+      } catch {
+        throw new Error("source reference invalid");
+      }
+    }
+    const sourcePath = remotePath.split(/[?#]/, 1)[0];
+    if (!sourcePath) throw new Error("source reference invalid");
+    retained = `${host}:${sourcePath}`;
+  }
+  if (/[?#]/.test(retained)) throw new Error("source reference invalid");
+  // Nested percent escapes must not hide userinfo in otherwise opaque references.
+  for (let decoded = retained; ;) {
+    if (decoded.includes("@")) throw new Error("source reference invalid");
+    const next = decoded.replace(/%([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)));
+    if (next === decoded) break;
+    decoded = next;
+  }
+  return `${prefix}${retained}`;
 }
 
 function portableIdentity(value) {
