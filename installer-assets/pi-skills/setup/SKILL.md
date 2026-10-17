@@ -41,6 +41,12 @@ when it is already healthy.
 
 ## Preferences
 
+For an explicit `models` target, run native `/th-worker-models` and follow
+[worker model profiles](references/worker-models.md), then return. The command
+uses the native catalog and confirmed preview; the standalone settings CLI has
+no registry evidence and cannot assign `worker-models`. Saving applies only to
+future conversations and preserves the chat and existing workers.
+
 Use the helper shipped in this validated package, under the same selected Pi
 environment. Replace `<package-root>` with its actual absolute path:
 

@@ -20,6 +20,12 @@ Never print raw settings or command output. Offer minimal setup or reuse first, 
 Skip unselected optional integrations and their surveys; prepare only capabilities the operator chose.
 Preserve unavailable Space bindings; alternatives apply only to explicitly selected new work.
 
+For an explicit `models` target, use [worker model profiles](references/worker-models.md)
+and the installed binary's `setup models --runtime opencode` action before ordinary
+reconciliation. Preview the draft and assignments; apply only the operator's confirmed
+selection. Use the JSON-file action for agent-guided choices, and return afterward.
+Do not change the native chat/primary model or fall back to legacy tiers for explicit inheritance.
+
 For ordinary setup, inspect only the active opencode config root and `.team-harness.json`.
 Reconcile the installed Team
 Harness ledger, agents, skills, commands, and operator preferences through the

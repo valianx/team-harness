@@ -44,7 +44,10 @@ var opencodeTierFlag = ""
 // resolveActiveTierProvider.
 var opencodeTierFlagSet = false
 
-// dispatchSubcommand checks os.Args for a plan|apply|uninstall subcommand and
+var workerModelsFileFlag, opencodeCLIFlag string
+var workerModelsDryRunFlag, workerModelsYesFlag bool
+
+// dispatchSubcommand checks os.Args for a native lifecycle or setup subcommand and
 // runs it. Returns true if a subcommand was handled (caller should not run the
 // legacy interactive install). Returns false if no subcommand matched.
 //
@@ -62,8 +65,15 @@ func dispatchSubcommand() bool {
 	if len(args) == 0 {
 		return false
 	}
+	if args[0] != "setup" && (workerModelsFileFlag != "" || opencodeCLIFlag != "" || workerModelsDryRunFlag) {
+		fmt.Fprintln(os.Stderr, "Worker-model flags require: install setup models --runtime opencode")
+		os.Exit(1)
+	}
 
 	switch args[0] {
+	case "setup":
+		runSetupModelsCommand(args[1:])
+		return true
 	case "plan":
 		runPlanCommand()
 		return true
@@ -141,6 +151,24 @@ func parseDispatchFlags(args []string) []string {
 		case arg == "--non-interactive", arg == "--yes":
 			// Both forms are accepted as aliases (SEC-DR-7).
 			nonInteractiveFlag = true
+			if arg == "--yes" {
+				workerModelsYesFlag = true
+			}
+			i++
+		case arg == "--worker-models-file" && i+1 < len(args):
+			workerModelsFileFlag = args[i+1]
+			i += 2
+		case strings.HasPrefix(arg, "--worker-models-file="):
+			workerModelsFileFlag = strings.TrimPrefix(arg, "--worker-models-file=")
+			i++
+		case arg == "--opencode-cli" && i+1 < len(args):
+			opencodeCLIFlag = args[i+1]
+			i += 2
+		case strings.HasPrefix(arg, "--opencode-cli="):
+			opencodeCLIFlag = strings.TrimPrefix(arg, "--opencode-cli=")
+			i++
+		case arg == "--dry-run":
+			workerModelsDryRunFlag = true
 			i++
 		case arg == "--opencode-tier" && i+1 < len(args):
 			opencodeTierFlag = args[i+1]
@@ -172,15 +200,29 @@ func selectPlacer() (Placer, error) {
 	}
 }
 
-// selectTransform returns the transform function for the configured runtime
-// and the active per-provider cost-tiering selection (#424), or an error when
-// --opencode-tier names a provider absent from the curated map. The function
+// selectTransform resolves present worker profiles before legacy cost tiers.
+// Invalid profiles fail without falling back to the legacy provider. The function
 // signature matches ComputePlan's transform parameter:
 // func(src, kind, sourcePath) ([]byte, error).
 func selectTransform(placer Placer) (func([]byte, string, string) ([]byte, error), error) {
 	if runtimeFlag != "opencode" {
 		// claude-code: identity (nil is treated as identity by ComputePlan).
 		return nil, nil
+	}
+	settings, err := readWorkerModelSettings(placer)
+	if err != nil {
+		return nil, fmt.Errorf("preflight config: %w", err)
+	}
+	if raw, present := settings["worker-models"]; present {
+		categories, err := readWorkerModelCategories(EmbeddedAssets())
+		if err != nil {
+			return nil, err
+		}
+		preference, err := validateWorkerModelsJSON(raw, categories)
+		if err != nil {
+			return nil, err
+		}
+		return workerModelTransformFor(placer, preference, categories), nil
 	}
 
 	provider, err := resolveActiveTierProvider(placer)

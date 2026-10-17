@@ -25,6 +25,7 @@ import {
   assertNoInjection,
   rejectPollutionKeys,
   transformToOpencode,
+  transformToOpencodeWorkerModels,
   applyModeByRole,
   transformToCC,
   validateOutputPath,
@@ -1260,6 +1261,58 @@ Orchestrator body.
   const { frontmatter: backFm } = parseFrontmatter(back.content);
   assert("round-trip: inverse restores canonical name 'orchestrator', not the injected 'TH-orchestrator'", backFm["name"] === "orchestrator");
   assert("round-trip: inverse does not leak the injected display name", backFm["name"] !== "TH-orchestrator");
+}
+
+// ---------------------------------------------------------------------------
+// Worker model projection parity
+// ---------------------------------------------------------------------------
+
+{
+  const cases = JSON.parse(await fs.readFile(new URL("../../tests/fixtures/worker-models.json", import.meta.url), "utf8"));
+  for (const testCase of cases) {
+    const result = transformToOpencodeWorkerModels(`agents/${testCase.role}.md`, testCase.source, "/fake-repo", testCase.preferences, {
+      legacyProvider: testCase.legacy_provider,
+      existingContent: testCase.existing_content,
+    });
+    assert(`Worker profile golden: ${testCase.name}`, result.content === testCase.expected_output,
+      `expected ${JSON.stringify(testCase.expected_output)}, got ${JSON.stringify(result.content)}`);
+    const modelLine = result.content.split("\n").find(line => line.startsWith("model:"));
+    const logicalModel = modelLine === undefined ? null : modelLine.slice(7).startsWith('"')
+      ? JSON.parse(modelLine.slice(7)) : modelLine.slice(7);
+    assert(`Worker profile logical model: ${testCase.name}`, logicalModel === testCase.expected_model);
+  }
+}
+
+{
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "hm-worker-profiles-")));
+  try {
+    const cases = JSON.parse(await fs.readFile(new URL("../../tests/fixtures/worker-models.json", import.meta.url), "utf8"));
+    const worker = cases.find(item => item.name === "quoted exact native identity");
+    const primary = cases.find(item => item.role === "orchestrator");
+    await fs.mkdir(path.join(root, "agents"));
+    await fs.mkdir(path.join(root, ".opencode", "agents"), { recursive: true });
+    await fs.writeFile(path.join(root, "agents", "implementer.md"), worker.source);
+    await fs.writeFile(path.join(root, "agents", "orchestrator.md"), primary.source);
+    const workerPath = path.join(root, ".opencode", "agents", "implementer.md");
+    const primaryPath = path.join(root, ".opencode", "agents", "orchestrator.md");
+    const configPath = path.join(root, ".opencode", ".team-harness.json");
+    const nativeConfig = '{"operator":{"credential":"synthetic-canary"},"opencode.cost_tier_provider":"anthropic"}\n';
+    await fs.writeFile(workerPath, "Existing worker.\n");
+    await fs.writeFile(primaryPath, primary.existing_content);
+    await fs.writeFile(configPath, nativeConfig);
+    const preview = await runTransform(DIRECTION_TO_OPENCODE, root, { dryRun: true, workerModels: worker.preferences });
+    assert("Worker batch draft reaches pre-write projection", preview.find(item => item.source.endsWith("implementer.md"))?.content === worker.expected_output);
+    assert("Worker batch preview leaves current worker bytes unchanged", await fs.readFile(workerPath, "utf8") === "Existing worker.\n");
+    assert("Worker batch preview leaves current primary bytes unchanged", await fs.readFile(primaryPath, "utf8") === primary.existing_content);
+    await assertThrowsAsync("Worker batch refuses whole invalid draft before publication", () => runTransform(DIRECTION_TO_OPENCODE, root, { workerModels: { ...worker.preferences, extra: "synthetic-canary" } }));
+    assert("Worker batch invalid draft preserves healthy output", await fs.readFile(workerPath, "utf8") === "Existing worker.\n");
+    await runTransform(DIRECTION_TO_OPENCODE, root, { workerModels: worker.preferences });
+    assert("Worker batch writes exact native choice", await fs.readFile(workerPath, "utf8") === worker.expected_output);
+    assert("Worker batch reapply preserves primary model metadata", await fs.readFile(primaryPath, "utf8") === primary.expected_output);
+    assert("Worker batch preserves opaque native preferences", await fs.readFile(configPath, "utf8") === nativeConfig);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
 }
 
 // ---------------------------------------------------------------------------

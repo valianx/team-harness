@@ -46,8 +46,9 @@ function ConvertTo-NativeArgument {
 # dispatcher accepts supported flags before the subcommand, for example
 # `--runtime codex apply`.
 $nativeSubcommands = @("plan", "apply", "update", "uninstall")
-$valueFlags = @("--runtime", "--scope", "--opencode-dir", "--codex-dir", "--memory-url", "--opencode-tier")
+$valueFlags = @("--runtime", "--scope", "--opencode-dir", "--codex-dir", "--memory-url", "--opencode-tier", "--worker-models-file", "--opencode-cli")
 $hasSubcommand = $false
+$setupPending = $false
 $skipValue = $false
 foreach ($argument in $args) {
     $value = [string]$argument
@@ -56,6 +57,16 @@ foreach ($argument in $args) {
         continue
     }
     if ($nativeSubcommands -contains $value.ToLowerInvariant()) {
+        if ($setupPending) { break }
+        $hasSubcommand = $true
+        break
+    }
+    if ($value -ieq "setup") {
+        $setupPending = $true
+        continue
+    }
+    if ($value -ieq "models") {
+        if (-not $setupPending) { break }
         $hasSubcommand = $true
         break
     }
@@ -66,7 +77,8 @@ foreach ($argument in $args) {
     if ($value.StartsWith("--runtime=") -or $value.StartsWith("--scope=") -or
         $value.StartsWith("--opencode-dir=") -or $value.StartsWith("--codex-dir=") -or
         $value.StartsWith("--memory-url=") -or $value.StartsWith("--opencode-tier=") -or
-        $value -in @("--force", "--non-interactive", "--yes")) {
+        $value.StartsWith("--worker-models-file=") -or $value.StartsWith("--opencode-cli=") -or
+        $value -in @("--force", "--non-interactive", "--yes", "--dry-run")) {
         continue
     }
     break
@@ -78,7 +90,7 @@ if (-not $hasSubcommand) {
     Write-Host "  /plugin install th"
     Write-Host "  /th:setup"
     Write-Host ""
-    Write-Host "For opencode or Codex, pass an explicit subcommand (plan, apply, update, or uninstall)."
+    Write-Host "For opencode or Codex, pass plan, apply, update, uninstall, or setup models (OpenCode)."
     exit 0
 }
 

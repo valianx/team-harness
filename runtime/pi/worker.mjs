@@ -24,7 +24,7 @@ const failure = (code, message) => Object.assign(new Error(message), { code });
 const PUBLIC_CODES = new Set(('INVALID_LIMIT INVALID_PATH INVALID_LAUNCHER INVALID_SDK VERSION_UNAVAILABLE VERSION_MISMATCH '
   + 'SPAWN_FAILED PROCESS_EXIT STDIN_CLOSED STDOUT_ERROR TRUNCATED_FRAME PROTOCOL_EOF DIAGNOSTIC_LIMIT FRAME_LIMIT '
   + 'INVALID_PROTOCOL INVALID_RESPONSE COMMAND_FAILED EVENT_FAILED WRITE_TIMEOUT PENDING_LIMIT RESPONSE_TIMEOUT PROCESS_STOPPED '
-  + 'MODEL_UNAVAILABLE INVALID_PROFILE SESSION_INVALID SESSION_MISMATCH CONFIG_INVALID CATALOG_INVALID OWNER_INVALID RUNTIME_CLOSED '
+  + 'MODEL_UNAVAILABLE MODEL_CATALOG_UNAVAILABLE MODEL_SELECTION_MISSING INVALID_PROFILE SESSION_INVALID SESSION_MISMATCH CONFIG_INVALID CATALOG_INVALID OWNER_INVALID RUNTIME_CLOSED '
   + 'WORKER_UNKNOWN POOL_LIMIT RESOURCE_INVALID RESOURCE_UNAVAILABLE STATE_MISMATCH BRIDGE_UNAVAILABLE BRIDGE_INVALID CAPABILITY_MISMATCH '
   + 'WORKER_BUSY DISPOSITION_INVALID ROLE_INVALID TASK_INVALID SESSION_LIMIT PROMPT_INVALID QUEUE_LIMIT WAIT_INVALID WAITER_LIMIT '
   + 'WAIT_ABORTED USAGE_INVALID OWNER_MISMATCH PROMPT_MISMATCH CLEANUP_INCOMPLETE').split(' '));
@@ -661,21 +661,26 @@ export class WorkerManager {
     }
   }
 
-  /** Start only an eligible role, inheriting the actual native primary model and thinking selection. */
+  /** Bind the current worker selection before asynchronous preparation; follow-ups retain the conversation binding. */
   async dispatch({ role: name, task, cwd = this.#options.parent.cwd }) {
     if (this.#closed) throw publicFailure('RUNTIME_CLOSED', 'Worker runtime is closed');
     const role = this.#roles.get(name);
     if (!role) throw publicFailure('ROLE_INVALID', 'Requested worker role is not eligible');
     if (!text(task, this.#limits.max_frame_bytes / 2)) throw publicFailure('TASK_INVALID', 'Worker task is invalid');
     if (this.#workers.size >= this.#limits.max_sessions) throw publicFailure('SESSION_LIMIT', 'Retained worker session limit reached');
+    const inherited = { model: this.#options.parent.model, thinking: this.#options.parent.thinking_level || 'off' };
+    const selected = this.#options.selectWorkerModel?.(name, inherited) ?? inherited;
+    const model = modelSelection(selected.model), thinking = selected.thinking;
+    if (!['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(thinking))
+      throw publicFailure('CONFIG_INVALID', 'Worker thinking selection is invalid');
     let worker;
     try {
       const directory = await absoluteDirectory(cwd, 'Worker directory');
       const root = await absoluteDirectory(this.#options.packageRoot, 'TH package root');
       const promptFile = await absoluteFile(path.resolve(root, role.prompt), 'Worker prompt');
       if (path.relative(root, promptFile).startsWith('..')) throw publicFailure('PROMPT_INVALID', 'Worker prompt escapes its package');
-      worker = { id: randomUUID(), role, cwd: directory, model: modelSelection(this.#options.parent.model),
-        thinking: this.#options.parent.thinking_level || 'off', sessionId: randomUUID(), sessionFile: null,
+      worker = { id: randomUUID(), role, cwd: directory, model,
+        thinking, sessionId: randomUUID(), sessionFile: null,
         promptFile, promptHash: digest(await fs.readFile(promptFile, 'utf8')), queue: [], waiters: new Set(), latest: null, active: null };
       const operationId = randomUUID(), epoch = worker.epoch || 0;
       worker.initialOperationId = operationId;

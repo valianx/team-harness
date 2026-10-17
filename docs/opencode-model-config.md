@@ -1,18 +1,15 @@
 # opencode model configuration
 
-How team-harness assigns models to opencode agents. The default is the
-**model-less baseline**: opencode agents carry no `model:` field, so the whole harness
-follows the operator's runtime model selection on any provider. An **opt-in,
-additive per-provider cost-tiering layer** (issue #424) sits on top of this baseline —
-see "Per-provider cost tiering (opt-in, shipped)" — and bakes a concrete model id per
-agent for one selected provider when the operator turns it on. This supersedes the
-earlier "profiles-first", "inherit-everywhere", and "resolver-baked-tiers" framings in
-this file's history.
+For OpenCode operators configuring agent models. Use [worker model profiles](../skills/setup/references/worker-models.md)
+for guided native catalog selection and per-workload/role choices. The chat model
+remains under native controls. The baseline below applies when neither explicit
+worker profiles nor the legacy opt-in provider tier is configured.
 
 ## Decision: model-less agents (the v1 baseline)
 
-Every opencode agent th ships — the primary `orchestrator` **and** every subagent —
-is emitted with **no `model:` line**. Consequences (per opencode's own inheritance
+Without worker profiles or a legacy tier, every projected agent has **no `model:` line**.
+The worker-profile operation preserves any existing primary/orchestrator model.
+Consequences of the baseline (per opencode's own inheritance
 rules, confirmed below):
 
 - **Primary (`orchestrator`):** inherits the **globally selected model** — the
@@ -27,8 +24,8 @@ provider does not serve.
 **The tradeoff — uniform cost.** Because subagents inherit the primary's model,
 **every agent runs at the selected model's tier**. A cheap validation step costs the
 same as the primary. This is the deliberate v1 baseline: it runs on every
-provider out of the box. Cost differentiation is added later, per provider, as each
-is actually adopted.
+provider out of the box. Use explicit worker profiles to choose different models;
+profile categories do not guarantee a price or quality difference.
 
 ## opencode rules we must obey (empirically confirmed)
 
@@ -74,8 +71,8 @@ runtime/provider mappings.
 ## How the installer emits it
 
 The CC→opencode transform (`cmd/install/transform.go`, `tools/harness-migrate/migrate.mjs`)
-projects each CC agent/command to opencode frontmatter and **drops the `model:` field
-entirely** — for both the agent and command surfaces. The CC source files under
+projects each CC agent/command to opencode frontmatter and drops its source `model:`
+field before applying any explicitly configured worker profiles or legacy tiers. The CC source files under
 `agents/` keep their `model:`/tier (they remain the canonical Claude Code artifacts);
 only the opencode projection is model-less.
 
@@ -83,7 +80,11 @@ The cross-language behavior is locked by `cmd/install/testdata/transform-conform
 (asserted by both the Go and the JS test runners) — the model-drop is encoded there so
 the two implementations cannot diverge.
 
-## Per-provider cost tiering (opt-in, shipped — issue #424)
+## Legacy provider tiers (opt-in — issue #424)
+
+This compatibility path applies only when `worker-models` is absent. Prefer the
+guided profile action for new configuration; explicit profile inheritance does
+not fall through to these fixed mappings.
 
 Cost differentiation is added **for one provider at a time**, as each is adopted —
 never forced up front. Because opencode requires a static literal (rule 1) and a
@@ -123,7 +124,7 @@ direction.
 CLI surface:
 
 ```shell
-install --runtime opencode --opencode-tier anthropic
+install apply --runtime opencode --opencode-tier anthropic
 # bakes: orchestrator → anthropic/claude-opus-5-5; implementer → anthropic/claude-sonnet-5-5;
 #        init/researcher → anthropic/claude-haiku-5-5
 ```

@@ -1,0 +1,179 @@
+[
+  {
+    "name": "absent baseline",
+    "role": "implementer",
+    "source": "---\nname: implementer\ndescription: Fixture worker.\nmodel: sonnet\ntools: Read, Grep\n---\nFixture body.\n",
+    "expected_output": "---\nname: implementer\ndescription: Fixture worker.\nmode: subagent\nth-origin: opencode\n---\nFixture body.\n",
+    "expected_model": null
+  },
+  {
+    "name": "absent legacy compatible",
+    "role": "implementer",
+    "legacy_provider": "anthropic",
+    "source": "---\nname: implementer\ndescription: Fixture worker.\nmodel: sonnet\ntools: Read, Grep\n---\nFixture body.\n",
+    "expected_output": "---\nname: implementer\ndescription: Fixture worker.\nmodel: anthropic/claude-sonnet-5-5\nmode: subagent\nth-origin: opencode\n---\nFixture body.\n",
+    "expected_model": "anthropic/claude-sonnet-5-5"
+  },
+  {
+    "name": "explicit inherit overrides legacy",
+    "role": "implementer",
+    "legacy_provider": "anthropic",
+    "preferences": {
+      "schema_version": 1,
+      "profiles": {
+        "reasoning": {
+          "mode": "inherit"
+        },
+        "general": {
+          "mode": "inherit"
+        },
+        "mechanical": {
+          "mode": "inherit"
+        }
+      },
+      "role_overrides": {}
+    },
+    "source": "---\nname: implementer\ndescription: Fixture worker.\nmodel: sonnet\ntools: Read, Grep\n---\nFixture body.\n",
+    "expected_output": "---\nname: implementer\ndescription: Fixture worker.\nmode: subagent\nth-origin: opencode\n---\nFixture body.\n",
+    "expected_model": null
+  },
+  {
+    "name": "quoted exact native identity",
+    "role": "implementer",
+    "preferences": {
+      "schema_version": 1,
+      "profiles": {
+        "reasoning": {
+          "mode": "inherit"
+        },
+        "general": {
+          "mode": "model",
+          "provider": "native-café",
+          "model": "owner/model \"東京\" \\ variant"
+        },
+        "mechanical": {
+          "mode": "inherit"
+        }
+      },
+      "role_overrides": {}
+    },
+    "source": "---\nname: implementer\ndescription: Fixture worker.\nmodel: sonnet\ntools: Read, Grep\n---\nFixture body.\n",
+    "expected_output": "---\nname: implementer\ndescription: Fixture worker.\nmodel: \"native-café/owner/model \\\"東京\\\" \\\\ variant\"\nmode: subagent\nth-origin: opencode\n---\nFixture body.\n",
+    "expected_model": "native-café/owner/model \"東京\" \\ variant"
+  },
+  {
+    "name": "explicit role wins category",
+    "role": "architect",
+    "preferences": {
+      "schema_version": 1,
+      "profiles": {
+        "reasoning": {
+          "mode": "model",
+          "provider": "native",
+          "model": "category"
+        },
+        "general": {
+          "mode": "inherit"
+        },
+        "mechanical": {
+          "mode": "inherit"
+        }
+      },
+      "role_overrides": {
+        "architect": {
+          "mode": "model",
+          "provider": "other",
+          "model": "explicit/id"
+        }
+      }
+    },
+    "source": "---\nname: architect\ndescription: Fixture worker.\nmodel: sonnet\ntools: Read, Grep\n---\nFixture body.\n",
+    "expected_output": "---\nname: architect\ndescription: Fixture worker.\nmodel: \"other/explicit/id\"\nmode: subagent\nth-origin: opencode\n---\nFixture body.\n",
+    "expected_model": "other/explicit/id"
+  },
+  {
+    "name": "role points to another profile",
+    "role": "implementer",
+    "preferences": {
+      "schema_version": 1,
+      "profiles": {
+        "reasoning": {
+          "mode": "inherit"
+        },
+        "general": {
+          "mode": "model",
+          "provider": "native",
+          "model": "general"
+        },
+        "mechanical": {
+          "mode": "model",
+          "provider": "native",
+          "model": "mechanical"
+        }
+      },
+      "role_overrides": {
+        "implementer": {
+          "profile": "mechanical"
+        }
+      }
+    },
+    "source": "---\nname: implementer\ndescription: Fixture worker.\nmodel: sonnet\ntools: Read, Grep\n---\nFixture body.\n",
+    "expected_output": "---\nname: implementer\ndescription: Fixture worker.\nmodel: \"native/mechanical\"\nmode: subagent\nth-origin: opencode\n---\nFixture body.\n",
+    "expected_model": "native/mechanical"
+  },
+  {
+    "name": "explicit role inheritance",
+    "role": "implementer",
+    "preferences": {
+      "schema_version": 1,
+      "profiles": {
+        "reasoning": {
+          "mode": "inherit"
+        },
+        "general": {
+          "mode": "model",
+          "provider": "native",
+          "model": "general"
+        },
+        "mechanical": {
+          "mode": "inherit"
+        }
+      },
+      "role_overrides": {
+        "implementer": {
+          "mode": "inherit"
+        }
+      }
+    },
+    "source": "---\nname: implementer\ndescription: Fixture worker.\nmodel: sonnet\ntools: Read, Grep\n---\nFixture body.\n",
+    "expected_output": "---\nname: implementer\ndescription: Fixture worker.\nmode: subagent\nth-origin: opencode\n---\nFixture body.\n",
+    "expected_model": null
+  },
+  {
+    "name": "primary native model metadata preserved",
+    "role": "orchestrator",
+    "preferences": {
+      "schema_version": 1,
+      "profiles": {
+        "reasoning": {
+          "mode": "model",
+          "provider": "native",
+          "model": "reasoning"
+        },
+        "general": {
+          "mode": "model",
+          "provider": "native",
+          "model": "worker"
+        },
+        "mechanical": {
+          "mode": "inherit"
+        }
+      },
+      "role_overrides": {}
+    },
+    "source": "---\nname: orchestrator\ndescription: Fixture worker.\nmodel: sonnet\ntools: Read, Grep\n---\nFixture body.\n",
+    "existing_content": "---\nname: TH-orchestrator\nmode: primary\nmodel: \"custom/primary\"\nvariant: \"deliberate\"\ntemperature: 0.25\ntop_p: 0.8\npermission: {bash: allow}\n---\nOld body.\n",
+    "expected_output": "---\nname: TH-orchestrator\ndescription: Fixture worker.\nmodel: \"custom/primary\"\nmode: primary\nth-origin: opencode\nvariant: \"deliberate\"\ntemperature: 0.25\ntop_p: 0.8\n---\nFixture body.\n",
+    "expected_model": "custom/primary"
+  }
+]

@@ -52,7 +52,7 @@ Claude Code uses its native marketplace. Run these commands inside Claude Code:
 | `install.ps1` | Windows — PowerShell | `irm https://valianx.github.io/team-harness/install.ps1 \| iex` |
 | `install.cmd` | Windows — cmd.exe | `curl -fsSL https://valianx.github.io/team-harness/install.cmd -o install.cmd && install.cmd` |
 
-With no arguments, each script prints the native Claude Code commands above and exits without downloading anything. To use the binary for an OpenCode or Codex operation, pass an explicit subcommand such as `apply`, `plan`, `update`, or `uninstall`; all remaining arguments are forwarded unchanged.
+With no arguments, each script prints the native Claude Code commands above and exits without downloading anything. Pass `apply`, `plan`, `update`, `uninstall`, or OpenCode's `setup models` action to download the binary and forward the remaining arguments unchanged.
 
 These scripts are served at `https://valianx.github.io/team-harness/install.{sh,ps1,cmd}` via GitHub Pages.
 

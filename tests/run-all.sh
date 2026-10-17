@@ -200,6 +200,8 @@ echo "# Pi: generated distribution, native preferences and bounded RPC"
 echo "############################################################"
 run_node_suite "pi-generation" "test_pi_generation.mjs" "node not found"
 run_node_suite "pi-settings" "test_pi_settings.mjs" "node not found"
+run_node_suite "worker-models" "test_worker_models.mjs" "node not found"
+run_node_suite "pi-worker-models" "test_pi_worker_models.mjs" "node not found"
 run_node_suite "pi-runtime" "test_pi_runtime.mjs" "node not found"
 if [ -n "$PY" ] && $PY "$TESTS_DIR/test_pi_shared_routes.py"; then
     echo "pi-shared-routes: PASS"
