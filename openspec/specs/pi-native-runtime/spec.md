@@ -1,8 +1,9 @@
-## Purpose
+# pi-native-runtime Specification
 
+## Purpose
 Provide Team Harness workflows and bounded specialist coordination through Pi's native package, extension, session and RPC interfaces while preserving existing workspace and delivery authority.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Pi owns package installation and maintenance
 TH SHALL ship a native Pi package compatible with Pi 1.3.0 and its supported Node runtime. Pi SHALL own installation, update, reload and removal. Package resources SHALL be explicitly declared and SHALL NOT install another host's configuration or alter unrelated Pi packages, authentication or model selection.
