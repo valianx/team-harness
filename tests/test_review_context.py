@@ -619,15 +619,26 @@ class PageWorkspaceTests(unittest.TestCase):
                 if name == target.name:
                     metadata = os.fstat(pinned)
                     handoff.update(original=pinned, alias=alias, expected=(metadata.st_dev, metadata.st_ino))
+                    metadata = os.fstat(alias)
+                    handoff["retained_before_close"] = (metadata.st_dev, metadata.st_ino)
                 return alias
 
-            def replace_name_before_original_pin_closes(descriptor):
+            def replace_name_after_original_pin_closes(descriptor):
                 if descriptor == handoff.get("original"):
                     handoff.pop("original")
-                    os.replace(replacement, target)
+                    # Windows must finish the stage's pending deletion before replacement.
+                    # The verified final-name handle keeps its inode pinned throughout.
                     real_close(descriptor)
+                    handoff["original_close_errno"] = None
+                    try:
+                        os.fstat(descriptor)
+                    except OSError as error:
+                        handoff["original_close_errno"] = error.errno
                     metadata = os.fstat(handoff["alias"])
-                    handoff["retained"] = (metadata.st_dev, metadata.st_ino)
+                    handoff["retained_after_close"] = (metadata.st_dev, metadata.st_ino)
+                    os.replace(replacement, target)
+                    metadata = os.fstat(handoff["alias"])
+                    handoff["retained_after_replace"] = (metadata.st_dev, metadata.st_ino)
                     return
                 real_close(descriptor)
 
@@ -637,14 +648,18 @@ class PageWorkspaceTests(unittest.TestCase):
                     raise failure
 
             with patch.object(MODULE, "_pin_capture_alias", side_effect=observe_handoff), \
-                    patch.object(MODULE.os, "close", side_effect=replace_name_before_original_pin_closes), \
+                    patch.object(MODULE.os, "close", side_effect=replace_name_after_original_pin_closes), \
                     patch.object(MODULE, "promote_artifact", side_effect=publish_then_fail), \
                     self.assertRaises(OSError) as caught:
                 self.capture(root)
             self.assertIs(caught.exception, failure)
-            self.assertEqual(handoff["retained"], handoff["expected"])
+            self.assertEqual(handoff["original_close_errno"], errno.EBADF)
+            self.assertEqual(handoff["retained_before_close"], handoff["expected"])
+            self.assertEqual(handoff["retained_after_close"], handoff["expected"])
+            self.assertEqual(handoff["retained_after_replace"], handoff["expected"])
             self.assertEqual(target.read_bytes(), b"foreign capture bytes")
             self.assertFalse((root / "pr-review-workspace-page-002.md").exists())
+            self.assertFalse(any(file.name.startswith("tmp-") for file in root.iterdir()))
             self.assertIn(target.name, " ".join(getattr(caught.exception, "__notes__", [])))
 
 
