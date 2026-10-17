@@ -72,9 +72,20 @@ try {
   }
   const configHome = path.join(temporary, "config");
   await mkdir(path.join(configHome, ".claude"), { recursive: true });
+  const vaultBase = path.join(configHome, "vault");
+  await writeFile(path.join(configHome, ".claude/.team-harness.json"), JSON.stringify({
+    "logs-mode": "obsidian", "logs-path": vaultBase, "logs-subfolder": "work-logs",
+  }));
+  const validDestination = spawnSync(process.execPath, [path.join(root, "hooks/ts/dist/session-start.cjs")], {
+    input: "{}", encoding: "utf8", windowsHide: true,
+    env: { ...process.env, HOME: configHome, USERPROFILE: configHome },
+  });
+  if (validDestination.error) throw validDestination.error;
+  assert.equal(validDestination.status, 0);
+  assert.match(JSON.parse(validDestination.stdout).hookSpecificOutput.additionalContext, /workspace mode: obsidian is configured/);
   for (const subfolder of ["../outside", "/absolute", "bad\\path", "bad\ninstruction", "nested//empty", "nested/*"]) {
     await writeFile(path.join(configHome, ".claude/.team-harness.json"), JSON.stringify({
-      "logs-mode": "obsidian", "logs-path": "/vault", "logs-subfolder": subfolder,
+      "logs-mode": "obsidian", "logs-path": vaultBase, "logs-subfolder": subfolder,
     }));
     const result = spawnSync(process.execPath, [path.join(root, "hooks/ts/dist/session-start.cjs")], {
       input: "{}", encoding: "utf8", windowsHide: true,

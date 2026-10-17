@@ -11,7 +11,7 @@
 // Security (SEC-DR-A/B/C):
 //   A — each config-derived value is validated with a FULL-STRING check.
 //       language must match ^[a-z]{2}$.
-//       logs-path is rejected if it contains any control character.
+//       logs-path must be a safe native absolute vault path.
 //   B — the additionalContext is emitted via a fixed template; only validated/derived
 //       tokens are interpolated; no raw config bytes flow into the output.
 //   C — rejected config values contribute nothing and never echo the raw value.
@@ -23,6 +23,8 @@
 // It is a session-initialization hook; it must not source _hook-profile.sh.
 // (Enforcement: Suite 117 / AC-11 / CLAUDE.md §5 Hook enforcement floors.)
 
+import { homedir } from "node:os";
+import * as path from "node:path";
 import type { NormalizedInput, NormalizedDecision } from "../shim/normalized-v1.js";
 import { selectWorkspacePreference } from "../../../skills/workspace/scripts/workspace-preference.mjs";
 
@@ -121,7 +123,21 @@ function loadEnglishLearning(config: Record<string, unknown>): string | null {
 // Load 3 — workspace mode
 // ---------------------------------------------------------------------------
 
-function loadWorkspaceMode(config: Record<string, unknown>): string | null {
+function validObsidianBasePath(base: string, homeDirectory: string): boolean {
+  if (!path.isAbsolute(base) || CONTROL_CHAR_RE.test(base)
+    || /[*?[\]]/.test(base)) return false;
+  const root = path.parse(base).root;
+  if (path.sep === "\\" && (root === "/" || root === "\\")) return false;
+  const parts = base.split(path.sep === "\\" ? /[\\/]/ : /\//);
+  if (parts.includes("..")) return false;
+
+  // Diagnostics are lexical; native writes retain access and symlink checks.
+  const normalized = path.resolve(base);
+  return normalized !== path.parse(normalized).root
+    && path.relative(homeDirectory, normalized) !== "";
+}
+
+function loadWorkspaceMode(config: Record<string, unknown>, homeDirectory?: string): string | null {
   const preference = selectWorkspacePreference(config);
   const conflict = preference.conflict
     ? " Team Harness workspace selector conflict: workspace-mode takes precedence; preserve both settings until an explicit repair."
@@ -140,8 +156,7 @@ function loadWorkspaceMode(config: Record<string, unknown>): string | null {
   const invalidDestination = "Team Harness workspace destination is invalid or incomplete for the selected Obsidian preference. Preserve the selection and resolve its destination with the current workspace skill." + conflict;
   if (!logsPath) return invalidDestination;
 
-  // SEC-DR-A: reject logs-path containing any control character.
-  if (CONTROL_CHAR_RE.test(logsPath)) return invalidDestination;
+  if (!validObsidianBasePath(logsPath, homeDirectory ?? homedir())) return invalidDestination;
 
   const logsSub =
     typeof config["logs-subfolder"] === "string" && config["logs-subfolder"]
@@ -172,13 +187,14 @@ function loadWorkspaceMode(config: Record<string, unknown>): string | null {
 //
 // Security (SEC-DR-A/B): delegates validation to the private load functions;
 // no new interpolation site is introduced here. Config bytes reach the output
-// ONLY via LANG_RE-validated `language` (loadLanguage) or CONTROL_CHAR_RE-
-// validated `logs-path` (loadWorkspaceMode) or exact-true booleans
+// ONLY via LANG_RE-validated `language` (loadLanguage), validated native
+// workspace paths (loadWorkspaceMode), or exact-true booleans
 // (loadEnglishLearning). No raw config string is interpolated directly.
 // ---------------------------------------------------------------------------
 
 export function composeSessionDirectives(
-  config: Record<string, unknown> | null
+  config: Record<string, unknown> | null,
+  homeDirectory?: string
 ): string[] {
   const directives: string[] = [];
 
@@ -199,7 +215,7 @@ export function composeSessionDirectives(
 
   // Load 4 — workspace mode.
   if (config !== null) {
-    const wsDirective = loadWorkspaceMode(config);
+    const wsDirective = loadWorkspaceMode(config, homeDirectory);
     if (wsDirective !== null) directives.push(wsDirective);
   }
 
