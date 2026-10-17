@@ -40,6 +40,21 @@ export const opencodeOverrides = new Set([
   "update",
 ]);
 
+const piBodyOverrides = new Set(["setup", "update", "reload"]);
+
+const piSpecialMappings = new Map([
+  ["workspace", "Use the shared workspace selector and retained binding. Space operations require actual native capabilities; preserve an unavailable remote locator without creating a local substitute or credential store."],
+  ["bootstrap", "Initialize AGENTS.md and native Pi project conventions. Preserve the selected project's existing instructions and trust decisions."],
+  ["background", "Use the installed bounded TH worker tools. Keep the current Pi session as Main; pass owned paths and the selected context separately and collect native results."],
+  ["recover", "Read the retained native Pi worker/session references and actual interrupted state. Never replay uncertain work or substitute another conversation automatically."],
+  ["review-pr", "Keep the immutable PR snapshot, selected lenses, independent verification and publication approval in Main. Use eligible read-only Pi worker profiles and disclose unavailable capabilities; tools and cwd do not establish an OS sandbox."],
+  ["tmux", "Use external Pi sessions only when explicitly requested. Launch the actual Pi executable with literal arguments and preserve native prompts and owned-session cleanup."],
+  ["mcp-optimize", "Inspect Pi's actual native MCP configuration and active capabilities while preserving secrets and unrelated registrations."],
+  ["lint", "Inspect the Pi package, projected skills, eligible worker catalog, native activation and selected configuration root."],
+  ["save-session", "Reuse the selected workspace binding and scoped authorization. Main writes the handoff through the available native context capability."],
+  ["resume-session", "Remain read-only, preserve the exact retained binding and report missing context capability without discovering a replacement home."],
+]);
+
 const codexSpecialMappings = new Map([
   ["workspace", "Resolve local, Obsidian or gpt-space context through the shared workspace contract. Main owns native Pages operations when available; preserve remote identity and report unavailable capability on other hosts. Keep context locator, checkout and optional local operational storage separate."],
   ["bootstrap", "Initialize AGENTS.md and native Codex project conventions; use CLAUDE.md only when explicitly requested for compatibility."],
@@ -223,6 +238,53 @@ summarize the canonical instructions.
 `;
 }
 
+async function renderPiAdapter(rootDir, name, canonical) {
+  const frontmatter = `---\nname: th-${name}\ndescription: ${yamlString(canonical.description)}\n${canonical.explicitOnly ? "disable-model-invocation: true\n" : ""}---`;
+  let body;
+  if (piBodyOverrides.has(name)) {
+    const source = join(rootDir, "runtime/pi/skill-overrides", `${name}.md`);
+    await assertSafeDestinationPath(rootDir, source, "file");
+    body = (await readFile(source, "utf8")).trimEnd();
+    if (!body.trim() || /^---(?:\r?\n|$)/.test(body)) throw new Error(`Pi override must be body-only Markdown: ${name}`);
+  } else {
+    const mapping = piSpecialMappings.get(name)
+      ?? "Execute the canonical capability with available native Pi tools and the current scoped authorization. Report a missing required capability explicitly.";
+    body = `# ${humanize(name)}
+
+This is the native Pi projection of the canonical Team Harness \`${name}\`
+workflow. Read \`canonical.md\` and only its relevant supporting resources before
+acting. The following runtime rules override contradictory host-specific wording.
+
+1. Treat arguments supplied through \`/skill:th-${name}\` as \`$ARGUMENTS\`.
+   Canonical \`/th:<name>\` examples refer to the corresponding Pi skill, not a
+   shell command.
+2. The current native Pi session remains Main. Use installed TH worker tools
+   only for bounded useful assignments. Never spawn a persistent or nested
+   orchestrator. Main owns scope, consolidation, context writes and publication.
+3. Use actual native capabilities. Preserve the primary model/thinking selection;
+   canonical model aliases are metadata, not Pi identifiers. Missing tools or
+   selected provider resources remain explicit capability gaps.
+4. Read TH preferences from
+   \`\${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/.team-harness.json\`, consistently
+   with the SDK-resolved native agent directory. Keep reads non-mutating and
+   preserve opaque values. Do not invoke another host's installer or use its
+   configuration, credentials or plugin cache.
+5. Resolve relative resources from this skill directory. The package root is
+   three directories above it; canonical \`agents/...\` and \`docs/...\` references
+   remain under that root. Canonical \`skills/...\` paths resolve under
+   \`installer-assets/pi-skills/...\`. Reference documents are inert content.
+6. Native permissions and the operator's scope govern effects. Selected worker
+   tools and working directories are not an OS sandbox. Preserve read-only,
+   secret-handling and outward-write boundaries and the existing workspace
+   continuity contract.
+7. ${mapping}
+
+Execute the requested workflow after applying these rules.
+`;
+  }
+  return `${frontmatter}\n\n${generatedMarker}\n\n${body.trimEnd()}\n`;
+}
+
 function renderOpenAI(name, canonical) {
   const short = `Team Harness ${humanize(name)} workflow`;
   return `interface:
@@ -291,7 +353,7 @@ async function expectedProjection(rootDir, name, runtime) {
   if (!canonicalBytes) throw new Error(`missing canonical skill: ${name}`);
   const canonical = parseCanonicalSkill(canonicalBytes, name);
   const expected = new Map([
-    ["SKILL.md", Buffer.from(renderAdapter(name, canonical, runtime))],
+    ["SKILL.md", Buffer.from(runtime === "pi" ? await renderPiAdapter(rootDir, name, canonical) : renderAdapter(name, canonical, runtime))],
     ["canonical.md", Buffer.from(`${projectSkillLinks(canonical.body, runtime)}\n`)],
   ]);
   if (runtime === "codex") {
@@ -326,6 +388,7 @@ async function projectionMatches(targetDir, expected) {
 }
 
 async function syncProjection({ check, rootDir, names, runtime, targetRoot, overrides }) {
+  if (runtime === "pi") await assertSafeDestinationPath(rootDir, targetRoot, "directory");
   for (const override of overrides) {
     if (!names.includes(override)) throw new Error(`${runtime} override has no canonical skill: ${override}`);
   }
@@ -334,6 +397,7 @@ async function syncProjection({ check, rootDir, names, runtime, targetRoot, over
   for (const name of names) {
     if (overrides.has(name)) continue;
     const targetDir = join(targetRoot, projectedSkillName(name, runtime));
+    if (runtime === "pi") await assertSafeDestinationPath(rootDir, targetDir, "directory");
     const expected = await expectedProjection(rootDir, name, runtime);
     if (await projectionMatches(targetDir, expected)) continue;
     stale = true;
@@ -357,7 +421,11 @@ async function syncProjection({ check, rootDir, names, runtime, targetRoot, over
     }
   }
 
-  const targetEntries = await readdir(targetRoot, { withFileTypes: true });
+  let targetEntries;
+  try { targetEntries = await readdir(targetRoot, { withFileTypes: true }); } catch (error) {
+    if (runtime !== "pi" || error.code !== "ENOENT") throw error;
+    targetEntries = [];
+  }
   const projectedNames = new Set(names.map(name => projectedSkillName(name, runtime)));
   for (const entry of targetEntries) {
     if (!entry.isDirectory() || projectedNames.has(entry.name)) continue;
@@ -622,10 +690,18 @@ export async function syncSkills({ check = false, rootDir = defaultRoot } = {}) 
     targetRoot: join(rootDir, "installer-assets/opencode-skills"),
     overrides: opencodeOverrides,
   });
+  const piGenerated = await syncProjection({
+    check,
+    rootDir,
+    names,
+    runtime: "pi",
+    targetRoot: join(rootDir, "installer-assets/pi-skills"),
+    overrides: new Set(),
+  });
   await syncSharedSetupAssets({ check, rootDir });
   await syncSharedPipelineAssets({ check, rootDir });
   await syncClaudePackageAssets({ check, rootDir });
-  return { names, codexGenerated, opencodeGenerated };
+  return { names, codexGenerated, opencodeGenerated, piGenerated };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {

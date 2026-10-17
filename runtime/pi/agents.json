@@ -1,0 +1,486 @@
+{
+  "schema_version": 1,
+  "runtime": "pi",
+  "version": "3.49.0",
+  "agents": [
+    {
+      "name": "adversary",
+      "description": "Independent break-the-design reviewer for the conditional final validation audit. Reviews the frozen delivery diff once, tests every changed security control against reachable worst-case preconditions, and returns broke-it | could-not-break without certifying or modifying source.",
+      "source": "agents/adversary.md",
+      "prompt": "installer-assets/pi-agents/adversary.md",
+      "model": "sonnet",
+      "effort": "xhigh",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "edit",
+        "write"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "agent-builder",
+      "description": "Designs and creates new Claude Code agents and slash commands (tools). Use when someone asks to create, design, or improve an agent or command. Applies best practices for system prompts, context management, memory, tool scoping, model selection, and output protocols. Always runs /th:lint after writing files.",
+      "source": "agents/agent-builder.md",
+      "prompt": "installer-assets/pi-agents/agent-builder.md",
+      "model": "opus",
+      "effort": "xhigh",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "bash",
+        "edit",
+        "write"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "architect",
+      "description": "Designs, evolves, and reviews software architecture for any project type (backend, frontend, or fullstack). Focuses on maintainability, security, performance, and accessibility. Produces architecture proposals, risk assessments, migration strategies, and technology research reports — never code.",
+      "source": "agents/architect.md",
+      "prompt": "installer-assets/pi-agents/architect.md",
+      "model": "opus",
+      "effort": "xhigh",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "edit",
+        "write"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "cleaner",
+      "description": "Cleans the approved changed production surface without changing behavior or tests; never expands scope or designs new architecture.",
+      "source": "agents/cleaner.md",
+      "prompt": "installer-assets/pi-agents/cleaner.md",
+      "model": "sonnet",
+      "effort": "medium",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "bash",
+        "edit",
+        "write"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "code-researcher",
+      "description": "Investigate a narrow code angle with Read/Glob/Grep and return evidence with file:line references. Main owns synthesis, persistence, decisions and follow-up.",
+      "source": "agents/code-researcher.md",
+      "prompt": "installer-assets/pi-agents/code-researcher.md",
+      "model": "sonnet",
+      "effort": "medium",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "read_only": true
+    },
+    {
+      "name": "d2-diagrammer",
+      "description": "Generates D2 diagrams from architect analysis. Invoked by the orchestrator after the architect produces a codebase analysis in research/00-research.md. Reads the analysis, follows the d2-diagram skill methodology, generates the .d2 source incrementally, validates with d2 fmt + compile, and reports back. Does NOT analyze codebases, write code, tests, or documentation.",
+      "source": "agents/d2-diagrammer.md",
+      "prompt": "installer-assets/pi-agents/d2-diagrammer.md",
+      "model": "sonnet",
+      "effort": "medium",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "bash",
+        "edit",
+        "write"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "delivery",
+      "description": "Prepares delivery material for Main using supplied review evidence and scoped metadata.",
+      "source": "agents/delivery.md",
+      "prompt": "installer-assets/pi-agents/delivery.md",
+      "model": "sonnet",
+      "effort": "medium",
+      "tools": [
+        "read",
+        "edit",
+        "write"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "diagrammer",
+      "description": "Generates Excalidraw diagrams from architect analysis. Invoked by the orchestrator after the architect produces a codebase analysis in research/00-research.md. Reads the analysis, follows the excalidraw-diagram skill methodology, generates the .excalidraw JSON section-by-section, runs a render-validate loop until the diagram passes quality checks, and reports back. Does NOT analyze codebases, write code, tests, or documentation.",
+      "source": "agents/diagrammer.md",
+      "prompt": "installer-assets/pi-agents/diagrammer.md",
+      "model": "sonnet",
+      "effort": "medium",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "bash",
+        "edit",
+        "write"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "documenter",
+      "description": "Transforms research findings into structured Obsidian documentation with concise, reader-focused content. Reads research/00-research.md, produces vault pages with Mermaid/Excalidraw/Canvas, and writes a 02-documentation.md manifest. Does not research codebases — that is the architect's job.",
+      "source": "agents/documenter.md",
+      "prompt": "installer-assets/pi-agents/documenter.md",
+      "model": "sonnet",
+      "effort": "high",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "bash",
+        "edit",
+        "write"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "gcp-cost-analyzer",
+      "description": "Analyzes GCP infrastructure costs and resource utilization across all accessible projects. Inventories resources via Cloud Asset Inventory and gcloud CLI, pulls billing data, fetches Recommender API suggestions, and produces a structured cost report with prioritized optimization recommendations. Use when someone asks to analyze GCP costs, audit cloud spending, find idle/unused resources, or get infrastructure optimization recommendations. Does not modify or delete any GCP resources.",
+      "source": "agents/gcp-cost-analyzer.md",
+      "prompt": "installer-assets/pi-agents/gcp-cost-analyzer.md",
+      "model": "opus",
+      "effort": "high",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "bash",
+        "write"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "gcp-infra",
+      "description": "Plans and prepares GCP infrastructure changes using validated gcloud scripts, impact analysis and rollback guidance. Executes only the concrete changes authorized by the operator through native permissions.",
+      "source": "agents/gcp-infra.md",
+      "prompt": "installer-assets/pi-agents/gcp-infra.md",
+      "model": "opus",
+      "effort": "xhigh",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "bash",
+        "write"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "implementer",
+      "description": "Implements the smallest approved production diff and ordinary owned tests, including only explicitly planned canonical documentation. Does not design architecture.",
+      "source": "agents/implementer.md",
+      "prompt": "installer-assets/pi-agents/implementer.md",
+      "model": "sonnet",
+      "effort": "high",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "bash",
+        "edit",
+        "write"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "init-project",
+      "description": "Bootstraps the active native runtime in any repository (backend, frontend, or fullstack). Discovers the tech stack, generates the runtime instruction file with golden commands and subagent orchestration, and creates a CHANGELOG.md if missing.",
+      "source": "agents/init-project.md",
+      "prompt": "installer-assets/pi-agents/init-project.md",
+      "model": "haiku",
+      "effort": "medium",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "bash",
+        "edit",
+        "write"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "inline-reviewer",
+      "description": "Runtime-native read-only reviewer for one bounded inline lens: tester, QA, security, or adversary.",
+      "source": "agents/inline-reviewer.md",
+      "prompt": "installer-assets/pi-agents/inline-reviewer.md",
+      "model": "sonnet",
+      "effort": "high",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "read_only": true
+    },
+    {
+      "name": "likec4-diagrammer",
+      "description": "Generates LikeC4 architecture diagrams from architect analysis. Invoked by the orchestrator after the architect produces a codebase analysis in research/00-research.md. Reads the analysis, follows the likec4-diagram skill methodology, generates the .c4 DSL incrementally, validates with CLI, and reports back. Does NOT analyze codebases, write code, tests, or documentation.",
+      "source": "agents/likec4-diagrammer.md",
+      "prompt": "installer-assets/pi-agents/likec4-diagrammer.md",
+      "model": "sonnet",
+      "effort": "medium",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "bash",
+        "edit",
+        "write"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "mentor",
+      "description": "Answers in chat as a senior peer with short inline diagrams; the teaching-pack file is an optional end-of-session artifact. Use when someone asks to learn, understand, or have something explained.",
+      "source": "agents/mentor.md",
+      "prompt": "installer-assets/pi-agents/mentor.md",
+      "model": "opus",
+      "effort": "high",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "write"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "plan-reviewer",
+      "description": "Reviews canonical OpenSpec and the linked workspace plan on request.",
+      "source": "agents/plan-reviewer.md",
+      "prompt": "installer-assets/pi-agents/plan-reviewer.md",
+      "model": "sonnet",
+      "effort": "medium",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "read_only": true
+    },
+    {
+      "name": "pr-review-qa",
+      "description": "Validates acceptance criteria against a frozen pull-request snapshot and returns findings with explicit coverage without modifying files.",
+      "source": "agents/pr-review-qa.md",
+      "prompt": "installer-assets/pi-agents/pr-review-qa.md",
+      "model": "sonnet",
+      "effort": "high",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "read_only": true
+    },
+    {
+      "name": "pr-review-security",
+      "description": "Reviews a frozen pull-request snapshot for concrete security regressions and returns an inline draft without modifying files.",
+      "source": "agents/pr-review-security.md",
+      "prompt": "installer-assets/pi-agents/pr-review-security.md",
+      "model": "sonnet",
+      "effort": "high",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "read_only": true
+    },
+    {
+      "name": "pr-review-verifier",
+      "description": "Confirms or refutes each blocking pull-request finding against the frozen worktree before preview; read-only and adds no findings.",
+      "source": "agents/pr-review-verifier.md",
+      "prompt": "installer-assets/pi-agents/pr-review-verifier.md",
+      "model": "opus",
+      "effort": "high",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "read_only": true
+    },
+    {
+      "name": "qa",
+      "description": "Independently verifies a candidate against canonical acceptance and quality evidence; produces validation results, never code or planning content.",
+      "source": "agents/qa.md",
+      "prompt": "installer-assets/pi-agents/qa.md",
+      "model": "opus",
+      "effort": "xhigh",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "edit",
+        "write"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "research-consolidator",
+      "description": "Return advisory synthesis of supplied research evidence, preserving citations, conflicts and coverage gaps. Main owns persistence, decisions and follow-up.",
+      "source": "agents/research-consolidator.md",
+      "prompt": "installer-assets/pi-agents/research-consolidator.md",
+      "model": "sonnet",
+      "effort": "high",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "read_only": true
+    },
+    {
+      "name": "researcher",
+      "description": "Collect evidence for a narrow web-research angle and return cited findings. Main owns synthesis, persistence, decisions and follow-up.",
+      "source": "agents/researcher.md",
+      "prompt": "installer-assets/pi-agents/researcher.md",
+      "model": "haiku",
+      "effort": "medium",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "read_only": true
+    },
+    {
+      "name": "reviewer",
+      "description": "Reviews pull requests for demonstrable correctness, contract, security, and change-caused regressions. Produces concise GitHub review bodies and actionable inline threads without publishing.",
+      "source": "agents/reviewer.md",
+      "prompt": "installer-assets/pi-agents/reviewer.md",
+      "model": "sonnet",
+      "effort": "high",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "read_only": true
+    },
+    {
+      "name": "reviewer-consolidator",
+      "description": "Consolidates selected PR-review lenses into one concise body and de-duplicated inline thread set without repeating findings.",
+      "source": "agents/reviewer-consolidator.md",
+      "prompt": "installer-assets/pi-agents/reviewer-consolidator.md",
+      "model": "sonnet",
+      "effort": "medium",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls"
+      ],
+      "read_only": true
+    },
+    {
+      "name": "security",
+      "description": "Performs comprehensive security audits on backend and frontend projects. Evaluates against OWASP Top 10 (latest via context7, baseline 2025), CWE Top 25, ASVS, and SANS Top 25. Detects vulnerabilities, hardcoded secrets, insecure configurations, auth flaws, and injection risks. Produces a prioritized, actionable security report in English. Does not implement fixes or modify source code.",
+      "source": "agents/security.md",
+      "prompt": "installer-assets/pi-agents/security.md",
+      "model": "opus",
+      "effort": "xhigh",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "edit",
+        "write"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "tester",
+      "description": "Selects appropriate evidence, authors warranted regression tests, and runs existing test suites without test-count quotas.",
+      "source": "agents/tester.md",
+      "prompt": "installer-assets/pi-agents/tester.md",
+      "model": "sonnet",
+      "effort": "high",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "bash",
+        "edit",
+        "write"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "translator",
+      "description": "Discovers user-facing strings in any frontend codebase, builds a product-aware glossary, sets up i18n infrastructure, extracts strings into locale files (source language preserved), translates to target language (default), and replaces hardcoded strings with i18n keys. Produces a glossary and translation report. Works with any frontend framework.",
+      "source": "agents/translator.md",
+      "prompt": "installer-assets/pi-agents/translator.md",
+      "model": "sonnet",
+      "effort": "medium",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "bash",
+        "edit",
+        "write"
+      ],
+      "read_only": false
+    },
+    {
+      "name": "ux-reviewer",
+      "description": "Reviews frontend tasks for UI/UX quality — accessibility, responsiveness, interaction states, component reuse, and visual consistency. Participates in Stage 1 (adds UI/UX AC) and Stage 3 (validates implementation). Produces review reports — never code.",
+      "source": "agents/ux-reviewer.md",
+      "prompt": "installer-assets/pi-agents/ux-reviewer.md",
+      "model": "opus",
+      "effort": "high",
+      "tools": [
+        "read",
+        "grep",
+        "find",
+        "ls",
+        "edit",
+        "write"
+      ],
+      "read_only": false
+    }
+  ]
+}

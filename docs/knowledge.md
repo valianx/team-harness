@@ -3,6 +3,8 @@
 
 ## Current workflow guidance
 
+- [decision] Pi owns its TH package and preferences; specialists use public bounded RPC and native session/usage receipts, with canonical references kept inert.
+
 - [decision] `workspace-mode` separates context from optional local tool storage; native Space efforts live under verified `workspace`, Main persists remote returns, and unavailable capability preserves identity without fallback.
 
 - [constraint] Shared executable assets follow Git's owner-executable bit on POSIX; checkout umask differences are not content drift.

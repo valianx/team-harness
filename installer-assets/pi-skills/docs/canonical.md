@@ -1,0 +1,56 @@
+
+# /th:docs — Documentation Pipeline
+
+Apply [write-documents](../write-documents/SKILL.md) when drafting or reviewing
+the documentation. Include only the pages, sections and visuals needed by the
+reader; pass this guidance to assigned writers and reviewers.
+
+Parse the user's input to extract:
+
+1. **Topic(s):** what to document (service name, database, API, library, product, etc.)
+2. **Language:** look for `--lang <code>` flag. Default: `en`. Examples: `--lang es`, `--lang pt`.
+3. **Folder:** look for `--folder <name>` flag. Default: derived from the topic name (kebab-case).
+4. **Destination:** look for an explicit `--vault <name>` and optional
+   `--folder <name>`. Otherwise file modes use the selected home; remote mode
+   requires a declared file deliverable directory or explicit documentation target,
+   outside the effort branch. Resolve a vault through the active runtime's
+   configured mapping; do not assume a host-specific config path.
+
+## Examples
+
+```
+/th:docs the auth service
+/th:docs --lang es the payment API
+/th:docs --folder infrastructure the deployment setup
+/th:docs the user database --lang en
+```
+
+## Multi-topic detection
+
+If the input contains multiple topics separated by commas, "and"/"y", or enumerated:
+
+```
+/th:docs the auth service, the user database, and the payment API
+```
+
+Pass all topics to the orchestrator. It handles parallel dispatch (one research+write cycle per topic).
+
+## Route
+
+Pass to the `orchestrator` agent with this task context:
+
+```
+Task: documentation
+Type: docs
+Topics: {parsed topic list}
+Language: {parsed language code, default: en}
+Context: {bound file or Page locator; Main retains useful returns here}
+Operational directory: {real absolute file directory when required}
+Folder: {parsed folder name, default: derived from topic}
+Vault: {parsed vault name or null}
+Output: {explicit documentation destination, separate from remote effort context}
+
+Operator request: {original user input}
+```
+
+The orchestrator handles the full documentation pipeline (see `ref-special-flows.md` § Documentation Flow).

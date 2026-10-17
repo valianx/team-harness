@@ -1,0 +1,38 @@
+
+Analyze the input: $ARGUMENTS
+
+---
+
+## Mode 1 — Topic provided
+
+Build a task payload and pass it to the `orchestrator` agent:
+
+```
+Direct Mode Task:
+- Mode: learn
+- Topic: {user's topic or question}
+```
+
+If `--resume` is present in the arguments, include it in the payload:
+
+```
+Direct Mode Task:
+- Mode: learn
+- Topic: {user's topic or question}
+- Resume: true (continue from existing teaching pack if one exists for this topic)
+```
+
+## Mode 2 — No input provided
+
+Ask the operator: "What would you like to learn? You can ask about a concept, a library or framework, a language feature, or how a specific part of this codebase works. Example: 'explain how React hooks work', 'how does the auth layer work in this project', 'explain how transformers work'."
+
+---
+
+## Important
+
+- Always invoke the `orchestrator` agent — do NOT invoke agents directly.
+- The orchestrator will classify `learn` as a read-only direct mode. It may
+  dispatch the `mentor` only for an optional teaching-pack or deep background
+  research; the ordinary answer stays inline in the current conversation.
+- Output: answer inline with a short diagram. For codebase questions, show real code with `file:line`, execution order and named entry points. An optional teaching pack is retained by Main in the bound Page, or `00-teaching-pack-{topic-slug}.md` in file modes; honor explicit file deliverables separately.
+- The `--resume` flag resumes an existing teaching pack without re-covering already-taught layers.

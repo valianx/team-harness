@@ -2933,7 +2933,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     preflight_parser = subparsers.add_parser("preflight")
     preflight_parser.add_argument("--repo-root", required=True, type=Path)
-    preflight_parser.add_argument("--runtime", choices=["claude", "codex", "opencode"], required=True)
+    preflight_parser.add_argument("--runtime", choices=["claude", "codex", "opencode", "pi"], required=True)
     preflight_parser.add_argument("--agents-dir", type=Path)
     preflight_parser.add_argument("--agent", action="append", choices=REVIEW_AGENT_NAMES)
     preflight_parser.add_argument("--prerequisites-only", action="store_true")

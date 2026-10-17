@@ -88,6 +88,10 @@ contracts listed below.
 
 | Suite | Covers |
 |---|---|
+| `test_pi_generation.mjs` | Canonical eligible role catalog, native tool projection, inert references and deterministic generated freshness. |
+| `test_pi_settings.mjs`, `test_pi_shared_routes.py` | Pi settings preservation and atomic validation, shared workspace representations, custom roots and narrowly shared runtime selectors. |
+| `test_pi_runtime.mjs` | Public RPC transport, bounded worker lifecycle, owned sessions, cancellation and usage receipts with deterministic child fixtures. |
+| `test_pi_native.mjs`, `test_pi_native_workers.mjs` | Isolated Pi 1.3.0 package lifecycle and actual native worker/session/accounting integration with a canned provider, no external model requests. CI provisions `TH_PI_TEST_ROOT` for Linux/Windows and Node 22.19/24; native suites are separate from the hermetic aggregate. |
 | `test_agent_frontmatter.py` | YAML frontmatter parses for every `agents/*.md`, via PyYAML. Catches the silent-agent-drop class: an unquoted `": "` in a description breaks parsing, and Claude Code then drops the agent from the registered `subagent_type` list with no error surfaced |
 | `test_opencode_agent_frontmatter.sh` | The same, for the opencode transform |
 | `test_security_scan.py` | Exact source allowlists for all five PR agents, optional Codex projection validation, read-only-tier Bash grants, secrets, and roster reachability |
@@ -106,6 +110,9 @@ contracts listed below.
 | `test_design_oversize_behavioral.sh` | The design requirement-count ceiling — an oversize delta is decided from the canonical delta and `openspec/config.yaml` alone, with no workspace, identity, or gate input or output |
 | `test_retired_phrases.py` | The closed retired-phrase list behind `/th:lint` Check 12 — a contract that restates a helper's flags, decision procedure, or attempt ordinals, plus the shrink-only exemption map |
 | `test_authoring_budgets.py` | Advisory word/line/contents health signals, plus the shrink-only word ceilings recorded in `tests/fixtures/authoring-baseline.json`. Three things fail: a contents link pointing to no real heading, a ceiling raised above (or an entry dropped from) the fixture at the base ref, and a ceiling violation — a file over its ceiling, or a ceiling left more than 2% above a file's current count |
+
+The Pi RPC EOF fixture requires Python 3 to close stdout while keeping stdin open;
+the native Pi CI matrix provisions Python 3.13 explicitly.
 
 **Installer, runtime, and tooling.**
 

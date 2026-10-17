@@ -8,6 +8,7 @@ const VERSION_SITES = [
   { path: ".claude-plugin/marketplace.json", required: true, kind: "json", select: (value) => value?.plugins?.[0]?.version },
   { path: "plugins/team-harness/.codex-plugin/plugin.json", required: false, kind: "json", select: (value) => value?.version },
   { path: "cmd/install/main.go", required: false, kind: "go" },
+  { path: "package.json", required: false, kind: "json", select: (value) => value?.version },
 ];
 
 const DISTRIBUTED_PREFIXES = [
@@ -20,6 +21,7 @@ const DISTRIBUTED_PREFIXES = [
   ".codex/",
   "runtime/",
   "tools/codex-runtime/",
+  "tools/pi-runtime/",
 ];
 const CHANGELOG_PATH = "CHANGELOG.md";
 

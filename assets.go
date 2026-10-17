@@ -20,7 +20,7 @@ import (
 //     operator-owned `.codex/config.toml` is intentionally excluded.
 //   - The embedded layout mirrors the repo layout: `agents/architect.md`
 //     in the repo becomes `agents/architect.md` inside embeddedAssets.
-//   - installer-assets/ holds distributed OpenCode payloads. Changes require
+//   - installer-assets/ holds generated runtime payloads. Changes require
 //     the same shared version update as other installed runtime inputs.
 
 //go:embed all:agents skills hooks installer-assets all:.codex/agents

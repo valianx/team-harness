@@ -96,6 +96,39 @@ async function withFixture(callback, options = {}) {
   });
 }
 
+for (const change of ["introduce", "update", "stale", "remove"]) {
+  await withFixture(async (f) => {
+    const manifest = path.join(f.root, "package.json");
+    if (change !== "introduce") {
+      await writeFile(manifest, JSON.stringify({ name: "team-harness-pi", version: "1.2.3", pi: {} }) + "\n");
+      f.git("add", ".");
+      f.git("commit", "--amend", "-qm", "Pi version baseline");
+      f.base = gitText(f, "rev-parse", "HEAD");
+    }
+    await changeVersion(f, "1.2.4");
+    if (change === "remove") await rm(manifest);
+    else if (change !== "stale") await writeFile(manifest, JSON.stringify({ name: "team-harness-pi", version: "1.2.4", pi: {} }) + "\n");
+    commit(f, `Pi manifest ${change}`);
+    const result = invoke(f);
+    if (change === "stale" || change === "remove") {
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /version sites disagree|must remain present/i);
+    } else {
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, /5 present version sites/);
+    }
+  }, { name: `Pi package release version: ${change}` });
+}
+
+await withFixture(async (f) => {
+  await mkdir(path.join(f.root, "tools/pi-runtime"), { recursive: true });
+  await writeFile(path.join(f.root, "tools/pi-runtime/generate.mjs"), "export const changed = true;\n");
+  commit(f, "unversioned Pi distribution generator");
+  const result = invoke(f);
+  assert.notEqual(result.status, 0, result.stdout);
+  assert.match(result.stderr, /strictly greater/i);
+}, { name: "Pi generator changes require a release" });
+
 await withFixture(async (f) => {
   await writeFile(path.join(f.root, "README.md"), "documentation-only edit\n");
   commit(f, "docs only");

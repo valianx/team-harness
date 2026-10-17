@@ -1,0 +1,73 @@
+# Set up Team Harness in Pi
+
+Run in the current Pi session. Keep the primary session as coordinator and use
+Pi's package, extension, skill and authentication ownership. Preserve unrelated
+packages, settings, credentials and the active model/thinking selection.
+
+Bind the loaded TH package's absolute root, selected Git/local source and install
+scope from native package discovery and its `package.json` manifest. The package
+root differs from the agent directory. Resolve the latter through Pi's native
+`getAgentDir()` and `PI_CODING_AGENT_DIR`, defaulting to `~/.pi/agent`. Verify every
+helper result names that directory's `.team-harness.json`.
+
+For an authorized new installation, use `pi install <selected-source>`, with
+`--local` only for the selected project scope. Supported sources include
+`git:github.com/valianx/team-harness@<selected-ref>` and an explicit local package
+directory. A local package is loaded in place. Respect Pi's project trust; do not
+install another host or use the Go installer. Reuse the running installation
+when it is already healthy.
+
+## Preferences
+
+Use the helper shipped in this validated package, under the same selected Pi
+environment. Replace `<package-root>` with its actual absolute path:
+
+```text
+node <package-root>/runtime/pi/settings.mjs show
+node <package-root>/runtime/pi/settings.mjs ensure --version <package-version>
+node <package-root>/runtime/pi/settings.mjs set --set KEY=JSON --set KEY=JSON
+```
+
+`show` is read-only and redacts secret metadata. `ensure` seeds local selectors
+only when both selectors are absent, updates selected TH version metadata and
+preserves existing selectors, conflicts, destinations and opaque settings.
+Diagnose existing invalid values without silently changing them. Gather only
+the operator's requested preferences and submit one validated `set` batch;
+repeated `--remove KEY` removes a supported preference. Invalid batches publish
+nothing. Preserve existing native execution policy and authentication.
+
+Use the shared [workspace workflow](../workspace/SKILL.md) for local, Obsidian
+and gpt-space behavior. Set remote selection and its two opaque IDs together
+only after the actual native Space operation establishes the destination.
+Pi capability absence preserves the existing locator and reports the unavailable
+operation. It does not authorize borrowed credentials, a fabricated transport
+or a second context home. Obsidian selection requires a valid native absolute
+base and relative subfolder in the same batch. Explicit local/Obsidian selection
+keeps matching canonical and legacy selectors; remote selection removes the
+legacy selector.
+
+For selected GitHub identity routing, use the packaged shared helper:
+
+```text
+python3 <package-root>/installer-assets/pi-skills/setup/scripts/manage_github_identities.py --runtime pi show
+python3 <package-root>/installer-assets/pi-skills/setup/scripts/manage_github_identities.py --runtime pi configure --routes-json JSON
+```
+
+Routes remain in the same Pi settings document. Never print or copy token
+bytes. Configure only requested routes; preserve unrelated metadata.
+
+## Selected upstream capabilities
+
+Prepare only the requested provider through the matching Pi route in
+[upstream tools](../spec/references/upstream-tools.md). OpenSpec uses its Pi
+target, TEA/BMAD its native Pi skill output, and Superpowers its own Pi package.
+Use their installed methods rather than copying them into TH. Verify discovery
+in the selected agent/project scope, especially under a custom agent directory.
+Report installed, discoverable and usable separately; another host's working
+installation is not Pi evidence. Do not reinstall healthy providers or prepare
+unrelated providers.
+
+Finish through [Pi reload](../reload/SKILL.md) when activation is required.
+Report the package identity/scope, settings path, changed preferences and
+remaining specific capability gaps. File presence alone does not prove live
+activation or successful specialist dispatch.
