@@ -60,17 +60,21 @@ func dispatchSubcommand() bool {
 	// Parse global flags before the subcommand name.
 	// Flags may appear as --flag=value or --flag value.
 	args := os.Args[1:]
-	args = parseDispatchFlags(args)
-
+	helpRequested := false
 	for _, arg := range args {
 		if arg == "--help" || arg == "-h" {
-			if len(args) >= 2 && args[0] == "setup" && args[1] == "models" {
-				printWorkerModelSetupHelp(os.Stdout)
-			} else {
-				printNativeInstallerHelp()
-			}
-			return true
+			helpRequested = true
+			break
 		}
+	}
+	args = parseDispatchFlags(args)
+	if helpRequested {
+		if len(args) >= 2 && args[0] == "setup" && args[1] == "models" {
+			printWorkerModelSetupHelp(os.Stdout)
+		} else {
+			printNativeInstallerHelp()
+		}
+		return true
 	}
 
 	if len(args) == 0 {

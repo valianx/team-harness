@@ -26,8 +26,11 @@ func TestLifecycleHelpPreservesInstallation(t *testing.T) {
 	}
 	for _, host := range []string{"opencode", "codex"} {
 		for _, action := range [][]string{{"plan"}, {"apply"}, {"update"}, {"uninstall"}, {"setup", "models"}} {
-			for _, help := range []string{"--help", "-h"} {
-				t.Run(host+"/"+strings.Join(action, " ")+"/"+help, func(t *testing.T) {
+			for _, helpArgs := range [][]string{{"--help"}, {"-h"}, {"--runtime", "--help"}, {"--runtime", "-h"}} {
+				if len(helpArgs) > 1 && action[0] != "apply" {
+					continue
+				}
+				t.Run(host+"/"+strings.Join(action, " ")+"/"+strings.Join(helpArgs, " "), func(t *testing.T) {
 					data := isolatedOpencodeLedger(t)
 					root := filepath.Join(data, "native root")
 					if err := os.MkdirAll(root, 0o700); err != nil {
@@ -53,7 +56,8 @@ func TestLifecycleHelpPreservesInstallation(t *testing.T) {
 					if err := os.WriteFile(filepath.Join(root, ".team-harness.json"), []byte(`{"operator_key":"retained"}`), 0o600); err != nil {
 						t.Fatal(err)
 					}
-					args := append(append([]string{}, action...), "--runtime", host, directoryFlag, root, "--non-interactive", help)
+					args := append(append([]string{}, action...), "--runtime", host, directoryFlag, root, "--non-interactive")
+					args = append(args, helpArgs...)
 					raw, err := json.Marshal(args)
 					if err != nil {
 						t.Fatal(err)
