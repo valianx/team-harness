@@ -10,10 +10,10 @@ Start when the operator selects this workflow. Main remains the current native
 general agent and coordinates Spec, Implementation, Validation and Publication.
 No nested orchestrator or TH permission ledger is needed.
 
-Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
-its configured local or Obsidian mode. Main coordinates with native tools and
-permissions. Reuse authorization for unchanged work and ask only for a missing
-decision. Specialists provide evidence and recommendations; Main judges them.
+Use [workspace](../workspace/SKILL.md) to reuse the bound file or Page context.
+Keep repository/worktree and any real local operational directory separate.
+Main persists useful specialist returns in that context and judges them;
+reuse authority for unchanged work and ask only for a missing decision.
 
 Apply [the OpenSpec lifecycle](../spec/references/lifecycle.md) at authoring,
 resumption, candidate preparation and completion. Use
@@ -43,7 +43,7 @@ Use that view in the existing plan. Retain spec's declared provider stages when
 continuing it, and the authorized endpoint and selected review decision throughout.
 
 Use specialists for distinct questions, not as mandatory stops. Supply the
-question, candidate, included/excluded scope, repository/workspace, relevant
+question, candidate, included/excluded scope, context locator, repository/worktree,
 acceptance sources and existing checks or assessments. Read additional context
 to answer an in-scope uncertainty, without a preliminary documentation tour.
 Accept useful findings and limits through native transport; no separate packet

@@ -53,7 +53,10 @@ Setup and update preserve existing native values and never add global cache,
 temporary, repository, or Obsidian roots as Team Harness defaults. Reviewer
 agent projections retain their read-only sandbox class as a role capability;
 that declaration does not replace the host's global policy. Workspace settings
-select the Obsidian destination, while any write there remains subject to the
+select local, Obsidian or native GPT Space context through the shared workspace
+skill. Remote mode needs TH 3.48.0 and a capable host; Main owns Page writes and
+specialists return narrative, with separate local storage for file-only tools.
+Any destination write remains subject to the
 native permission boundary. When an access probe fails, report its exact target
 and native refusal rather than prescribing a policy rewrite or restart without
 activation evidence.

@@ -24,11 +24,11 @@ dispatch, not duplicated in the role. Include:
 - existing checks and provider assessments, with candidate, command, environment,
   actual result and named relevant skips or gaps.
 
-Do not copy the entire conversation, full logs or equivalent generated files into
-each prompt. Link evidence available to the reviewer; supply a bounded excerpt
-when its native access cannot reach the workspace. Reuse review-surface parity
-checks for generated copies, without treating unchecked copies as verified.
-An entirely checker-verified surface needs no empty agent dispatch.
+Link bounded evidence instead of copying conversations, logs or generated files.
+For remote context Main supplies frozen complete-block captures with source/head
+provenance through the review-context helper, or pinned excerpts; never substitute
+live Pages or infer connector write authority. Reuse generated-surface checks;
+unchecked copies remain unverified and fully checked surfaces need no empty dispatch.
 
 ## Native execution and focused inspection
 

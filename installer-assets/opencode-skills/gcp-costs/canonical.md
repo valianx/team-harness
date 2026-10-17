@@ -2,8 +2,8 @@
 Analyze the input: $ARGUMENTS
 
 Use the [workspace skill](../workspace/SKILL.md) to resolve or reuse the shared
-absolute workspace before delegation. Pass that exact effort workspace and any
-explicit deliverable target to the specialist.
+context locator before delegation. Pass repository/operational paths separately;
+Main persists useful returns there and honors explicit deliverable targets.
 
 ---
 name: gcp-costs
@@ -22,8 +22,8 @@ Examples: `/th:gcp-costs`, `/th:gcp-costs all`, `/th:gcp-costs full`
    - Scope: full
    - Projects: all accessible
    - Feature: gcp-cost-analysis
-   - Workspace path: {resolved shared workspace}
-   - Deliverable target: {explicit target, or the resolved workspace}
+   - Context: {bound file or Page locator}
+   - Deliverable target: {explicit target, or native return to Main}
    ```
 
 ## Mode 2 — Scoped analysis (specific projects or services)
@@ -42,8 +42,8 @@ Examples: `/th:gcp-costs project-abc project-xyz`, `/th:gcp-costs --service comp
    - Projects: {comma-separated project IDs, or "all" if only service filter}
    - Service filter: {service name, or "all" if only project filter}
    - Feature: gcp-cost-analysis
-   - Workspace path: {resolved shared workspace}
-   - Deliverable target: {explicit target, or the resolved workspace}
+   - Context: {bound file or Page locator}
+   - Deliverable target: {explicit target, or native return to Main}
    ```
 
 ## Mode 3 — Quick scan (idle resources only)
@@ -61,8 +61,8 @@ Examples: `/th:gcp-costs --quick`, `/th:gcp-costs --quick project-abc`
    - Scope: quick
    - Projects: {project IDs or "all"}
    - Feature: gcp-cost-analysis
-   - Workspace path: {resolved shared workspace}
-   - Deliverable target: {explicit target, or the resolved workspace}
+   - Context: {bound file or Page locator}
+   - Deliverable target: {explicit target, or native return to Main}
    ```
 
 ---
@@ -71,7 +71,7 @@ name: gcp-costs
 ## Important
 
 - Main remains the coordinator and may delegate directly to `gcp-cost-analyzer`; do not create a second orchestrator or a separate approval/mode gate for cost analysis.
-- Output: `00-gcp-costs.md` in the resolved workspace, unless the operator supplied an explicit deliverable target.
+- Main retains output in the same Page, or `00-gcp-costs.md` in file modes. Required machine artifacts use declared real local storage; preserve explicit deliverable targets.
 - The agent uses `gcloud` CLI commands (read-only) and optionally BigQuery for billing data
 - **Prerequisites:** user must have `gcloud` installed and authenticated (`gcloud auth login`)
 - **Required IAM roles:** Billing Viewer, Cloud Asset Viewer, Recommender Viewer, Compute Viewer

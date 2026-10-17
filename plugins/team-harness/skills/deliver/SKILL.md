@@ -16,8 +16,11 @@ For completed repository changes, continue the Publication phase of
 Recover the evidence, workspace, review decision and requested endpoint. Local
 completion is valid when no PR is requested; PR preparation does not imply publication.
 
-Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
-its configured local or Obsidian mode. Main coordinates with native tools and
+Use [workspace](../workspace/SKILL.md) to reuse the bound file home or verified
+gpt-space effort. Main retains remote delivery status and handoff in that Page;
+required PR body/build files use separate scoped operational storage. Do not
+treat a local path as a portable attachment, create a Markdown mirror or replace
+an unavailable remote identity. Main coordinates with native tools and
 permissions. Reuse authorization for unchanged work and ask only for a missing
 decision. Specialists provide evidence and recommendations; Main judges them.
 

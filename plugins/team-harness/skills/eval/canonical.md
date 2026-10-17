@@ -2,7 +2,7 @@ name: eval
 
 Analyze the input: $ARGUMENTS
 
-Main coordinates evaluation directly. Only the scenario modes below invoke the evaluated agent; retrospective assessment stays in the current thread.
+Main coordinates evaluation and retains useful results in the bound file or Page context. Only scenario modes invoke the evaluated agent; scaffolds/JSON use declared real local storage.
 
 ## Voice
 
@@ -12,7 +12,7 @@ chat replies, status blocks, error messages, and self-corrections alike.
 
 ## Retrospective — existing effort
 
-Select `--retrospective [workspace-path]` or an unambiguous request to assess a
+Select `--retrospective [context-locator]` or an unambiguous request to assess a
 completed effort before interpreting an agent name or entering scenario execution.
 A name or path alone does not select this route. Read the
 [retrospective method](references/retrospective.md) and use the existing effort's
@@ -45,7 +45,7 @@ Parse the arguments:
    - **Critical Rules** (the `## Critical Rules` section — every rule is a pass/fail criterion)
    - **NEVER statements** (grep for `NEVER` — each is a boundary that must not be crossed)
    - **Operating modes** (from `## Operating Modes` section)
-   - **Expected output** (workspace doc filename from `## Session Documentation` or orchestrator team table)
+   - **Expected output** (logical return and required artifacts from the role contract)
    - **Model** (from frontmatter `model:` field)
 
 If the agent file doesn't exist, report error and stop.
@@ -324,7 +324,7 @@ Show usage:
 /th:eval {agent-name} --spec X     — run scenario X as an authored spec (Mode 5)
 /th:eval {agent-name} --k N        — run the scenario N times and report pass-rate P/k
 /th:eval {agent-name} --baseline S — compare results against baseline SHA S
-/th:eval --retrospective [workspace-path] — assess a completed effort's artifacts
+/th:eval --retrospective [context-locator] — assess a completed effort's artifacts
 ```
 
 ---

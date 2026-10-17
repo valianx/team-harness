@@ -13,3 +13,7 @@ assigned artifact. Findings cite location, evidence, criterion, impact,
 correction and closure check. Return outcomes, checks and coverage limits
 concisely. Findings are advisory; Main decides disposition. Protect private
 data.
+
+For remote context use supplied pinned excerpts or immutable Page captures.
+Return useful narrative to Main for persistence; do not mutate Pages, create a
+local Markdown mirror or treat a remote locator as a file path.

@@ -66,8 +66,8 @@ pending scope and supported recovery, and continue independent supported work.
 
 ### Evidence and execution ownership
 
-Keep complete original supported JSON/artifacts under workspace `research/rea/`;
-TH interpretation in `research/00-research.md` links identities, profiles, provenance,
+Keep complete original JSON/artifacts in declared local `research/rea/` storage;
+Main retains interpretation in the bound context (`research/00-research.md` in file modes), linking identities, profiles, provenance,
 limits, omissions and diagnostics. Views/exports link their parent original; these
 paths add no TH Evidence schema. Verify output destinations and complete results.
 A standalone CLI Evidence record is portable through supported inline inputs for
@@ -177,8 +177,8 @@ native permissions, use the existing [setup provider route](../../setup/SKILL.md
 and the provider's official owner to install or repair it. Preparation only makes
 dependencies available; it does not run future stages or configure inactive hosts.
 
-Pass the selected local or Obsidian workspace through supported provider settings,
-and report installed, discoverable and active states separately. Check a resolved
+Pass the bound context and separate real local operational directory where file
+settings require one; report installed, discoverable and active states separately. Check a resolved
 version against the policy baseline and its prerequisites; validate compatibility
 for another version instead of forcing a downgrade or pinning an unavailable
 marketplace release. A failed action or pending activation gets a concrete recovery,
@@ -187,9 +187,9 @@ not a generic restart. Updating TH does not reinstall these providers.
 TEA preparation uses BMAD's official module installer (`npx bmad-method install`),
 which generates project-local native entries and uses `uv` for shared scripts.
 Its optional CLI runners invoke a supported coding agent. Check each configured
-report destination, including derived paths, against the selected workspace.
+file destination, including derived paths, against declared operational storage.
 With BMAD 6.12 on Windows, use project-relative settings resolving to that same
-absolute workspace. Inspect remembered configuration before install/update:
+absolute operational directory. Inspect remembered configuration before install/update:
 directory creation reads it before `--set` overrides and mishandles absolute
 Windows paths. Correct only affected local path settings, then verify outputs.
 Superpowers is installed as the official plugin for the active
@@ -204,7 +204,7 @@ and preparation details; TEA supplies testing architecture throughout the work.
 In spec, Main invokes these methods with the existing intent and evidence. Select
 the provider's supported sequential mode for bounded work; do not map each method
 to a new agent. Preserve its current upstream instructions and useful outputs,
-passing the selected workspace and reusing existing assessments. Test-design,
+passing the bound context and required operational paths, reusing assessments. Test-design,
 test-review and trace answer different questions about the same tests; they do
 not each require another full analysis or test run. When additional expertise is
 useful, give that reviewer the unanswered question and existing results.
@@ -270,7 +270,8 @@ tools share one effort and its evidence instead of reproducing each other's work
 
 Main or a bounded native specialist reads and executes the installed upstream
 skill. The request carries the objective, relevant spec/tasks, code and test scope,
-candidate identity, known findings and absolute local/Obsidian workspace path.
+candidate identity, known findings, bound context and repository/worktree, plus a
+real absolute operational directory only for required file inputs/outputs.
 A delegated agent uses the provider as its method for that question; TH does not
 run a second equivalent local method afterward.
 Include the question, evidence boundary, supported output destinations and the
@@ -328,22 +329,18 @@ through the official route; reading the catalog does not select them all.
 Use native skill execution for interactive work. The optional runner's
 `--agent none` only resolves inputs and emits a prompt; it is not a completed
 test review. Check the installed runner's help before selecting its adapter.
-Verify the runner actually consumed the supplied context. If it omits workspace
-inputs or restricts them to the project root, use native execution of the installed
-skill with those paths; do not mirror an Obsidian workspace into the repository.
+Verify the runner consumed the supplied context. If its supported file interface
+cannot use a Page, execute the installed skill natively with selected context and
+the declared operational directory. Never pass a URL/opaque ID as a path.
 
-Pass output locations through supported provider configuration or flags. Resolve
-the existing workspace once and give every provider the same resolved destination:
-the configured local workspace in local mode, or the existing effort folder in
-the configured vault in Obsidian mode. Obsidian mode creates no local mirror.
-
-Working test designs, coverage analyses, verification reports and review summaries
-are retained there as Markdown, with links from the existing plan. If a provider
-returns its assessment only in conversation, Main records a concise faithful
-summary with the source and outcome there. Do not generate empty reports merely
-to populate a fixed folder tree. Required JSON, captures and other native artifacts
-keep their formats; transient caches or isolated runs may remain in permitted
-temporary storage, linked when useful.
+Main retains useful test designs, assessments and review returns in the same effort
+Page, preserving source, scope and outcome. File modes retain established Markdown
+names in their selected home. Conversational returns need no local report mirror
+or Page per specialist. File-output flags, required JSON, captures and render
+sources use explicit real local operational storage and keep native formats.
+Link actual portable evidence from the plan; unsupported upload remains pending,
+and a bare local path is not a remote attachment. Verify output/readback rather
+than populating an empty report tree.
 
 Canonical OpenSpec proposals, tasks, deltas and archives stay under openspec/ in
 their owning repository. Product code, maintained tests and durable documentation
@@ -353,7 +350,7 @@ without duplicating them.
 
 Reuse current evidence when the upstream workflow accepts it and rerun checks
 when the candidate or evidence requires it. Verify actual provider output paths.
-If a required capability cannot honor the selected workspace through a supported
+If a required capability cannot honor the selected context through a supported
 route, report the integration limitation and pending action; do not silently switch
 modes, create a second workspace or claim the output was retained there.
 

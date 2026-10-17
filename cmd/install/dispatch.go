@@ -417,9 +417,9 @@ func resolveOpencodeSetupFromEnvFlags() opencodeSetupValues {
 // environment variables and flags, using an explicitly supplied migration
 // candidate only for compatibility callers.
 //
-// After the trim, logs-mode is always "local" on the non-interactive path
-// (the work-logs group is removed from the interactive form). Language,
-// english_learning, clickup, and obsidian_tasks are not written (AC-7).
+// Fresh setup defaults to local. The config writer preserves any existing
+// workspace selection and destination. Language, english_learning, clickup,
+// and obsidian_tasks are not written.
 //
 // Security note: this function resolves setup values (URLs, presence bools)
 // only — it does NOT populate opencodeMCPSecrets. Token-mode selection remains
@@ -427,8 +427,6 @@ func resolveOpencodeSetupFromEnvFlags() opencodeSetupValues {
 func resolveOpencodeSetupFromEnvFlagsWithCCURL(migration opencodeMCPMigration) opencodeSetupValues {
 	cfg := opencodeSetupValues{}
 
-	// Work-logs mode — always "local" (the work-logs group was removed in the
-	// interactive flow; the non-interactive path follows suit for consistency).
 	cfg.LogsMode = "local"
 
 	// Optional knowledge-graph MCP: explicit flag > environment > compatibility

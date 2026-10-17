@@ -2,8 +2,8 @@
 Analyze the input: $ARGUMENTS
 
 Use [workspace](../workspace/SKILL.md) to select the existing effort in the
-configured local/Obsidian location. Pass its absolute root as `workspaces path:`
-in dispatch; output paths below refer to that root.
+bound file or Page context. Maintained tests stay in the supplied repository/worktree;
+captures and native machine results use declared real local operational storage.
 
 ---
 name: test-cross-browser
@@ -26,7 +26,7 @@ matches, omit the field (absence is the signal — do not set it to false explic
    ```
    Direct Mode Task:
    - Mode: test
-   - workspaces path: {absolute-workspace-root}
+   - Context: {bound locator; separate operational directory for file tools}
    - Feature: {feature-name}
    - cross_browser: true        # always set by this skill — the distinguishing field
    - frontend_scope: true       # only when frontend markers detected; omit otherwise
@@ -34,13 +34,13 @@ matches, omit the field (absence is the signal — do not set it to false explic
 
 ## Mode 2 — No input provided
 
-1. Find existing efforts in the configured workspace location containing `02-implementation.md`.
+1. Discover existing efforts read-only with implementation evidence (`02-implementation.md` in file modes).
 2. If exactly one found, use its feature name.
 3. If multiple found, ask the user: "Multiple features found in workspaces. Which one do you want
    to test with cross-browser coverage? {list}"
 4. If none found, report the checked location and ask for the intended feature;
    do not create a fallback workspace.
-5. Once the feature path is resolved, run the frontend detection step before building the payload.
+5. Once the bound context is verified, run frontend detection before building the payload.
 
 ## When to use `/th:test-cross-browser` vs `/th:test`
 
@@ -64,11 +64,11 @@ elements (headers, field names, status-block keys) stay English.
 ## Output Discipline
 
 - Build the Direct Mode Task payload and route to the `orchestrator` agent — no inline analysis.
-- Do NOT produce test files, test plans, or workspaces content directly. That is the tester's
-  responsibility once dispatched.
+- The tester owns tests and returns evidence; Main persists useful results in the
+  bound context, without granting the tester remote mutation authority.
 - Do NOT invoke the `tester` agent directly — always route through the orchestrator.
-- Output: tests authored across the configured browser matrix + `workspaces/{feature-name}/03-testing.md`,
-  identical to `/th:test` output but with the cross-engine matrix applied.
+- Output: repository tests across the matrix; Main retains returned results in the
+  same Page, or `03-testing.md` in file modes, linking native captures/results.
 
 ## Important
 
@@ -80,5 +80,5 @@ elements (headers, field names, status-block keys) stay English.
 - **Never invokes the `tester` agent directly.** The full pipeline (architect determination of
   scope, tester phase-0 reference routing, qa verification) runs as normal — cross-browser is an
   axis, not a bypass of the pipeline.
-- Requires existing workspaces with implementation docs. If none exist, Mode 2 will report the
-  checked location and ask for the intended feature; it will not create a fallback workspace.
+- Requires an existing effort with implementation evidence. If absent, Mode 2 reports the
+  checked location and asks for the intended feature without creating a fallback.

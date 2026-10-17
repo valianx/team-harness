@@ -44,8 +44,8 @@ inventing schemas, infrastructure, performance targets or delivery dates.
 
 ## One deliverable and coherent sources
 
-Deliver one Markdown document in the selected workspace, honoring an explicit
-output destination or requested format. Keep long proposals navigable with
+Main retains one logical proposal in the same Page, or Markdown in file modes;
+honor explicit output destinations/formats. Keep long proposals navigable with
 headings and a contents list when useful. Separate narrative documents only
 when the operator asks; length alone is not a reason. Diagrams and editable
 visual sources can remain supporting assets, not additional narrative proposals.

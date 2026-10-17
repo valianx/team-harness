@@ -16,8 +16,40 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+type workspacePreferenceCase struct {
+	Name     string                     `json:"name"`
+	Config   map[string]json.RawMessage `json:"config"`
+	Expected struct {
+		Status       string `json:"status"`
+		Mode         string `json:"mode"`
+		SelectedFrom string `json:"selected_from"`
+		Conflict     bool   `json:"conflict"`
+		ReasonCode   string `json:"reason_code"`
+	} `json:"expected"`
+}
+
+func workspacePreferenceCases(t *testing.T) []workspacePreferenceCase {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("..", "..", "tests", "fixtures", "workspace-preferences.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		SchemaVersion int                       `json:"schema_version"`
+		Cases         []workspacePreferenceCase `json:"cases"`
+	}
+	if err := json.Unmarshal(data, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	if fixture.SchemaVersion != 1 || len(fixture.Cases) == 0 {
+		t.Fatal("unsupported or empty workspace preference fixture")
+	}
+	return fixture.Cases
+}
 
 func TestTeamHarnessConfigWritersRejectNonobjectsWithoutChanges(t *testing.T) {
 	for _, tc := range []struct {
@@ -206,8 +238,288 @@ func TestWriteOpencodeTeamHarnessConfig_InstallerManagedKeysAlwaysSet(t *testing
 	if result["logs-mode"] != "local" {
 		t.Errorf("fresh logs-mode = %v, want local", result["logs-mode"])
 	}
+	if result["workspace-mode"] != "local" {
+		t.Errorf("fresh workspace-mode = %v, want local", result["workspace-mode"])
+	}
 	if _, ok := result["updated_at"]; !ok {
 		t.Error("updated_at missing from fresh install")
+	}
+}
+
+func TestWriteOpencodeTeamHarnessConfig_PreservesWorkspacePreferenceGroup(t *testing.T) {
+	for _, tc := range workspacePreferenceCases(t) {
+		t.Run(tc.Name, func(t *testing.T) {
+			root := t.TempDir()
+			path := opencodeSettingsConfigPath(root)
+			original := tc.Config
+			original["operator-metadata"] = json.RawMessage(`{"nested":[null,{"keep":true}]}`)
+			before, err := json.Marshal(original)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, before, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			placer := newOpencodePlacerAt(root)
+			for attempt := 0; attempt < 2; attempt++ {
+				if err := writeOpencodeTeamHarnessConfig(path, opencodeSetupValues{LogsMode: "local"}, placer); err != nil {
+					t.Fatal(err)
+				}
+				after, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var got map[string]json.RawMessage
+				if err := json.Unmarshal(after, &got); err != nil {
+					t.Fatal(err)
+				}
+				for key, want := range original {
+					var compact bytes.Buffer
+					if err := json.Compact(&compact, got[key]); err != nil {
+						t.Fatalf("invalid value for %s: %v", key, err)
+					}
+					if !bytes.Equal(compact.Bytes(), want) {
+						t.Errorf("attempt %d: %s = %s, want %s", attempt, key, got[key], want)
+					}
+				}
+				for _, key := range []string{"workspace-mode", "logs-mode", "logs-path", "logs-subfolder", "workspace-space-id", "workspace-container-page-id"} {
+					if tc.Expected.SelectedFrom == "default" && (key == "workspace-mode" || key == "logs-mode") {
+						if string(got[key]) != `"local"` {
+							t.Errorf("attempt %d: %s = %s, want local", attempt, key, got[key])
+						}
+						continue
+					}
+					if _, existed := original[key]; !existed {
+						if _, injected := got[key]; injected {
+							t.Errorf("attempt %d: injected preference key %s", attempt, key)
+						}
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestBuildImportCandidate_WorkspacePreferenceFixture(t *testing.T) {
+	for _, tc := range workspacePreferenceCases(t) {
+		t.Run(tc.Name, func(t *testing.T) {
+			got := buildImportCandidate(tc.Config).workspace
+			want := workspacePreference{
+				status: tc.Expected.Status, mode: tc.Expected.Mode,
+				selectedFrom: tc.Expected.SelectedFrom, conflict: tc.Expected.Conflict,
+				reasonCode: tc.Expected.ReasonCode,
+			}
+			if got != want {
+				t.Errorf("workspace selection = %+v, want %+v", got, want)
+			}
+		})
+	}
+}
+
+func TestRefreshManagedConfigKeys_PreservesWorkspacePreferenceGroup(t *testing.T) {
+	for _, tc := range workspacePreferenceCases(t) {
+		t.Run(tc.Name, func(t *testing.T) {
+			root := t.TempDir()
+			path := opencodeSettingsConfigPath(root)
+			original := tc.Config
+			original["operator-metadata"] = json.RawMessage(`{"nested":[null,{"keep":true}]}`)
+			original["installed_version"] = json.RawMessage(`"old-version"`)
+			before, err := json.Marshal(original)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, before, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			placer := newOpencodePlacerAt(root)
+			for attempt := 0; attempt < 2; attempt++ {
+				if err := refreshManagedConfigKeys(path, placer); err != nil {
+					t.Fatal(err)
+				}
+				after, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var got map[string]json.RawMessage
+				if err := json.Unmarshal(after, &got); err != nil {
+					t.Fatal(err)
+				}
+				if string(got["installed_version"]) != string(mustMarshalJSON(version)) {
+					t.Errorf("metadata was not refreshed: %s", got["installed_version"])
+				}
+				delete(got, "format_version")
+				delete(got, "installed_version")
+				delete(got, "updated_at")
+				delete(original, "installed_version")
+				want, err := json.Marshal(original)
+				if err != nil {
+					t.Fatal(err)
+				}
+				actual, err := json.Marshal(got)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Equal(actual, want) {
+					t.Errorf("attempt %d: update changed preferences: %s, want %s", attempt, actual, want)
+				}
+			}
+		})
+	}
+}
+
+func TestOpencodeConfigWriters_DiagnoseInvalidOrConflictingPreferenceOnce(t *testing.T) {
+	for _, operation := range []struct {
+		name  string
+		write func(string, *opencodePlacer) error
+	}{
+		{"apply", func(path string, p *opencodePlacer) error {
+			return writeOpencodeTeamHarnessConfig(path, opencodeSetupValues{LogsMode: "local"}, p)
+		}},
+		{"update", refreshManagedConfigKeys},
+	} {
+		for _, tc := range workspacePreferenceCases(t) {
+			if tc.Expected.ReasonCode == "" {
+				continue
+			}
+			t.Run(operation.name+"/"+tc.Name, func(t *testing.T) {
+				root := t.TempDir()
+				path := opencodeSettingsConfigPath(root)
+				seed, err := json.Marshal(tc.Config)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, seed, 0o600); err != nil {
+					t.Fatal(err)
+				}
+				capture, err := os.CreateTemp(t.TempDir(), "stderr")
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer capture.Close()
+				originalStderr := os.Stderr
+				os.Stderr = capture
+				defer func() { os.Stderr = originalStderr }()
+				if err := operation.write(path, newOpencodePlacerAt(root)); err != nil {
+					t.Fatal(err)
+				}
+				os.Stderr = originalStderr
+				output, err := os.ReadFile(capture.Name())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if strings.Count(string(output), "\n") != 1 || !strings.Contains(string(output), tc.Expected.ReasonCode) {
+					t.Errorf("diagnosis = %q, want one %s diagnosis", output, tc.Expected.ReasonCode)
+				}
+			})
+		}
+	}
+}
+
+func TestOpencodeConfigWriters_DiagnoseWorkspaceDestinationsWithoutRepair(t *testing.T) {
+	for _, operation := range []struct {
+		name  string
+		write func(string, *opencodePlacer) error
+	}{
+		{"apply", func(path string, p *opencodePlacer) error {
+			return writeOpencodeTeamHarnessConfig(path, opencodeSetupValues{LogsMode: "local"}, p)
+		}},
+		{"update", refreshManagedConfigKeys},
+	} {
+		for _, tc := range []struct {
+			name   string
+			config string
+			codes  []string
+		}{
+			{"remote missing both IDs", `{"workspace-mode":"gpt-space"}`, []string{"incomplete_space_destination"}},
+			{"remote missing container ID", `{"workspace-mode":"gpt-space","workspace-space-id":"space_one"}`, []string{"incomplete_space_destination"}},
+			{"remote missing Space ID", `{"workspace-mode":"gpt-space","workspace-container-page-id":"page_one"}`, []string{"incomplete_space_destination"}},
+			{"missing ID before invalid ID", `{"workspace-mode":"gpt-space","workspace-space-id":null}`, []string{"incomplete_space_destination"}},
+			{"remote null ID", `{"workspace-mode":"gpt-space","workspace-space-id":"space_one","workspace-container-page-id":null}`, []string{"invalid_space_destination"}},
+			{"remote numeric ID", `{"workspace-mode":"gpt-space","workspace-space-id":7,"workspace-container-page-id":"page_one"}`, []string{"invalid_space_destination"}},
+			{"remote list ID", `{"workspace-mode":"gpt-space","workspace-space-id":[],"workspace-container-page-id":"page_one"}`, []string{"invalid_space_destination"}},
+			{"remote empty ID", `{"workspace-mode":"gpt-space","workspace-space-id":"","workspace-container-page-id":"page_one"}`, []string{"invalid_space_destination"}},
+			{"remote URL ID", `{"workspace-mode":"gpt-space","workspace-space-id":"https://example.test/private-value","workspace-container-page-id":"page_one"}`, []string{"invalid_space_destination"}},
+			{"remote path ID", `{"workspace-mode":"gpt-space","workspace-space-id":"space_one","workspace-container-page-id":"/private-value/page"}`, []string{"invalid_space_destination"}},
+			{"remote whitespace ID", `{"workspace-mode":"gpt-space","workspace-space-id":"space_one","workspace-container-page-id":"private-value page"}`, []string{"invalid_space_destination"}},
+			{"remote invalid initial character", `{"workspace-mode":"gpt-space","workspace-space-id":"_space_one","workspace-container-page-id":"page_one"}`, []string{"invalid_space_destination"}},
+			{"remote oversized ID", `{"workspace-mode":"gpt-space","workspace-space-id":"` + strings.Repeat("s", 257) + `","workspace-container-page-id":"page_one"}`, []string{"invalid_space_destination"}},
+			{"remote valid opaque IDs", `{"workspace-mode":"gpt-space","workspace-space-id":"Space_1-a","workspace-container-page-id":"Page_2-b"}`, nil},
+			{"remote longest valid ID", `{"workspace-mode":"gpt-space","workspace-space-id":"` + strings.Repeat("s", 256) + `","workspace-container-page-id":"page_one"}`, nil},
+			{"remote conflict and missing IDs", `{"workspace-mode":"gpt-space","logs-mode":"local"}`, []string{"selector_conflict", "incomplete_space_destination"}},
+			{"invalid selector before destination", `{"workspace-mode":null,"workspace-space-id":"https://example.test/private-value"}`, []string{"invalid_workspace_mode"}},
+			{"legacy Obsidian missing destination", `{"logs-mode":"obsidian"}`, []string{"incomplete_obsidian_destination"}},
+			{"legacy Obsidian missing subfolder", `{"logs-mode":"obsidian","logs-path":"/private-value/vault"}`, []string{"incomplete_obsidian_destination"}},
+			{"canonical Obsidian missing vault", `{"workspace-mode":"obsidian","logs-subfolder":"work-logs"}`, []string{"incomplete_obsidian_destination"}},
+			{"Obsidian wrong type", `{"workspace-mode":"obsidian","logs-path":null,"logs-subfolder":"work-logs"}`, []string{"invalid_obsidian_destination"}},
+			{"Obsidian empty subfolder", `{"logs-mode":"obsidian","logs-path":"/private-value/vault","logs-subfolder":""}`, []string{"invalid_obsidian_destination"}},
+			{"Obsidian Windows destination", `{"logs-mode":"obsidian","logs-path":"C:/private-value/Vault","logs-subfolder":"work-logs"}`, nil},
+			{"local ignores unused remote destination", `{"workspace-mode":"local","workspace-space-id":null}`, nil},
+		} {
+			t.Run(operation.name+"/"+tc.name, func(t *testing.T) {
+				root := t.TempDir()
+				path := opencodeSettingsConfigPath(root)
+				var original map[string]json.RawMessage
+				if err := json.Unmarshal([]byte(tc.config), &original); err != nil {
+					t.Fatal(err)
+				}
+				original["operator-metadata"] = json.RawMessage(`{"nested":["private-value",null,{"keep":true}]}`)
+				before, err := json.Marshal(original)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, before, 0o600); err != nil {
+					t.Fatal(err)
+				}
+				capture, err := os.CreateTemp(t.TempDir(), "stderr")
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer capture.Close()
+				originalStderr := os.Stderr
+				os.Stderr = capture
+				defer func() { os.Stderr = originalStderr }()
+				if err := operation.write(path, newOpencodePlacerAt(root)); err != nil {
+					t.Fatal(err)
+				}
+				os.Stderr = originalStderr
+				output, err := os.ReadFile(capture.Name())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(tc.codes) == 0 && len(output) != 0 {
+					t.Errorf("unexpected destination diagnosis: %q", output)
+				}
+				if len(tc.codes) > 0 && strings.Count(string(output), "\n") != 1 {
+					t.Errorf("diagnosis = %q, want one line", output)
+				}
+				for _, code := range tc.codes {
+					if !strings.Contains(string(output), code) {
+						t.Errorf("diagnosis = %q, want %s", output, code)
+					}
+				}
+				if strings.Contains(string(output), "private-value") || len(output) > 512 {
+					t.Errorf("diagnosis disclosed values or exceeded its bound: %q", output)
+				}
+				after, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var got map[string]json.RawMessage
+				if err := json.Unmarshal(after, &got); err != nil {
+					t.Fatal(err)
+				}
+				for _, key := range []string{"format_version", "installed_version", "updated_at"} {
+					delete(got, key)
+				}
+				actual, err := json.Marshal(got)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Equal(actual, before) {
+					t.Errorf("destination or metadata was repaired: %s, want %s", actual, before)
+				}
+			})
+		}
 	}
 }
 
@@ -315,13 +627,9 @@ func TestOpencodeSettingsConfigPath(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: buildImportCandidate — trimmed to logs-mode only (AC-7)
+// Tests: buildImportCandidate — workspace preference only
 // ---------------------------------------------------------------------------
 
-// TestBuildImportCandidate_ReadsLogsMode verifies that buildImportCandidate
-// reads the surviving allowlisted key (logs-mode) from a raw JSON map.
-// The removed keys (language, english_learning, clickup, obsidian_tasks) are
-// intentionally not extracted — they must not appear in the written config (AC-7).
 func TestBuildImportCandidate_ReadsLogsMode(t *testing.T) {
 	seed := map[string]interface{}{
 		"logs-mode": "obsidian",
@@ -342,14 +650,12 @@ func TestBuildImportCandidate_ReadsLogsMode(t *testing.T) {
 	if cand == nil {
 		t.Fatal("buildImportCandidate returned nil")
 	}
-	if cand.logsMode != "obsidian" {
-		t.Errorf("logsMode = %q, want obsidian", cand.logsMode)
+	if cand.workspace.mode != "obsidian" {
+		t.Errorf("workspace mode = %q, want obsidian", cand.workspace.mode)
 	}
 }
 
-// TestBuildImportCandidate_AbsentLogsModeReturnsEmpty verifies that absent
-// logs-mode is returned as "" (not an error), so a sparse CC config is handled.
-func TestBuildImportCandidate_AbsentLogsModeReturnsEmpty(t *testing.T) {
+func TestBuildImportCandidate_AbsentSelectorsDefaultsLocal(t *testing.T) {
 	seed := map[string]interface{}{
 		"language": "es", // non-allowlisted key — ignored
 	}
@@ -361,8 +667,8 @@ func TestBuildImportCandidate_AbsentLogsModeReturnsEmpty(t *testing.T) {
 	}
 
 	cand := buildImportCandidate(raw)
-	if cand.logsMode != "" {
-		t.Errorf("logsMode = %q, want empty (absent key)", cand.logsMode)
+	if cand.workspace.mode != "local" || cand.workspace.selectedFrom != "default" {
+		t.Errorf("workspace = %+v, want default local", cand.workspace)
 	}
 }
 
@@ -470,9 +776,8 @@ func TestCCConfigFallback_DetectFromArbitraryPath(t *testing.T) {
 		t.Fatal("detectExistingConfig returned nil for an existing CC config")
 	}
 	cand := buildImportCandidate(m)
-	// Only logs-mode is extracted; removed fields are not read (AC-7).
-	if cand.logsMode != "obsidian" {
-		t.Errorf("logsMode = %q, want obsidian", cand.logsMode)
+	if cand.workspace.mode != "obsidian" {
+		t.Errorf("workspace mode = %q, want obsidian", cand.workspace.mode)
 	}
 }
 

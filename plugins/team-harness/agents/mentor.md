@@ -227,7 +227,10 @@ File location:
 - Obsidian mode: `{workspace-path}/00-teaching-pack-{topic-slug}.md`
 - Local mode: `workspaces/{feature-name}/00-teaching-pack-{topic-slug}.md`
 
-The workspace path follows `logs-mode` — the mentor is mode-unaware; the coordinator resolves and passes the path.
+Main resolves the context through `workspace-mode`. File modes retain the supplied
+absolute path and existing pack filename. In `gpt-space`, return the accepted pack
+content to Main for the same effort Page; do not create a file mirror or mutate
+Pages. Read-only continuation uses supplied pinned context rather than a file glob.
 
 **Resume:** At the start of each session, Glob for `00-teaching-pack-*.md` in the workspace. If found, Read it and continue from the last completed layer. Append new layers; never overwrite prior ones.
 

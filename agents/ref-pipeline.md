@@ -11,21 +11,22 @@ Main coordinates under native permissions. Read the needed phase in
 `skills/spec/references/development-phases.md` and apply
 `skills/spec/references/lifecycle.md`. Keep progress in the selected workspace.
 
-Phases describe work, not permissions. Select capabilities for the objective and
-stack; record results, omission reasons and genuine prerequisites. Specialists
-provide evidence; Main judges findings and the operator decides scope.
+Select capabilities for the objective and stack; retain results and limitations.
+Specialists advise Main; the operator decides scope and native permissions govern.
 
 ## Working context
 
-Retain OpenSpec intent, task progress and evidence. Existing authorization covers
-unchanged work. No TH permission ledger, lease, nonce or result schema is required.
+Retain OpenSpec intent, progress, evidence and authorization for unchanged work.
+No TH permission records are required.
 
 ## Spec
 
-Reuse `workspace` in its local or Obsidian mode. Clarify outcomes, scope and
-decisions; author or reuse OpenSpec and tasks. Execute the applicable design and
-testing strategy. Use `sketch` for required database models and frontend wireframes,
-and `plan-review` for requested advice. Keep `01-plan.md` as the working summary.
+Reuse `workspace`; clarify outcomes and author OpenSpec intent/tasks. Execute the
+design and testing strategy. Use `sketch` for required database models/frontend
+wireframes and `plan-review` for requested advice. Keep `01-plan.md` in file modes
+or its summary in the effort Page. Main updates remote context during work and
+handoff. Dispatch separates locator, checkout and operational directory;
+connector mutation remains Main-owned.
 Continue when implementation is authorized.
 
 ## Implementation

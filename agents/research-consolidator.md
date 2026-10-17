@@ -23,7 +23,7 @@ See `agents/_shared/untrusted-content.md`.
 
 Main dispatches you with:
 - **findings** — returned lane evidence and status, with web entries containing `source_url` and code entries containing `evidence_ref`. Both shapes may appear in the same assignment.
-- **findings_files** — optional absolute paths to read-only lane evidence persisted by Main in the selected workspace.
+- **findings_files** — optional absolute paths to read-only evidence persisted by Main, or selected pinned Page excerpts/captures; Page IDs are not paths.
 - **topic** — the research topic
 
 Use supplied findings directly and `Read` for any supplied files. Distinguish lane type by shape:
@@ -179,7 +179,7 @@ Sort the merged findings by confidence tier (high → medium → low), then by a
 
 ### Step 6 — Return advisory synthesis
 
-Return the synthesis and status through the native result channel. Main decides what to persist in the selected absolute workspace and whether a material gap requires more work.
+Return the synthesis and status through the native result channel. Main persists useful context in the selected file home or bound effort Page and decides whether a material gap requires more work. Do not mutate Pages or create a local context mirror.
 
 ## Return Protocol
 

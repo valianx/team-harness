@@ -4,6 +4,8 @@ import { lstat, readdir } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
+import { validateContextBinding } from "../../workspace/scripts/workspace-context.mjs";
+import { selectSpaceEffort } from "../../workspace/scripts/space-context.mjs";
 
 const SAFE_SEGMENT = /^[A-Za-z0-9._-]+$/;
 const DATED_WORKSPACE = /^\d{4}-\d{2}-\d{2}_(.+)$/;
@@ -87,6 +89,30 @@ export async function resolveWorkspace({ basePath, feature } = {}) {
     state_available: await regularFile(state),
     candidates: names,
   };
+}
+
+/** Resolve retained file or native Page context without creating a destination. */
+export async function resolveContextWorkspace({ binding, remoteCandidates, listingComplete = false } = {}) {
+  const validated = validateContextBinding(binding);
+  if (validated.status !== "ready") return { ...validated, binding, create_allowed: false };
+  const context = validated.binding.context;
+  if (context.kind === "file") {
+    return resolveWorkspace({ basePath: path.dirname(context.path), feature: path.basename(context.path) });
+  }
+  const selected = selectSpaceEffort({
+    containerId: context.container_page_id,
+    boundEffortId: context.effort_page_id,
+    sourceAssociations: context.source_associations,
+    candidates: remoteCandidates,
+    listingComplete,
+  });
+  if (selected.status === "ready" && selected.page.container_space_id !== context.space_id) {
+    return { status: "destination-conflict", reason_code: "bound_effort_space_conflict", binding: validated.binding, create_allowed: false };
+  }
+  return { ...selected, binding: validated.binding, create_allowed: false,
+    ...(selected.status === "ready" ? { handoff: {
+      kind: "gpt-space", page_id: context.effort_page_id, url: context.url, section: "Session Handoff",
+    } } : {}) };
 }
 
 function parseArguments(argv) {

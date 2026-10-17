@@ -8,11 +8,11 @@ TH provides context and delivery scope; upstream owns the authoring method.
 ## Acquire or reuse the owner resource
 
 Reuse a readable, independently owned checkout when available. Otherwise, when
-dependency preparation is authorized, clone the official repository into an
-isolated external provider directory, such as `workspace/providers/frontend-slides`.
+dependency preparation is authorized, clone the official repository into a
+declared real local operational directory, such as `<operational-directory>/providers/frontend-slides`.
 Inspect an existing checkout's origin and revision; preserve its changes.
 Record the actual repository URL, resolved commit and resource path in the
-workspace's research note. Do not assume that a historical research commit is
+bound context. Do not assume a historical research commit is
 the current installed method or reset an independently owned checkout.
 
 Read that checkout's `SKILL.md` and the resources its applicable route requires.
@@ -29,8 +29,8 @@ Reuse settled context and identity; resolve material choices with the actual
 content. Upstream defaults for editing, export, wheel handlers or deployment
 apply only when they fit the requested effects and interaction context.
 
-Keep the authored deck at the explicit target and source provenance/captures in
-the workspace. Do not vendor the upstream skill or install every host runtime.
+Keep the deck at its explicit target and captures in declared local storage;
+Main retains provenance in the context. Do not vendor upstream or install every runtime.
 Its standalone HTML recipe does not justify replacing an existing application's
 React/Vue components or presentation engine.
 

@@ -7,14 +7,13 @@ color: cyan
 
 # Initiative coordination
 
-Main coordinates related projects without spawning another orchestrator.
-Use these sections only for an initiative.
+Main coordinates initiatives without another orchestrator.
 
 ## Initiative path composition
 
-Use the installed workspace skill and its identity helper. Reuse the existing
-absolute local/Obsidian home rather than recomputing a dated path. Each service
-may keep notes below that shared home; no duplicate local workspace is needed.
+Use `workspace` and its identity helper. Reuse the file home or verified effort
+Page. Remote initiatives need no sibling paths. Dispatch separates locator,
+checkout and operational storage; Main persists remote returns.
 
 ## Repo-identity verification
 
@@ -24,16 +23,15 @@ another service solely because its path differs.
 
 ## Multi-project sequencing
 
-Record each repository, objective and dependency in the overview. Keep dependent
-changes sequential, especially while a shared contract is changing. Independent
-bounded tasks may be delegated with explicit ownership. Use separate branches
-and PRs where repository boundaries require them; honor the requested delivery
-grouping. Reuse the approved sequence and ask only for an unresolved decision.
+Record repositories, objectives and dependencies in the overview. Keep dependent
+changes sequential; delegate independent work with explicit ownership. Repository
+boundaries require separate branches/PRs; preserve approved grouping and sequence.
 
 ## overview.md — you are the sole writer
 
 Main keeps the initiative overview coherent and updates one row per project
-after meaningful progress. Reuse the same file rather than versioned siblings.
+after meaningful progress. Reuse the same file or logical overview in the bound
+effort Page rather than versioned siblings. Remote mode needs no local overview.
 
 ### Template (obsidian shown; local omits the obsidian-only frontmatter keys)
 

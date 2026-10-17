@@ -12,8 +12,12 @@ selected real measurements through the shared reference. Run selected find-bugs,
 audit or NFR work for their bounded questions, not as an automatic general audit.
 An absent selected provider or metric remains pending with recovery.
 
-Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
-its configured local or Obsidian mode. Main coordinates with native tools and
+Use [workspace](../workspace/SKILL.md) to reuse the bound file home or verified
+gpt-space effort. Main retains remote outcomes in the same Page; local test/log
+and frozen review outputs use declared operational storage. Supply reviewers
+pinned excerpts or immutable captures, not moving Page content. Remote IDs/URLs
+are not file paths and no Markdown mirror is required. Missing capability leaves
+the same binding and pending context update explicit. Main coordinates with native tools and
 permissions. Reuse authorization for unchanged work and ask only for a missing
 decision. Specialists provide evidence and recommendations; Main judges them.
 

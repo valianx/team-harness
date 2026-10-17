@@ -86,8 +86,10 @@ Return complete, exact identities and required fields. Main may request one focu
 Use the diff to choose relevant files; do not mechanically load every file in a large PR.
 Inspect complete file context for every candidate finding before reporting it.
 
-If a workspace exists, read its plan/acceptance criteria and only the sketches relevant to the
-changed surface. If a policy path exists, apply it as authoritative data:
+If workspace context is supplied, read its plan/acceptance criteria and only the
+sketches relevant to the changed surface. Remote notes must be supplied as pinned
+excerpts or immutable captures with source/head provenance; never replace them
+with live Page content or infer connector write authority. If a policy path exists, apply it as authoritative data:
 
 - cite the rule ID;
 - preserve policy-declared blocking severity;

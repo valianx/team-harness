@@ -106,7 +106,28 @@ try {
   assert.equal(existsSync(boundSnapshot), false, "relative TH_WORKSPACE must skip snapshot");
   assert.equal(existsSync(boundBreadcrumb), false, "relative TH_WORKSPACE must skip breadcrumb");
 
-  console.log("workspace-bound-hooks: PASS");
+  const uninitialized = join(root, "operational-only");
+  mkdirSync(uninitialized);
+  const remoteIdDirectories = ["page_remote", "space_remote"].map(id => join(cwd, id));
+  for (const directory of remoteIdDirectories) {
+    mkdirSync(directory);
+    writeFileSync(join(directory, "00-state.md"), "not an operational binding\n");
+  }
+  for (const binding of [undefined, "page_remote", "space_remote", "https://chatgpt.com/space/page_remote", "gpt-space:page_remote", uninitialized]) {
+    run(startHook, startPayload, binding);
+    run(traceHook, stopPayload, binding);
+    run(snapshotHook, compactPayload, binding);
+    for (const filename of ["00-state.md", "00-subagent-trace.jsonl", "00-state.precompact-snapshot.md", "00-precompact.jsonl"]) {
+      assert.equal(existsSync(join(uninitialized, filename)), false, `${binding}: no optional output or fabricated state`);
+    }
+    for (const directory of [bound, discovered, ...remoteIdDirectories]) {
+      for (const filename of ["00-subagent-trace.jsonl", "00-state.precompact-snapshot.md", "00-precompact.jsonl"]) {
+        assert.equal(existsSync(join(directory, filename)), false, `${binding}: no fallback to ${directory}`);
+      }
+    }
+  }
+
+  console.log("workspace-bound-hooks: PASS (9 binding cases)");
 } finally {
   rmSync(root, { recursive: true, force: true });
 }

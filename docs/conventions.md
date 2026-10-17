@@ -12,7 +12,9 @@ A workspace is the shared context home for an effort, including substantive dire
 work. Use the [workspace skill](../skills/workspace/SKILL.md) across flows; pipeline
 identity and state apply only to pipeline work. Agents share useful artifacts and
 the operator uses the workspace as a review surface. Local
-`workspaces/` is always git-ignored; Obsidian mode creates no local duplicate.
+`workspaces/` is always git-ignored; Obsidian and remote modes create no local
+context duplicate. Remote narrative examples below are logical sections in the
+bound effort Page, persisted by Main; file-only outputs use separate local storage.
 
 Beyond the root-tier docs (`00-state.md`, `01-plan.md`, `02-implementation.md`, `03-testing.md`, etc.), a workspace groups related artifacts under subfolders created implicitly on first `Write`: `plan/` for architecture, delivery, conditional invariants, and per-task shards; `sketches/` for plan-stage sketches; `research/` for research-family artifacts; and `reviews/` for review-family reports. Basenames never change merely because of grouping except where `docs/plan-shards.md` defines the plan layout.
 
@@ -60,14 +62,18 @@ This rule is mirrored in `docs/voice-guide.md § Operator-Supplied Content Bound
 
 ## Workspace selection
 
-`logs-mode` directly selects one canonical workspace on every runtime. The
-coordinator resolves it once, forwards it to every subagent, and recovery reads
-that recorded path without copying or reconciling roots.
+`workspace-mode` selects `local`, `obsidian` or `gpt-space`; valid legacy
+`logs-mode` is read only when the canonical key is absent. Existing bindings win.
+Dispatch separates context locator, checkout and optional operational directory.
+Recovery reuses the exact identity without copying or reconciling roots.
 
 - **local**, single repo — `{repo-root}/workspaces/{YYYY-MM-DD}_{feature}`.
 - **obsidian**, single repo — `{logs-path}/{logs-subfolder}/{repo-name}/{YYYY-MM-DD}_{feature}`.
 - **local**, initiative — `{common-repository-parent}/{YYYY-MM-DD}_{initiative}`.
 - **obsidian**, initiative — `{logs-path}/{logs-subfolder}/{repo_base}/{YYYY-MM-DD}_{initiative}`.
+- **gpt-space** — one verified source-bound effort Page beneath the selected
+  Space's `workspace` container. Main maintains context during work and at handoff;
+  no sibling-repository path is required and no local Markdown mirror is created.
 
 Initiatives have one coordinator root and one `00-state.md`; service artifacts
 live below it. Writable product files and editable service-owned OpenSpec remain
@@ -78,7 +84,7 @@ There is no separate `obsidian-direct` mode and no one-way export for new
 runs. Legacy state that already records `obsidian_sync: armed|pending|exported`
 remains recoverable without migration.
 
-The operator switches modes via `/th:setup` or a session override in `00-state.md`.
+Setup explicitly changes defaults; an existing effort is not migrated by that change.
 
 ## Installer file overwrite behavior
 
@@ -88,18 +94,21 @@ Agents, skills, and hooks in `~/.claude/` are canonical bytes from this repo. Di
 - Backs up `~/.claude.json` before every merge.
 - Presents a Keep/Change preservation menu for operator-specific identity (`mcpServers.memory` URL/bearer, context7 API key) — these are never silently clobbered.
 
-## Single config file — `~/.claude/.team-harness.json`
+## Native runtime settings
 
-All Team Harness settings live in one file: `logs-mode`, `logs-path`, `logs-subfolder`, installer manifest, version metadata, and skill-specific keys (e.g., ClickUp under `clickup`).
+Use the active runtime's `.team-harness.json`: Claude's `~/.claude`, Codex's
+`${CODEX_HOME:-$HOME/.codex}`, or OpenCode's selected native config root. Preserve
+`logs-path`/`logs-subfolder` for Obsidian. Remote setup persists only non-secret
+`workspace-space-id` and `workspace-container-page-id` after native verification.
 
 Rules for contributors:
-- Skills MUST NOT create their own config files in `~/.claude/` — use namespaced keys inside `.team-harness.json`.
+- Skills MUST NOT create competing settings files — use the active native document.
 - Every write is a merge: read the full document, replace only the owned key, write the whole document back. Never write a partial payload.
 - Exception: `~/.claude/settings.json` is Claude Code's own file and is managed separately by the harness.
 
 ## Obsidian-mode diagram embedding
 
-In `logs-mode: obsidian`, diagram generation works as follows:
+In `workspace-mode: obsidian` (or its legacy alias), diagram generation works as follows:
 
 - **D2** — renders via the `d2` CLI to SVG; the SVG file is written into the canonical workspace folder and an `![[…]]` embed appended to `05-diagram.md`.
 - **LikeC4** — renders via `npx likec4 export png` to PNG; same embed pattern.

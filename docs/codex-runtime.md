@@ -102,8 +102,13 @@ read-only defaults remain part of those roles. Setup/update preserve existing
 operator preferences, including values installed by older TH versions; they do
 not reset them or add cache and vault paths to native permissions.
 
-Workspace/Obsidian selection remains a TH preference resolved by the existing
-workspace mechanism. A configured path is a destination, not a permission grant.
+`workspace-mode: local | obsidian | gpt-space` resolves through the shared
+workspace skill. TH 3.48.0 supports remote context through current native Codex
+Pages; this does not provision a connector for other hosts. Setup verifies the
+Space root and its `workspace` container before saving their non-secret IDs.
+Existing bindings and legacy file preferences remain readable. Main persists
+remote narrative returns; file tools receive separate local operational storage.
+A configured destination is not a permission grant.
 When a real write fails, report the affected target and available native remedy.
 Use native permission controls for an explicitly requested access change; do not
 treat a different policy or unavailable activation evidence as update failure.

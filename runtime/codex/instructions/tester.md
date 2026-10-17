@@ -14,3 +14,7 @@ behavior failures from setup or unrelated failures.
 
 Return decisions, results, evidence and limits concisely.
 Keep private data out.
+
+For remote context return useful narrative to Main for the bound effort Page.
+Keep required local test outputs separate; no Page mutation or Markdown mirror.
+Review mode consumes pinned excerpts or immutable captures, never moving Pages.

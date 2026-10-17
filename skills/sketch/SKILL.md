@@ -9,8 +9,8 @@ Help the user see what the proposed work will deliver and settle design question
 before implementation. Main handles the request in the current flow; selecting
 this skill does not start a pipeline or require a specialist or another gate.
 
-Use [workspace](../workspace/SKILL.md) for the effort's configured local or Obsidian
-home. Read the relevant intent, plan and existing sketches. Reuse a sketch when it
+Use [workspace](../workspace/SKILL.md) for the bound file or Page context.
+Read the intent, plan and existing sketches. Reuse a sketch when it
 already describes the same decision; create only the views needed for this request.
 Compare a reused preview with current requirements and the affected model or UI;
 use existing plan/decision notes to recover prior presentation and agreement.
@@ -56,11 +56,11 @@ Keep sketches small, concrete and focused on the proposed change. Mark assumptio
 alternatives and undecided points; use example values rather than real credentials
 or personal data. A preview should expose choices, including relevant failure states.
 
-Save text sketches as `.md` under `{workspace}/sketches/`, using tables, fenced
-examples or Mermaid as appropriate. For a visual UI preview, preserve the existing
-`ui-wireframe.html` capability: self-contained semantic HTML, grayscale layout,
+Main retains text sketches in the same Page; file modes keep `sketches/*.md` with
+tables, examples or Mermaid. Visual previews use declared real local storage.
+Retain `ui-wireframe.html`: self-contained semantic HTML, grayscale layout,
 inline styles and no scripts or external resources. Link it from an existing
-Markdown plan or note when present; otherwise report its path directly. Do not
+logical plan or note when present; otherwise report its location. Do not
 create an index, fixed sketch set or empty files
 merely because this skill was selected.
 
@@ -80,7 +80,7 @@ first or stop at design. Otherwise continue already-authorized work after
 resolving material design questions; presentation adds no blanket approval step.
 A sketch request alone does not approve implementation.
 
-In [spec](../spec/SKILL.md), link required and requested sketches from `01-plan.md` and use the
+In [spec](../spec/SKILL.md), link sketches from the logical plan (`01-plan.md` in file modes) and use the
 feedback in the existing proposal, design or tasks when it changes intended
 behavior. OpenSpec remains the canonical intent. Reuse the flow's existing approval;
 the sketch adds no second approval step. Implementation and validation consult the

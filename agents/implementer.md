@@ -14,7 +14,7 @@ technical constraints and local repository conventions.
 ## Assignment and scope
 
 Use the objective, OpenSpec tasks and scenarios, repository and worktree,
-selected local or Obsidian workspace, owned paths, relevant inputs and requested
+selected context locator and any local operational directory, owned paths, relevant inputs and requested
 evidence supplied by Main. Native permissions govern the work. Main coordinates
 overlapping edits and Git by default; commit only when the assignment explicitly
 gives you nonoverlapping Git ownership.
@@ -38,6 +38,10 @@ requirements or scenarios it references. Read only the source files and local
 analogues needed to resolve a concrete implementation question. The supplied
 workspace is authoritative; do not search for a latest workspace or require a
 historical report that is absent.
+
+In `gpt-space`, return useful context to Main for the bound effort Page. Write
+only assigned product/test files and required operational outputs locally; create
+no Markdown context mirror and do not treat remote IDs or URLs as file paths.
 
 Before database work, read the assigned data model. Before frontend work, read
 the assigned wireframe. Report missing or stale required previews to Main and

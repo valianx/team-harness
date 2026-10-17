@@ -220,6 +220,46 @@ class ConvergenceFixture(unittest.TestCase):
         self.assertEqual(list(self.plugin.parent.glob(".*.team-harness-link-*")), [])
         self.assertIn((CODEX_BIN, "mcp", "list", "--json"), native.calls)
 
+    def test_workspace_maintenance_preserves_selection_and_reports_bounded_diagnostics(self) -> None:
+        settings = self.codex_home / ".team-harness.json"
+        workspace_keys = {
+            "workspace-mode", "logs-mode", "logs-path", "logs-subfolder",
+            "workspace-space-id", "workspace-container-page-id",
+        }
+        cases = [
+            ({"logs-mode": "obsidian", "logs-path": str(self.base / "vault"), "logs-subfolder": "TH"}, []),
+            ({"workspace-mode": "gpt-space", "workspace-space-id": "space_one", "workspace-container-page-id": "page_one"}, []),
+            ({"workspace-mode": "gpt-space", "workspace-space-id": "space_one"}, ["incomplete_space_destination"]),
+            ({"workspace-mode": "local", "logs-mode": "obsidian"}, ["selector_conflict"]),
+            ({"workspace-mode": None, "logs-mode": "local"}, ["invalid_workspace_mode", "selector_conflict"]),
+        ]
+        for preference, diagnostics in cases:
+            with self.subTest(preference=preference):
+                settings.write_text(json.dumps({**preference, "opaque": {"keep": [1, 2]}}), encoding="utf-8")
+                native = FakeCodex()
+                first = self.converge(native)
+                self.assertIsNone(first["failedDomain"])
+                self.assertEqual(first["domains"]["config"]["workspaceDiagnostics"], diagnostics)
+                persisted = json.loads(settings.read_text(encoding="utf-8"))
+                self.assertEqual({key: value for key, value in persisted.items() if key in workspace_keys}, preference)
+                self.assertEqual(persisted["opaque"], {"keep": [1, 2]})
+                before = settings.read_bytes()
+                native.calls.clear()
+                second = self.converge(native)
+                self.assertEqual(second["status"], "current")
+                self.assertEqual(second["domains"]["config"]["workspaceDiagnostics"], diagnostics)
+                self.assertEqual(settings.read_bytes(), before)
+                self.assertEqual(native.calls, [(CODEX_BIN, "features", "list"), (CODEX_BIN, "mcp", "list", "--json")])
+
+    def test_receipt_rejects_unbounded_workspace_diagnostics(self) -> None:
+        receipt = self.converge(FakeCodex())
+        for diagnostics in (["operator-supplied-value"], ["selector_conflict", "selector_conflict"], "selector_conflict"):
+            with self.subTest(diagnostics=diagnostics):
+                changed = json.loads(json.dumps(receipt))
+                changed["domains"]["config"]["workspaceDiagnostics"] = diagnostics
+                with self.assertRaisesRegex(CONVERGE.ConvergenceError, "RECEIPT_SCHEMA_INVALID"):
+                    CONVERGE.validate_receipt(changed)
+
     def test_existing_alias_path_is_preserved_without_claiming_restart(self) -> None:
         self.converge(FakeCodex(), authorize_runtime=True)
         args = self.args()

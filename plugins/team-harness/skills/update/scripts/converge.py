@@ -39,9 +39,14 @@ NON_FATAL_ALIAS_WARNING = (
     "WARNING: proceeding, even though we could not create PATH aliases: "
     "Read-only file system (os error 30)"
 )
+WORKSPACE_DIAGNOSTICS = frozenset({
+    "selector_conflict", "invalid_workspace_mode", "invalid_logs_mode",
+    "incomplete_space_destination", "invalid_space_destination",
+    "incomplete_obsidian_destination", "invalid_obsidian_destination",
+})
 HELPER_DIGESTS = {
     "skills/update/scripts/bridge_snapshot.py": "52da3ca0233c3d9f145a46a9f0b6648aa65f01bd867cd4d7b0870053b8f2f99d",
-    "skills/setup/scripts/manage_config.py": "936a00fbe9977760b10014c980dc0a7db72d5164318fe433d57c5f50ea81b180",
+    "skills/setup/scripts/manage_config.py": "8023662302f8e36a14caac4e7361c0a6fc29797f98da4aa94e973a7eb37ba5af",
     "skills/setup/scripts/manage_agents.py": "c1fe6c68b5e8e373036db4ba18de0135a996a9063af3138526c87b034186f240",
 }
 
@@ -477,7 +482,7 @@ def validate_receipt(receipt: object) -> dict[str, object]:
         raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
     domain_keys = {
         "bridge": {"status", "bridgeStatus", "restartRequired"},
-        "config": {"status", "added", "removedLegacySelectors", "restartRequired"},
+        "config": {"status", "added", "removedLegacySelectors", "workspaceDiagnostics", "restartRequired"},
         "features": {"status", "changed", "required", "restartRequired"},
         "agents": {"status", "scope", "changedCount", "customDefaultsPreserved", "restartRequired"},
         "mcp": {"status", "registeredCount", "missingExpected", "restartRequired"},
@@ -508,6 +513,13 @@ def validate_receipt(receipt: object) -> dict[str, object]:
         value = domains["config"].get(name, [])
         if not isinstance(value, list) or len(value) > MAX_LIST_ITEMS or any(not isinstance(item, str) for item in value):
             raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
+    diagnostics = domains["config"].get("workspaceDiagnostics", [])
+    if (
+        not isinstance(diagnostics, list) or len(diagnostics) > len(WORKSPACE_DIAGNOSTICS)
+        or any(not isinstance(item, str) or item not in WORKSPACE_DIAGNOSTICS for item in diagnostics)
+        or len(diagnostics) != len(set(diagnostics))
+    ):
+        raise ConvergenceError("RECEIPT_SCHEMA_INVALID")
     for name in ("changed", "required"):
         value = domains["features"].get(name, [])
         if not isinstance(value, list) or len(value) > MAX_LIST_ITEMS or any(item not in REQUIRED_FEATURES for item in value):
@@ -641,6 +653,7 @@ def run_convergence(
             "status": "changed" if result["changed"] else "current",
             "added": result["added"],
             "removedLegacySelectors": result["removedLegacySelectors"],
+            "workspaceDiagnostics": result["workspaceDiagnostics"],
             "restartRequired": False,
         }
 

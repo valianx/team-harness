@@ -184,7 +184,7 @@ echo
 echo "############################################################"
 echo "# Suite 3h: Codex update single-pass convergence"
 echo "############################################################"
-if [ -n "$PY" ] && $PY "$TESTS_DIR/test_codex_update_convergence.py" && $PY "$TESTS_DIR/test_codex_binary_resolution.py"; then
+if [ -n "$PY" ] && $PY "$TESTS_DIR/test_workspace_config.py" && $PY "$TESTS_DIR/test_codex_update_convergence.py" && $PY "$TESTS_DIR/test_codex_binary_resolution.py"; then
     echo "codex-update-convergence: PASS"
 elif [ -z "$PY" ]; then
     echo "codex-update-convergence: FAIL (Python 3 not found)"
@@ -330,6 +330,8 @@ fi
 run_node_suite "workspace-preflight" "test_workspace_preflight.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "version-preflight" "test_version_preflight.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "workspace-identity" "test_workspace_identity.mjs" "node not found — install Node.js to run this suite"
+run_node_suite "workspace-context" "test_workspace_context.mjs" "node not found — install Node.js to run this suite"
+run_node_suite "space-context" "test_space_context.mjs" "node not found — install Node.js to run this suite"
 
 echo
 echo "############################################################"

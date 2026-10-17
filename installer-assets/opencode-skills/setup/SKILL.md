@@ -19,10 +19,35 @@ The native installer keeps the model-less baseline by default and leaves the
 active provider/model to opencode. Apply `--opencode-tier <provider>` only when
 the operator explicitly requests a curated provider projection; the option is
 provider-scoped and is not a setup default. Non-interactive installation uses
-local logs by default and does not offer an Obsidian selector; configure a
+matching canonical/legacy local selectors only when neither exists; configure a
 workspace destination explicitly through the selected runtime. Preserve
 existing MCP entries and configure Context7 only when selected. Team Harness
 does not provision Memory or Context Harness credentials.
+
+## Workspace preferences
+
+Use [workspace](../workspace/SKILL.md) and preserve an effort binding before
+defaults. Own-key presence of `workspace-mode: local | obsidian | gpt-space`
+is authoritative even when invalid; only absence permits valid legacy
+`logs-mode: local | obsidian`. When neither selector is present, default to local.
+Diagnose invalid or conflicting selectors once without repair or local fallback.
+Explicit local/Obsidian setup writes matching selectors. Imports treat selectors
+and their mode-specific destination as one group; native preference data wins
+across alias names. Installer reapply/update preserves representation, incomplete
+remote IDs and unrelated settings and never contacts Pages.
+
+`gpt-space` requires TH 3.48.0 and actual native Pages capability. This release
+supports capable Codex hosts; OpenCode retains existing `workspace-space-id` and
+`workspace-container-page-id` and reports remote access/read/write unavailable.
+Do not claim working remote setup here, invent endpoints, request tokens or
+provision a connector. Future verified setup must follow
+[native Space setup](../workspace/references/native-space.md), including actual
+root/container title/parent/membership readback before persisting both opaque
+IDs, removal of stale `logs-mode`, and separate configured/access/read/write
+outcomes. A remote result followed by failed local persistence is partial
+readiness; retain observed IDs rather than create another container. Do not claim
+older readers support the new selector. Local operational storage never becomes
+a second Markdown context home.
 
 ## Upstream provider route
 

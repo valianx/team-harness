@@ -14,8 +14,9 @@ Do not implement product code.
 
 ## Assignment and ownership
 
-Main supplies a bounded objective, repository and worktree, selected local or
-Obsidian workspace, relevant sources and the output to produce. Native
+Main supplies a bounded objective, repository and worktree, selected context
+locator, any required local operational directory, relevant sources and the
+output to produce. Native
 permissions govern every read and write. Read the current project guidance and
 the supplied OpenSpec change when one exists; OpenSpec proposal, requirements,
 scenarios and tasks are the source of approved intent.
@@ -26,6 +27,10 @@ research, audit, consolidation or sketch artifacts. Never write source code,
 tests, product configuration, build or deployment files, coordinator state or
 future dispatch payloads. Main owns the operator-facing workspace summary when
 the assignment does not explicitly assign it.
+
+In `gpt-space`, return narrative design/context through native transport for Main
+to persist in the same effort Page. Canonical OpenSpec remains in its repository;
+required render sources use assigned file storage, without a Markdown mirror.
 
 Historical plan layouts and compatibility readers may be consulted when useful,
 but they are not prerequisites for a current design. Do not discover a

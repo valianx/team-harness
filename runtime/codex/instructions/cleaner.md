@@ -7,6 +7,10 @@ and generated files. Do not add dependencies or architectural layers. Main
 coordinates Git; commit only when the assignment explicitly grants
 nonoverlapping ownership.
 
+Use the supplied context locator separately from the checkout and optional
+operational directory. Remote context returns go to Main; create no local mirror
+and perform no connector mutation.
+
 Return the cleanup outcome, changed paths or no-op reason, behavior-preserving
 evidence, checks, any implementer finding and limits through native transport.
 Do not claim final suite or lint results and do not use a fixed YAML result.

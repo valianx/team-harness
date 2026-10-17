@@ -4,8 +4,8 @@
 The current general agent coordinates one analysis effort. Resolve the project
 from supplied paths or unambiguous existing context; ask only for a material
 missing target or decision while continuing independent work. Use
-[workspace](../workspace/SKILL.md) to reuse its absolute local or Obsidian home,
-operator language, context and authorized endpoint.
+[workspace](../workspace/SKILL.md) to reuse its bound file or Page context,
+operator language and authorized endpoint.
 
 Record repositories and snapshots, effective environments, critical capabilities,
 requested emphasis and delivery grouping/format/location/access. Assess every
@@ -34,11 +34,11 @@ Follow critical capabilities across entry, actors, contracts, state/data,
 consumers and dependencies through their expected outcomes, including material
 success and failure/recovery scenarios. Execute appropriate controlled local
 checks and synthetic reproductions; retain actual outputs and their limits.
-Working probes belong in the workspace, not the audited product.
+Working probes require declared real local operational storage outside the product.
 
 Main consolidates causes, dispositions, coverage and improvements using the
 project audit method and [write-documents](../write-documents/SKILL.md). The
-default principal result is **`00-full-audit.md`** in the selected workspace:
+principal result is retained by Main in the same Page, or **`00-full-audit.md`** in file modes:
 one integral report with findings, improvement opportunities and optimizations.
 Incorporate or link useful lens annexes and actual evidence; do not publish a
 document per specialist by default. Honor requested grouping or format.
@@ -49,7 +49,7 @@ adequate independent coverage for packaging. Use
 [deliver](../deliver/SKILL.md) and the format/provider owner only for an already
 authorized external destination; verify the requested object/action/access.
 
-Present the report path and principal decisions with explicit limits. Completion
+Present the report location and principal decisions with explicit limits. Completion
 means the declared investigation and consolidation finished; it does not mean
 every control passed or the product is certified. This invocation does not
 authorize repairs, production attacks/load, cloud changes, broader permissions,

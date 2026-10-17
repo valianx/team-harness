@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "space_id": "space_example",
+  "root_page_id": "page_root",
+  "container": {
+    "page_id": "page_workspace",
+    "title": "workspace",
+    "parent": {"page_id":"page_root","title":"Team Harness"},
+    "drive_scope": "space",
+    "drive_space_id": "space_example",
+    "deleted_at": null,
+    "access": {"can_read":true,"can_write":true},
+    "url": "https://chatgpt.com/space/page_workspace"
+  },
+  "source_associations": [
+    {"kind":"repository","identity":"repository:merchant","role":"writable-owner","verified":true,"host_paths":[{"host":"laptop","path":"/projects/merchant"}]},
+    {"kind":"repository","identity":"repository:reference","role":"evidence-only","verified":true}
+  ],
+  "effort": {
+    "page_id": "page_effort",
+    "title": "Payment flow",
+    "parent": {"page_id":"page_workspace","title":"workspace"},
+    "drive_scope": "space",
+    "drive_space_id": "space_example",
+    "deleted_at": null,
+    "access": {"can_read":true,"can_write":true},
+    "url": "https://chatgpt.com/space/page_effort",
+    "container_space_id": "space_example",
+    "provenance_complete": true,
+    "source_associations": [
+      {"kind":"repository","identity":"repository:merchant","role":"writable-owner","verified":true,"host_paths":[{"host":"build-host","path":"/different/checkout/name"}]}
+    ]
+  },
+  "complete_absence": [
+    {"items":[],"next_cursor":"cursor_second","partial_results":false,"incomplete_reasons":[]},
+    {"items":[],"next_cursor":null,"partial_results":false,"incomplete_reasons":[]}
+  ],
+  "continuing_empty": [
+    {"items":[],"next_cursor":"cursor_more","partial_results":false,"incomplete_reasons":[]}
+  ],
+  "partial_empty": [
+    {"items":[],"next_cursor":null,"partial_results":true,"incomplete_reasons":["content_failed"]}
+  ],
+  "unknown_completeness": [
+    {"items":[],"next_cursor":null}
+  ],
+  "unavailable_listing": [{"error":{"code":"permission_denied","message":"Access unavailable"}}]
+}

@@ -31,7 +31,9 @@ Main accounts for reused and newly requested coverage together in the existing
 report without inventing helper returns or a new reviewer pass.
 Main consolidates duplicate findings and checks their supporting evidence against the anchored candidate before changing code. Preserve unresolved
 disagreements and coverage limits. The summary is factual evidence; it does not decide closure or publication. Reviewers do not edit files or publish anything. Main writes
-`reviews/pre-pr-review.md` in the existing common workspace and links it from `01-plan.md`; in Obsidian mode both remain there, without a repository-local duplicate.
+the logical review in the bound Page and links it from the plan; file modes retain
+`reviews/pre-pr-review.md` and `01-plan.md`. File-only review helpers/captures use
+declared local operational storage; reviewers receive pinned excerpts or captures.
 
 For a failed reviewer, diagnose the observed cause and preserve useful work. Use a
 supported focused recovery when likely to help; a separate CLI run is optional.

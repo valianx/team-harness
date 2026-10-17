@@ -15,6 +15,9 @@ from typing import Any
 
 
 ALLOWED_KEYS = {
+    "workspace-mode",
+    "workspace-space-id",
+    "workspace-container-page-id",
     "logs-mode",
     "logs-path",
     "logs-subfolder",
@@ -26,10 +29,15 @@ ALLOWED_KEYS = {
     "agent-scope",
 }
 DEFAULTS = {
-    "logs-mode": "local",
     "english_learning": False,
     "agent-scope": "global",
 }
+WORKSPACE_KEYS = frozenset({
+    "workspace-mode", "logs-mode", "logs-path", "logs-subfolder",
+    "workspace-space-id", "workspace-container-page-id",
+})
+WORKSPACE_ID_KEYS = frozenset({"workspace-space-id", "workspace-container-page-id"})
+OPAQUE_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,255}")
 LEGACY_SELECTOR_KEYS = frozenset({
     "lane_autoselect", "lane", "profile", "posture", "mode", "express",
     "full", "fast", "fast_mode", "simple", "simple_mode", "tier",
@@ -117,11 +125,11 @@ def read_json(path: Path, *, missing_ok: bool = True) -> dict[str, Any]:
     return value
 
 
-def get_nested(doc: dict[str, Any], dotted: str) -> Any:
+def get_nested(doc: dict[str, Any], dotted: str, default: Any = None) -> Any:
     current: Any = doc
     for part in dotted.split("."):
         if not isinstance(current, dict) or part not in current:
-            return None
+            return default
         current = current[part]
     return current
 
@@ -152,6 +160,80 @@ def remove_nested(doc: dict[str, Any], dotted: str) -> None:
     for parent, part in reversed(parents):
         if parent.get(part) == {}:
             parent.pop(part)
+
+
+def _json_equal(left: Any, right: Any) -> bool:
+    if type(left) in {int, float}:
+        return type(right) in {int, float} and left == right
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(_json_equal(left[key], right[key]) for key in left)
+    if isinstance(left, list):
+        return len(left) == len(right) and all(_json_equal(a, b) for a, b in zip(left, right))
+    return left == right
+
+
+def resolve_workspace_preference(doc: dict[str, Any]) -> dict[str, Any]:
+    """Resolve selector presence without repairing or changing operator state."""
+    canonical = "workspace-mode" in doc
+    legacy = "logs-mode" in doc
+    selected_from = "workspace-mode" if canonical else "logs-mode" if legacy else "default"
+    value = doc[selected_from] if selected_from != "default" else "local"
+    conflict = canonical and legacy and not _json_equal(doc["workspace-mode"], doc["logs-mode"])
+    allowed = {"local", "obsidian", "gpt-space"} if canonical else {"local", "obsidian"}
+    valid = isinstance(value, str) and value in allowed
+    reason = None
+    if not valid:
+        reason = "invalid_workspace_mode" if canonical else "invalid_logs_mode"
+    elif conflict:
+        reason = "selector_conflict"
+    return {
+        "status": "selected" if valid else "invalid",
+        "mode": value if valid else None,
+        "selected_from": selected_from,
+        "conflict": conflict,
+        "reason_code": reason,
+    }
+
+
+def validate_workspace_destination(doc: dict[str, Any]) -> dict[str, Any]:
+    """Validate destination data; native access and identity verification are separate."""
+    preference = resolve_workspace_preference(doc)
+    mode = preference["mode"]
+    reason = preference["reason_code"] if preference["status"] == "invalid" else None
+    if reason is None and mode == "gpt-space":
+        if not WORKSPACE_ID_KEYS.issubset(doc):
+            reason = "incomplete_space_destination"
+        elif any(not isinstance(doc[key], str) or OPAQUE_ID_RE.fullmatch(doc[key]) is None for key in WORKSPACE_ID_KEYS):
+            reason = "invalid_space_destination"
+    elif reason is None and mode == "obsidian":
+        if not {"logs-path", "logs-subfolder"}.issubset(doc):
+            reason = "incomplete_obsidian_destination"
+        else:
+            base, subfolder = doc["logs-path"], doc["logs-subfolder"]
+            if not isinstance(base, str) or not isinstance(subfolder, str) or not base or not subfolder:
+                reason = "invalid_obsidian_destination"
+            else:
+                path, child = Path(base), Path(subfolder)
+                if (
+                    not path.is_absolute() or path == Path(path.anchor)
+                    or path == Path.home() or child.is_absolute()
+                    or any(part in {"", ".", ".."} for part in re.split(r"[/\\]", subfolder))
+                    or ".." in path.parts or GLOB_RE.search(base + subfolder)
+                    or any(ord(char) < 32 for char in base + subfolder)
+                ):
+                    reason = "invalid_obsidian_destination"
+    return {"status": "invalid" if reason else "valid", "mode": mode, "reason_code": reason}
+
+
+def workspace_diagnostics(doc: dict[str, Any]) -> list[str]:
+    preference = resolve_workspace_preference(doc)
+    reasons = [preference["reason_code"]]
+    if preference["conflict"]:
+        reasons.append("selector_conflict")
+    reasons.append(validate_workspace_destination(doc)["reason_code"])
+    return list(dict.fromkeys(reason for reason in reasons if reason))
 
 
 def is_legacy_selector(key: str, value: Any) -> bool:
@@ -226,9 +308,10 @@ def displayable_config(doc: dict[str, Any]) -> dict[str, Any]:
     dumper for them, even when their key names do not look sensitive.
     """
     shown: dict[str, Any] = {}
+    missing = object()
     for key in sorted(ALLOWED_KEYS | {"format_version", "installed_version", "updated_at"}):
-        value = get_nested(doc, key)
-        if value is not None:
+        value = get_nested(doc, key, missing)
+        if value is not missing:
             set_nested(shown, key, redact_for_display(value, key))
     if isinstance(doc.get("migration"), dict):
         shown["migration"] = redact_for_display(doc["migration"], "migration")
@@ -242,8 +325,11 @@ def import_missing(
     legacy: list[str] | None = None,
 ) -> list[str]:
     imported: list[str] = []
+    preserve_workspace = not prefix and any(key in target for key in WORKSPACE_KEYS)
     for key, source_value in source.items():
         if not prefix and key in IMPORT_EXCLUDED_KEYS:
+            continue
+        if preserve_workspace and key in WORKSPACE_KEYS:
             continue
         dotted = f"{prefix}.{key}" if prefix else key
         if is_legacy_selector(key, source_value):
@@ -272,11 +358,33 @@ def import_missing(
     return imported
 
 
+def _workspace_import_view(doc: dict[str, Any]) -> dict[str, Any]:
+    preference = resolve_workspace_preference(doc)
+    if preference["status"] == "invalid" or preference["selected_from"] == "default":
+        return {"preference": preference, **{key: doc[key] for key in WORKSPACE_KEYS if key in doc}}
+    view = {"mode": preference["mode"]}
+    if preference["conflict"]:
+        view["logs-mode"] = doc["logs-mode"]
+    destination_keys = WORKSPACE_ID_KEYS if preference["mode"] == "gpt-space" else (
+        {"logs-path", "logs-subfolder"} if preference["mode"] == "obsidian" else set()
+    )
+    view.update({key: doc[key] for key in destination_keys if key in doc})
+    return view
+
+
 def classify_import(target: dict[str, Any], source: dict[str, Any], prefix: str = "") -> tuple[list[str], list[str]]:
     importable: list[str] = []
     conflicts: list[str] = []
+    preserve_workspace = not prefix and any(key in target for key in WORKSPACE_KEYS)
+    workspace_conflict = preserve_workspace and not _json_equal(
+        _workspace_import_view(target), _workspace_import_view(source),
+    )
     for key, source_value in source.items():
         if not prefix and key in IMPORT_EXCLUDED_KEYS:
+            continue
+        if preserve_workspace and key in WORKSPACE_KEYS:
+            if workspace_conflict:
+                conflicts.append(key)
             continue
         dotted = f"{prefix}.{key}" if prefix else key
         if is_legacy_selector(key, source_value):
@@ -306,7 +414,11 @@ def validate(key: str, value: Any) -> None:
     encoded = json.dumps(value, ensure_ascii=False)
     if TOKEN_RE.search(encoded):
         raise ValueError(f"{key} looks like it contains a secret")
-    if key == "logs-mode" and value not in {"local", "obsidian"}:
+    if key == "workspace-mode" and resolve_workspace_preference({key: value})["status"] == "invalid":
+        raise ValueError("workspace-mode must be local, obsidian or gpt-space")
+    if key in WORKSPACE_ID_KEYS and (not isinstance(value, str) or OPAQUE_ID_RE.fullmatch(value) is None):
+        raise ValueError(f"{key} must be an opaque ID, not a URL or path")
+    if key == "logs-mode" and resolve_workspace_preference({key: value})["status"] == "invalid":
         raise ValueError("logs-mode must be local or obsidian")
     if key == "logs-path":
         if not isinstance(value, str) or not value:
@@ -392,6 +504,7 @@ def show() -> int:
             for name, source in sources.items()
         ],
         "config": displayable_config(doc),
+        "workspaceDiagnostics": workspace_diagnostics(doc),
         "legacySelectors": legacy,
         "migrationGuidance": LEGACY_GUIDANCE if legacy else None,
         "preservedOpaqueTopLevelKeys": sum(
@@ -409,8 +522,11 @@ def set_values(assignments: list[str], removals: list[str], version: str | None)
     path = config_path()
     before = read_json(path)
     after = json.loads(json.dumps(before))
+    selected: dict[str, Any] = {}
     for raw in assignments:
         key, value = parse_assignment(raw)
+        if key in {"workspace-mode", "logs-mode"}:
+            selected[key] = value
         if key == "obsidian_tasks" and isinstance(value, bool):
             existing = get_nested(after, key)
             if isinstance(existing, dict):
@@ -422,6 +538,21 @@ def set_values(assignments: list[str], removals: list[str], version: str | None)
         if key not in ALLOWED_KEYS and key not in LEGACY_SELECTOR_KEYS:
             raise ValueError(f"unsupported setting: {key}")
         remove_nested(after, key)
+        selected.pop(key, None)
+    if len(selected) == 2 and selected["workspace-mode"] != selected["logs-mode"]:
+        raise ValueError("explicit workspace selectors conflict")
+    if selected:
+        mode = selected.get("workspace-mode", selected.get("logs-mode"))
+        after["workspace-mode"] = mode
+        if mode == "gpt-space":
+            after.pop("logs-mode", None)
+        else:
+            after["logs-mode"] = mode
+    elif "workspace-mode" not in after and "logs-mode" not in after:
+        after.update({"workspace-mode": "local", "logs-mode": "local"})
+    destination = validate_workspace_destination(after)
+    if destination["status"] == "invalid":
+        raise ValueError(f"workspace destination is invalid: {destination['reason_code']}")
     removed_legacy = remove_legacy_selectors(after)
     after["format_version"] = "1"
     if version is not None:
@@ -435,6 +566,7 @@ def set_values(assignments: list[str], removals: list[str], version: str | None)
         "changed": changed,
         "removedLegacySelectors": removed_legacy,
         "migrationGuidance": LEGACY_GUIDANCE if removed_legacy else None,
+        "workspaceDiagnostics": workspace_diagnostics(after),
     }, sort_keys=True))
     return 0
 
@@ -445,6 +577,9 @@ def ensure_defaults_result(version: str | None, *, apply: bool = True) -> dict[s
     after = json.loads(json.dumps(before))
     removed_legacy = remove_legacy_selectors(after)
     added: list[str] = []
+    if "workspace-mode" not in after and "logs-mode" not in after:
+        after.update({"workspace-mode": "local", "logs-mode": "local"})
+        added.extend(("workspace-mode", "logs-mode"))
     for key, value in DEFAULTS.items():
         if get_nested(after, key) is None:
             set_nested(after, key, value)
@@ -475,6 +610,7 @@ def ensure_defaults_result(version: str | None, *, apply: bool = True) -> dict[s
         "added": added,
         "removedLegacySelectors": removed_legacy,
         "migrationGuidance": LEGACY_GUIDANCE if removed_legacy else None,
+        "workspaceDiagnostics": workspace_diagnostics(after),
     }
 
 
@@ -497,6 +633,7 @@ def inspect_import(source_name: str) -> int:
         "excludedKeys": sorted(key for key in source if key in IMPORT_EXCLUDED_KEYS),
         "legacySelectors": legacy,
         "migrationGuidance": LEGACY_GUIDANCE if legacy else None,
+        "workspaceDiagnostics": workspace_diagnostics(target),
     }, sort_keys=True))
     return 0
 
@@ -506,6 +643,7 @@ def import_config(source_name: str, version: str | None) -> int:
     before = read_json(path)
     source_path = import_sources()[source_name]
     source = read_json(source_path, missing_ok=False)
+    _, conflicts = classify_import(before, source)
     after = json.loads(json.dumps(before))
     legacy: list[str] = []
     imported = import_missing(after, source, legacy=legacy)
@@ -538,8 +676,10 @@ def import_config(source_name: str, version: str | None) -> int:
         "source": source_name,
         "sourcePath": str(source_path),
         "imported": imported,
+        "preservedNativeKeys": sorted(conflicts),
         "removedLegacySelectors": legacy,
         "migrationGuidance": LEGACY_GUIDANCE if legacy else None,
+        "workspaceDiagnostics": workspace_diagnostics(after),
     }, sort_keys=True))
     return 0
 

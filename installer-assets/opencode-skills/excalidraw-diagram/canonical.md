@@ -5,9 +5,9 @@ Generate `.excalidraw` JSON files that **argue visually**, not just display info
 
 ## Workspace and Runtime Paths
 
-For a direct invocation without a bound workspace, use the [workspace skill](../workspace/SKILL.md) to resolve or create the configured local/Obsidian home before writing. The current agent is Main; no parent workflow is required.
+Reuse the bound [context](../workspace/SKILL.md), or resolve it for direct work. Main retains narrative returns in the same Page or file home; specialists do not create Pages.
 
-Before writing, consume the `workspace` and optional `deliverable_target` supplied by Main. `workspace` is the absolute shared local or Obsidian home already resolved for this effort; it is not a repository-relative template. Set `output_dir` to the explicit target directory when supplied, otherwise to `workspace`. If the target names a file, use its parent as `output_dir` and keep that exact `source_file`; otherwise use `source_file = {output_dir}/diagram.excalidraw`. Place the PNG preview alongside `source_file` unless the operator supplies another output target. Resolve references and render helpers from `skill_root`, the active installation directory containing this document. Never derive output from the current working directory or read another runtime's configuration.
+Set `output_dir` to the explicit `deliverable_target` or declared real local operational directory; file modes may use their bound home. URLs/opaque IDs are not paths. For a file target, keep its exact `source_file` and parent directory; otherwise use `{output_dir}/diagram.excalidraw`. Put the PNG preview alongside unless explicitly directed elsewhere. Resolve references/render helpers from this installation's `skill_root`, never an inferred working directory or another runtime's configuration. Main links portable artifacts from the context; unsupported upload stays pending, without presenting a local path as an attachment.
 
 **Setup:** If the user asks you to set up this skill (renderer, dependencies, etc.), see `README.md` for instructions.
 

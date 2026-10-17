@@ -1,6 +1,6 @@
 ---
 name: workspace
-description: Select, reuse and maintain the shared local or Obsidian workspace for a task. Use across TH workflows and substantive direct work that benefits from retained context, artifacts or a handoff.
+description: Select, reuse and maintain local, Obsidian or native Space context for a task. Use across TH workflows and substantive direct work that benefits from retained context, artifacts or a handoff.
 ---
 
 # Workspace
@@ -13,76 +13,98 @@ needed. Prefer reusing an existing workspace even for a small follow-up.
 
 Brief conversation needs no empty directory or note. Read-only status, preview
 and report-only `resume-session` may resolve and read a workspace but do not create or
-update one. A specialist receives the selected absolute workspace from Main and
-uses only the artifacts and write scope assigned to it.
+update one. Main gives specialists the context locator, source checkout and any
+needed absolute operational directory separately. Specialists use their assigned
+scope and return useful context for Main to retain; connector availability grants
+no additional write authority.
 
 ## Select the effort's home
 
-1. Reuse the workspace already bound to the effort in the conversation, plan,
-   handoff or pipeline identity. Check its source/repository association before
-   using it. A different checkout name, date or configuration does not move an
-   existing effort. An explicit relocation request is a separate scoped action.
-2. Without that binding, honor an explicit workspace destination or read only the active
-   runtime's relevant `logs-mode`, `logs-path` and `logs-subfolder` preferences.
-   Claude Code uses its TH settings; Codex and OpenCode use their native TH
-   settings, including configured scope overrides. Do not read another host's
-   configuration or print a complete config containing unrelated credentials.
-3. Look for an existing effort in that configured location using its task/change
-   identity and source links. For Git worktrees, identify the owning project from
-   Git's worktree/common-directory information rather than treating the checkout
-   basename as a new project. Keep the current code checkout unchanged. If several
-   plausible efforts remain, ask which one; do not choose the newest directory.
-4. For genuinely new work, choose a descriptive task slug and retain its creation
-   date. Use the configured Obsidian location or the project's local `workspaces/`
-   directory. Work without a repository uses its established working/output
-   directory or explicit workspace destination; it does not need Git initialization.
-   If no destination can be established, ask only for that missing choice.
+1. Reuse the effort's bound file identity or native Page locator before consulting
+   new defaults, including invalid defaults. Verify its source association. A new
+   checkout name, date, host path or preference does not move an existing effort.
+   Unverifiable bindings remain explicit; they do not authorize another home.
+2. Without a binding, honor an explicit destination or read only relevant settings
+   from the active runtime, including its scope overrides. Resolve `workspace-mode`
+   by own-key presence: `local | obsidian | gpt-space`. A present invalid canonical
+   value is invalid even beside valid `logs-mode`. Only an absent canonical key
+   permits legacy `local | obsidian`; only absence of both defaults to local.
+   Diagnose conflicting selectors once without repairing configuration. Do not
+   read another host's settings or print unrelated credentials.
+3. Discover an existing effort through retained IDs or complete candidate reads
+   with verified task and source association. Git common-directory information
+   helps identify a file checkout; a checkout basename, Page title or newest
+   modification time does not establish portable project identity. Multiple
+   plausible candidates or incomplete provenance stop mutation.
+4. For new work, retain a descriptive slug and creation date. File modes use their
+   existing layout below. For `gpt-space`, follow [native Space](references/native-space.md)
+   to verify the configured Space and its exact `workspace` container, then reuse
+   or create the source-bound effort beneath that Page. General documentation
+   stays outside this branch. Read-only flows create neither container nor effort.
 
-Every flow respects the selected local/Obsidian mode. Workspace paths such as
+Every flow respects the selected context mode. Workspace paths such as
 `workspaces/{feature}/` in flow instructions are templates for this absolute home,
-not an instruction to create a repository-local copy. A requested artifact output
-location does not change the workspace mode. Before writing, resolve existing
-parent directories to their physical targets; if a symlink/junction redirects
-outside the selected home, surface that destination conflict rather than silently
-writing there. This location check does not replace native access controls.
+not an instruction to create a repository-local copy. In remote mode they name
+logical content in the effort, not a filesystem path. A requested artifact output
+location does not change context mode. File-only tools receive a separately
+declared absolute operational directory, never a Page ID or URL. Reject relative
+paths and filesystem roots. Before file writes, verify real directory containment
+and physical parent targets; surface redirected destinations as conflicts. Native
+access controls remain authoritative.
 
-Use the existing read-only [workspace identity helper](../pipeline/scripts/workspace-identity.mjs)
-for repository-backed layouts. It is an imported library, not a command that
-discovers settings or repository identity for you. Supply verified project
-bindings and preferences; reuse a persisted pipeline identity unchanged. Keep
-existing pipeline discovery, service bindings and useful task context in that flow.
-Direct/spec work may reuse its path calculation without writing pipeline state.
+Use [workspace-context.mjs](scripts/workspace-context.mjs) for selector and binding
+validation. Binding results are `ready`, `invalid` or `pending`; a remote binding keeps
+Space, container and effort IDs, URL, source associations, date and slug separate
+from `operational_directory`. These pure helpers neither discover credentials nor
+perform native operations. File bindings adapt the existing read-only
+[workspace identity helper](../pipeline/scripts/workspace-identity.mjs) without
+changing v1 identities or formulas. Supply verified inputs and reuse persisted
+identities unchanged. Direct/spec work can reuse file path calculation without
+writing pipeline state.
 For projectless work, use `<working-directory>/workspaces/<date>_<task>` locally
 or `<logs-path>/<logs-subfolder>/<project-name>/<date>_<task>` in Obsidian; derive
-the project name from the established work context, not an unrelated shell cwd.
+the project name from established work context. Remote projectless work uses its
+established project association and requires no Git initialization. Remote
+initiatives may span non-sibling repositories and hosts. Retain portable verified
+source identity separately from host paths, remove credentials from origin
+evidence and require verified alias/association evidence for a changed identity.
+Evidence-only sources do not become owners or redefine the effort.
 
-For a saved handoff, [resume-session](../resume-session/SKILL.md) uses its existing
-read-only lookup after this skill has established the correct base and effort.
-Neither that lookup nor pipeline discovery finds arbitrary unbound work across
-the filesystem. Report missing or ambiguous context honestly.
+For a saved handoff, [resume-session](../resume-session/SKILL.md) uses the same
+binding and its file lookup or logical Page reference. Neither lookup nor pipeline
+discovery finds arbitrary unbound efforts. Missing native tools, access loss,
+offline state or moved/deleted/renamed Pages preserve the locator and pending
+operation. Independent authorized work may continue when it needs no unavailable
+context. Do not create a replacement Page or local context home.
 
 ## Keep context useful
 
-Write context notes as Markdown (`.md`) in the selected workspace in both local
+Write context notes as Markdown (`.md`) in the selected file workspace in local
 and Obsidian mode: plans, research, decisions, review summaries and handoffs.
 Use headings and links that help the task; the common format requires no universal
 template, extra frontmatter or Obsidian-specific syntax. Preserve fields or anchors
-that an existing flow or reader needs. Machine-consumed state, event records and
-helper artifacts keep their required formats; code, tests and deliverables keep
-their own formats and locations. Link them from notes rather than renaming or
-duplicating them as Markdown.
+that existing readers need. In remote mode Main retains useful context in the
+same effort Page during work, at milestones and at handoff using native guarded
+edits and readback. There is no second Markdown context home or routine local
+report mirror. Use [native Space](references/native-space.md) for receipt and
+reconciliation decisions.
+
+Machine state, JSON, builds, render sources, immutable review captures and other
+operational files keep their required formats in declared file storage. Code,
+canonical OpenSpec, maintained tests and deliverables keep their own locations.
+Link useful evidence from the effort. A bare local path is not a portable remote
+attachment; an unsupported upload remains pending.
 
 Create only artifacts the task needs. For substantive artifact work, establish
 principal output grouping, annex treatment, format/destination and requested
 access in the existing context at intake; preserve them through delivery.
 
-Record the workspace's absolute location,
-project/source association (Git common directory for repository work, established
-working directory otherwise), objective, important decisions, progress, evidence
-links and next step in the flow's existing plan, report or handoff as applicable.
+Record the absolute file location or exact remote locator, verified portable
+project/source association and relevant host mappings, objective, decisions,
+progress, evidence links and next step in the flow's existing plan or handoff.
 For a task without such a note, a short handoff is enough when continuity matters;
 use [save-session](../save-session/SKILL.md). No parallel index, fixed folder tree,
-new identity schema or event log is required for ordinary work.
+new identity file or event log is required for ordinary work.
 
 Refresh context when decisions or progress materially change and at handoff or
 completion, not after every tool call. Link to canonical OpenSpec in its owning
@@ -104,7 +126,7 @@ workspace rather than moving or duplicating their protected artifacts.
 
 Selecting a workspace does not activate a pipeline, approve work, require another
 agent or contact Context Harness/Memory MCP. Native permissions govern access.
-On an actual refusal, explain the unavailable path and continue independent work;
+On an actual refusal, explain the unavailable operation and continue independent work;
 do not widen permissions, silently relocate or create a competing fallback copy.
 Preserve existing notes and unrelated work. Cleanup or migration follows the
 user's requested scope, not directory age or successful task completion.

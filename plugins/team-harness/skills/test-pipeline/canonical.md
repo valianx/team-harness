@@ -55,8 +55,8 @@ name: test-pipeline
   that decision in the current Main thread. Do not create a nested coordinator.
 - The current coordinator analyzes the service, decomposes modules when useful,
   and dispatches bounded tester or review work according to the request.
-- Output: `{workspace}/00-pipeline-summary.md` when a workspace is selected and
-  a consolidated report is useful.
+- Main retains useful consolidated results in the bound Page, or `00-pipeline-summary.md`
+  in file modes; file tools/results use a separate real local operational directory.
 - Treat coverage as evidence against the repository's declared targets and the
   selected workflow. There is no universal 80% branch-coverage gate; report
   the measured result, missing configuration and any unreachable blocker.

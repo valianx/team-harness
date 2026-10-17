@@ -21,10 +21,13 @@ color: cyan
 - [Test-Pipeline Mode](#test-pipeline-mode)
 - [Apply-Review Mode](#apply-review-mode)
 
-Locate the needed section by heading; do not read this file in full.
+Locate the section by heading; do not read this file in full.
 
-Use `workspace` for retained context. Substitute its absolute home for workspace
-examples and pass it to specialists. Preserve explicit outputs and read-only scope.
+Use `workspace`: Main persists remote narrative; supply locator, checkout and
+optional operational storage separately. File examples retain names; preserve
+explicit outputs and read-only scope.
+In file-tool examples, `{workspace}` is a real output directory, separate from
+remote context; narrative examples are logical content persisted by Main.
 
 **Role mapping.** The current principal executes direct workflows using their
 installed skills. Broader coordination follows the operator's selected pipeline
@@ -107,10 +110,10 @@ to the current status and recovery routes.
 
 ### Step 0 — Resolve output path
 
-Use `workspace` to resolve the configured local/Obsidian home. Default output:
-`{workspace}/diagram.excalidraw`. Honor an explicitly supplied `Vault:`/`Folder:`
-as a deliverable destination using the active runtime's vault mapping; ask only
-for a missing destination. Keep research and continuity in the selected workspace.
+Resolve context through `workspace`. File output defaults to
+`{workspace}/diagram.excalidraw`; remote mode uses declared operational storage.
+Honor explicit `Vault:`/`Folder:` destinations through native mapping and ask only
+for missing destination data.
 
 ### Step 1 — Architect analyzes codebase context
 
@@ -159,10 +162,9 @@ When invoked with `Direct Mode Task: likec4-diagram`:
 
 ### Step 0 — Resolve output path
 
-Use `workspace` to resolve the configured local/Obsidian home. Default output:
-`{workspace}/diagram.c4`. Honor an explicitly supplied `Vault:`/`Folder:` as a
-deliverable destination using the active runtime's vault mapping; ask only for a
-missing destination. Keep research and continuity in the selected workspace.
+Resolve context through `workspace`. File output defaults to `{workspace}/diagram.c4`;
+remote mode uses declared operational storage. Honor explicit `Vault:`/`Folder:`
+destinations through native mapping; ask only for missing destination data.
 
 ### Step 1 — Architect analyzes codebase context
 
@@ -199,10 +201,9 @@ When invoked with `Direct Mode Task: d2-diagram`:
 
 ### Step 0 — Resolve output path
 
-Use `workspace` to resolve the configured local/Obsidian home. Default output:
-`{workspace}/diagram.d2`. Honor an explicitly supplied `Vault:`/`Folder:` as a
-deliverable destination using the active runtime's vault mapping; ask only for a
-missing destination. Keep research and continuity in the selected workspace.
+Resolve context through `workspace`. File output defaults to `{workspace}/diagram.d2`;
+remote mode uses declared operational storage. Honor explicit `Vault:`/`Folder:`
+destinations through native mapping; ask only for missing destination data.
 
 ### Step 1 — Architect analyzes codebase context
 

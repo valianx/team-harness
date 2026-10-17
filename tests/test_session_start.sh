@@ -583,6 +583,52 @@ else
 fi
 rm -rf "$TMP" "$BASELINE"
 
+echo
+echo "=== Workspace: shared canonical and legacy preference cases ==="
+if node --input-type=module - "$REPO_ROOT" <<'NODE'
+import assert from "node:assert/strict";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+const root = process.argv[2];
+const fixture = JSON.parse(readFileSync(join(root, "tests/fixtures/workspace-preferences.json"), "utf8"));
+const home = mkdtempSync(join(tmpdir(), "th-session-preferences-"));
+try {
+    mkdirSync(join(home, ".claude"));
+    for (const { name, config, expected } of fixture.cases) {
+        const source = JSON.stringify({ "logs-path": "/fixture/vault", ...config });
+        const path = join(home, ".claude/.team-harness.json");
+        writeFileSync(path, source);
+        const result = spawnSync(process.execPath, [join(root, "hooks/ts/dist/session-start.cjs")], {
+            input: "{}", encoding: "utf8", env: { ...process.env, HOME: home, USERPROFILE: home },
+        });
+        assert.equal(result.status, 0, name);
+        const directive = JSON.parse(result.stdout).hookSpecificOutput.additionalContext;
+        if (expected.status === "invalid") {
+            assert.match(directive, /workspace selection is invalid/, name);
+            assert.doesNotMatch(directive, /workspace mode: (local|obsidian|gpt-space)/, name);
+        } else {
+            assert.ok(directive.includes(`workspace mode: ${expected.mode}`), name);
+        }
+        assert.equal((directive.match(/workspace selector conflict/g) ?? []).length,
+            Number(expected.conflict), `${name}: conflict is diagnosed once`);
+        if (expected.mode === "gpt-space") {
+            assert.match(directive, /unavailable to this hook/, name);
+            assert.doesNotMatch(directive, /fixture\/vault|workspace mode: local/, name);
+        }
+        assert.equal(readFileSync(path, "utf8"), source, `${name}: reading does not repair configuration`);
+    }
+    console.log(`  [PASS] ${fixture.cases.length} shared workspace preference cases`);
+} finally { rmSync(home, { recursive: true, force: true }); }
+NODE
+then
+    PASS=$((PASS + 1))
+else
+    FAIL=$((FAIL + 1))
+    FAILURES+=("shared workspace preference cases")
+fi
+
 # ===========================================================================
 # Summary
 # ===========================================================================

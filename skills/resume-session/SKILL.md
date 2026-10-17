@@ -12,17 +12,21 @@ Analyze the input: $ARGUMENTS
 
 ---
 
-## Step 0 — Resolve workspaces path
+## Step 0 — Resolve the retained context
 
-Use [workspace](../workspace/SKILL.md) in read-only mode. Reuse the effort's bound
-absolute workspace and source identity when available. Pass its parent directory
-as the base and its exact directory name as the feature below. Otherwise establish
-the configured workspace base for the owning project, including across worktrees,
-and use the requested feature. Do not derive project identity from the current
-checkout basename. Replace `workspaces/` references below with that resolved base.
-Do not create a workspace or handoff when lookup reports missing context.
+Use [workspace](../workspace/SKILL.md) read-only. Reuse the bound locator and verified
+source association before defaults, checkout names or dates. For remote context,
+Main reads exact retained IDs using native tools and supplies verified candidates
+to exported `resolveContextWorkspace({binding,remoteCandidates,listingComplete})`.
+It returns a logical handoff reference, never creates Pages or requires local state.
+Preserve missing, ambiguous, incomplete, unavailable or conflicting bindings and
+report the pending reason; do not substitute a new Page or local home.
 
-Resolve `scripts/resolve-workspace.mjs` relative to this skill's own directory,
+Bound file context delegates to the unchanged file resolver. Unbound file lookup
+uses the CLI below with the configured owning-project base and requested feature.
+Do not infer ownership from the checkout basename.
+
+For file contexts only, resolve `scripts/resolve-workspace.mjs` relative to this directory,
 falling back to `./skills/resume-session/scripts/resolve-workspace.mjs` in a
 repository checkout. Run it read-only with the absolute base path and the
 operator's feature argument:
@@ -42,29 +46,27 @@ or compose `{resolved-path}/{feature}` after the helper returned another path.
 
 ## Step 1 — Read the handoff (read-only)
 
-Read the helper's exact `handoff` path (read-only). Check its recorded workspace
-and source against the selected effort before using its context. A matching
-feature or checkout basename is insufficient. For an older handoff without that
-binding, verify the association from its linked plan/source or ask for the missing
-association; do not use or overwrite a different effort's context.
+Read the exact file handoff or selected Page's logical handoff on its selected
+stream. Verify its locator and source association; title alone is insufficient.
+For older context, establish the association from linked plan/source evidence or
+report the missing association. Read phase/status from the plan or optional file
+`state` path; a missing `00-state.md` is not a remote error.
 
-Also read its exact `state` path (read-only) for phase and status
-context.
-
-If discovery is `ambiguous`, list only the candidate directory names and ask the
+For file discovery, if `ambiguous`, list candidate directory names and ask the
 operator to rerun with one exact name. If it is `not-found`, report that no
 matching workspace exists; do not recommend `save-session`, because creating a
 new path is outside this read-only skill. If discovery is `handoff-missing`,
 report the exact existing workspace and missing handoff path; never recommend a
-logical-name save that could create an undated parallel workspace. Then stop —
-do not write anything.
+logical-name save that could create an undated parallel workspace. Remote errors
+report the retained Page IDs/URL and precise pending reason. Any unresolved lookup
+stops without mutation.
 
 The three required field anchors in a valid handoff are:
 - `### What Worked`
 - `### What NOT to Retry`
 - `### Next Step`
 
-If any of these anchors is absent from the handoff file, note the missing field in
+If any of these fields is absent from the handoff, note the missing field in
 the briefing and continue.
 
 ---
@@ -74,9 +76,11 @@ the briefing and continue.
 Render the three fields for the operator:
 
 ```
-=== Session Handoff: {workspace_name} ===
+=== Session Handoff: {effort_label} ===
 
-Phase / Status (from 00-state.md): {phase} / {status}
+Context: {verified locator}
+
+Phase / Status (from retained context): {phase} / {status}
 
 What Worked
 -----------
@@ -106,21 +110,18 @@ End the briefing with concise stable options:
 ```
 
 Numbers are shortcuts, not required command syntax. Tell the operator that a short unambiguous
-reply is sufficient and that this briefing made no file changes. Never instruct the operator to
+reply is sufficient and that this briefing changed no context. Never instruct the operator to
 enter a runtime-specific recovery command. This report-only turn takes no action; on the next live
-reply, the coordinator binds the choice to this exact `{workspace_name}` presentation and routes
+reply, the coordinator binds the choice to this exact context presentation and routes
 continuation internally to the recovery capability installed in the active runtime.
 
 ---
 
 ## REPORT-only Boundary
 
-**HARD boundary:** `resume-session` never writes a file. It never dispatches the
-orchestrator or any agent. There is no `--apply` path, no `--fix` path, and no
-auto-write path of any kind. The skill reads `00-session-handoff.md` and
-`00-state.md` (both read-only) and emits the briefing. Nothing else happens until the operator
-replies. A later affirmative reply is a new coordinator turn, not an action performed by this
-report-only skill.
+**HARD boundary:** `resume-session` never mutates files, Pages or settings and
+never dispatches an agent. It reads retained handoff/status and emits the briefing.
+A later affirmative reply is a new coordinator turn; it takes no action here.
 
 If a future request asks this skill to write a file, dispatch an agent, or resume
 the pipeline automatically, that request falls outside this skill's scope and must

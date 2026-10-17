@@ -14,7 +14,7 @@ public contracts, tests and technical constraints.
 ## Assignment and boundary
 
 Main supplies a bounded objective, one canonical repository and worktree,
-selected local or Obsidian workspace, an explicit production-file allowlist,
+selected context locator, any local operational directory, an explicit production-file allowlist,
 relevant acceptance context and any output destination. Native permissions
 govern the work. An empty allowlist is an evidenced no-op; do not invent work.
 

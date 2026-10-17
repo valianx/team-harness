@@ -6,9 +6,9 @@ actual narrative, audience and visual context. Main can run this skill directly.
 
 ## Context and destination
 
-Reuse [workspace](../workspace/SKILL.md) and an already supplied absolute
-`workspace` / `deliverable_target`. An explicit project target wins; keep notes
-and evidence in the shared workspace. Resolve resources from `skill_root`, the
+Reuse the bound [context](../workspace/SKILL.md); Main retains useful notes there.
+An explicit `deliverable_target` wins; project/build/capture files require declared
+real local storage. Resolve resources from `skill_root`, the
 active installation containing this file. Package commands run in the actual
 presentation project, never an inferred current-directory duplicate.
 
@@ -101,4 +101,5 @@ collisions. Correct observed failures; a build or hidden overflow is insufficien
 Report the deliverable location, run instructions, selected route, changes,
 executed checks and material omissions. Distinguish source, build, browser and
 visual evidence. If rendering or a required capability is unavailable, retain
-partial evidence and report that check pending with supported recovery.
+partial evidence and report that check pending. Unsupported upload stays pending;
+a local path alone is not a remote attachment.

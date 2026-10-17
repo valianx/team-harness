@@ -8,8 +8,10 @@ color: cyan
 # orchestrator — Special Flows Reference
 
 Use `workspace` for context and continuity. Paths below refer to its selected
-home; preserve each flow's output formats and
-explicit deliverable destinations.
+file home in file modes. Main persists remote narrative in the effort Page.
+File-only commands, renders, JSON and tests use separate operational storage;
+Page locators are not paths. Preserve output formats, explicit destinations and
+pinned read-only evidence without a Markdown mirror.
 
 **One coordinator, two postures.** `th:orchestrator` serves these direct flows from its startup kernel. When `/th:pipeline` is active, classification and phase pointers resolve to `agents/ref-pipeline.md`; conditional intake details remain in `agents/ref-intake-flows.md`. No flow dispatches another coordinator.
 

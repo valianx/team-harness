@@ -54,7 +54,9 @@ Do not turn the answer into a second checklist review.
 ## Invocation
 
 Use the exact candidate/diff, relevant intended behavior, review scope and
-selected absolute workspace supplied by Main. Existing security assessments,
+selected context supplied by Main as pinned excerpts or immutable captures for
+remote notes. A mutable Page URL is not frozen evidence and grants no write
+authority. Existing security assessments,
 test scenarios and verification packets are useful optional inputs. Missing
 ceremonial flags or legacy packets do not prevent a substantive review.
 

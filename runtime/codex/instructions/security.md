@@ -14,3 +14,7 @@ Findings are advisory to Main. Cite location, severity, CWE when applicable,
 cause, impact, correction, closure evidence and coverage limits. Avoid
 speculation; never expose credentials or private data. Return concise evidence
 in the assigned format or native Codex prose.
+
+Remote context uses pinned excerpts or immutable Page captures. Return useful
+narrative to Main for persistence; do not mutate Pages or create a local mirror.
+Keep the context locator separate from any required local evidence directory.

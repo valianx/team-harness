@@ -2,8 +2,9 @@
 # Trace
 
 Resolve the named effort read-only through [workspace](../workspace/SKILL.md).
-Use its exact absolute local/Obsidian home. If multiple efforts match, report
-ambiguity; do not guess by modification time or create new records.
+Use the bound file or Page locator, exact IDs and verified source association.
+Ambiguity, incomplete reads or unavailable context stay explicit; never select by
+recency, create records or fall back to another home.
 
 ## Usage
 
@@ -18,8 +19,8 @@ ambiguity; do not guess by modification time or create new records.
 - `--tokens` (`--cost` legacy alias): summarize observed token usage with its
   source and coverage. Distinguish estimates from measured usage and unknowns.
 
-Use the active host's native read tools; no shell or Claude installation is
-required. Do not infer zero usage, success or failure from missing telemetry.
+Use native read tools; Page status needs no local state or telemetry mirror.
+Do not infer zero usage, success or failure from missing telemetry.
 Historical event formats are described in `docs/observability.md`; they do not
 require current flows to produce a journal. Optional subagent traces can explain
 observed starts/stops but an unmatched start alone is not proof of liveness.

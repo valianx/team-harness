@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"time"
 )
 
@@ -20,23 +22,123 @@ func claudeCodeTeamHarnessConfigPath() (string, error) {
 	return filepath.Join(home, ".claude", manifestFilename), nil
 }
 
-// importCandidate carries the allowlisted keys read from a detected
-// .team-harness.json during migration source detection (CC config or
-// opencode-owned re-run). After the trim, only logs-mode is read —
-// the removed settings (language, english_learning, clickup, obsidian_tasks)
-// are never imported into a new config (AC-7).
+// importCandidate describes the workspace preference in an existing config.
+// The native reapply keeps the complete destination in the original document;
+// the trimmed setup form does not import unrelated settings or credentials.
 type importCandidate struct {
-	logsMode string
+	workspace workspacePreference
 }
 
-// buildImportCandidate reads the surviving allowlisted key from a raw JSON map.
-// MCP URL and secrets are NOT in .team-harness.json and are never read here.
-// The removed fields (language, english_learning, clickup, obsidian_tasks) are
-// intentionally not extracted — they must not appear in the written config (AC-7).
 func buildImportCandidate(m map[string]json.RawMessage) *importCandidate {
 	return &importCandidate{
-		logsMode: extractStringFromRaw(m, "logs-mode"),
+		workspace: selectWorkspacePreference(m),
 	}
+}
+
+type workspacePreference struct {
+	status       string
+	mode         string
+	selectedFrom string
+	conflict     bool
+	reasonCode   string
+}
+
+func selectWorkspacePreference(m map[string]json.RawMessage) workspacePreference {
+	result := workspacePreference{status: "selected", mode: "local", selectedFrom: "default"}
+	canonical, hasCanonical := m["workspace-mode"]
+	legacy, hasLegacy := m["logs-mode"]
+	if hasCanonical {
+		result.selectedFrom = "workspace-mode"
+		result.mode = extractStringFromRaw(m, "workspace-mode")
+		if hasLegacy {
+			var canonicalValue, legacyValue interface{}
+			_ = json.Unmarshal(canonical, &canonicalValue)
+			_ = json.Unmarshal(legacy, &legacyValue)
+			result.conflict = !reflect.DeepEqual(canonicalValue, legacyValue)
+		}
+		if result.mode != "local" && result.mode != "obsidian" && result.mode != "gpt-space" {
+			result.status = "invalid"
+			result.mode = ""
+			result.reasonCode = "invalid_workspace_mode"
+			return result
+		}
+		if result.conflict {
+			result.reasonCode = "selector_conflict"
+		}
+	} else if hasLegacy {
+		result.selectedFrom = "logs-mode"
+		result.mode = extractStringFromRaw(m, "logs-mode")
+		if result.mode != "local" && result.mode != "obsidian" {
+			result.status = "invalid"
+			result.mode = ""
+			result.reasonCode = "invalid_logs_mode"
+		}
+	}
+	return result
+}
+
+func reportWorkspacePreference(m map[string]json.RawMessage) {
+	preference := selectWorkspacePreference(m)
+	if preference.status == "invalid" {
+		fmt.Fprintf(os.Stderr, "workspace: %s: %s is invalid; preferences retained; use /th:setup to correct it\n", preference.reasonCode, preference.selectedFrom)
+		return
+	}
+	var diagnoses []string
+	if preference.conflict {
+		diagnoses = append(diagnoses, "selector_conflict: workspace-mode and logs-mode disagree; canonical selection retained")
+	}
+	if destination := workspaceDestinationDiagnosis(m, preference.mode); destination != "" {
+		diagnoses = append(diagnoses, destination)
+	}
+	if len(diagnoses) > 0 {
+		fmt.Fprintf(os.Stderr, "workspace: %s; preferences retained; use /th:setup to correct them\n", strings.Join(diagnoses, "; "))
+	}
+}
+
+func workspaceDestinationDiagnosis(m map[string]json.RawMessage, mode string) string {
+	switch mode {
+	case "gpt-space":
+		_, hasSpace := m["workspace-space-id"]
+		_, hasContainer := m["workspace-container-page-id"]
+		if !hasSpace || !hasContainer {
+			return "incomplete_space_destination: workspace-space-id and workspace-container-page-id are required"
+		}
+		for _, key := range []string{"workspace-space-id", "workspace-container-page-id"} {
+			if !isWorkspaceOpaqueID(extractStringFromRaw(m, key)) {
+				return "invalid_space_destination: workspace IDs must be opaque identifiers"
+			}
+		}
+	case "obsidian":
+		_, hasPath := m["logs-path"]
+		_, hasSubfolder := m["logs-subfolder"]
+		if !hasPath || !hasSubfolder {
+			return "incomplete_obsidian_destination: logs-path and logs-subfolder are required"
+		}
+		for _, key := range []string{"logs-path", "logs-subfolder"} {
+			value := extractStringFromRaw(m, key)
+			if strings.TrimSpace(value) == "" || hasControlChar(value) {
+				return "invalid_obsidian_destination: logs-path and logs-subfolder must be nonempty strings without control characters"
+			}
+		}
+	}
+	return ""
+}
+
+func isWorkspaceOpaqueID(value string) bool {
+	if len(value) == 0 || len(value) > 256 {
+		return false
+	}
+	for i := 0; i < len(value); i++ {
+		char := value[i]
+		if char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z' || char >= '0' && char <= '9' {
+			continue
+		}
+		if i > 0 && (char == '_' || char == '-') {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 // hasControlChar reports whether s contains any character in [\x00-\x1f\x7f].
@@ -81,6 +183,7 @@ func opencodeSettingsConfigPath(configRoot string) string {
 // cost-tiering selection: absent ⇒ model-less baseline; present ⇒ the
 // provider whose curated tier map the transform bakes into agent files.
 var allowlistedOpencodeKeys = map[string]bool{
+	"workspace-mode":              true,
 	"logs-mode":                   true,
 	"opencode.cost_tier_provider": true,
 }
@@ -89,7 +192,7 @@ var allowlistedOpencodeKeys = map[string]bool{
 // writes from cfg-derived values. Kept in lockstep with allowlistedOpencodeKeys
 // and checked by assertCfgDerivedKeysMatchAllowlist so the allowlist stays the
 // actual source of truth rather than documentation that can silently drift.
-var cfgDerivedKeysWritten = []string{"logs-mode", "opencode.cost_tier_provider"}
+var cfgDerivedKeysWritten = []string{"workspace-mode", "logs-mode", "opencode.cost_tier_provider"}
 
 // assertCfgDerivedKeysMatchAllowlist panics when cfgDerivedKeysWritten and
 // allowlistedOpencodeKeys diverge — a developer added or removed a
@@ -178,16 +281,19 @@ func writeOpencodeTeamHarnessConfig(path string, cfg opencodeSetupValues, placer
 		delete(raw, k)
 	}
 
-	// Apply a local default only for a fresh config. An existing workspace mode
-	// and its path/subfolder are operator-owned preferences and must survive a
-	// native OpenCode re-apply even though the setup form no longer offers them.
-	if _, exists := raw["logs-mode"]; !exists {
+	preference := selectWorkspacePreference(raw)
+	if preference.selectedFrom == "default" {
 		mode := cfg.LogsMode
 		if mode == "" {
 			mode = "local"
 		}
+		if mode != "local" && mode != "obsidian" {
+			return fmt.Errorf("invalid setup logs-mode: expected local or obsidian")
+		}
+		raw["workspace-mode"] = mustMarshalJSON(mode)
 		raw["logs-mode"] = mustMarshalJSON(mode)
 	}
+	reportWorkspacePreference(raw)
 
 	// Apply the per-provider cost-tiering selection (#424). cfg.CostTierProvider
 	// already reflects the resolved precedence (flag > persisted > absent) —
@@ -231,7 +337,7 @@ func writeOpencodeTeamHarnessConfig(path string, cfg opencodeSetupValues, placer
 
 // refreshManagedConfigKeys performs a managed-key-only update of the
 // .team-harness.json at path. Unlike writeOpencodeTeamHarnessConfig it does
-// NOT touch operator-controlled keys (logs-mode, logs-path, logs-subfolder, or
+// NOT touch operator-controlled keys (workspace mode, destination, or
 // any unknown key). It overwrites ONLY the three installer-managed keys:
 // format_version, installed_version, updated_at — preserving everything else
 // byte-for-byte (SEC-OC-R4 / AC-5 contract).
@@ -252,6 +358,7 @@ func refreshManagedConfigKeys(path string, placer *opencodePlacer) error {
 			return readErr
 		}
 	}
+	reportWorkspacePreference(raw)
 
 	// Remove installer-managed keys from the map so we always overwrite them
 	// (SEC-OC-R4 mass-assignment defense — same pattern as

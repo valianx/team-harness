@@ -5,8 +5,12 @@ description: Resume retained work from its actual plan, tasks and evidence.
 
 # Recover
 
-Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
-its configured local or Obsidian mode. Main coordinates with native tools and
+Use [workspace](../workspace/SKILL.md) to reuse the bound file home or verified
+gpt-space effort. Read-only discovery creates no Page or state. Preserve exact
+IDs/source association when unavailable, moved or deleted; report the pending
+operation without a replacement home. Read the remote logical plan/handoff in
+that effort, separating checkout and any local operational storage. Main
+coordinates with native tools and
 permissions. Reuse authorization for unchanged work and ask only for a missing
 decision. Specialists provide evidence and recommendations; Main judges them.
 

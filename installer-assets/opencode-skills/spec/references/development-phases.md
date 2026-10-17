@@ -9,10 +9,10 @@
 
 Use this shared path for development through spec or an explicitly selected
 pipeline. Main coordinates with the native host's tools and permissions. Keep
-the existing objective, canonical tasks, candidate, review choice and absolute
-[workspace](../../workspace/SKILL.md), in its local or Obsidian mode. Entering a
-later phase recovers these inputs and completes real gaps; it does not recreate
-planning or activate a pipeline.
+the objective, canonical tasks, candidate, review choice and bound
+[context](../../workspace/SKILL.md). Main retains plans/returns in the same Page
+or file home; real local operational storage remains separate when tools need it.
+Later phases recover these inputs without recreating planning or activating a pipeline.
 
 Spec keeps execution with the principal and uses independent reviewers for the
 selected questions. Pipeline adds coordination of useful specialists: group
@@ -122,7 +122,7 @@ When complexity against coverage will help assess changed functions, select CRAP
 and prepare the project's collectors. Use the installed
 [quality runner](../../pipeline/scripts/quality-runner.mjs) in `measure` mode,
 with the [manifest and invocation guide](quality-runner.md) and a clean committed candidate. Keep the
-manifest, normalized inputs and receipt in the workspace. The adapter supplies
+manifest, normalized inputs and receipt in declared local operational storage. The adapter supplies
 per-function path, symbol, new/changed status, complexity and coverage percent;
 the runner computes the score. Collectors and metric versions remain explicit.
 

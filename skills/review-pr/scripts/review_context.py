@@ -17,6 +17,7 @@ import tempfile
 import time
 from pathlib import Path
 from typing import Any, Iterable
+from urllib.parse import urlsplit, urlunsplit
 
 
 if os.name == "nt":
@@ -109,11 +110,13 @@ def _regular_stat_at(directory_fd: int, name: str) -> os.stat_result:
     return value
 
 
-def safe_read_leaf(root: Path, name: str, *, limit: int = 2_000_000) -> bytes:
+def safe_read_leaf(root: Path, name: str, *, limit: int = 2_000_000, require_unaliased: bool = False) -> bytes:
     name = _safe_leaf(name)
     _, directory_fd = _open_directory(root)
     try:
         before = _regular_stat_at(directory_fd, name)
+        if require_unaliased and before.st_nlink != 1:
+            raise ContextError("artifact leaf is hard-linked outside its ownership")
         try:
             leaf_fd = artifact_fs.open(name, os.O_RDONLY | NOFOLLOW, dir_fd=directory_fd)
         except OSError as error:
@@ -122,6 +125,8 @@ def safe_read_leaf(root: Path, name: str, *, limit: int = 2_000_000) -> bytes:
             after = os.fstat(leaf_fd)
             if not stat.S_ISREG(after.st_mode) or (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
                 raise ContextError("artifact leaf changed before secure read")
+            if require_unaliased and after.st_nlink != 1:
+                raise ContextError("artifact leaf is hard-linked outside its ownership")
             chunks: list[bytes] = []
             total = 0
             while True:
@@ -2096,6 +2101,245 @@ def write_artifact_leaf(root: Path, name: str, content: bytes) -> None:
     promote_artifact(root, temporary, name)
 
 
+PAGE_CAPTURE_LIMIT = 2_000_000
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+PAGE_WORKSPACE_MANIFEST = "pr-review-workspace.json"
+
+
+def _capture_text(value: Any, maximum: int = 4096) -> bool:
+    return (isinstance(value, str) and bool(value) and value.strip() == value
+            and len(value.encode("utf-8")) <= maximum and not re.search(r"[\x00-\x1f\x7f]", value))
+
+
+def _capture_id(value: Any) -> bool:
+    return _capture_text(value, 512) and not re.search(r"[\s/\\:]", value) and value not in {".", ".."}
+
+
+def _capture_source_reference(value: Any, *, identity: bool = False) -> str:
+    if not _capture_text(value, 1024 if identity else 4096):
+        raise ContextError("Page capture source reference is invalid")
+    if identity and (value.startswith(("/", "\\")) or re.match(r"^[A-Za-z]:[\\/]", value)):
+        raise ContextError("Page capture source identity must be portable")
+    prefix = "origin:" if value.startswith("origin:") else ""
+    reference = value[len(prefix):]
+    try:
+        parsed = urlsplit(reference)
+        if parsed.hostname:
+            host = parsed.netloc.rsplit("@", 1)[-1]
+            return prefix + urlunsplit((parsed.scheme, host, parsed.path, "", ""))
+    except ValueError as error:
+        raise ContextError("Page capture source reference is invalid") from error
+    return prefix + re.sub(r"^[^/@:]+@(?=[^/:]+:)", "", reference)
+
+
+def _capture_sources(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list) or not 1 <= len(value) <= 128:
+        raise ContextError("Page capture requires verified source associations")
+    result = []
+    identities: set[tuple[str, str]] = set()
+    for source in value:
+        if (not isinstance(source, dict) or source.get("kind") not in ("repository", "projectless")
+                or source.get("role") not in ("writable-owner", "evidence-only")
+                or source.get("verified") is not True
+                or (source["kind"] == "projectless" and source["role"] != "writable-owner")):
+            raise ContextError("Page capture source association is unverified")
+        item = {"kind": source["kind"], "identity": _capture_source_reference(source.get("identity"), identity=True),
+                "role": source["role"], "verified": True}
+        key = (item["kind"], item["identity"])
+        if key in identities:
+            raise ContextError("Page capture source association is duplicated")
+        identities.add(key)
+        if "canonical_source" in source:
+            item["canonical_source"] = _capture_source_reference(source["canonical_source"])
+        if "aliases" in source:
+            if not isinstance(source["aliases"], list) or len(source["aliases"]) > 128:
+                raise ContextError("Page capture source aliases are invalid")
+            aliases = []
+            for alias in source["aliases"]:
+                if not isinstance(alias, dict) or alias.get("verified") is not True:
+                    raise ContextError("Page capture source alias is unverified")
+                aliases.append({"identity": _capture_source_reference(alias.get("identity"), identity=True),
+                                "evidence": _capture_source_reference(alias.get("evidence")), "verified": True})
+            item["aliases"] = sorted(aliases, key=lambda alias: (alias["identity"], alias["evidence"]))
+        result.append(item)
+    if not any(source["role"] == "writable-owner" for source in result):
+        raise ContextError("Page capture requires an owning source association")
+    return sorted(result, key=lambda source: (source["kind"], source["identity"], source["role"]))
+
+
+def _page_capture_value(snapshot: Any, reviewed_head: str, technical_hash: str) -> tuple[dict[str, Any], list[bytes]]:
+    if not is_full_oid(reviewed_head) or not isinstance(technical_hash, str) or not SHA256_RE.fullmatch(technical_hash):
+        raise ContextError("Page capture requires reviewed head and technical hash")
+    try:
+        if len(json.dumps(snapshot, ensure_ascii=False).encode("utf-8")) > PAGE_CAPTURE_LIMIT:
+            raise ContextError("Page capture exceeds the supplied JSON limit")
+    except (TypeError, ValueError, UnicodeError, RecursionError) as error:
+        raise ContextError("Page capture must be bounded JSON") from error
+    if not isinstance(snapshot, dict) or not _capture_id(snapshot.get("page_id")):
+        raise ContextError("Page capture requires an expected Page identity")
+    page_id = snapshot["page_id"]
+    url = snapshot.get("url")
+    if url != f"https://chatgpt.com/space/{page_id}" or urlsplit(url).path != f"/space/{page_id}":
+        raise ContextError("Page capture URL does not match its Page")
+    stream = snapshot.get("stream_kind")
+    if stream not in ("content", "scratch"):
+        raise ContextError("Page capture requires the selected stream")
+    selected = snapshot.get("selected_block_ids")
+    if (not isinstance(selected, list) or not 1 <= len(selected) <= 64
+            or not all(_capture_id(block_id) for block_id in selected) or len(set(selected)) != len(selected)):
+        raise ContextError("Page capture requires explicit selected block IDs")
+    captured_at = snapshot.get("captured_at")
+    try:
+        if not _capture_text(captured_at, 64) or dt.datetime.fromisoformat(captured_at.replace("Z", "+00:00")).utcoffset() is None:
+            raise ValueError("timezone required")
+    except ValueError as error:
+        raise ContextError("Page capture requires a timestamp with timezone") from error
+    sources = _capture_sources(snapshot.get("source_associations"))
+    if sources != _capture_sources(snapshot.get("expected_source_associations")):
+        raise ContextError("Page capture source association does not match the bound effort")
+    read = snapshot.get("native_read")
+    if not isinstance(read, dict) or read.get("isError"):
+        raise ContextError("Page capture requires a successful native read")
+    read = read.get("structuredContent", read)
+    if (not isinstance(read, dict) or "error" in read or read.get("view") not in (None, "editing", "full")
+            or "block_excerpts" in read or any(read.get(key) for key in ("truncated", "incomplete", "content_truncated"))):
+        raise ContextError("Page capture requires complete native blocks")
+    metadata, content = read.get("metadata"), read.get("content")
+    if (not isinstance(metadata, dict) or not isinstance(content, dict)
+            or metadata.get("page_id") != page_id or content.get("page_id") != page_id
+            or metadata.get("url") != url or metadata.get("stream_kind", "content") != stream
+            or metadata.get("drive_scope") not in (None, "space")
+            or type(content.get("schema_version")) is not int or content["schema_version"] not in (1, 2)):
+        raise ContextError("Page capture native Page or stream identity disagrees")
+    sequence = content.get("through_sequence")
+    if "through_sequence" in content and (type(sequence) is not int or sequence < 0):
+        raise ContextError("Page capture sequence is invalid")
+    blocks = content.get("blocks")
+    if not isinstance(blocks, list) or not 1 <= len(blocks) <= 4096:
+        raise ContextError("Page capture requires complete native blocks")
+    captured_blocks, payloads, seen = [], [], set()
+    for block in blocks:
+        if (not isinstance(block, dict) or not _capture_id(block.get("id")) or block["id"] in seen
+                or block.get("kind") not in ("markdown", "agent_instructions") or not isinstance(block.get("markdown"), str)
+                or not isinstance(block.get("hash"), str) or not SHA256_RE.fullmatch(block["hash"])):
+            raise ContextError("Page capture block metadata is invalid")
+        seen.add(block["id"])
+        payload = block["markdown"].encode("utf-8")
+        if hashlib.sha256(payload).hexdigest() != block["hash"]:
+            raise ContextError("Page capture block hash does not match its complete content")
+        if block["id"] in selected:
+            captured_blocks.append({key: block[key] for key in ("id", "kind", "hash", "markdown")})
+            payloads.append(payload)
+    if not set(selected).issubset(seen):
+        raise ContextError("Page capture selected blocks are missing")
+    if "selection" in read:
+        selection = read["selection"]
+        if (not isinstance(selection, dict) or selection.get("selection_complete") is not True
+                or selection.get("missing_block_ids") != [] or selection.get("returned_block_count") != len(blocks)
+                or not isinstance(selection.get("blocks"), list)
+                or [item.get("block_id") if isinstance(item, dict) else None for item in selection["blocks"]] != [block["id"] for block in blocks]):
+            raise ContextError("Page capture native selection is incomplete or inconsistent")
+    files = [{"block_id": block["id"], "kind": block["kind"], "native_hash": block["hash"],
+              "captured_leaf": f"pr-review-workspace-page-{index:03d}.md", "sha256": block["hash"]}
+             for index, block in enumerate(captured_blocks, 1)]
+    manifest = {"schema_version": 1, "provider": "gpt-space", "page_id": page_id, "url": url,
+                "stream_kind": stream, "source_associations": sources, "captured_at": captured_at,
+                "reviewed_head": reviewed_head, "technical_hash": technical_hash,
+                "content_sha256": stable_hash(captured_blocks), "files": files}
+    if "through_sequence" in content:
+        manifest["through_sequence"] = sequence
+    return manifest, payloads
+
+
+def _owned_page_capture_root(artifact_root: Path) -> Path:
+    root, descriptor = _open_directory(artifact_root)
+    os.close(descriptor)
+    owner = _load_review_owner(root)
+    return validate_owned_review_run(root.parent.parent.parent, root, owner["owner_token"], owner["pr"])
+
+
+def capture_page_workspace(artifact_root: Path, snapshot: dict[str, Any], *, reviewed_head: str, technical_hash: str) -> dict[str, Any]:
+    """Freeze selected complete native Page blocks in an existing owned review run."""
+    root = _owned_page_capture_root(artifact_root)
+    manifest, payloads = _page_capture_value(snapshot, reviewed_head, technical_hash)
+    _, descriptor = _open_directory(root)
+    try:
+        for name in [PAGE_WORKSPACE_MANIFEST, *(file["captured_leaf"] for file in manifest["files"])]:
+            try:
+                artifact_fs.stat(name, dir_fd=descriptor, follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            raise ContextError("workspace capture output already exists; preserve frozen evidence in this run")
+    finally:
+        os.close(descriptor)
+    for file, payload in zip(manifest["files"], payloads):
+        write_artifact_leaf(root, file["captured_leaf"], payload)
+    encoded = (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+    write_artifact_leaf(root, PAGE_WORKSPACE_MANIFEST, encoded)
+    return {"provider": "gpt-space", "manifest": str(root / PAGE_WORKSPACE_MANIFEST),
+            "manifest_sha256": hashlib.sha256(encoded).hexdigest(), "content_sha256": manifest["content_sha256"],
+            "reviewed_head": reviewed_head, "technical_hash": technical_hash,
+            "workspace_files": [str(root / file["captured_leaf"]) for file in manifest["files"]]}
+
+
+def validate_page_workspace(artifact_root: Path, *, reviewed_head: str, technical_hash: str, manifest_sha256: str) -> dict[str, Any]:
+    """Validate frozen Page bytes against the manifest digest retained before dispatch."""
+    root = _owned_page_capture_root(artifact_root)
+    encoded = safe_read_leaf(root, PAGE_WORKSPACE_MANIFEST, limit=PAGE_CAPTURE_LIMIT, require_unaliased=True)
+    if not isinstance(manifest_sha256, str) or not SHA256_RE.fullmatch(manifest_sha256) or hashlib.sha256(encoded).hexdigest() != manifest_sha256:
+        raise ContextError("workspace capture manifest changed; dependent review evidence is not reusable")
+    try:
+        manifest = json.loads(encoded)
+    except (ValueError, UnicodeError) as error:
+        raise ContextError("workspace capture manifest is invalid") from error
+    if (not isinstance(manifest, dict) or manifest.get("provider") != "gpt-space" or manifest.get("schema_version") != 1
+            or manifest.get("reviewed_head") != reviewed_head or manifest.get("technical_hash") != technical_hash
+            or not isinstance(manifest.get("files"), list) or not 1 <= len(manifest["files"]) <= 64):
+        raise ContextError("workspace capture identity does not match the reviewed snapshot")
+    blocks = []
+    for index, file in enumerate(manifest["files"], 1):
+        if not isinstance(file, dict) or file.get("captured_leaf") != f"pr-review-workspace-page-{index:03d}.md":
+            raise ContextError("workspace capture leaf is invalid")
+        payload = safe_read_leaf(root, file["captured_leaf"], limit=PAGE_CAPTURE_LIMIT, require_unaliased=True)
+        if hashlib.sha256(payload).hexdigest() != file.get("sha256"):
+            raise ContextError("workspace capture bytes changed; dependent review evidence is not reusable")
+        try:
+            markdown = payload.decode("utf-8")
+        except UnicodeError as error:
+            raise ContextError("workspace capture is not UTF-8") from error
+        blocks.append({"id": file.get("block_id"), "kind": file.get("kind"), "hash": file.get("native_hash"), "markdown": markdown})
+    content = {"page_id": manifest.get("page_id"), "schema_version": 2, "blocks": blocks}
+    if "through_sequence" in manifest:
+        content["through_sequence"] = manifest["through_sequence"]
+    expected, _ = _page_capture_value({"page_id": manifest.get("page_id"), "url": manifest.get("url"),
+        "stream_kind": manifest.get("stream_kind"), "selected_block_ids": [block["id"] for block in blocks],
+        "captured_at": manifest.get("captured_at"), "source_associations": manifest.get("source_associations"),
+        "expected_source_associations": manifest.get("source_associations"),
+        "native_read": {"metadata": {"page_id": manifest.get("page_id"), "url": manifest.get("url"),
+                                     "stream_kind": manifest.get("stream_kind")}, "content": content}}, reviewed_head, technical_hash)
+    if expected != manifest:
+        raise ContextError("workspace capture provenance or content digest is inconsistent")
+    return manifest
+
+
+def command_capture_page_workspace(args: argparse.Namespace) -> int:
+    root = _owned_page_capture_root(args.artifact_root)
+    try:
+        snapshot = json.loads(safe_read_leaf(root, args.snapshot_name, limit=PAGE_CAPTURE_LIMIT))
+    except (ValueError, UnicodeError) as error:
+        raise ContextError("supplied Page capture JSON is invalid") from error
+    print(json.dumps(capture_page_workspace(root, snapshot, reviewed_head=args.reviewed_head, technical_hash=args.technical_hash), sort_keys=True))
+    return 0
+
+
+def command_verify_page_workspace(args: argparse.Namespace) -> int:
+    manifest = validate_page_workspace(args.artifact_root, reviewed_head=args.reviewed_head,
+                                       technical_hash=args.technical_hash, manifest_sha256=args.manifest_sha256)
+    print(json.dumps({"status": "current", "provider": manifest["provider"], "manifest_sha256": args.manifest_sha256,
+                      "content_sha256": manifest["content_sha256"]}, sort_keys=True))
+    return 0
+
+
 def command_apply_verification(args: argparse.Namespace) -> int:
     inline = json.loads(safe_read_leaf(args.artifact_root, args.inline_name))
     verifier = None
@@ -2458,6 +2702,20 @@ def build_parser() -> argparse.ArgumentParser:
     capture_parser.add_argument("--deadline-epoch", type=float)
     capture_parser.add_argument("--remote", default="origin")
     capture_parser.set_defaults(func=command_capture)
+
+    page_capture_parser = subparsers.add_parser("capture-page-workspace")
+    page_capture_parser.add_argument("--artifact-root", required=True, type=Path)
+    page_capture_parser.add_argument("--snapshot-name", required=True)
+    page_capture_parser.add_argument("--reviewed-head", required=True)
+    page_capture_parser.add_argument("--technical-hash", required=True)
+    page_capture_parser.set_defaults(func=command_capture_page_workspace)
+
+    page_verify_parser = subparsers.add_parser("verify-page-workspace")
+    page_verify_parser.add_argument("--artifact-root", required=True, type=Path)
+    page_verify_parser.add_argument("--reviewed-head", required=True)
+    page_verify_parser.add_argument("--technical-hash", required=True)
+    page_verify_parser.add_argument("--manifest-sha256", required=True)
+    page_verify_parser.set_defaults(func=command_verify_page_workspace)
 
     materialize_parser = subparsers.add_parser("materialize")
     materialize_parser.add_argument("--repo", required=True)

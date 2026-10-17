@@ -32,7 +32,7 @@ unreadable input paths and resolve that material gap before dependent tracing.
 Validate targets and retain missing repositories as explicit limits; continue
 independent analysis when useful targets remain. Do not fabricate topology or
 follow profile references outside the authorized scope. Reuse
-[workspace](../workspace/SKILL.md) for the absolute local or Obsidian home.
+[workspace](../workspace/SKILL.md) for the bound context; keep file paths separate.
 
 ## Trace the selected question
 
@@ -60,8 +60,8 @@ When this method contributes to `full-audit`, put its contract evidence and
 dispositions in that effort's integral report. Do not create another full audit
 or a second principal deliverable.
 
-For direct invocation, honor `--output <absolute-or-workspace-relative-dir>`;
-otherwise use `{workspace}/cross-repo/{analysis-slug}/report/00-consolidated.md`.
+Honor `--output` (absolute or operational-directory-relative) and `--workspace` file destinations. Otherwise Main retains
+the report in the same Page; file modes use `cross-repo/{analysis-slug}/report/00-consolidated.md`.
 Keep scope/snapshots/environment, relevant profile/flow context, repository roles,
 unique findings, invariant/contract results, failure coverage, topology,
 recommendations and limits together. Working per-repository/lens annexes and
@@ -74,7 +74,7 @@ Reuse attributable unchanged-input evidence, update canonical cause/IDs instead
 of summing lens counts, and link observations needed to resolve material gaps.
 Preserve the operator's language and requested delivery grouping.
 
-Present the report path, targets/focus, material boundary or invariant findings
-and explicit limits. Keep linked evidence at stable workspace paths. Clean only
+Present the report location, targets/focus, material boundary or invariant findings
+and explicit limits. Keep native evidence in declared real local storage. Clean only
 run-owned transient scratch after its useful evidence has been retained; never
 delete another effort, requested deliverable or linked reproduction.

@@ -60,7 +60,7 @@ effects, permission or coordination authority.
 
 Keep upstream product/design records, metadata, configuration, surface briefs
 and artifacts at their supported owner-project locations. The selected TH
-workspace holds dependency readiness, research/adaptation rationale and links to
+context holds readiness, research/adaptation rationale and links to
 decisions and verification evidence, not competing design authority. On resumption,
 read current owner records and report stale or contradictory context before
 dependent work; do not repair independently owned drift as a design side effect.
