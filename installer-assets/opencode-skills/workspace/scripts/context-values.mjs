@@ -40,7 +40,7 @@ function sourceReference(value) {
   if (!safeText(value)) throw new Error("source reference invalid");
   const prefix = value.match(/^(?:origin:)+/i)?.[0] ?? "";
   const reference = value.slice(prefix.length);
-  if (!reference) throw new Error("source reference invalid");
+  if (!reference || /^[\s\u0085]+$/u.test(reference)) throw new Error("source reference invalid");
   const urlLooking = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(reference) || /^(?:https?|ssh):/i.test(reference);
   if (urlLooking && (reference.includes("\\") || !/^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/?#]+/.test(reference))) {
     throw new Error("source reference invalid");
