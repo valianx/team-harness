@@ -607,12 +607,23 @@ class PageWorkspaceTests(unittest.TestCase):
             root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
             target = root / "pr-review-workspace-page-001.md"
             replacement = Path(directory) / "replacement"
+            retired = Path(directory) / "retired-original"
             replacement.write_bytes(b"foreign capture bytes")
             failure = OSError(errno.ENOSPC, "injected after publication")
+            raw_refusal = PermissionError(errno.EACCES, "simulated Windows held-target refusal")
+            raw_refusal.winerror = 32
             real_pin = MODULE._pin_capture_alias
             real_close = MODULE.os.close
             real_promote = MODULE.promote_artifact
-            handoff = {}
+            real_replace = MODULE.os.replace
+            handoff = {"injection_status": "not_attempted", "raw_replacement_attempts": []}
+
+            def refuse_raw_replacement(source, destination, **kwargs):
+                if (Path(source).name == replacement.name and Path(destination).name == target.name
+                        and kwargs.get("src_dir_fd") is None and kwargs.get("dst_dir_fd") is None):
+                    handoff["raw_replacement_attempts"].append("raw os.replace")
+                    raise raw_refusal
+                return real_replace(source, destination, **kwargs)
 
             def observe_handoff(root, name, pinned):
                 alias = real_pin(root, name, pinned)
@@ -636,9 +647,35 @@ class PageWorkspaceTests(unittest.TestCase):
                         handoff["original_close_errno"] = error.errno
                     metadata = os.fstat(handoff["alias"])
                     handoff["retained_after_close"] = (metadata.st_dev, metadata.st_ino)
-                    os.replace(replacement, target)
-                    metadata = os.fstat(handoff["alias"])
-                    handoff["retained_after_replace"] = (metadata.st_dev, metadata.st_ino)
+                    handoff["boundary"] = "open anchored directories"
+                    try:
+                        _, run_fd = MODULE._open_directory(root)
+                        try:
+                            _, outside_fd = MODULE._open_directory(Path(directory))
+                            try:
+                                handoff["boundary"] = "read original bytes"
+                                handoff["original_bytes"] = MODULE.safe_read_leaf(root, target.name)
+                                # Legacy Windows rename cannot replace an open destination.
+                                # Move its entry aside first; its verified alias stays live.
+                                handoff["boundary"] = "rename pinned original to absent leaf"
+                                MODULE.artifact_fs.replace(target.name, retired.name, src_dir_fd=run_fd, dst_dir_fd=outside_fd)
+                                handoff["boundary"] = "rename foreign bytes to absent final leaf"
+                                MODULE.artifact_fs.replace(replacement.name, target.name, src_dir_fd=outside_fd, dst_dir_fd=run_fd)
+                                handoff["boundary"] = "fstat alias after replacement"
+                                metadata = os.fstat(handoff["alias"])
+                                handoff["retained_after_replace"] = (metadata.st_dev, metadata.st_ino)
+                                handoff["injection_status"] = "replaced"
+                            finally:
+                                real_close(outside_fd)
+                        finally:
+                            real_close(run_fd)
+                    except Exception as error:
+                        handoff["injection_status"] = "failed"
+                        handoff["injection_error"] = {
+                            "type": type(error).__name__, "error": str(error),
+                            "errno": getattr(error, "errno", None), "winerror": getattr(error, "winerror", None),
+                        }
+                        raise
                     return
                 real_close(descriptor)
 
@@ -649,18 +686,27 @@ class PageWorkspaceTests(unittest.TestCase):
 
             with patch.object(MODULE, "_pin_capture_alias", side_effect=observe_handoff), \
                     patch.object(MODULE.os, "close", side_effect=replace_name_after_original_pin_closes), \
+                    patch.object(MODULE.os, "replace", side_effect=refuse_raw_replacement), \
                     patch.object(MODULE, "promote_artifact", side_effect=publish_then_fail), \
                     self.assertRaises(OSError) as caught:
                 self.capture(root)
+            notes = " ".join(getattr(caught.exception, "__notes__", []))
+            diagnostic = f"namespace injection: {handoff!r}; capture cleanup notes: {notes}"
             self.assertIs(caught.exception, failure)
+            self.assertEqual(handoff["injection_status"], "replaced", diagnostic)
+            self.assertEqual(handoff["raw_replacement_attempts"], [], diagnostic)
             self.assertEqual(handoff["original_close_errno"], errno.EBADF)
             self.assertEqual(handoff["retained_before_close"], handoff["expected"])
             self.assertEqual(handoff["retained_after_close"], handoff["expected"])
             self.assertEqual(handoff["retained_after_replace"], handoff["expected"])
             self.assertEqual(target.read_bytes(), b"foreign capture bytes")
+            self.assertEqual(retired.read_bytes(), handoff["original_bytes"])
+            metadata = retired.stat()
+            self.assertEqual((metadata.st_dev, metadata.st_ino), handoff["expected"])
+            self.assertFalse(replacement.exists())
             self.assertFalse((root / "pr-review-workspace-page-002.md").exists())
             self.assertFalse(any(file.name.startswith("tmp-") for file in root.iterdir()))
-            self.assertIn(target.name, " ".join(getattr(caught.exception, "__notes__", [])))
+            self.assertIn(target.name, notes)
 
 
 def seed_review_artifacts(root: Path, original: dict, latest: dict | None = None):
