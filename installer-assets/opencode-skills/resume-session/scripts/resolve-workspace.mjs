@@ -28,6 +28,16 @@ async function regularFile(candidate) {
   }
 }
 
+async function resolveWorkspaceHandoff({ base, feature, workspace, candidates }) {
+  const handoff = path.join(workspace, "00-session-handoff.md");
+  const state = path.join(workspace, "00-state.md");
+  const result = { base, feature, workspace, workspace_name: path.basename(workspace), handoff, state, candidates };
+  if (!(await regularFile(handoff))) {
+    return { status: "handoff-missing", reason_code: "HANDOFF_NOT_FOUND", ...result };
+  }
+  return { status: "resolved", reason_code: null, ...result, state_available: await regularFile(state) };
+}
+
 export async function resolveWorkspace({ basePath, feature } = {}) {
   if (typeof basePath !== "string" || !path.isAbsolute(basePath)
     || typeof feature !== "string" || feature.length === 0 || feature.length > 256
@@ -61,34 +71,7 @@ export async function resolveWorkspace({ basePath, feature } = {}) {
     return { status: "ambiguous", reason_code: "WORKSPACE_AMBIGUOUS", base, feature, candidates: names };
   }
 
-  const workspace = path.join(base, names[0]);
-  const handoff = path.join(workspace, "00-session-handoff.md");
-  const state = path.join(workspace, "00-state.md");
-  if (!(await regularFile(handoff))) {
-    return {
-      status: "handoff-missing",
-      reason_code: "HANDOFF_NOT_FOUND",
-      base,
-      feature,
-      workspace,
-      workspace_name: names[0],
-      handoff,
-      state,
-      candidates: names,
-    };
-  }
-  return {
-    status: "resolved",
-    reason_code: null,
-    base,
-    feature,
-    workspace,
-    workspace_name: names[0],
-    handoff,
-    state,
-    state_available: await regularFile(state),
-    candidates: names,
-  };
+  return resolveWorkspaceHandoff({ base, feature, workspace: path.join(base, names[0]), candidates: names });
 }
 
 /** Resolve retained file or native Page context without creating a destination. */
@@ -97,7 +80,13 @@ export async function resolveContextWorkspace({ binding, remoteCandidates, listi
   if (validated.status !== "ready") return { ...validated, binding, create_allowed: false };
   const context = validated.binding.context;
   if (context.kind === "file") {
-    return resolveWorkspace({ basePath: path.dirname(context.path), feature: path.basename(context.path) });
+    const workspace = path.resolve(context.path);
+    const base = path.dirname(workspace);
+    const feature = path.basename(workspace);
+    if (!(await realDirectory(workspace))) {
+      return { status: "not-found", reason_code: "WORKSPACE_NOT_FOUND", base, feature, candidates: [] };
+    }
+    return resolveWorkspaceHandoff({ base, feature, workspace, candidates: [feature] });
   }
   const selected = selectSpaceEffort({
     containerId: context.container_page_id,

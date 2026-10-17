@@ -525,6 +525,128 @@ class PageWorkspaceTests(unittest.TestCase):
             self.assertIn("cleanup", diagnostic.getvalue())
             self.assertIn("pr-review-workspace-page-001.md", diagnostic.getvalue())
 
+    def test_capture_rolls_back_when_adapter_defers_unlink_until_stage_pin_closes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
+            before = {file.name: file.read_bytes() for file in root.iterdir()}
+            failure = OSError(errno.ENOSPC, "injected after publication")
+            real_temporary = MODULE._temporary_leaf
+            real_promote = MODULE.promote_artifact
+            real_unlink = MODULE.artifact_fs.unlink
+            real_stat = MODULE.artifact_fs.stat
+            real_close = MODULE.os.close
+            stage_pins = {}
+            pending = set()
+
+            def pin_stage(*args, **kwargs):
+                result = real_temporary(*args, **kwargs)
+                if kwargs.get("pin"):
+                    path, descriptor = result
+                    stage_pins[descriptor] = path.name
+                return result
+
+            def defer_stage_unlink(name, *args, **kwargs):
+                if name in stage_pins.values():
+                    pending.add(name)
+                    return
+                return real_unlink(name, *args, **kwargs)
+
+            def stat_without_pending_names(name, *args, **kwargs):
+                if name in pending:
+                    raise PermissionError(errno.EACCES, "adapter entry is pending deletion", name)
+                return real_stat(name, *args, **kwargs)
+
+            def close_stage_pin(descriptor):
+                name = stage_pins.pop(descriptor, None)
+                real_close(descriptor)
+                if name in pending:
+                    pending.remove(name)
+                    _, directory_fd = MODULE._open_directory(root)
+                    try:
+                        real_unlink(name, dir_fd=directory_fd)
+                    finally:
+                        real_close(directory_fd)
+
+            def publish_then_fail(root, temporary, final):
+                real_promote(root, temporary, final)
+                if final == "pr-review-workspace-page-002.md":
+                    raise failure
+
+            with patch.object(MODULE, "_temporary_leaf", side_effect=pin_stage), \
+                    patch.object(MODULE.artifact_fs, "unlink", side_effect=defer_stage_unlink), \
+                    patch.object(MODULE.artifact_fs, "stat", side_effect=stat_without_pending_names), \
+                    patch.object(MODULE.os, "close", side_effect=close_stage_pin), \
+                    patch.object(MODULE, "promote_artifact", side_effect=publish_then_fail), \
+                    self.assertRaises(OSError) as caught:
+                self.capture(root)
+            self.assertIs(caught.exception, failure)
+            self.assertEqual({file.name: file.read_bytes() for file in root.iterdir()}, before,
+                             " ".join(getattr(caught.exception, "__notes__", [])))
+            receipt = self.capture(root)
+            self.assertEqual(len(self.verify(root, receipt)["files"]), 2)
+
+    def test_capture_alias_pin_refuses_a_replacement_without_releasing_original(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
+            temporary, pinned = MODULE._temporary_leaf(root, "tmp-owned", pin=True)
+            try:
+                MODULE._write_existing_leaf(temporary, b"owned")
+                MODULE.write_artifact_leaf(root, "published.md", b"replacement")
+                self.assertTrue(callable(getattr(MODULE, "_pin_capture_alias", None)))
+                with self.assertRaisesRegex(MODULE.ContextError, "same pinned artifact"):
+                    MODULE._pin_capture_alias(root, "published.md", pinned)
+                self.assertEqual(os.fstat(pinned).st_size, 5)
+                self.assertEqual(MODULE.safe_read_leaf(root, temporary.name), b"owned")
+                self.assertEqual(MODULE.safe_read_leaf(root, "published.md"), b"replacement")
+            finally:
+                os.close(pinned)
+
+    def test_capture_handoff_keeps_original_inode_pinned_when_final_name_is_replaced(self):
+        self.assertTrue(callable(getattr(MODULE, "_pin_capture_alias", None)))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
+            target = root / "pr-review-workspace-page-001.md"
+            replacement = Path(directory) / "replacement"
+            replacement.write_bytes(b"foreign capture bytes")
+            failure = OSError(errno.ENOSPC, "injected after publication")
+            real_pin = MODULE._pin_capture_alias
+            real_close = MODULE.os.close
+            real_promote = MODULE.promote_artifact
+            handoff = {}
+
+            def observe_handoff(root, name, pinned):
+                alias = real_pin(root, name, pinned)
+                if name == target.name:
+                    metadata = os.fstat(pinned)
+                    handoff.update(original=pinned, alias=alias, expected=(metadata.st_dev, metadata.st_ino))
+                return alias
+
+            def replace_name_before_original_pin_closes(descriptor):
+                if descriptor == handoff.get("original"):
+                    handoff.pop("original")
+                    os.replace(replacement, target)
+                    real_close(descriptor)
+                    metadata = os.fstat(handoff["alias"])
+                    handoff["retained"] = (metadata.st_dev, metadata.st_ino)
+                    return
+                real_close(descriptor)
+
+            def publish_then_fail(root, temporary, final):
+                real_promote(root, temporary, final)
+                if final == "pr-review-workspace-page-002.md":
+                    raise failure
+
+            with patch.object(MODULE, "_pin_capture_alias", side_effect=observe_handoff), \
+                    patch.object(MODULE.os, "close", side_effect=replace_name_before_original_pin_closes), \
+                    patch.object(MODULE, "promote_artifact", side_effect=publish_then_fail), \
+                    self.assertRaises(OSError) as caught:
+                self.capture(root)
+            self.assertIs(caught.exception, failure)
+            self.assertEqual(handoff["retained"], handoff["expected"])
+            self.assertEqual(target.read_bytes(), b"foreign capture bytes")
+            self.assertFalse((root / "pr-review-workspace-page-002.md").exists())
+            self.assertIn(target.name, " ".join(getattr(caught.exception, "__notes__", [])))
+
 
 def seed_review_artifacts(root: Path, original: dict, latest: dict | None = None):
     """Seed the immutable context pair plus representative completed review work."""

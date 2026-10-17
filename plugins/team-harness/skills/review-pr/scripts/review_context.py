@@ -2289,6 +2289,24 @@ def _capture_cleanup_note(error: Exception, message: str) -> None:
         print(f"review-context: {message}", file=sys.stderr)
 
 
+def _pin_capture_alias(root: Path, name: str, pinned: int) -> int:
+    name = _safe_leaf(name)
+    _, directory_fd = _open_directory(root)
+    try:
+        alias = artifact_fs.open(name, os.O_RDONLY | NOFOLLOW, dir_fd=directory_fd)
+        try:
+            original = os.fstat(pinned)
+            observed = os.fstat(alias)
+            if not stat.S_ISREG(observed.st_mode) or (observed.st_dev, observed.st_ino) != (original.st_dev, original.st_ino):
+                raise ContextError("capture alias is not the same pinned artifact")
+            return alias
+        except Exception:
+            os.close(alias)
+            raise
+    finally:
+        os.close(directory_fd)
+
+
 def capture_page_workspace(artifact_root: Path, snapshot: dict[str, Any], *, reviewed_head: str, technical_hash: str) -> dict[str, Any]:
     """Freeze selected complete native Page blocks in an existing owned review run."""
     root = _owned_page_capture_root(artifact_root)
@@ -2322,6 +2340,20 @@ def capture_page_workspace(artifact_root: Path, snapshot: dict[str, Any], *, rev
         capture_error = error
         cleanup_errors = []
         cleanup = []
+        published_names = {name for name, _ in attempted}
+        # Windows stage deletion may remain pending until its original handle closes.
+        # Keep the inode pinned through its verified final alias before releasing that handle.
+        for index, (temporary, final_name, pinned) in enumerate(staged):
+            if final_name not in published_names:
+                continue
+            try:
+                alias = _pin_capture_alias(root, final_name, pinned)
+                staged[index] = (temporary, final_name, alias)
+                os.close(pinned)
+            except FileNotFoundError:
+                continue
+            except Exception as cleanup_error:
+                cleanup_errors.append(f"{final_name}: {cleanup_error}")
         for temporary, _, pinned in staged:
             try:
                 metadata = os.fstat(pinned)

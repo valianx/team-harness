@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import * as resolver from "../skills/resume-session/scripts/resolve-workspace.mjs";
+import { validateContextBinding } from "../skills/workspace/scripts/workspace-context.mjs";
 
 const { resolveWorkspace } = resolver;
 
@@ -43,6 +44,68 @@ try {
     `2026-08-25_${feature}`,
   ]);
 
+  const bindFile = workspace => ({ context: { kind: "file", mode: "local", path: workspace, identity: null },
+    operational_directory: workspace });
+  const retainedMissing = path.join(root, "retained-missing");
+  const replacement = path.join(root, "2026-10-17_retained-missing");
+  await mkdir(replacement);
+  await writeFile(path.join(replacement, "00-session-handoff.md"), "Unrelated dated effort\n", "utf8");
+  const missingBound = await resolver.resolveContextWorkspace({ binding: bindFile(retainedMissing) });
+  assert.equal(missingBound.status, "not-found", "an absent retained path cannot discover a dated replacement");
+  assert.equal(missingBound.reason_code, "WORKSPACE_NOT_FOUND");
+  assert.deepEqual(missingBound.candidates, []);
+  await assert.rejects(lstat(retainedMissing), { code: "ENOENT" }, "read-only lookup cannot create the missing bound path");
+
+  const undated = path.join(root, feature);
+  await mkdir(undated);
+  await writeFile(path.join(undated, "00-session-handoff.md"), "Retained undated effort\n", "utf8");
+  const exactBound = await resolver.resolveContextWorkspace({ binding: bindFile(undated) });
+  assert.equal(exactBound.status, "resolved", "an existing retained undated path wins over dated siblings");
+  assert.equal(exactBound.workspace, undated);
+  assert.deepEqual(exactBound.candidates, [feature]);
+  assert.equal((await resolveWorkspace({ basePath: root, feature })).status, "ambiguous",
+    "unbound feature discovery still considers all matching directories");
+
+  const unicodeWorkspace = path.join(root, "tarea con espacios ñ");
+  await mkdir(unicodeWorkspace);
+  await writeFile(path.join(unicodeWorkspace, "00-session-handoff.md"), "Retained Unicode effort\n", "utf8");
+  const unicodeBinding = bindFile(unicodeWorkspace);
+  assert.equal(validateContextBinding(unicodeBinding).status, "ready");
+  const unicodeBound = await resolver.resolveContextWorkspace({ binding: unicodeBinding });
+  assert.equal(unicodeBound.status, "resolved", "a valid bound path does not inherit feature-discovery name restrictions");
+  assert.equal(unicodeBound.workspace, unicodeWorkspace);
+
+  const emptyBound = path.join(root, "retained-empty");
+  await mkdir(emptyBound);
+  const emptyReplacement = path.join(root, "2026-10-17_retained-empty");
+  await mkdir(emptyReplacement);
+  await writeFile(path.join(emptyReplacement, "00-session-handoff.md"), "Another effort\n", "utf8");
+  const emptyResult = await resolver.resolveContextWorkspace({ binding: bindFile(emptyBound) });
+  assert.equal(emptyResult.status, "handoff-missing");
+  assert.equal(emptyResult.workspace, emptyBound);
+  assert.deepEqual(await readdir(emptyBound), [], "a missing handoff and state remain unwritten");
+
+  const readOnlyBound = path.join(root, "retained-read-only");
+  const readOnlyHandoff = path.join(readOnlyBound, "00-session-handoff.md");
+  await mkdir(readOnlyBound);
+  await writeFile(readOnlyHandoff, "Retained read-only effort\n", "utf8");
+  await chmod(readOnlyHandoff, 0o444);
+  await chmod(readOnlyBound, 0o555);
+  try {
+    const directoryMode = (await lstat(readOnlyBound)).mode;
+    const handoffMode = (await lstat(readOnlyHandoff)).mode;
+    const readOnly = await resolver.resolveContextWorkspace({ binding: bindFile(readOnlyBound) });
+    assert.equal(readOnly.status, "resolved", "read-only retained context can be resumed without writes");
+    assert.equal(readOnly.state_available, false);
+    assert.deepEqual(await readdir(readOnlyBound), ["00-session-handoff.md"]);
+    assert.equal(await readFile(readOnlyHandoff, "utf8"), "Retained read-only effort\n");
+    assert.equal((await lstat(readOnlyBound)).mode, directoryMode);
+    assert.equal((await lstat(readOnlyHandoff)).mode, handoffMode);
+  } finally {
+    await chmod(readOnlyBound, 0o755);
+    await chmod(readOnlyHandoff, 0o644);
+  }
+
   const missingFeature = "missing-handoff";
   const missing = path.join(root, `2026-08-24_${missingFeature}`);
   await mkdir(missing);
@@ -55,6 +118,24 @@ try {
   await writeFile(path.join(external, "00-session-handoff.md"), "### What Worked\n", "utf8");
   await symlink(external, path.join(root, "2026-08-24_symlinked"), process.platform === "win32" ? "junction" : "dir");
   assert.equal((await resolveWorkspace({ basePath: root, feature: "symlinked" })).status, "not-found");
+  assert.equal((await resolver.resolveContextWorkspace({ binding: bindFile(path.join(root, "2026-08-24_symlinked")) })).status,
+    "not-found", "bound lookup does not follow a linked directory");
+  const linkedDirectory = path.join(root, "retained-linked-directory");
+  await symlink(external, linkedDirectory, process.platform === "win32" ? "junction" : "dir");
+  const linkedReplacement = path.join(root, "2026-10-17_retained-linked-directory");
+  await mkdir(linkedReplacement);
+  await writeFile(path.join(linkedReplacement, "00-session-handoff.md"), "Another effort\n", "utf8");
+  assert.equal((await resolver.resolveContextWorkspace({ binding: bindFile(linkedDirectory) })).status,
+    "not-found", "a linked bound directory cannot be replaced by a dated sibling");
+  assert.equal((await lstat(linkedDirectory)).isSymbolicLink(), true);
+  const linkedHandoff = path.join(root, "retained-linked-handoff");
+  await mkdir(linkedHandoff);
+  await symlink(path.join(external, "00-session-handoff.md"), path.join(linkedHandoff, "00-session-handoff.md"), "file");
+  const linkedResult = await resolver.resolveContextWorkspace({ binding: bindFile(linkedHandoff) });
+  assert.equal(linkedResult.status, "handoff-missing", "bound lookup does not follow a linked handoff");
+  assert.equal(linkedResult.workspace, linkedHandoff);
+  assert.equal((await lstat(path.join(linkedHandoff, "00-session-handoff.md"))).isSymbolicLink(), true);
+  assert.equal(await readFile(path.join(external, "00-session-handoff.md"), "utf8"), "### What Worked\n");
 
   for (const invalid of ["../escape", "a/b", "*", "..", ""]) {
     assert.equal((await resolveWorkspace({ basePath: root, feature: invalid })).status, "invalid");
