@@ -59,11 +59,13 @@ export function resolveContextBinding({ boundContext = null, preference, fileIde
   }
   if (preference.mode === "gpt-space") {
     if (remoteIdentity === null) return outcome("pending", "remote_identity_required");
+    if (remoteIdentity?.kind !== "gpt-space") return outcome("invalid", "remote_kind_mismatch");
     return validateContextBinding({ context: remoteIdentity, operational_directory: operationalDirectory ?? null });
   }
   if (fileIdentity === null) return outcome("pending", "file_identity_required");
   const binding = isWorkspaceIdentity(fileIdentity) ? wrapFile(fileIdentity)
     : { context: fileIdentity, operational_directory: operationalDirectory ?? fileIdentity?.path ?? null };
+  if (binding.context?.kind !== "file") return outcome("invalid", "file_kind_mismatch");
   if (binding.context?.mode !== preference.mode) return outcome("invalid", "file_mode_mismatch");
   return validateContextBinding(binding);
 }

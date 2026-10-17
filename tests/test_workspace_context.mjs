@@ -48,6 +48,26 @@ const selectedRemote = selectWorkspacePreference({ "workspace-mode": "gpt-space"
 const selectedLocal = selectWorkspacePreference({ "workspace-mode": "local" });
 const invalidPreference = selectWorkspacePreference({ "workspace-mode": null, "logs-mode": "local" });
 
+const mismatchedFileIdentity = { kind: "file", mode: "local", path: "/tmp/th-wrong-kind", identity: null };
+assert.deepEqual(resolveContextBinding({ preference: selectedRemote, remoteIdentity: mismatchedFileIdentity }), {
+  status: "invalid", binding: null, reason_code: "remote_kind_mismatch",
+}, "an unbound remote preference cannot accept a file context through remoteIdentity");
+for (const mode of ["local", "obsidian"]) {
+  const preference = selectWorkspacePreference({ "workspace-mode": mode });
+  const mismatchedRemoteIdentity = { ...remote, mode };
+  assert.deepEqual(resolveContextBinding({ preference, fileIdentity: mismatchedRemoteIdentity }), {
+    status: "invalid", binding: null, reason_code: "file_kind_mismatch",
+  }, `an unbound ${mode} preference cannot accept a remote context carrying a matching mode`);
+  assert.deepEqual(resolveContextBinding({ boundContext: remoteBinding, preference, fileIdentity: mismatchedRemoteIdentity }).binding,
+    remoteBinding, "a retained binding wins before inspecting irrelevant new identity inputs");
+  assert.equal(resolveContextBinding({ preference, fileIdentity: null }).status, "pending");
+}
+const retainedFileBinding = { context: mismatchedFileIdentity, operational_directory: null };
+assert.deepEqual(resolveContextBinding({ boundContext: retainedFileBinding, preference: selectedRemote,
+  remoteIdentity: mismatchedFileIdentity }).binding, retainedFileBinding,
+  "a retained file binding remains valid after a remote default is selected");
+assert.equal(resolveContextBinding({ preference: selectedRemote, remoteIdentity: null }).status, "pending");
+
 assert.deepEqual(validateContextBinding(remoteBinding), { status: "ready", binding: remoteBinding, reason_code: null });
 for (const preference of [selectedLocal, invalidPreference]) {
   assert.deepEqual(resolveContextBinding({ boundContext: remoteBinding, preference }).binding, remoteBinding,
