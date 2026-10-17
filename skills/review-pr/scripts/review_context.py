@@ -2145,6 +2145,18 @@ def _capture_id(value: Any) -> bool:
     return _capture_text(value, 512) and not re.search(r"[\s/\\:]", value) and value not in {".", ".."}
 
 
+def _capture_check_no_userinfo_marker(reference: str) -> None:
+    # Percent escapes must not hide userinfo in retained source references.
+    decoded = reference
+    while True:
+        if "@" in decoded:
+            raise ContextError("Page capture source reference is invalid")
+        next_decoded = re.sub(r"%([0-9A-Fa-f]{2})", lambda match: chr(int(match.group(1), 16)), decoded)
+        if next_decoded == decoded:
+            return
+        decoded = next_decoded
+
+
 def _capture_source_reference(value: Any, *, identity: bool = False) -> str:
     if not _capture_text(value, 1024 if identity else 4096):
         raise ContextError("Page capture source reference is invalid")
@@ -2163,6 +2175,7 @@ def _capture_source_reference(value: Any, *, identity: bool = False) -> str:
             _ = parsed.port  # urlsplit defers validation of malformed authority ports.
         if parsed.hostname:
             host = parsed.netloc.rsplit("@", 1)[-1]
+            _capture_check_no_userinfo_marker(host)
             return prefix + urlunsplit((parsed.scheme, host, parsed.path, "", ""))
     except ValueError:
         raise ContextError("Page capture source reference is invalid") from None
@@ -2181,15 +2194,7 @@ def _capture_source_reference(value: Any, *, identity: bool = False) -> str:
         retained = host + ":" + source_path
     if re.search(r"[?#]", retained):
         raise ContextError("Page capture source reference is invalid")
-    # Nested percent escapes must not hide userinfo in otherwise opaque references.
-    decoded = retained
-    while True:
-        if "@" in decoded:
-            raise ContextError("Page capture source reference is invalid")
-        next_decoded = re.sub(r"%([0-9A-Fa-f]{2})", lambda match: chr(int(match.group(1), 16)), decoded)
-        if next_decoded == decoded:
-            break
-        decoded = next_decoded
+    _capture_check_no_userinfo_marker(retained)
     return prefix + retained
 
 

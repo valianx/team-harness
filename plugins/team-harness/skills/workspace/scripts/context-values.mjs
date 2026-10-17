@@ -26,6 +26,16 @@ function isPortableHostDirectory(value) {
   return normalized !== syntax.parse(normalized).root;
 }
 
+function assertNoUserinfoMarker(value) {
+  // Nested percent escapes must not hide userinfo in retained source coordinates.
+  for (let decoded = value; ;) {
+    if (decoded.includes("@")) throw new Error("source reference invalid");
+    const next = decoded.replace(/%([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)));
+    if (next === decoded) return;
+    decoded = next;
+  }
+}
+
 function sourceReference(value) {
   if (!safeText(value)) throw new Error("source reference invalid");
   const prefix = value.match(/^(?:origin:)+/i)?.[0] ?? "";
@@ -34,6 +44,7 @@ function sourceReference(value) {
   try {
     const parsed = new URL(reference);
     if (parsed.hostname) {
+      assertNoUserinfoMarker(parsed.hostname);
       parsed.username = "";
       parsed.password = "";
       parsed.search = "";
@@ -60,13 +71,7 @@ function sourceReference(value) {
     retained = `${host}:${sourcePath}`;
   }
   if (/[?#]/.test(retained)) throw new Error("source reference invalid");
-  // Nested percent escapes must not hide userinfo in otherwise opaque references.
-  for (let decoded = retained; ;) {
-    if (decoded.includes("@")) throw new Error("source reference invalid");
-    const next = decoded.replace(/%([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)));
-    if (next === decoded) break;
-    decoded = next;
-  }
+  assertNoUserinfoMarker(retained);
   return `${prefix}${retained}`;
 }
 

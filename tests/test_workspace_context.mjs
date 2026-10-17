@@ -230,6 +230,13 @@ const invalidSourceReferences = [
   `host:owner/repo#${credentialCanary}`,
   `repository:merchant?token=${credentialCanary}`,
   `project:annual-review#${credentialCanary}`,
+  `git+ssh://user%3A${credentialCanary}%40example.test/owner/repo`,
+  `git+ssh://user%253A${credentialCanary}%2540example.test/owner/repo`,
+  `git+ssh://user%253A${credentialCanary}%25%34%30example.test/owner/repo`,
+  `ssh://user%3A${credentialCanary}%40example.test/owner/repo`,
+  `custom://user%3A${credentialCanary}%40example.test/owner/repo`,
+  `https://user%3A${credentialCanary}%40example.test/owner/repo`,
+  `git+ssh://git:${credentialCanary}@user%3A${credentialCanary}%2540example.test/owner/repo`,
 ];
 for (const [index, invalidReference] of invalidSourceReferences.entries()) {
   for (const prefix of originPrefixes) {
@@ -261,6 +268,11 @@ for (const [reference, expected] of [
   [`https://first@user:${credentialCanary}@github.example/owner/repo.git`, "https://github.example/owner/repo.git"],
   [`ssh://user%3A${credentialCanary}%40extra@github.example/owner/repo.git`, "ssh://github.example/owner/repo.git"],
   [`git+ssh://user:${credentialCanary}@github.example/owner/repo.git?access=synthetic-query#fragment`, "git+ssh://github.example/owner/repo.git"],
+  ["https://github.example/owner/user%3Aname%40example.test.git", "https://github.example/owner/user%3Aname%40example.test.git"],
+  [`git+ssh://git:${credentialCanary}@github.example/owner/user%3Aname%40example.test.git?access=synthetic-query#fragment`, "git+ssh://github.example/owner/user%3Aname%40example.test.git"],
+  ["git+ssh://github.example/owner/user%253Aname%2540example.test.git", "git+ssh://github.example/owner/user%253Aname%2540example.test.git"],
+  [`https://git:${credentialCanary}@b\u00fccher.example/owner/repo.git`, "https://xn--bcher-kva.example/owner/repo.git"],
+  [`ssh://git:${credentialCanary}@[2001:db8::1]/owner/repo.git`, "ssh://[2001:db8::1]/owner/repo.git"],
 ]) {
   for (const prefix of originPrefixes) {
     for (const [field, makeAssociation, readReference] of sourceReferenceLocations) {
