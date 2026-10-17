@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "runtimes": {
+    "claude": {
+      "native_package": {
+        "requirements": [{ "tool": "claude" }],
+        "owner": "claude_native_plugin_manager"
+      }
+    },
+    "codex": {
+      "native_package": {
+        "requirements": [{ "tool": "codex" }],
+        "owner": "codex_native_plugin_manager",
+        "platforms": ["posix"],
+        "support": "beta"
+      }
+    },
+    "opencode": {
+      "native_package": {
+        "requirements": [{ "tool": "opencode" }],
+        "owner": "published_team_harness_binary"
+      }
+    },
+    "pi": {
+      "native_package": {
+        "requirements": [
+          { "tool": "pi", "minimum": "1.3.0" },
+          { "tool": "node", "minimum": "22.19.0" }
+        ],
+        "owner": "pi_native_package_manager"
+      }
+    }
+  },
+  "capabilities": {
+    "status_reader": {
+      "optional": true,
+      "requirements": [{ "tool": "python", "minimum": "3.8.0" }]
+    },
+    "codex_agents": {
+      "optional": true,
+      "requirements": [{ "tool": "python", "minimum": "3.11.0" }]
+    },
+    "github": {
+      "optional": true,
+      "requirements": [{ "tool": "gh" }],
+      "verification": "native_authentication"
+    },
+    "context7": {
+      "optional": true,
+      "requirements": [{ "tool": "native_mcp_access" }]
+    },
+    "gpt_space": {
+      "optional": true,
+      "requirements": [{ "tool": "native_page_access" }]
+    },
+    "obsidian": {
+      "optional": true,
+      "requirements": [{ "tool": "selected_vault_access" }]
+    },
+    "workflow_providers": {
+      "optional": true,
+      "requirements": [{ "tool": "selected_workflow_provider" }]
+    }
+  }
+}

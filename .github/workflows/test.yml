@@ -112,6 +112,7 @@ jobs:
       - name: Verify portable workflow regressions on Windows
         run: python tests/test_inline_git_hardening.py
       - run: python tests/test_github_identity_routes.py
+      - run: python tests/test_setup_status.py
       - run: python tests/test_pi_shared_routes.py
       - run: node tests/test_codex_usage.mjs
       - run: node tests/test_pipeline_control_plane.mjs

@@ -7,6 +7,22 @@ Configure the Team Harness system. Run this after installing the plugin or to re
 
 Analyze the input: $ARGUMENTS
 
+## Read-only status and setup choices
+
+Handle `status` and `status --all` before provider routing, version refresh or writes; report and return.
+Resolve the actual native configuration root and selected TH plugin root from the host.
+Verify Python 3.8+ with bounded literal argv probes: `python3`, then `python`;
+on Windows, try `py` with `-3`, then `python`, then `python3`. Keep executable/prefix arguments separate.
+Invoke the verified interpreter with this skill's absolute `scripts/setup_status.py` path and
+`--runtime claude --root ABS_CONFIG_ROOT --package-root ABS_PACKAGE_ROOT`; pass the selected `--scope`.
+Add `--all` only for an explicit inventory of other hosts; discovery authorizes no installation or configuration.
+Use `scripts/setup_requirements.json` for operation-specific prerequisites and recovery.
+Report CLI, package, configuration and activation separately; file presence leaves activation unknown.
+Without a suitable interpreter, inspect native evidence directly and report helper inspection unavailable,
+with recovery; this is a partial diagnostic, not a failed native installation. Never print raw settings or command output.
+Offer minimal native setup first, reuse healthy installations/preferences, then prepare only selected optional capabilities.
+Honor an existing selection without asking again. Preserve unavailable Space bindings; offer alternatives only for new work.
+
 ## Upstream provider route
 
 Route the explicit targets `openspec`, `superpowers`, `tea`, `rea`, `semgrep`,
@@ -78,7 +94,8 @@ observed stale activation.
 
 Normalize `$ARGUMENTS`: trim surrounding whitespace; lowercase the result for matching only (the raw value is never written or logged). Branch:
 
-- **Empty or whitespace-only →** run the full flow, Steps 0 through 8, exactly as written today. No behavioural change. Step 0 version-staleness guard runs as normal.
+- **Empty or whitespace-only →** offer the setup choices above, then run only the applicable Steps 0 through 8.
+  Minimal mode keeps necessary native writes and workspace/language defaults, skipping unselected optional integrations and their surveys.
 - **Non-empty →** match the normalized text against the bilingual intent map below. On a confident match → enter **Targeted mode** for that one concern (see § Targeted mode contract). On no confident match → enter the **No-match fallback** (see below).
 
 ### Intent map (ES / EN)
@@ -90,6 +107,7 @@ fallback rather than guessing.
 
 | Target concern | Routes to | EN cues | ES cues |
 |----------------|-----------|---------|---------|
+| **status** | § Read-only status and setup choices; return without setup writes | `status`, `status --all` | `estado`, `estado --all` |
 | **upstream / quality provider** | § Upstream provider route; resolve owner before routing ambiguous diagnosis names | `openspec`, `superpowers`, `tea`, `bmad tea`, `quality`, `quality-tools`, `semgrep`, `dependency-cruiser`, `depcruise`, `knip`, `sentry find-bugs`, `getsentry/skills` | same provider names, `calidad`, `herramientas de calidad` |
 | **context7** | Step 2 — context7 block | `context7`, `context 7`, `docs`, `library docs`, `api key`, `c7` | `context7`, `clave api`, `documentación`, `docs de librerías` |
 | **workspace** | Step 3 — workspace output mode | `workspace`, `logs`, `logs mode`, `obsidian vault`, `vault`, `output location` | `espacio de trabajo`, `logs`, `modo de logs`, `bóveda`, `obsidian`, `ubicación de salida` |
@@ -109,6 +127,7 @@ When the normalized argument does not confidently match any concern in the inten
 No configuration concern matched for: '<original argument>'
 
 Routable concerns for /th:setup <intent>:
+  status [--all]  — read-only native installation and capability inventory
   openspec / superpowers / tea — official upstream provider setup
   rea             — official application-research dependency setup
   quality / quality-tools — choose an applicable quality capability (Semgrep, dependency-cruiser, Knip, Sentry find-bugs)
@@ -466,32 +485,31 @@ When Context7 was explicitly configured, call `mcp__context7__resolve-library-id
 
 If a server fails, show the error and suggest troubleshooting steps (check URL, check API key, check network).
 
-### 6b. Runtime probe — python3 presence
+### 6b. Runtime probe — selected Python capability
 
-After MCP config, run one python3 presence probe and act on the result. This step is advisory — setup always completes regardless of the outcome.
+For a selected Python-dependent capability, use its version requirement from `scripts/setup_requirements.json`
+and the bounded literal interpreter probes above. If none is selected, report optional helper availability
+and continue to Step 7; a missing optional interpreter does not block native setup.
 
-Run: `command -v python3`
+**If a compatible interpreter is available:** reuse its verified executable/prefix; do not offer another installation.
 
-**If python3 is available:** continue silently (no output for this step; the summary row will show `python3: available`).
-
-**If python3 is absent:**
+**If no candidate meets the selected capability's requirement:**
 
 Report the degraded-mode advisory:
 ```
-python3 not found on PATH.
+No interpreter meets the selected capability's Python requirement.
   Native runtime permissions and approvals remain active regardless of python3
   presence. Team Harness does not install a policy hook layer for this check.
-  Some `th` skills (lint, audit-security, excalidraw-diagram) invoke python3 for
-  supporting scripts and remain in degraded/unavailable mode without it.
-  For full skill coverage, install python3.
+  The selected supporting helper remains unavailable. Use the requirements
+  catalog's capability-specific recovery; other native capabilities remain available.
 ```
 
-Then offer an explicit consent prompt:
+Install only for the chosen capability under existing authorization; otherwise offer explicit consent:
 
 ## python3
 
 ```
-Install python3 now for full skill coverage? [Y/n]
+Install Python for the selected capability now? [Y/n]
 ```
 
 **On `n` (decline or no input):** print the above degraded-mode advisory summary and continue to Step 7. No install attempted. Setup completes normally.
@@ -511,9 +529,9 @@ Install python3 now for full skill coverage? [Y/n]
   - The skill never escalates privileges itself. If `sudo` elevation fails, print the exact command for the operator to run manually and continue.
   - If no manager is found: print manual install instructions and continue.
 
-**Post-install re-probe:** after a consented install, run `command -v python3` again.
-- If python3 is now on PATH: report `python3 installed — full skill coverage now active.`
-- If python3 is still absent (re-probe fails): **Windows caveat** — a winget-installed python3 may not appear on PATH in the current Git Bash process. When the re-probe fails immediately after a reported-successful winget install, report `python3 installed, but this process cannot resolve the updated PATH; the current setup run remains degraded. Resolve the installed executable from the OS install location or retry from a process with refreshed PATH.` Do not claim full coverage until the probe succeeds. On other platforms: report the degraded-mode advisory and continue.
+**Post-install re-probe:** repeat the verified alternatives and selected catalog version check.
+- If a compatible interpreter resolves, report that prerequisite available; do not claim every skill is active.
+- If none resolves, retain partial status. On Windows, resolve the installed executable or refresh the process PATH after winget; do not recommend a duplicate installation merely because `python3` is absent.
 
 **Failed install, absent manager, or elevated command declined:** fall back to the degraded-mode advisory printed above. Native runtime permissions and approvals remain the action boundary; only the python3-dependent skills remain in degraded/unavailable mode.
 

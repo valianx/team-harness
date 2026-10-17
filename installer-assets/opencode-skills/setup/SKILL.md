@@ -5,8 +5,23 @@ description: Configure or reconcile the native Team Harness opencode installatio
 
 # Set up Team Harness in opencode
 
-Inspect the active opencode config root and `.team-harness.json` without
-reading Claude Code or Codex configuration. Reconcile the installed Team
+## Read-only status and setup choices
+
+Handle `status` and `status --all` before installer reconciliation or writes; report and return.
+Resolve the actual OpenCode root, selected TH package evidence and project/global scope.
+Verify Python 3.8+ with bounded literal argv: `python3`, then `python`; Windows uses `py` with `-3`, `python`, `python3`.
+Invoke its verified executable/prefix with this skill's absolute `scripts/setup_status.py` path and
+`--runtime opencode --root ABS_CONFIG_ROOT --scope SCOPE`; add `--package-root ABS_PACKAGE_ROOT` only when established.
+Only explicit `--all` inventories other supported hosts; it never installs or configures them.
+Use `scripts/setup_requirements.json` for capability prerequisites. Basic published installation needs neither Python nor Go.
+Without an interpreter, inspect native evidence and report helper inspection unavailable with recovery; installation is not failed.
+Keep CLI, package, configuration and activation separate; settings/ledger presence leaves activation unknown.
+Never print raw settings or command output. Offer minimal setup or reuse first, preserving workspace/language defaults.
+Skip unselected optional integrations and their surveys; prepare only capabilities the operator chose.
+Preserve unavailable Space bindings; alternatives apply only to explicitly selected new work.
+
+For ordinary setup, inspect only the active opencode config root and `.team-harness.json`.
+Reconcile the installed Team
 Harness ledger, agents, skills, commands, and operator preferences through the
 native installer when it is available. Preserve unknown configuration keys,
 never print secret values, and ask before adding MCP credentials or performing

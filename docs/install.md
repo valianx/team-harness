@@ -10,13 +10,13 @@ codex plugin add team-harness@team-harness
 ```
 
 Plugin installation is separate from generated-agent placement for pipeline
-specialists and independent reviewers. Use `install apply --runtime codex --scope project`
-when installing those TOML agents. The current principal can use `init` for
+specialists and independent reviewers. Use `$team-harness:setup` and bundled
+native helpers for those TOML agents. The current principal can use `init` for
 lightweight intake, `spec` for development with written intent and independent
 review, or `pipeline` for broader coordination. Plugin-only skills can run
 without additional executors. Use `reload` to refresh supported components and
 report any actual activation gap. See
-[`codex-runtime.md`](./codex-runtime.md) for the trusted-checkout contributor
+[`codex-runtime.md`](./codex-runtime.md) for the contributor/offline
 flow, upgrade, and removal.
 
 Detailed installation reference. For the **canonical install**, see the [README](../README.md#install).
@@ -33,7 +33,10 @@ The Claude Code plugin is the canonical install path. Run the following three co
 /th:setup
 ```
 
-`/th:setup` configures your **logs mode** (local `./workspaces/` or an Obsidian vault), native preferences, and the managed instruction block. Context7 remains an optional, explicit MCP integration. Existing MCP registrations and credentials are preserved; setup does not provision Memory or Context Harness. Activate changed plugin assets with `/reload-plugins` when the host supports it, and reconnect only when the host reports that reload cannot activate them.
+`/th:setup` configures workspace mode (local, Obsidian or a supported native Space),
+native preferences and the managed instruction block. Context7 is optional;
+existing MCP registrations and credentials are preserved. Activate changed plugin
+assets with `/reload-plugins`; reconnect only for a demonstrated activation need.
 
 ---
 
@@ -170,15 +173,23 @@ install update --runtime opencode --scope global --non-interactive
 
 ---
 
-## Requirements
+## Requirements and read-only status
 
-**Required:**
-- A supported native runtime: [Claude Code](https://docs.claude.com/en/docs/claude-code), Codex, or OpenCode
+Start with the selected native host and minimum TH package, reuse a healthy installation,
+then configure only chosen optional capabilities. The shared
+[requirements catalog](../skills/setup/scripts/setup_requirements.json) identifies prerequisites by operation.
 
-**Recommended (not required):**
-- [`gh`](https://cli.github.com/) CLI — for `/issue`, `/deliver`, and `/review-pr` GitHub integration. When `gh` is absent or unauthenticated, these skills use `curl` against the GitHub REST API (if `$GH_TOKEN`/`$GITHUB_TOKEN` is set) or fall back to operator-paste paths with `blocked-manual-push` status. The installer prints a note when `gh` is missing.
+- Claude Code uses its marketplace plugin; Node enables its context/observation hooks.
+- Codex uses its native plugin and bundled setup helpers; agent configuration needs Python 3.11+, not the Go installer.
+- OpenCode's published installer places assets without a Python or Go toolchain requirement.
+- Pi uses its native package lifecycle and [documented Pi/Node minimum](./pi-runtime.md#install-and-maintain), without Python or Go for basic installation.
 
-**Optional:**
-- [context7](https://context7.com/) API key — for library docs retrieval when explicitly configured
+Request `setup status` through the active host's setup skill for CLI/version, TH package,
+configuration health and separate activation evidence. `status --all` explicitly inventories
+the other supported hosts without installing or configuring them. Installed files and prior receipts do not prove live activation.
+The optional status helper needs Python 3.8+; setup verifies `python3`/`python` or Windows
+`py -3`/`python`/`python3` using bounded literal argv. If none works, native inspection continues
+with a partial helper diagnostic and recovery, preserving the installation.
 
-No Python, no `uv` — the installer binary is stdlib-only Go.
+GitHub CLI, Context7, Obsidian, native Space access and workflow providers are optional unless the selected capability needs them.
+Keep existing preferences, models, permissions and Space bindings; unavailable Space access does not select another context home.

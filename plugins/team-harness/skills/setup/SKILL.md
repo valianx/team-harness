@@ -11,9 +11,25 @@ pipeline state, or spawn subagents.
 
 Team Harness settings are native and runtime-isolated at
 `${CODEX_HOME:-$HOME/.codex}/.team-harness.json`. Never read Claude Code or
-opencode settings during ordinary operation and never modify their files. MCP
+opencode settings during ordinary operation; explicit `status --all` permits read-only inventory. Never modify their files. MCP
 registrations and credentials are owned by the native runtime and are left
 untouched unless the operator explicitly selects an integration.
+
+## Read-only status and setup choices
+
+Handle `status` and `status --all` before provider routing, marketplace refresh or writes; report and return.
+Bind the actual Codex configuration root, selected plugin snapshot and project/global scope from native discovery.
+Verify Python 3.8+ using bounded literal argv: `python3`, then `python`; Windows uses `py` with `-3`, `python`, `python3`.
+Invoke its verified executable/prefix with this skill's absolute `scripts/setup_status.py` path and
+`--runtime codex --root ABS_CONFIG_ROOT --package-root ABS_PACKAGE_ROOT --scope SCOPE`.
+Only explicit `--all` inventories other hosts; never borrow their settings or configure a detected host.
+Use `scripts/setup_requirements.json` for capability prerequisites; Codex agent configuration still requires Python 3.11+.
+Keep CLI, package, configuration and activation separate; manifests or convergence receipts leave activation unknown.
+If the helper interpreter is unavailable, inspect native evidence and report a partial diagnostic with recovery,
+not failed plugin installation. Do not download the Go installer or expose raw settings/command output.
+Offer minimal native setup or reuse of healthy choices first, preserving workspace/language defaults.
+Skip unselected optional integrations and their surveys; prepare only capabilities the operator chose.
+Preserve unavailable Space bindings and native model/permissions; alternatives apply only to explicitly selected new work.
 
 ## Upstream provider route
 

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.50.0] - 2026-10-17
+
+### Added
+
+- Inspect coding CLI installations without changes and choose a minimal Team Harness setup with optional capabilities.
+
 ## [3.49.0] - 2026-10-17
 
 ### Added
