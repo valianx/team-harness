@@ -36,6 +36,12 @@ BASE_OID = "a" * 40
 HEAD_OID = "b" * 40
 MERGE_BASE_OID = "c" * 40
 NEW_HEAD_OID = "d" * 40
+SOURCE_BOUNDARY_WHITESPACE_CODEPOINTS = (
+    0x0009, 0x000A, 0x000B, 0x000C, 0x000D, 0x001C, 0x001D, 0x001E, 0x001F,
+    0x0020, 0x0085, 0x00A0, 0x1680, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004,
+    0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200A, 0x2028, 0x2029, 0x202F,
+    0x205F, 0x3000, 0xFEFF,
+)
 RAW_URL_GRAMMAR_CASES = [
     ("https-backslash-authority", "https://good.com\\user:{canary}@evil.test/repo"),
     ("https-backslash-path", "https://good.com/\\user:{canary}@evil.test/repo"),
@@ -483,6 +489,10 @@ class PageWorkspaceTests(unittest.TestCase):
             ("opaque-fragment", f"project:review#{canary}"),
         ]
         malformed += [(name, reference.format(canary=canary)) for name, reference in RAW_URL_GRAMMAR_CASES]
+        malformed += [(f"leading-source-boundary-U{point:04X}", chr(point) + "repository:owner/repo")
+                      for point in SOURCE_BOUNDARY_WHITESPACE_CODEPOINTS]
+        malformed += [(f"trailing-source-boundary-U{point:04X}", "repository:owner/repo" + chr(point))
+                      for point in SOURCE_BOUNDARY_WHITESPACE_CODEPOINTS]
         fields = {
             "identity": lambda source, value: source.update(identity=value),
             "canonical_source": lambda source, value: source.update(canonical_source=value),
@@ -538,6 +548,7 @@ class PageWorkspaceTests(unittest.TestCase):
             ("https://user%3Asecret%40team@github.com/owner/repo?token=secret", "https://github.com/owner/repo"),
             ("https://user:secret@team@github.com/owner/repo?token=secret", "https://github.com/owner/repo"),
             ("https://user:secret@github.com/owner@team/repo:branch", "https://github.com/owner@team/repo:branch"),
+            ("https://user:secret@github.com/owner%20name/repo%20", "https://github.com/owner%20name/repo%20"),
             ("git+ssh://git:secret@github.com/owner%5Crepo", "git+ssh://github.com/owner%5Crepo"),
             ("https://user:secret@github.com/owner%40team/repo%3Abranch?token=secret#ref", "https://github.com/owner%40team/repo%3Abranch"),
             ("git+ssh://git:secret@github.com/owner%2540team/repo%253Abranch", "git+ssh://github.com/owner%2540team/repo%253Abranch"),
@@ -548,6 +559,8 @@ class PageWorkspaceTests(unittest.TestCase):
             ("origin:ORIGIN:ssh://git:secret@github.com/owner/repo", "origin:ORIGIN:ssh://github.com/owner/repo"),
             ("ORIGIN:origin:git@github.com:owner/repo.git", "ORIGIN:origin:github.com:owner/repo.git"),
         ]
+        references += [("repository:équipe/研究" + chr(point) + "notes", "repository:équipe/研究" + chr(point) + "notes")
+                       for point in SOURCE_BOUNDARY_WHITESPACE_CODEPOINTS if point >= 0x0020]
         for prefix, (reference, normalized) in product(["", "origin:", "ORIGIN:", "origin:ORIGIN:"], references):
             identity, expected = prefix + reference, prefix + normalized
             with self.subTest(identity=identity), tempfile.TemporaryDirectory() as directory:

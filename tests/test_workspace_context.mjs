@@ -199,7 +199,7 @@ const sourceReferenceLocations = [
     { identity: "repository:previous", verified: true, evidence: reference },
   ] }), association => association.aliases[0].evidence],
 ];
-const originPrefixes = ["", "origin:", "ORIGIN:", "origin:ORIGIN:"];
+const originPrefixes = ["", "origin:", "ORIGIN:", "origin:origin:", "origin:ORIGIN:"];
 for (const blankReference of [
   "origin:", "ORIGIN:", "origin:origin:", "origin:ORIGIN:",
   "origin:\u0085", "ORIGIN:\ufeff", "origin:origin:\u0085\u0085",
@@ -216,6 +216,41 @@ for (const blankReference of [
     assert.throws(() => normalizeSourceAssociations([association]), {
       name: "Error", message: /^source (?:(?:identity|reference) invalid|alias unverified)$/,
     }, "blank source diagnostics are generic");
+  }
+}
+const sourceBoundaryWhitespace = [
+  0x0085, 0x0009, 0x000a, 0x000b, 0x000c, 0x000d, 0x001c, 0x001d, 0x001e, 0x001f,
+  0x0020, 0x00a0, 0x1680, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006,
+  0x2007, 0x2008, 0x2009, 0x200a, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff,
+];
+for (const codePoint of sourceBoundaryWhitespace) {
+  const whitespace = String.fromCodePoint(codePoint);
+  for (const [side, reference] of [["leading", `${whitespace}repository:caf\u00e9`], ["trailing", `repository:caf\u00e9${whitespace}`]]) {
+    for (const prefix of originPrefixes) {
+      for (const [field, makeAssociation] of sourceReferenceLocations) {
+        const association = makeAssociation(`${prefix}${reference}`);
+        const before = structuredClone(association);
+        const result = resolveContextBinding({ preference: selectedRemote,
+          remoteIdentity: { ...remote, source_associations: [association] } });
+        assert.equal(result.status, "invalid", `${field} rejects ${side} source whitespace U+${codePoint.toString(16)}`);
+        assert.equal(result.binding, null, "source boundary whitespace cannot enter retained context");
+        assert.deepEqual(association, before, "source boundary rejection preserves supplied metadata");
+        assert.throws(() => normalizeSourceAssociations([association]), {
+          name: "Error", message: /^source (?:(?:identity|reference) invalid|alias unverified)$/,
+        }, "source boundary diagnostics are generic");
+      }
+    }
+  }
+}
+for (const codePoint of sourceBoundaryWhitespace.filter(value => value >= 0x0020)) {
+  const reference = `repository:caf\u00e9${String.fromCodePoint(codePoint)}merchant`;
+  for (const prefix of originPrefixes) {
+    for (const [field, makeAssociation, readReference] of sourceReferenceLocations) {
+      const result = resolveContextBinding({ preference: selectedRemote,
+        remoteIdentity: { ...remote, source_associations: [makeAssociation(`${prefix}${reference}`)] } });
+      assert.equal(result.status, "ready", `${field} preserves meaningful Unicode sources with interior whitespace`);
+      assert.equal(readReference(result.binding.context.source_associations[0]), `${prefix}${reference}`);
+    }
   }
 }
 const invalidSourceReferences = [
@@ -309,6 +344,9 @@ for (const [reference, expected] of [
   ["https://github.example/owner/name:label@example.test.git", "https://github.example/owner/name:label@example.test.git"],
   ["https://github.example/owner/repo%5Cname.git", "https://github.example/owner/repo%5Cname.git"],
   ["git+ssh://github.example/owner/repo%5Cname.git", "git+ssh://github.example/owner/repo%5Cname.git"],
+  ["https://github.example/owner/caf\u00e9 name.git", "https://github.example/owner/caf%C3%A9%20name.git"],
+  ["https://github.example/owner/caf\u00e9\u0085name.git", "https://github.example/owner/caf%C3%A9%C2%85name.git"],
+  ["https://github.example/owner/caf\u00e9\ufeffname.git", "https://github.example/owner/caf%C3%A9%EF%BB%BFname.git"],
 ]) {
   for (const prefix of originPrefixes) {
     for (const [field, makeAssociation, readReference] of sourceReferenceLocations) {
