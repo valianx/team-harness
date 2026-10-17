@@ -172,7 +172,8 @@ public static class ArgvProbe {
     }
 
     public static int Main(string[] args) {
-        if (String.Equals(Path.GetFileName(Environment.GetCommandLineArgs()[0]), "curl.exe",
+        var executable = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
+        if (String.Equals(Path.GetFileName(executable), "curl.exe",
                           StringComparison.OrdinalIgnoreCase)) return Download(args);
         var encoded = new StringBuilder();
         for (var i = 0; i < args.Length; i++) {
