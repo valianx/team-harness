@@ -19,7 +19,7 @@
 ## 4. Validation and readiness
 
 - [x] 4.1 Document the public preference/actions within budget and synchronize generated resources.
-- [ ] 4.2 Run affected Go/JS/Pi checks, required full suite and native canned-provider integration without external model calls.
-- [ ] 4.3 Execute actual TEA test-review/trace and retain findings, dispositions and platform limits.
-- [ ] 4.4 Execute actual OpenSpec implementation verification and Superpowers completion evidence.
-- [ ] 4.5 Inspect the complete candidate, prepare living-spec synchronization and coordinate release metadata once.
+- [x] 4.2 Run affected Go/JS/Pi checks, required full suite and native canned-provider integration without external model calls.
+- [x] 4.3 Execute actual TEA test-review/trace and retain findings, dispositions and platform limits.
+- [x] 4.4 Execute actual OpenSpec implementation verification and Superpowers completion evidence.
+- [x] 4.5 Inspect the complete candidate, prepare living-spec synchronization and coordinate release metadata once.
