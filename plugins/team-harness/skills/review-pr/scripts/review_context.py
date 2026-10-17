@@ -2154,13 +2154,18 @@ def _capture_source_reference(value: Any, *, identity: bool = False) -> str:
     if identity and (not _capture_text(reference, 1024) or reference.startswith(("/", "\\"))
                      or re.match(r"^(?:[A-Za-z]:|file:)", reference, re.IGNORECASE)):
         raise ContextError("Page capture source identity must be portable")
+    url_looking = re.match(r"^(?:[A-Za-z][A-Za-z0-9+.-]*://|(?:https?|ssh):)", reference, re.IGNORECASE) is not None
     try:
         parsed = urlsplit(reference)
+        if url_looking:
+            if not parsed.hostname:
+                raise ValueError("URL hostname is missing")
+            _ = parsed.port  # urlsplit defers validation of malformed authority ports.
         if parsed.hostname:
             host = parsed.netloc.rsplit("@", 1)[-1]
             return prefix + urlunsplit((parsed.scheme, host, parsed.path, "", ""))
-    except ValueError as error:
-        raise ContextError("Page capture source reference is invalid") from error
+    except ValueError:
+        raise ContextError("Page capture source reference is invalid") from None
     return prefix + re.sub(r"^[^/@:]+@(?=[^/:]+:)", "", reference)
 
 

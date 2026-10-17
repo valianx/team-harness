@@ -187,6 +187,57 @@ for (const [identity, expected] of [
   assert.equal(result.binding.context.source_associations[0].aliases[0].identity, expected);
 }
 
+const credentialCanary = "synthetic-credential-canary";
+const sourceReferenceLocations = [
+  ["identity", reference => ({ ...remote.source_associations[0], identity: reference }), association => association.identity],
+  ["canonical_source", reference => ({ ...remote.source_associations[0], canonical_source: reference }), association => association.canonical_source],
+  ["alias_identity", reference => ({ ...remote.source_associations[0], aliases: [
+    { identity: reference, verified: true, evidence: "verified source transfer" },
+  ] }), association => association.aliases[0].identity],
+  ["alias_evidence", reference => ({ ...remote.source_associations[0], aliases: [
+    { identity: "repository:previous", verified: true, evidence: reference },
+  ] }), association => association.aliases[0].evidence],
+];
+const originPrefixes = ["", "origin:", "ORIGIN:", "origin:ORIGIN:"];
+const malformedSourceReferences = [
+  `https://user:${credentialCanary}@[broken/owner/repo`,
+  `https://user:${credentialCanary}@/owner/repo`,
+  `ssh:///user:${credentialCanary}@broken/owner/repo`,
+  `https://user:${credentialCanary}@host:notaport/owner/repo`,
+  `https:user:${credentialCanary}@[broken/owner/repo`,
+  `https:/user:${credentialCanary}@[broken/owner/repo`,
+  `ssh:/user:${credentialCanary}@[broken/owner/repo`,
+];
+for (const [index, malformed] of malformedSourceReferences.entries()) {
+  for (const prefix of originPrefixes) {
+    for (const [field, makeAssociation] of sourceReferenceLocations) {
+      const association = makeAssociation(`${prefix}${malformed}`);
+      const result = resolveContextBinding({ preference: selectedRemote,
+        remoteIdentity: { ...remote, source_associations: [association] } });
+      assert.equal(result.status, "invalid", `${field} rejects malformed URL reference ${index}`);
+      assert.equal(result.binding, null, "invalid source references cannot enter retained context");
+    }
+  }
+}
+for (const [reference, expected] of [
+  ["repository:merchant", "repository:merchant"],
+  ["project:annual-review", "project:annual-review"],
+  ["git@github.example:owner/repo.git", "github.example:owner/repo.git"],
+  [`https://user:${credentialCanary}@github.example/owner/repo.git?access=synthetic-query#fragment`, "https://github.example/owner/repo.git"],
+  [`ssh://git:${credentialCanary}@github.example/owner/repo.git?access=synthetic-query#fragment`, "ssh://github.example/owner/repo.git"],
+]) {
+  for (const prefix of originPrefixes) {
+    for (const [field, makeAssociation, readReference] of sourceReferenceLocations) {
+      const association = makeAssociation(`${prefix}${reference}`);
+      const result = resolveContextBinding({ preference: selectedRemote,
+        remoteIdentity: { ...remote, source_associations: [association] } });
+      assert.equal(result.status, "ready", `${field} retains valid opaque, URL and SCP references`);
+      assert.equal(JSON.stringify(result.binding).includes(credentialCanary), false, "retained context excludes source credentials");
+      assert.equal(readReference(result.binding.context.source_associations[0]), `${prefix}${expected}`);
+    }
+  }
+}
+
 const root = await realpath(await mkdtemp(path.join(tmpdir(), "th-workspace-context-")));
 try {
   const first = path.join(root, "projects", "merchant");

@@ -30,6 +30,7 @@ function sourceReference(value) {
   if (!safeText(value)) throw new Error("source reference invalid");
   const prefix = value.match(/^(?:origin:)+/i)?.[0] ?? "";
   const reference = value.slice(prefix.length);
+  const urlLooking = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(reference) || /^(?:https?|ssh):/i.test(reference);
   try {
     const parsed = new URL(reference);
     if (parsed.hostname) {
@@ -39,7 +40,10 @@ function sourceReference(value) {
       parsed.hash = "";
       return `${prefix}${parsed.href}`;
     }
-  } catch { /* Portable opaque identities need not be URLs. */ }
+  } catch {
+    if (urlLooking) throw new Error("source reference invalid");
+  }
+  if (urlLooking) throw new Error("source reference invalid");
   return `${prefix}${reference.replace(/^[^/@:]+@(?=[^/:]+:)/, "")}`;
 }
 

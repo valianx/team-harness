@@ -15,6 +15,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import traceback
 import unittest
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from itertools import product
@@ -397,31 +398,74 @@ class PageWorkspaceTests(unittest.TestCase):
                     self.capture(root, snapshot)
                 self.assertEqual([file.name for file in root.iterdir()], [MODULE.REVIEW_OWNER_FILE])
 
+    def test_malformed_url_sources_and_alias_evidence_refuse_credentials_without_outputs(self):
+        canary = "synthetic-credential-canary"
+        malformed = [
+            ("https-bracket", f"https://user:{canary}@[broken/owner/repo"),
+            ("ssh-bracket", f"ssh://user:{canary}@[broken/owner/repo"),
+            ("https-empty-host", f"https://user:{canary}@/owner/repo"),
+            ("ssh-empty-host", f"ssh://user:{canary}@/owner/repo"),
+            ("ssh-missing-authority", f"ssh:///user:{canary}@broken/owner/repo"),
+            ("https-invalid-port", f"https://user:{canary}@example.test:{canary}/owner/repo"),
+            ("ssh-one-slash", f"ssh:/user:{canary}@[broken/owner/repo"),
+            ("https-one-slash", f"HtTpS:/user:{canary}@[broken/owner/repo"),
+            ("https-no-slash", f"https:user:{canary}@[broken/owner/repo"),
+            ("custom-empty-host", f"git+ssh://user:{canary}@/owner/repo"),
+        ]
+        fields = {
+            "identity": lambda source, value: source.update(identity=value),
+            "canonical_source": lambda source, value: source.update(canonical_source=value),
+            "alias_identity": lambda source, value: source.update(aliases=[{
+                "identity": value, "verified": True, "evidence": "repository:verified-owner",
+            }]),
+            "alias_evidence": lambda source, value: source.update(aliases=[{
+                "identity": "repository:verified-owner", "verified": True, "evidence": value,
+            }]),
+        }
+        for prefix, (name, reference), (field, assign) in product(["", "origin:", "ORIGIN:", "origin:ORIGIN:"], malformed, fields.items()):
+            with self.subTest(case=name, prefix=prefix, field=field), tempfile.TemporaryDirectory() as directory:
+                root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
+                before = {file.name: file.read_bytes() for file in root.iterdir()}
+                snapshot = page_workspace_snapshot()
+                assign(snapshot["source_associations"][0], prefix + reference)
+                snapshot["expected_source_associations"] = copy.deepcopy(snapshot["source_associations"])
+                original = copy.deepcopy(snapshot)
+                with self.assertRaisesRegex(MODULE.ContextError, "source reference is invalid") as caught:
+                    self.capture(root, snapshot)
+                self.assertNotIn(canary, str(caught.exception))
+                self.assertNotIn(canary, "".join(traceback.format_exception(caught.exception)))
+                self.assertEqual(snapshot, original)
+                self.assertEqual({file.name: file.read_bytes() for file in root.iterdir()}, before)
+
     def test_portable_sources_strip_wrapped_credentials_and_keep_host_paths_out_of_identity(self):
         references = [
             ("repository:owner/repo", "repository:owner/repo"), ("project:release", "project:release"),
             ("https://user:secret@github.com/owner/repo?token=secret#ref", "https://github.com/owner/repo"),
+            ("http://user:secret@github.com/owner/repo?token=secret#ref", "http://github.com/owner/repo"),
             ("ssh://git:secret@github.com/owner/repo", "ssh://github.com/owner/repo"),
+            ("git@github.com:owner/repo.git", "github.com:owner/repo.git"),
             ("origin:https://user:secret@github.com/owner/repo", "origin:https://github.com/owner/repo"),
             ("ORIGIN:https://user:secret@github.com/owner/repo", "ORIGIN:https://github.com/owner/repo"),
             ("origin:ORIGIN:ssh://git:secret@github.com/owner/repo", "origin:ORIGIN:ssh://github.com/owner/repo"),
             ("ORIGIN:origin:git@github.com:owner/repo.git", "ORIGIN:origin:github.com:owner/repo.git"),
         ]
-        for identity, expected in references:
+        for prefix, (reference, normalized) in product(["", "origin:", "ORIGIN:", "origin:ORIGIN:"], references):
+            identity, expected = prefix + reference, prefix + normalized
             with self.subTest(identity=identity), tempfile.TemporaryDirectory() as directory:
                 root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
                 snapshot = page_workspace_snapshot()
                 source = snapshot["source_associations"][0]
-                source.update({"identity": identity, "aliases": [{"identity": identity, "verified": True,
-                               "evidence": "origin:ORIGIN:https://user:secret@github.com/owner/repo"}],
+                source.update({"identity": identity, "canonical_source": identity,
+                               "aliases": [{"identity": identity, "verified": True, "evidence": identity}],
                                "host_paths": [{"host": "linux", "path": "/srv/repos/th"},
                                               {"host": "windows", "path": "C:\\repos\\th"}]})
                 snapshot["expected_source_associations"] = copy.deepcopy(snapshot["source_associations"])
                 receipt = self.capture(root, snapshot)
                 captured_source = self.verify(root, receipt)["source_associations"][0]
                 self.assertEqual(captured_source["identity"], expected)
+                self.assertEqual(captured_source["canonical_source"], expected)
                 self.assertEqual(captured_source["aliases"][0]["identity"], expected)
-                self.assertEqual(captured_source["aliases"][0]["evidence"], "origin:ORIGIN:https://github.com/owner/repo")
+                self.assertEqual(captured_source["aliases"][0]["evidence"], expected)
                 self.assertNotIn("host_paths", captured_source)
                 self.assertNotIn("secret", MODULE.safe_read_leaf(root, "pr-review-workspace.json").decode())
 
