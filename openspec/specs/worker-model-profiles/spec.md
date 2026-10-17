@@ -1,8 +1,9 @@
-## Purpose
+# worker-model-profiles Specification
 
+## Purpose
 Let operators choose native providers and models for specialist workloads while preserving their chat model, preferences and existing worker conversations.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Guided native catalog selection
 OpenCode and Pi SHALL offer reasoning, general and mechanical worker profiles using their actual native model catalogs. Each profile SHALL default to inheritance. Setup MUST NOT choose a fixed provider/model for the operator, refresh catalogs implicitly, authenticate or execute inference to configure a profile. A listed model MUST NOT be presented as proof of authentication or successful execution.
