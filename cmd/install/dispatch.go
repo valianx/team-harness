@@ -62,6 +62,17 @@ func dispatchSubcommand() bool {
 	args := os.Args[1:]
 	args = parseDispatchFlags(args)
 
+	for _, arg := range args {
+		if arg == "--help" || arg == "-h" {
+			if len(args) >= 2 && args[0] == "setup" && args[1] == "models" {
+				printWorkerModelSetupHelp(os.Stdout)
+			} else {
+				printNativeInstallerHelp()
+			}
+			return true
+		}
+	}
+
 	if len(args) == 0 {
 		return false
 	}
@@ -89,6 +100,19 @@ func dispatchSubcommand() bool {
 	default:
 		return false
 	}
+}
+
+func printNativeInstallerHelp() {
+	fmt.Printf("Team Harness native installer v%s\n\n", version)
+	fmt.Println("Usage: install <plan|apply|update|uninstall> --runtime opencode|codex [options]")
+	fmt.Println("       install setup models --runtime opencode [options]")
+	fmt.Println()
+	fmt.Println("  --scope global|project  Select the installation scope (default: global).")
+	fmt.Println("  --opencode-dir ABS      Select an explicit OpenCode configuration root.")
+	fmt.Println("  --codex-dir ABS         Select an explicit Codex configuration root.")
+	fmt.Println("  --non-interactive       Skip lifecycle prompts; model drafts still need --yes.")
+	fmt.Println("  --yes                   Confirm a lifecycle operation or supplied model draft.")
+	fmt.Println("  -h, --help              Show help without changing installation state.")
 }
 
 // parseDispatchFlags extracts --runtime, --scope, and runtime directory flags from

@@ -88,6 +88,8 @@ contracts listed below.
 
 | Suite | Covers |
 |---|---|
+| `cmd/install/bootstrap_integrity_test.go`, `cmd/install/lifecycle_help_test.go` | Actual POSIX bootstraps with local downloads, integrity failures, literal argv, exit status and cleanup; native lifecycle help preserves assets, settings and ownership. |
+| `test_install_bootstrap_windows.py` | Native CMD and PowerShell 5.1/7 bootstraps with inert release fixtures, checksum gating, literal argv, exit status, cleanup and OpenCode custom-root selection; runs in Windows CI. |
 | `test_pi_generation.mjs` | Canonical eligible role catalog, native tool projection, inert references and deterministic generated freshness. |
 | `test_pi_settings.mjs`, `test_pi_shared_routes.py` | Pi settings preservation and atomic validation, shared workspace representations, custom roots and narrowly shared runtime selectors. |
 | `test_pi_runtime.mjs` | Public RPC transport, bounded worker lifecycle, owned sessions, cancellation and usage receipts with deterministic child fixtures. |

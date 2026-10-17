@@ -299,3 +299,4 @@ superseded unless a bullet explicitly records the current two-posture contract.
 - [decision] Eval retrospective assesses an existing effort's evidence and omissions without rerunning it; scenario and baseline modes remain separate. → `skills/eval/SKILL.md`
 - [constraint] Setup diagnostics distinguish native package files, configuration and observed activation; optional capabilities never become universal installation prerequisites.
 - [decision] OpenCode/Pi worker profiles resolve role→workload→inherit; native catalogs validate choices, primary models and existing Pi conversations remain operator-owned.
+- [constraint] Every release bootstrap verifies the exact asset checksum before execution; native lifecycle help preserves installation state, and updater shortcuts must respect the selected configuration root.

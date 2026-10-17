@@ -85,6 +85,7 @@ esac
 
 ASSET="install-${OS}-${ARCH}"
 URL="${BASE_URL}/${ASSET}"
+SUMS_URL="${BASE_URL}/SHA256SUMS"
 
 # Download to a tmp dir we clean up on exit.
 TMP=$(mktemp -d 2>/dev/null) || {
@@ -93,9 +94,24 @@ TMP=$(mktemp -d 2>/dev/null) || {
 }
 trap 'rm -rf "$TMP"' EXIT
 
+if command -v sha256sum >/dev/null 2>&1; then
+    HASH_CMD="sha256sum"
+elif command -v shasum >/dev/null 2>&1; then
+    HASH_CMD="shasum -a 256"
+else
+    echo "Error: no sha256sum or shasum available; cannot verify binary." >&2
+    exit 1
+fi
+
 echo "DEPRECATED: This script is the legacy install path." >&2
 echo "  Canonical install: /plugin marketplace add valianx/team-harness" >&2
 echo "  Then: /plugin install th && /th:setup  (inside Claude Code)" >&2
+echo "Downloading SHA256SUMS..."
+if ! curl -fsSL --max-time 30 -o "$TMP/SHA256SUMS" "$SUMS_URL"; then
+    echo "Error: download failed from ${SUMS_URL}" >&2
+    exit 1
+fi
+
 echo "Downloading ${ASSET} from latest release..."
 if ! curl -fsSL --max-time 120 -o "$TMP/install" "$URL"; then
     echo "Error: download failed from ${URL}" >&2
@@ -105,6 +121,21 @@ if ! curl -fsSL --max-time 120 -o "$TMP/install" "$URL"; then
     exit 1
 fi
 
+# Match the exact asset and execute the same file that was verified.
+EXPECTED=$(awk -v a="$ASSET" '$2==a {print $1}' "$TMP/SHA256SUMS" | tr '[:upper:]' '[:lower:]')
+if [ -z "$EXPECTED" ]; then
+    echo "Error: no SHA256SUMS entry for '${ASSET}'; refusing to run unverified binary." >&2
+    exit 1
+fi
+ACTUAL=$($HASH_CMD "$TMP/install" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
+if [ "$ACTUAL" != "$EXPECTED" ]; then
+    echo "Error: checksum verification failed for ${ASSET}." >&2
+    echo "  Expected: ${EXPECTED}" >&2
+    echo "  Got:      ${ACTUAL}" >&2
+    exit 1
+fi
+
+echo "Checksum verified."
 chmod +x "$TMP/install"
 
 echo "Launching installer..."

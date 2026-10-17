@@ -276,7 +276,10 @@ function Unblock-File {
             shells = [("powershell-5.1", self.powershell51)]
             if self.powershell7:
                 shells.append(("powershell-7", self.powershell7))
-            generic_args = ["apply", "--runtime", "opencode", "--non-interactive"]
+            config_root = directory / "native config root"
+            config_root.mkdir()
+            generic_args = ["apply", "--runtime", "opencode", "--opencode-dir", str(config_root),
+                            "--non-interactive"]
             runners = []
             for shell_name, shell in shells:
                 for launcher_name, args, expected_argv in (

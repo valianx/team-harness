@@ -110,12 +110,14 @@ $Arch = switch ($env:PROCESSOR_ARCHITECTURE) {
 }
 
 $Asset = "install-windows-$Arch.exe"
+$SumsUrl = "$BaseUrl/SHA256SUMS"
 $Url   = "$BaseUrl/$Asset"
 
 $TmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName())
 New-Item -ItemType Directory -Path $TmpDir | Out-Null
 
 try {
+    $SumsPath = Join-Path $TmpDir "SHA256SUMS"
     # NOTE: filename must NOT contain "install", "setup", "update", or "patch" —
     # Windows applies an "installer detection" heuristic to executables with
     # those names and forces UAC elevation even when launched via CreateProcess
@@ -125,6 +127,14 @@ try {
     Write-Host "DEPRECATED: This script is the legacy install path." -ForegroundColor Yellow
     Write-Host "  Canonical install: /plugin marketplace add valianx/team-harness" -ForegroundColor Yellow
     Write-Host "  Then: /plugin install th && /th:setup  (inside Claude Code)" -ForegroundColor Yellow
+    Write-Host "Downloading SHA256SUMS..."
+    try {
+        Invoke-WebRequest -Uri $SumsUrl -OutFile $SumsPath -UseBasicParsing -TimeoutSec 30
+    } catch {
+        Write-Host "Error: download failed from $SumsUrl" -ForegroundColor Red
+        Write-Host "  Check that a release has been tagged at https://github.com/$Repo/releases"
+        exit 1
+    }
     Write-Host "Downloading $Asset from latest release..."
     try {
         Invoke-WebRequest -Uri $Url -OutFile $InstallerPath -UseBasicParsing -TimeoutSec 120
@@ -135,6 +145,24 @@ try {
         Write-Host "  Releases: https://github.com/$Repo/releases"
         exit 1
     }
+
+    $ExpectedHash = $null
+    Get-Content -LiteralPath $SumsPath | ForEach-Object {
+        $fields = $_ -split '\s+'
+        if ($fields.Count -ge 2 -and $fields[1] -eq $Asset) {
+            $ExpectedHash = $fields[0]
+        }
+    }
+    if ($null -eq $ExpectedHash -or $ExpectedHash -eq '') {
+        Write-Host "Error: no SHA256SUMS entry for '$Asset'; refusing to run unverified binary."
+        exit 1
+    }
+    $ActualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $InstallerPath).Hash.ToLowerInvariant()
+    if ($ActualHash -ne $ExpectedHash.ToLowerInvariant()) {
+        Write-Host "Error: checksum verification failed for $Asset."
+        exit 1
+    }
+    Write-Host "Checksum verified."
 
     # Strip Mark-of-the-Web Zone Identifier from the downloaded file.
     # Invoke-WebRequest tags downloads with a Zone.Identifier ADS marking them

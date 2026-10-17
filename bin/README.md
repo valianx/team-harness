@@ -21,7 +21,7 @@ existing MCP registrations and credentials remain untouched.
 | `update-opencode.ps1` | Windows | `iwr https://valianx.github.io/team-harness/update-opencode.ps1 \| iex` |
 
 These scripts:
-1. Perform a cheap `releases/latest/download/VERSION` pre-check — no binary download when already current.
+1. Perform a cheap `releases/latest/download/VERSION` pre-check for default-root requests — no binary download when already current; explicit arguments or a Windows `OPENCODE_CONFIG_DIR` override reach the native engine.
 2. Download the platform binary and verify its SHA256 checksum (fail-closed, anchored exact-asset-name match, case-insensitive compare — mirrors the install scripts).
 3. Run `binary update --runtime opencode --scope global "$@"`, which shows the four-bucket diff preview, prompts `[Y/n]` on a TTY (operator "n" → zero writes), applies asset changes through the proven `ComputePlan`/`ApplyPlan` engine, and bumps only the installer-managed config keys.
 
@@ -53,6 +53,10 @@ Claude Code uses its native marketplace. Run these commands inside Claude Code:
 | `install.cmd` | Windows — cmd.exe | `curl -fsSL https://valianx.github.io/team-harness/install.cmd -o install.cmd && install.cmd` |
 
 With no arguments, each script prints the native Claude Code commands above and exits without downloading anything. Pass `apply`, `plan`, `update`, `uninstall`, or OpenCode's `setup models` action to download the binary and forward the remaining arguments unchanged.
+
+Every bootstrap verifies the exact release asset against `SHA256SUMS` before executing it, accepts either checksum case, removes temporary downloads and returns the child's exit status. POSIX needs `curl` and either `sha256sum` or `shasum`; CMD needs `curl` and Windows PowerShell's `Get-FileHash`. PowerShell scripts use the same native hash cmdlet. Missing verification prerequisites stop execution.
+
+For native lifecycle commands, `--help` and `-h` show guidance without changing managed assets, preferences or ownership records.
 
 These scripts are served at `https://valianx.github.io/team-harness/install.{sh,ps1,cmd}` via GitHub Pages.
 
