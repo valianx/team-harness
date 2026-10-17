@@ -2167,18 +2167,19 @@ def _capture_source_reference(value: Any, *, identity: bool = False) -> str:
                      or re.match(r"^(?:[A-Za-z]:|file:)", reference, re.IGNORECASE)):
         raise ContextError("Page capture source identity must be portable")
     url_looking = re.match(r"^(?:[A-Za-z][A-Za-z0-9+.-]*://|(?:https?|ssh):)", reference, re.IGNORECASE) is not None
-    try:
-        parsed = urlsplit(reference)
-        if url_looking:
+    if url_looking:
+        if "\\" in reference or not re.match(r"^[A-Za-z][A-Za-z0-9+.-]*://[^/?#]+", reference):
+            raise ContextError("Page capture source reference is invalid")
+        try:
+            parsed = urlsplit(reference)
             if not parsed.hostname:
                 raise ValueError("URL hostname is missing")
             _ = parsed.port  # urlsplit defers validation of malformed authority ports.
-        if parsed.hostname:
             host = parsed.netloc.rsplit("@", 1)[-1]
             _capture_check_no_userinfo_marker(host)
             return prefix + urlunsplit((parsed.scheme, host, parsed.path, "", ""))
-    except ValueError:
-        raise ContextError("Page capture source reference is invalid") from None
+        except ValueError:
+            raise ContextError("Page capture source reference is invalid") from None
     retained = reference
     scp = re.fullmatch(r"[^@:/\\?#\s]+@(\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9._-]+):([^@]+)", reference)
     if scp is not None:

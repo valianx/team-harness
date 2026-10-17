@@ -36,6 +36,25 @@ BASE_OID = "a" * 40
 HEAD_OID = "b" * 40
 MERGE_BASE_OID = "c" * 40
 NEW_HEAD_OID = "d" * 40
+RAW_URL_GRAMMAR_CASES = [
+    ("https-backslash-authority", "https://good.com\\user:{canary}@evil.test/repo"),
+    ("https-backslash-path", "https://good.com/\\user:{canary}@evil.test/repo"),
+    ("https-backslash-path-segment", "https://good.com/owner\\user:{canary}@evil.test/repo"),
+    ("https-uppercase-backslash", "HtTpS://good.com\\user:{canary}@evil.test/repo"),
+    ("ssh-backslash-authority", "ssh://good.com\\user:{canary}@evil.test/repo"),
+    ("custom-backslash-authority", "git+ssh://good.com\\user:{canary}@evil.test/repo"),
+    ("custom-backslash-path", "git+ssh://good.com/owner\\user:{canary}@evil.test/repo"),
+    ("https-one-slash-authority", "https:/user:{canary}@evil.test/repo"),
+    ("https-no-slash-authority", "https:user:{canary}@evil.test/repo"),
+    ("https-extra-slash-authority", "https:///user:{canary}@evil.test/repo"),
+    ("https-uppercase-extra-slashes", "HTTPS:////user:{canary}@evil.test/repo"),
+    ("http-one-slash-authority", "http:/user:{canary}@evil.test/repo"),
+    ("ssh-one-slash-authority", "ssh:/user:{canary}@evil.test/repo"),
+    ("ssh-extra-slash-authority", "ssh:///user:{canary}@evil.test/repo"),
+    ("https-empty-query-authority", "https://?token={canary}"),
+    ("https-empty-fragment-authority", "https://#{canary}"),
+    ("custom-extra-slash-authority", "git+ssh:///user:{canary}@evil.test/repo"),
+]
 
 
 def context(**overrides):
@@ -453,6 +472,7 @@ class PageWorkspaceTests(unittest.TestCase):
             ("opaque-query", f"repository:merchant?token={canary}"),
             ("opaque-fragment", f"project:review#{canary}"),
         ]
+        malformed += [(name, reference.format(canary=canary)) for name, reference in RAW_URL_GRAMMAR_CASES]
         fields = {
             "identity": lambda source, value: source.update(identity=value),
             "canonical_source": lambda source, value: source.update(canonical_source=value),
@@ -478,6 +498,15 @@ class PageWorkspaceTests(unittest.TestCase):
                 self.assertEqual(snapshot, original)
                 self.assertEqual({file.name: file.read_bytes() for file in root.iterdir()}, before)
 
+    def test_invalid_raw_url_grammar_is_refused_before_parsing(self):
+        canary = "synthetic-credential-canary"
+        for prefix, (name, reference) in product(["", "origin:", "ORIGIN:", "origin:ORIGIN:"], RAW_URL_GRAMMAR_CASES):
+            with self.subTest(case=name, prefix=prefix), patch.object(MODULE, "urlsplit") as parser:
+                parser.side_effect = AssertionError("Invalid raw URL grammar reached the parser")
+                with self.assertRaisesRegex(MODULE.ContextError, "^Page capture source reference is invalid$"):
+                    MODULE._capture_source_reference(prefix + reference.format(canary=canary))
+                parser.assert_not_called()
+
     def test_portable_sources_strip_wrapped_credentials_and_keep_host_paths_out_of_identity(self):
         references = [
             ("repository:owner/repo", "repository:owner/repo"), ("project:release", "project:release"),
@@ -494,6 +523,8 @@ class PageWorkspaceTests(unittest.TestCase):
             ("git+ssh://user:secret@github.com/owner/repo?token=secret#ref", "git+ssh://github.com/owner/repo"),
             ("https://user%3Asecret%40team@github.com/owner/repo?token=secret", "https://github.com/owner/repo"),
             ("https://user:secret@team@github.com/owner/repo?token=secret", "https://github.com/owner/repo"),
+            ("https://user:secret@github.com/owner@team/repo:branch", "https://github.com/owner@team/repo:branch"),
+            ("git+ssh://git:secret@github.com/owner%5Crepo", "git+ssh://github.com/owner%5Crepo"),
             ("https://user:secret@github.com/owner%40team/repo%3Abranch?token=secret#ref", "https://github.com/owner%40team/repo%3Abranch"),
             ("git+ssh://git:secret@github.com/owner%2540team/repo%253Abranch", "git+ssh://github.com/owner%2540team/repo%253Abranch"),
             ("https://user:secret@münich.example/owner/repo", "https://münich.example/owner/repo"),

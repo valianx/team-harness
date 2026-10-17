@@ -41,9 +41,12 @@ function sourceReference(value) {
   const prefix = value.match(/^(?:origin:)+/i)?.[0] ?? "";
   const reference = value.slice(prefix.length);
   const urlLooking = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(reference) || /^(?:https?|ssh):/i.test(reference);
+  if (urlLooking && (reference.includes("\\") || !/^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/?#]+/.test(reference))) {
+    throw new Error("source reference invalid");
+  }
   try {
-    const parsed = new URL(reference);
-    if (parsed.hostname) {
+    const parsed = urlLooking ? new URL(reference) : null;
+    if (parsed?.hostname) {
       assertNoUserinfoMarker(parsed.hostname);
       parsed.username = "";
       parsed.password = "";

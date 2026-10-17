@@ -237,6 +237,18 @@ const invalidSourceReferences = [
   `custom://user%3A${credentialCanary}%40example.test/owner/repo`,
   `https://user%3A${credentialCanary}%40example.test/owner/repo`,
   `git+ssh://git:${credentialCanary}@user%3A${credentialCanary}%2540example.test/owner/repo`,
+  `https://good.com\\user:${credentialCanary}@evil.example/repo`,
+  `https://good.com/owner\\user:${credentialCanary}@evil.example/repo`,
+  `git+ssh://good.com/owner\\user:${credentialCanary}@evil.example/repo`,
+  `https:/good.com/user:${credentialCanary}@evil.example/repo`,
+  `https:///good.com/user:${credentialCanary}@evil.example/repo`,
+  `HtTpS:////good.com/user:${credentialCanary}@evil.example/repo`,
+  `https:good.com/user:${credentialCanary}@evil.example/repo`,
+  `http:/good.com/user:${credentialCanary}@evil.example/repo`,
+  `ssh:good.com/user:${credentialCanary}@evil.example/repo`,
+  "https://",
+  `git+ssh:///good.com/user:${credentialCanary}@evil.example/repo`,
+  `ftp:good.com\\user:${credentialCanary}@evil.example/repo`,
 ];
 for (const [index, invalidReference] of invalidSourceReferences.entries()) {
   for (const prefix of originPrefixes) {
@@ -273,6 +285,9 @@ for (const [reference, expected] of [
   ["git+ssh://github.example/owner/user%253Aname%2540example.test.git", "git+ssh://github.example/owner/user%253Aname%2540example.test.git"],
   [`https://git:${credentialCanary}@b\u00fccher.example/owner/repo.git`, "https://xn--bcher-kva.example/owner/repo.git"],
   [`ssh://git:${credentialCanary}@[2001:db8::1]/owner/repo.git`, "ssh://[2001:db8::1]/owner/repo.git"],
+  ["https://github.example/owner/name:label@example.test.git", "https://github.example/owner/name:label@example.test.git"],
+  ["https://github.example/owner/repo%5Cname.git", "https://github.example/owner/repo%5Cname.git"],
+  ["git+ssh://github.example/owner/repo%5Cname.git", "git+ssh://github.example/owner/repo%5Cname.git"],
 ]) {
   for (const prefix of originPrefixes) {
     for (const [field, makeAssociation, readReference] of sourceReferenceLocations) {
