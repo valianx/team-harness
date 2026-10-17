@@ -22,6 +22,7 @@ Bind the actual Codex configuration root, selected plugin snapshot and project/g
 Verify Python 3.8+ using bounded literal argv: `python3`, then `python`; Windows uses `py` with `-3`, `python`, `python3`.
 Invoke its verified executable/prefix with this skill's absolute `scripts/setup_status.py` path and
 `--runtime codex --root ABS_CONFIG_ROOT --package-root ABS_PACKAGE_ROOT --scope SCOPE`.
+Retain that literal argv prefix for every Python helper below; `<verified-python-argv>` is notation for it, including launcher arguments such as `py -3`, never a replacement `python3` lookup.
 Only explicit `--all` inventories other hosts; never borrow their settings or configure a detected host.
 Use `scripts/setup_requirements.json` for capability prerequisites; Codex agent configuration still requires Python 3.11+.
 Keep CLI, package, configuration and activation separate; manifests or convergence receipts leave activation unknown.
@@ -122,7 +123,7 @@ migration, and preserve every unrelated value.
 1. Inspect native state:
 
    ```bash
-   python3 scripts/manage_config.py show
+   <verified-python-argv> scripts/manage_config.py show
    ```
 
    Malformed native JSON is blocking; never fall through to another runtime.
@@ -156,8 +157,8 @@ migration, and preserve every unrelated value.
    displaying values:
 
    ```bash
-   python3 scripts/manage_config.py inspect-import --from claude
-   python3 scripts/manage_config.py inspect-import --from opencode
+   <verified-python-argv> scripts/manage_config.py inspect-import --from claude
+   <verified-python-argv> scripts/manage_config.py inspect-import --from opencode
    ```
 
    After explicit source selection and import authorization, use the validated
@@ -165,9 +166,9 @@ migration, and preserve every unrelated value.
 
    ```bash
    if [ -n "${SELECTED_VERSION:-}" ]; then
-     python3 scripts/manage_config.py import --from SOURCE --version "$SELECTED_VERSION"
+     <verified-python-argv> scripts/manage_config.py import --from SOURCE --version "$SELECTED_VERSION"
    else
-     python3 scripts/manage_config.py import --from SOURCE
+     <verified-python-argv> scripts/manage_config.py import --from SOURCE
    fi
    ```
    The helper deep-fills missing keys, copies opaque values without printing
@@ -185,9 +186,9 @@ migration, and preserve every unrelated value.
 
    ```bash
    if [ -n "${SELECTED_VERSION:-}" ]; then
-     python3 scripts/manage_config.py ensure --version "$SELECTED_VERSION"
+     <verified-python-argv> scripts/manage_config.py ensure --version "$SELECTED_VERSION"
    else
-     python3 scripts/manage_config.py ensure
+     <verified-python-argv> scripts/manage_config.py ensure
    fi
    ```
 
@@ -288,7 +289,7 @@ migration, and preserve every unrelated value.
    `scripts/manage_github_identities.py`. First run:
 
    ```bash
-   python3 scripts/manage_github_identities.py --runtime codex show
+   <verified-python-argv> scripts/manage_github_identities.py --runtime codex show
    ```
 
    Each entry contains an absolute `workspace` prefix, `host` (default
@@ -300,7 +301,7 @@ migration, and preserve every unrelated value.
    must serialize GitHub writes for that host. Persist the complete array with:
 
    ```bash
-   python3 scripts/manage_github_identities.py --runtime codex configure \
+   <verified-python-argv> scripts/manage_github_identities.py --runtime codex configure \
      --routes-json '<validated JSON array>'
    ```
 
@@ -321,9 +322,11 @@ migration, and preserve every unrelated value.
 7. Reconcile all twenty bundled specialists in the persisted scope on every full
    setup, and whenever `agents` is targeted:
 
+   First verify the retained interpreter meets Python 3.11; if not, repeat native discovery with that minimum and retain the successful prefix. If none is verified, skip agent inspection/synchronization, preserve installed agents and report the unavailable/unverified capability with recovery.
+
    ```bash
-   python3 scripts/manage_agents.py inspect --scope SCOPE
-   python3 scripts/manage_agents.py sync --scope SCOPE
+   <verified-python-argv> scripts/manage_agents.py inspect --scope SCOPE
+   <verified-python-argv> scripts/manage_agents.py sync --scope SCOPE
    ```
 
    The spawn-overridable pipeline set is `pipeline-architect`,

@@ -153,15 +153,20 @@ def discover_python(minimum=(3, 8, 0), platform=None, env=None, which=None, prob
     candidates = [("py", ["-3"]), ("python", []), ("python3", [])] if platform == "win32" else [
         ("python3", []), ("python", []),
     ]
+    ambiguous = False
     for name, arguments in candidates:
         path = lookup(name)
         if not path:
             continue
         argv = [str(path)] + arguments
         result = probe(argv + ["--version"], env=env, python_only=True)
+        ambiguous = ambiguous or result["status"] == "unknown"
         if result["status"] == "available" and _version_at_least(result.get("version"), minimum):
             return {"status": "requirements_met", "path": str(path), "argv": argv,
                     "version": result["version"], "code": "python_version_verified"}
+    if ambiguous:
+        return {"status": "unknown", "code": "python_version_unverified",
+                "next_step": "Inspect candidate Python versions, resolve failed probes, then retry; native inspection remains available."}
     return {"status": "unavailable", "code": "python_missing_or_incompatible",
             "next_step": "Select a Python interpreter meeting this operation's minimum, or use native inspection."}
 

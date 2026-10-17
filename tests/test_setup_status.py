@@ -377,7 +377,7 @@ class SetupStatusTests(unittest.TestCase):
         self.assertEqual(result["argv"], ["/native/py", "-3"])
 
     def test_python_discovery_continues_after_timeout_and_excessive_output(self):
-        for code in ["probe_timeout", "probe_output_limit"]:
+        for code in ["probe_timeout", "probe_output_limit", "version_unrecognized", "probe_failed"]:
             def version(argv, **unused):
                 return {"status": "unknown", "code": code} if argv[0].endswith("python3") else {
                     "status": "available", "version": "3.10.1", "code": "version_observed"}
@@ -385,11 +385,30 @@ class SetupStatusTests(unittest.TestCase):
                 which=lambda name: "/native/" + name, probe=version)
             self.assertEqual(result["argv"], ["/native/python"])
 
+    def test_python_discovery_retains_ambiguity_without_a_verified_alternative(self):
+        for minimum, incompatible in [((3, 8, 0), "3.7.17"), ((3, 11, 0), "3.10.1")]:
+            for code in ["probe_timeout", "probe_output_limit", "version_unrecognized", "probe_failed"]:
+                for alternative in ["missing", "incompatible"]:
+                    with self.subTest(minimum=minimum, code=code, alternative=alternative):
+                        def version(argv, **unused):
+                            return {"status": "unknown", "code": code} if argv[0].endswith("python3") else {
+                                "status": "available", "version": incompatible, "code": "version_observed"}
+                        result = STATUS.discover_python(minimum, platform="linux", env=self.env,
+                            which=lambda name: None if name == "python" and alternative == "missing" else "/native/" + name,
+                            probe=version)
+                        self.assertEqual(result["status"], "unknown")
+                        self.assertEqual(result["code"], "python_version_unverified")
+                        self.assertIn("Python", result["next_step"])
+
     def test_no_suitable_interpreter_remains_an_optional_unavailable_capability(self):
-        result = STATUS.discover_python((3, 11, 0), platform="linux", env=self.env,
-            which=lambda name: None)
-        self.assertEqual(result["status"], "unavailable")
-        self.assertIn("next_step", result)
+        for minimum in [(3, 8, 0), (3, 11, 0)]:
+            for available in [False, True]:
+                result = STATUS.discover_python(minimum, platform="linux", env=self.env,
+                    which=lambda name: "/native/" + name if available else None,
+                    probe=lambda argv, **unused: {
+                        "status": "available", "version": "3.7.17", "code": "version_observed"})
+                self.assertEqual(result["status"], "unavailable")
+                self.assertIn("next_step", result)
 
     def test_runtime_probes_use_fixed_version_commands_and_continue_after_failure(self):
         observed = []
