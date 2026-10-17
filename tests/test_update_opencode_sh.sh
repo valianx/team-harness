@@ -179,6 +179,9 @@ assert_forwarded() {
 <--scope>
 <global>
 $expected" ] && echo 1 || echo 0)"
+    if [ "$status" -ne 0 ]; then
+        printf '  updater exit: %s\n%s\n' "$status" "$output"
+    fi
 }
 
 assert_forwarded "project scope" '<--scope>
@@ -226,10 +229,16 @@ NO_PARSER_BIN="$TMPROOT/no-parser-bin"
 mkdir -p "$NO_PARSER_BIN"
 for utility in awk chmod cp mktemp rm sh sha256sum shasum touch tr; do
     if command -v "$utility" >/dev/null 2>&1; then
-        ln -s "$(command -v "$utility")" "$NO_PARSER_BIN/$utility"
+        # Keep MSYS executables in their original directory with their DLLs;
+        # Git Bash can copy executables when asked to create symbolic links.
+        utility_path=$(command -v "$utility")
+        printf '#!/bin/sh\nexec '\''%s'\'' "$@"\n' "${utility_path//\'/\'\\\'\'}" > "$NO_PARSER_BIN/$utility"
+        chmod +x "$NO_PARSER_BIN/$utility"
     fi
 done
 cp "$MOCKBIN/curl" "$MOCKBIN/uname" "$NO_PARSER_BIN/"
+env PATH="$NO_PARSER_BIN" sh -c '! command -v python3 >/dev/null 2>&1 && ! command -v python >/dev/null 2>&1'
+assert_true "missing-reader fixture excludes both Python commands" "$([ "$?" -eq 0 ] && echo 1 || echo 0)"
 TEST_UPDATE_PATH="$NO_PARSER_BIN" \
     assert_forwarded "missing optional JSON reader" '<--non-interactive>' --non-interactive
 

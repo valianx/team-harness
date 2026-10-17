@@ -12,6 +12,10 @@ The shared OpenCode installation ledger SHALL validate every record and resolve 
 - **WHEN** each root is installed, updated and removed independently
 - **THEN** each operation preserves the other root's assets and ownership while invalid ledger records still fail before writes
 
+#### Scenario: A root is addressed with alternate casing
+- **WHEN** the filesystem proves two existing link-free case variants identify the same directory
+- **THEN** update and removal reuse its ownership, including supported default-root legacy records, while case-distinct or unproven roots remain independent
+
 ### Requirement: Bootstrap forwards substantive update requests
 The Unix OpenCode updater SHALL NOT short-circuit a scope, configuration-directory or provider-tier request solely because the global installation already has the current release. Supported separated and equals-form arguments SHALL reach the installer unchanged. Root resolution SHALL prefer the explicit directory over OPENCODE_CONFIG_DIR, then project scope and the global default; selected paths SHALL receive the same validation without falling back after an invalid override.
 
@@ -36,6 +40,10 @@ Installation and removal SHALL represent files beneath the selected configuratio
 #### Scenario: Windows removes a managed asset
 - **WHEN** the selected root and managed file use native Windows separators
 - **THEN** removal records the root-relative closure successfully without persisting a machine-specific absolute path.
+
+#### Scenario: A POSIX path contains a literal backslash
+- **WHEN** installation validates or writes beneath that native directory name
+- **THEN** it preserves the literal name and refuses symlink redirection through any real path component without writing outside the selected root
 
 ### Requirement: Setup records the selected distribution version
 Codex setup SHALL derive installation metadata from the selected plugin's manifest rather than a release literal, preserving unrelated operator preferences.

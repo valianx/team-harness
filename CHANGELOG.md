@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - Lock hook build dependencies and use reproducible local compiler commands in CI.
+- Reject symlink redirection through literal-backslash POSIX paths during installer writes and ownership checks.
 
 ## [3.47.0] - 2026-10-14
 

@@ -269,6 +269,32 @@ func historicalPluginOwnershipMatches(component, cleanPath string) bool {
 	return false
 }
 
+// matchingLedgerRoot retains exact bindings even before a root exists. A
+// different casing is accepted only when both existing, link-free directories
+// have the same filesystem identity; case-distinct roots remain independent.
+func matchingLedgerRoot(first, second string) bool {
+	first, second = filepath.Clean(first), filepath.Clean(second)
+	if first == second {
+		return true
+	}
+	// Unrelated foreign records must not trigger filesystem or network I/O.
+	if !strings.EqualFold(first, second) {
+		return false
+	}
+	if err := lstatWalkNoOwnershipCheck(first); err != nil {
+		return false
+	}
+	if err := lstatWalkNoOwnershipCheck(second); err != nil {
+		return false
+	}
+	firstInfo, err := os.Stat(first)
+	if err != nil || !firstInfo.IsDir() {
+		return false
+	}
+	secondInfo, err := os.Stat(second)
+	return err == nil && secondInfo.IsDir() && os.SameFile(firstInfo, secondInfo)
+}
+
 // readLedger reads the ownership ledger and returns the set of well-formed
 // entries plus any parse errors encountered. Malformed lines (including
 // schemaVersion != 1) are collected into []ledgerError and skipped — never
@@ -336,7 +362,7 @@ func readLedger() ([]LedgerEntry, []ledgerError) {
 			continue
 		}
 		if activeLedgerConfigRoot != "" {
-			if entry.ConfigRoot != "" && filepath.Clean(entry.ConfigRoot) != activeLedgerConfigRoot {
+			if entry.ConfigRoot != "" && !matchingLedgerRoot(entry.ConfigRoot, activeLedgerConfigRoot) {
 				if activeLedgerFilename == ledgerFilenameOpencode {
 					continue // valid ownership belongs exclusively to another root
 				}
@@ -345,7 +371,7 @@ func readLedger() ([]LedgerEntry, []ledgerError) {
 			}
 			if entry.ConfigRoot == "" && activeLedgerFilename == ledgerFilenameOpencode {
 				globalRoot, rootErr := opencodeGlobalConfigDir()
-				if rootErr != nil || filepath.Clean(globalRoot) != activeLedgerConfigRoot {
+				if rootErr != nil || !matchingLedgerRoot(globalRoot, activeLedgerConfigRoot) {
 					errs = append(errs, ledgerError{Line: lineNum, Reason: "legacy ledger entry has no config-root binding and cannot be replayed against a non-default root"})
 					continue
 				}

@@ -214,13 +214,13 @@ func lstatWalkNoOwnershipCheck(normalized string) error {
 	return nil
 }
 
-// splitSegmentsPath splits a path string by the OS separator, similar to
-// datahome_unix.go:splitSegments but using filepath.Separator for portability.
+// splitSegmentsPath splits on native path separators, preserving literal
+// backslashes in POSIX filenames while accepting both separators on Windows.
 func splitSegmentsPath(p string) []string {
 	var segs []string
 	start := 0
 	for i := 0; i <= len(p); i++ {
-		if i == len(p) || p[i] == '/' || p[i] == '\\' {
+		if i == len(p) || os.IsPathSeparator(p[i]) {
 			if i > start {
 				segs = append(segs, p[start:i])
 			}

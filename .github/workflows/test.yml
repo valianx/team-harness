@@ -59,7 +59,7 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Verify installer paths on native Windows
-        run: go test ./cmd/install/ -count=1 -timeout=120s
+        run: go test ./cmd/install/ -v -count=1 -timeout=120s
       - name: Verify native hook registration and Windows filesystem
         run: node tests/test_hook_registration.mjs
       - run: node tests/test_openspec_launcher.mjs
