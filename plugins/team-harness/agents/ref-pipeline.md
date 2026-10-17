@@ -54,8 +54,8 @@ verifies corrections, renewing affected evidence without restarting unrelated wo
 ## Publication
 
 Use `create-pr` to prepare and publish the authorized candidate with its archive,
-current evidence and artifact hygiene. Main normally executes publication; an
-assigned delivery specialist uses the same method. Recover relevant missing
+current evidence and artifact hygiene. Main executes publication; an assigned
+delivery specialist may prepare its artifacts. Recover relevant missing
 context without demanding legacy reports or another acceptance matrix.
 
 For metadata corrections, renew affected checks and preserve applicable authority.

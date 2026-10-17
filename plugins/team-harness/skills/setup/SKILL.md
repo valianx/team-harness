@@ -191,18 +191,19 @@ migration, and preserve every unrelated value.
    For every other targeted setup, skip both feature-writer commands and do not
    change global Codex feature state. Confirm both flags with
    `codex features list` only when this step runs. The generated project config
-   also enables both flags and supplies the generic `gpt-6-luna` / `max`
+   also enables both flags and supplies the generic `gpt-6.1-sol` / `max`
    subagent fallback under `[agents]`. It also sets
    `project_doc_fallback_filenames = ["CLAUDE.md"]`, so Codex reads `CLAUDE.md`
    only at directory levels where `AGENTS.md` is absent; it never overrides
    Main's selected model. Global installation applies both defaults narrowly:
    agent sync
    installs a missing fallback and migrates only the exact formerly managed
-   `gpt-5.6-terra` / `medium` and `gpt-5.6-luna` / `max` pairs to `gpt-6-luna` / `max`. It preserves any
+   `gpt-5.6-terra` / `medium`, `gpt-5.6-luna` / `max`, and `gpt-6-luna` / `max`
+   pairs to `gpt-6.1-sol` / `max`. It preserves any
    other complete operator-selected pair as `custom-preserved`. Standard named
-   specialists retain the generated per-role projection table; the seven
-   `pipeline-*` identities intentionally omit model and effort so the pipeline
-   can supply either that standard pair or one live-session pair at dispatch.
+   specialists, including the seven `pipeline-*` identities, explicitly pin
+   Sol 6.1 with their generated per-role `max` or `xhigh` effort. A supported
+   live-session override remains dispatch metadata and never changes Main's model.
    For project-document
    fallbacks, sync preserves their order and appends `CLAUDE.md` once when it is
    absent.

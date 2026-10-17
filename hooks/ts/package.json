@@ -5,13 +5,18 @@
   "type": "module",
   "description": "TypeScript context and observability hooks for team-harness",
   "scripts": {
-    "build:session-start": "npx esbuild entry/session-start.cc.ts --bundle --platform=node --format=cjs --outfile=dist/session-start.cjs --external:node:*",
-    "build:language-user-prompt": "npx esbuild entry/language-user-prompt.cc.ts --bundle --platform=node --format=cjs --outfile=dist/language-user-prompt.cjs --external:node:*",
-    "build:subagent-trace": "npx esbuild entry/subagent-trace.cc.ts --bundle --platform=node --format=cjs --outfile=dist/subagent-trace.cjs --external:node:*",
-    "build:precompact-snapshot": "npx esbuild entry/precompact-snapshot.cc.ts --bundle --platform=node --format=cjs --outfile=dist/precompact-snapshot.cjs --external:node:*",
-    "build:notify-stage": "npx esbuild entry/notify-stage.cc.ts --bundle --platform=node --format=cjs --outfile=dist/notify-stage.cjs --external:node:*",
-    "build:subagent-start": "npx esbuild entry/subagent-start.cc.ts --bundle --platform=node --format=cjs --outfile=dist/subagent-start.cjs --external:node:*",
+    "build:session-start": "esbuild entry/session-start.cc.ts --bundle --platform=node --format=cjs --outfile=dist/session-start.cjs --external:node:*",
+    "build:language-user-prompt": "esbuild entry/language-user-prompt.cc.ts --bundle --platform=node --format=cjs --outfile=dist/language-user-prompt.cjs --external:node:*",
+    "build:subagent-trace": "esbuild entry/subagent-trace.cc.ts --bundle --platform=node --format=cjs --outfile=dist/subagent-trace.cjs --external:node:*",
+    "build:precompact-snapshot": "esbuild entry/precompact-snapshot.cc.ts --bundle --platform=node --format=cjs --outfile=dist/precompact-snapshot.cjs --external:node:*",
+    "build:notify-stage": "esbuild entry/notify-stage.cc.ts --bundle --platform=node --format=cjs --outfile=dist/notify-stage.cjs --external:node:*",
+    "build:subagent-start": "esbuild entry/subagent-start.cc.ts --bundle --platform=node --format=cjs --outfile=dist/subagent-start.cjs --external:node:*",
     "build": "npm run build:session-start && npm run build:language-user-prompt && npm run build:subagent-trace && npm run build:precompact-snapshot && npm run build:notify-stage && npm run build:subagent-start && echo 'context and observability builds ok'",
-    "typecheck": "npx tsc --noEmit"
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "esbuild": "0.28.2",
+    "typescript": "5.9.3"
   }
 }

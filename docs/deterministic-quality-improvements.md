@@ -20,14 +20,18 @@ The packaged-asset regression also verifies that local OpenCode scratch bundles 
 
 | Priority | Investment | Concrete application | Adoption boundary |
 |---|---|---|---|
-| 1 | Reproducible hook builds | Declare local build-tool dependencies, lock their resolution, and use local binaries plus `npm ci`. | Foundational tooling improvement; no pipeline phase. |
+| 1 | Reproducible hook builds | Keep local build-tool dependencies locked and use local binaries plus `npm ci`. | Implemented tooling foundation; no pipeline phase. |
 | 2 | Property-based and stateful testing | Generate sequences of leases, repeated results, rejected inputs, and recovery; assert independent invariants. | Start with one canonical module and preserve minimal failures. |
 | 3 | Selective mutation testing | Check whether tests detect incorrect comparisons, missing validation, or altered outcomes. | Advisory pilot on changed logic before any blocking threshold. |
 | 4 | Product-specific integration testing | Generate API cases, test real database behavior, or execute user-visible browser scenarios. | Select only tools applicable to the consumer repository. |
 
 ### Reproducible builds
 
-[Hook scripts](../hooks/ts/package.json) invoke `npx esbuild` and `npx tsc` without declaring those development dependencies, and their lockfile does not pin them. CI runs `npm install` before rebuilding. The proposed improvement is to declare and lock those tools and invoke their local binaries. [`npm ci`](https://docs.npmjs.com/cli/v11/commands/npm-ci/) rejects manifest/lockfile disagreement instead of updating the lock during installation. This improvement is proposed, not implemented by the residual-contract cleanup.
+[Hook scripts](../hooks/ts/package.json) invoke locally installed esbuild and
+TypeScript, with compiler and Node type dependencies pinned in the lockfile. CI
+uses [`npm ci`](https://docs.npmjs.com/cli/v11/commands/npm-ci/) before building and
+typechecking; it rejects manifest/lockfile disagreement instead of updating the
+lock during installation. Committed hook bundles must match the rebuilt bytes.
 
 ### Properties and fuzzing
 

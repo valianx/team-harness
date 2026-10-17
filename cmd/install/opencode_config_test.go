@@ -12,11 +12,58 @@ package main
 //   - detectExistingConfig returns a populated map when the file is present.
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestTeamHarnessConfigWritersRejectNonobjectsWithoutChanges(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		write func(string, *opencodePlacer) error
+	}{
+		{"setup", func(path string, p *opencodePlacer) error {
+			return writeOpencodeTeamHarnessConfig(path, opencodeSetupValues{}, p)
+		}},
+		{"update", refreshManagedConfigKeys},
+		{"tier", func(path string, p *opencodePlacer) error {
+			return persistResolvedTierProvider(path, "anthropic", p)
+		}},
+		{"tier-clear", func(path string, p *opencodePlacer) error {
+			return persistResolvedTierProvider(path, "", p)
+		}},
+	} {
+		for _, invalid := range []string{"null\n", "[]\n", "\"text\"\n", "true\n", "42\n", ""} {
+			t.Run(tc.name+"/"+invalid, func(t *testing.T) {
+				root := t.TempDir()
+				path := opencodeSettingsConfigPath(root)
+				if err := os.WriteFile(path, []byte(invalid), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				if err := validateTeamHarnessConfigFile(path); err == nil {
+					t.Error("preflight accepted a nonobject configuration")
+				}
+				defer func() {
+					if value := recover(); value != nil {
+						t.Errorf("writer panicked on a nonobject configuration: %v", value)
+					}
+				}()
+				if err := tc.write(path, newOpencodePlacerAt(root)); err == nil {
+					t.Error("writer accepted a nonobject configuration")
+				}
+				if after, err := os.ReadFile(path); err != nil || !bytes.Equal(after, []byte(invalid)) {
+					t.Errorf("writer modified invalid configuration: %q %v", after, err)
+				}
+				entries, err := os.ReadDir(root)
+				if err != nil || len(entries) != 1 {
+					t.Errorf("writer created a backup or temporary file for invalid configuration: %v %v", entries, err)
+				}
+			})
+		}
+	}
+}
 
 // TestWriteOpencodeTeamHarnessConfig_PreservesUnknownKeys verifies that keys
 // in the existing .team-harness.json that are not part of the installer's

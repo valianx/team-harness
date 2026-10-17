@@ -1,9 +1,9 @@
 # Delivery mechanics
 
 Use the installed `create-pr` skill for the requested preparation or publication
-checkpoint. Main normally executes it; an assigned delivery specialist can do
-the same work with the current candidate, evidence and authorized endpoint.
-Main retains decisions and coordinates Git mutations.
+checkpoint. Main executes publication and Git mutations; an assigned delivery
+specialist may prepare artifacts from the current candidate and evidence, then
+return the coordinates to Main.
 
 Reuse current checks, reviews and prepared prose. Recover needed repository
 context and metadata without requiring fixed v4 reports, another acceptance

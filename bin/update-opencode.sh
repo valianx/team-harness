@@ -57,23 +57,25 @@ BIN_URL="${BASE_URL}/${ASSET}"
 # On any read uncertainty, fall through to download + the authoritative Go-side
 # comparison (which parses JSON robustly and is idempotent).
 #
-# Skipped ONLY when --opencode-dir is among the passthrough args — that flag
-# (in either "--opencode-dir <path>" or "--opencode-dir=<path>" form) points
-# the Go binary at a non-default config root, and the shell-side check only
-# reads the default global path, so it would incorrectly short-circuit before
-# the binary resolves the correct root. --non-interactive does not affect
-# config-root resolution, so its presence alone must not skip the pre-check.
+# Only harmless confirmation flags can use this shortcut. Other arguments
+# may select a project/root, change provider tiers, or require native argument
+# validation even when the default global installation is already current.
+# An environment root override also belongs to the authoritative Go resolver.
 # ---------------------------------------------------------------------------
-HAS_OPENCODE_DIR_FLAG=0
+CAN_PRECHECK=1
+if [ -n "${OPENCODE_CONFIG_DIR:-}" ]; then
+    CAN_PRECHECK=0
+fi
 for _arg in "$@"; do
     case "$_arg" in
-        --opencode-dir|--opencode-dir=*)
-            HAS_OPENCODE_DIR_FLAG=1
+        --non-interactive|--yes|--force) ;;
+        *)
+            CAN_PRECHECK=0
             ;;
     esac
 done
 
-if [ "$HAS_OPENCODE_DIR_FLAG" -eq 0 ]; then
+if [ "$CAN_PRECHECK" -eq 1 ]; then
 if [ -n "${XDG_CONFIG_HOME:-}" ]; then
     OC_CONFIG_DIR="${XDG_CONFIG_HOME}/opencode"
 else
@@ -83,11 +85,35 @@ TH_JSON="${OC_CONFIG_DIR}/.team-harness.json"
 
 INSTALLED_VERSION=""
 if [ -f "$TH_JSON" ]; then
-    # Extract "installed_version" from the JSON file using grep + sed.
-    # The key is always written on one line by the Go installer (json.MarshalIndent).
-    INSTALLED_VERSION=$(grep '"installed_version"' "$TH_JSON" 2>/dev/null \
-        | sed 's/.*"installed_version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' \
-        | head -1 || true)
+    # Use an optional standard-library JSON reader: a matching substring in
+    # corrupt JSON or an array must not bypass the Go-side object preflight.
+    # Without a usable reader, download the updater normally.
+    JSON_READER=""
+    if command -v python3 >/dev/null 2>&1; then
+        JSON_READER="python3"
+    elif command -v python >/dev/null 2>&1; then
+        JSON_READER="python"
+    fi
+    if [ -n "$JSON_READER" ]; then
+        INSTALLED_VERSION=$("$JSON_READER" - "$TH_JSON" 2>/dev/null <<'PY' || true
+import json
+import re
+import sys
+
+def reject_constant(value):
+    raise ValueError("non-JSON constant")
+
+try:
+    with open(sys.argv[1]) as config_file:
+        config = json.load(config_file, parse_constant=reject_constant)
+    version = config.get("installed_version") if isinstance(config, dict) else None
+    if isinstance(version, str) and re.match(r"[0-9]+\.[0-9]+\.[0-9]+\Z", version):
+        sys.stdout.write(version)
+except (OSError, ValueError):
+    pass
+PY
+        )
+    fi
 fi
 
 LATEST_VERSION=""
@@ -136,7 +162,7 @@ EOF
         exit 0
     fi
 fi
-fi # end: HAS_OPENCODE_DIR_FLAG -eq 0 pre-check guard
+fi # end: CAN_PRECHECK guard
 
 # ---------------------------------------------------------------------------
 # Download and verify (mirrors install-opencode.sh byte-for-byte — AC-10).

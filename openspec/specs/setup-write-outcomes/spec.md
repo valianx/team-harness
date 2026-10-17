@@ -5,6 +5,31 @@ Make provisioning reports describe observed writes, failures and retained config
 
 ## Requirements
 
+### Requirement: OpenCode ownership is isolated by configuration root
+The shared OpenCode installation ledger SHALL validate every record and resolve ownership only for the selected configuration root. Valid records for another root SHALL NOT block installation or authorize writes or deletion there. Malformed records and unbound legacy records outside their supported default root SHALL remain refused.
+
+#### Scenario: Two roots use the same component
+- **WHEN** each root is installed, updated and removed independently
+- **THEN** each operation preserves the other root's assets and ownership while invalid ledger records still fail before writes
+
+### Requirement: Bootstrap forwards substantive update requests
+The Unix OpenCode updater SHALL NOT short-circuit a scope, configuration-directory or provider-tier request solely because the global installation already has the current release. Supported separated and equals-form arguments SHALL reach the installer unchanged. Root resolution SHALL prefer the explicit directory over OPENCODE_CONFIG_DIR, then project scope and the global default; selected paths SHALL receive the same validation without falling back after an invalid override.
+
+#### Scenario: The global version is current but a project is stale
+- **WHEN** update is requested with project scope
+- **THEN** the installer updates the selected project rather than returning the global current-version result
+
+#### Scenario: An environment override selects a different installation
+- **WHEN** OPENCODE_CONFIG_DIR selects a stale installation while the global installation is current
+- **THEN** update changes the validated override installation and preserves the global installation's bytes
+
+### Requirement: OpenCode configuration must be a JSON object
+Installation preflight and configuration writers SHALL reject null and other non-object Team Harness configuration values with an ordinary error before changing assets, backups or ownership records.
+
+#### Scenario: An existing configuration contains null
+- **WHEN** installation or update reads that configuration
+- **THEN** it fails without panic or partial installation and can be retried after the configuration is repaired
+
 ### Requirement: Native installation records use portable paths
 Installation and removal SHALL represent files beneath the selected configuration root with portable root-relative record paths on Windows and POSIX. Equivalent native path separators SHALL NOT prevent ownership records from being written.
 

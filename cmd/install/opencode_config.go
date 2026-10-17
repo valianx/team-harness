@@ -126,18 +126,26 @@ func validateTeamHarnessConfigFile(path string) error {
 	if err != nil {
 		return fmt.Errorf("read .team-harness.json: %w", err)
 	}
+	_, err = parseTeamHarnessConfig(data)
+	return err
+}
+
+func parseTeamHarnessConfig(data []byte) (map[string]json.RawMessage, error) {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return fmt.Errorf("existing .team-harness.json is corrupt (cannot parse): %w", err)
+		return nil, fmt.Errorf("existing .team-harness.json is corrupt (cannot parse): %w", err)
 	}
-	return nil
+	if raw == nil {
+		return nil, fmt.Errorf("existing .team-harness.json is corrupt (expected a JSON object)")
+	}
+	return raw, nil
 }
 
 // writeOpencodeTeamHarnessConfig performs an ALLOWLISTED read-merge-write of
 // .team-harness.json at path.
 //
 // Contract:
-//   - Load existing JSON at path (empty map if absent or unreadable).
+//   - Load an existing JSON object at path (empty map only if absent).
 //   - Overlay only installer-owned keys that cfg sets. Existing workspace and
 //     native preference values remain operator-owned and are preserved.
 //   - ALWAYS set installer-managed keys (format_version, installed_version,
@@ -157,9 +165,10 @@ func writeOpencodeTeamHarnessConfig(path string, cfg opencodeSetupValues, placer
 		return fmt.Errorf("read .team-harness.json: %w", readErr)
 	}
 	raw := map[string]json.RawMessage{}
-	if readErr == nil && len(existing) > 0 {
-		if err := json.Unmarshal(existing, &raw); err != nil {
-			return fmt.Errorf("existing .team-harness.json is corrupt (cannot parse): %w", err)
+	if readErr == nil {
+		raw, readErr = parseTeamHarnessConfig(existing)
+		if readErr != nil {
+			return readErr
 		}
 	}
 
@@ -237,13 +246,10 @@ func refreshManagedConfigKeys(path string, placer *opencodePlacer) error {
 		return fmt.Errorf("read .team-harness.json: %w", readErr)
 	}
 	raw := map[string]json.RawMessage{}
-	if readErr == nil && len(existing) > 0 {
-		if err := json.Unmarshal(existing, &raw); err != nil {
-			// fix(config): fail closed — a corrupt file must not be silently
-			// overwritten and replaced with only managed keys (AC-5). The operator
-			// must repair or remove the file before the update can proceed; this
-			// preserves all operator keys until the file is parseable again.
-			return fmt.Errorf("existing .team-harness.json is corrupt (cannot parse): %w", err)
+	if readErr == nil {
+		raw, readErr = parseTeamHarnessConfig(existing)
+		if readErr != nil {
+			return readErr
 		}
 	}
 
@@ -305,9 +311,10 @@ func persistResolvedTierProvider(path, provider string, placer *opencodePlacer) 
 		return fmt.Errorf("read .team-harness.json: %w", readErr)
 	}
 	raw := map[string]json.RawMessage{}
-	if readErr == nil && len(existing) > 0 {
-		if err := json.Unmarshal(existing, &raw); err != nil {
-			return fmt.Errorf("existing .team-harness.json is corrupt (cannot parse): %w", err)
+	if readErr == nil {
+		raw, readErr = parseTeamHarnessConfig(existing)
+		if readErr != nil {
+			return readErr
 		}
 	}
 

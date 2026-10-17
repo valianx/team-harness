@@ -324,8 +324,22 @@ func readLedger() ([]LedgerEntry, []ledgerError) {
 			errs = append(errs, ledgerError{Line: lineNum, Reason: fmt.Sprintf("invalid op %q (want install|update|remove)", entry.Op)})
 			continue
 		}
+		// The OpenCode ledger is shared by configuration roots. Validate every
+		// record before filtering so a foreign binding cannot hide corruption
+		// or a forged ownership claim from the fail-closed lifecycle checks.
+		if err := validateLedgerOwnership(entry); err != nil {
+			errs = append(errs, ledgerError{Line: lineNum, Reason: fmt.Sprintf("invalid ownership: %v", err)})
+			continue
+		}
+		if entry.ConfigRoot != "" && !filepath.IsAbs(entry.ConfigRoot) {
+			errs = append(errs, ledgerError{Line: lineNum, Reason: "config root must be absolute"})
+			continue
+		}
 		if activeLedgerConfigRoot != "" {
 			if entry.ConfigRoot != "" && filepath.Clean(entry.ConfigRoot) != activeLedgerConfigRoot {
+				if activeLedgerFilename == ledgerFilenameOpencode {
+					continue // valid ownership belongs exclusively to another root
+				}
 				errs = append(errs, ledgerError{Line: lineNum, Reason: "config root does not match this installation"})
 				continue
 			}
@@ -341,11 +355,6 @@ func readLedger() ([]LedgerEntry, []ledgerError) {
 				continue
 			}
 		}
-		if err := validateLedgerOwnership(entry); err != nil {
-			errs = append(errs, ledgerError{Line: lineNum, Reason: fmt.Sprintf("invalid ownership: %v", err)})
-			continue
-		}
-
 		entries = append(entries, entry)
 	}
 	if err := scanner.Err(); err != nil {

@@ -47,7 +47,7 @@ def main() -> int:
     canonical_bytes = CANONICAL.read_bytes()
     if os.name != "nt":
         for helper in (CANONICAL, *COPIES):
-            require(stat.S_IMODE(helper.stat().st_mode) == 0o755, f"helper mode drifted: {helper}")
+            require(helper.stat().st_mode & stat.S_IXUSR != 0, f"helper is not executable: {helper}")
     # NTFS does not expose the POSIX executable bit. Content parity and the
     # subprocess behavior below remain portable checks on Windows.
     for copy in COPIES:

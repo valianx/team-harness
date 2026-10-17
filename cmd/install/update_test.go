@@ -1043,8 +1043,6 @@ func TestUpdateOpencodesSH_StaticVerify(t *testing.T) {
 		{"version-precheck: VERSION asset fetch", `BASE_URL}/VERSION`},
 		// AC-9: already-current short-circuit exits 0 without downloading.
 		{"already-current: exit 0 branch", `exit 0`},
-		// AC-9: installed_version extraction from .team-harness.json.
-		{"installed-version: grep+sed extraction", `grep '"installed_version"'`},
 		// AC-10: anchored exact-asset-name match (awk field-2 equality, not substring).
 		{"exact-field-awk: $2==a", `$2==a`},
 		// AC-10: sha256sum tool selection with shasum fallback.

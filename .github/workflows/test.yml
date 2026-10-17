@@ -161,6 +161,10 @@ jobs:
         if: steps.release-only.outputs.is_release_only != 'true'
         uses: oven-sh/setup-bun@v2
 
+      - name: Install locked hook build tooling
+        if: steps.release-only.outputs.is_release_only != 'true'
+        run: npm ci --prefix hooks/ts --no-audit --no-fund
+
       - name: Run full verification suite
         if: steps.release-only.outputs.is_release_only != 'true'
         env:
@@ -244,7 +248,11 @@ jobs:
 
       - name: Install hooks/ts dependencies
         working-directory: hooks/ts
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck TS hooks
+        working-directory: hooks/ts
+        run: npm run typecheck
 
       - name: Rebuild TS hook bundles
         working-directory: hooks/ts
