@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -260,6 +261,15 @@ func TestWriteOpencodeTeamHarnessConfig_PreservesWorkspacePreferenceGroup(t *tes
 			if err := os.WriteFile(path, before, 0o600); err != nil {
 				t.Fatal(err)
 			}
+			preferenceKeys := []string{"workspace-mode", "logs-mode", "logs-path", "logs-subfolder", "workspace-space-id", "workspace-container-page-id"}
+			wantPreferences := make(map[string]json.RawMessage, len(preferenceKeys))
+			for _, key := range preferenceKeys {
+				wantPreferences[key] = original[key]
+			}
+			if tc.Expected.SelectedFrom == "default" {
+				wantPreferences["workspace-mode"] = json.RawMessage(`"local"`)
+				wantPreferences["logs-mode"] = json.RawMessage(`"local"`)
+			}
 			placer := newOpencodePlacerAt(root)
 			for attempt := 0; attempt < 2; attempt++ {
 				if err := writeOpencodeTeamHarnessConfig(path, opencodeSetupValues{LogsMode: "local"}, placer); err != nil {
@@ -269,8 +279,12 @@ func TestWriteOpencodeTeamHarnessConfig_PreservesWorkspacePreferenceGroup(t *tes
 				if err != nil {
 					t.Fatal(err)
 				}
+				var compactAfter bytes.Buffer
+				if err := json.Compact(&compactAfter, after); err != nil {
+					t.Fatal(err)
+				}
 				var got map[string]json.RawMessage
-				if err := json.Unmarshal(after, &got); err != nil {
+				if err := json.Unmarshal(compactAfter.Bytes(), &got); err != nil {
 					t.Fatal(err)
 				}
 				for key, want := range original {
@@ -282,18 +296,12 @@ func TestWriteOpencodeTeamHarnessConfig_PreservesWorkspacePreferenceGroup(t *tes
 						t.Errorf("attempt %d: %s = %s, want %s", attempt, key, got[key], want)
 					}
 				}
-				for _, key := range []string{"workspace-mode", "logs-mode", "logs-path", "logs-subfolder", "workspace-space-id", "workspace-container-page-id"} {
-					if tc.Expected.SelectedFrom == "default" && (key == "workspace-mode" || key == "logs-mode") {
-						if string(got[key]) != `"local"` {
-							t.Errorf("attempt %d: %s = %s, want local", attempt, key, got[key])
-						}
-						continue
-					}
-					if _, existed := original[key]; !existed {
-						if _, injected := got[key]; injected {
-							t.Errorf("attempt %d: injected preference key %s", attempt, key)
-						}
-					}
+				gotPreferences := make(map[string]json.RawMessage, len(preferenceKeys))
+				for _, key := range preferenceKeys {
+					gotPreferences[key] = got[key]
+				}
+				if !reflect.DeepEqual(gotPreferences, wantPreferences) {
+					t.Errorf("attempt %d: workspace preferences = %s, want %s", attempt, gotPreferences, wantPreferences)
 				}
 			}
 		})

@@ -593,10 +593,29 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 const root = process.argv[2];
 const fixture = JSON.parse(readFileSync(join(root, "tests/fixtures/workspace-preferences.json"), "utf8"));
+const contracts = {
+    "invalid:null": {
+        required: /workspace selection is invalid/,
+        forbidden: /workspace mode: (local|obsidian|gpt-space)|(?:fixture|example)\/vault/,
+    },
+    "selected:local": {
+        required: /workspace mode: local/,
+        forbidden: /workspace mode: (obsidian|gpt-space)|(?:fixture|example)\/vault/,
+    },
+    "selected:obsidian": {
+        required: /workspace mode: obsidian/,
+        forbidden: /workspace mode: (local|gpt-space)/,
+    },
+    "selected:gpt-space": {
+        required: /^(?=[\s\S]*workspace mode: gpt-space)(?=[\s\S]*unavailable to this hook)/,
+        forbidden: /(?:fixture|example)\/vault|workspace mode: (local|obsidian)/,
+    },
+};
 const home = mkdtempSync(join(tmpdir(), "th-session-preferences-"));
 try {
     mkdirSync(join(home, ".claude"));
     for (const { name, config, expected } of fixture.cases) {
+        const contract = contracts[`${expected.status}:${expected.mode}`];
         const source = JSON.stringify({ "logs-path": "/fixture/vault", ...config });
         const path = join(home, ".claude/.team-harness.json");
         writeFileSync(path, source);
@@ -605,18 +624,10 @@ try {
         });
         assert.equal(result.status, 0, name);
         const directive = JSON.parse(result.stdout).hookSpecificOutput.additionalContext;
-        if (expected.status === "invalid") {
-            assert.match(directive, /workspace selection is invalid/, name);
-            assert.doesNotMatch(directive, /workspace mode: (local|obsidian|gpt-space)/, name);
-        } else {
-            assert.ok(directive.includes(`workspace mode: ${expected.mode}`), name);
-        }
+        assert.match(directive, contract.required, name);
+        assert.doesNotMatch(directive, contract.forbidden, name);
         assert.equal((directive.match(/workspace selector conflict/g) ?? []).length,
             Number(expected.conflict), `${name}: conflict is diagnosed once`);
-        if (expected.mode === "gpt-space") {
-            assert.match(directive, /unavailable to this hook/, name);
-            assert.doesNotMatch(directive, /fixture\/vault|workspace mode: local/, name);
-        }
         assert.equal(readFileSync(path, "utf8"), source, `${name}: reading does not repair configuration`);
     }
     console.log(`  [PASS] ${fixture.cases.length} shared workspace preference cases`);
