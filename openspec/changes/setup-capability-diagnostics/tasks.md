@@ -13,8 +13,8 @@
 
 ## 3. Verification and delivery
 
-- [ ] 3.1 Run affected checks and the required full suite, retaining executed counts and omissions.
+- [x] 3.1 Run affected checks and the required full suite, retaining executed counts and omissions.
 - [ ] 3.2 Execute installed TEA test-review and trace using the same evidence; disposition findings within this change.
 - [ ] 3.3 Execute actual OpenSpec implementation verification and Superpowers verification-before-completion.
-- [ ] 3.4 Confirm the new living capability content and prepare completed-change retirement under repository policy.
-- [ ] 3.5 Inspect the complete candidate and coordinate release metadata once for the authorized delivery.
+- [x] 3.4 Confirm the new living capability content and prepare completed-change retirement under repository policy.
+- [x] 3.5 Inspect the complete candidate and coordinate release metadata once for the authorized delivery.

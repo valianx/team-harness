@@ -294,6 +294,19 @@ class SetupStatusTests(unittest.TestCase):
                 which=lambda name: "/native/" + name if name in {"pi", "node"} else None, probe=version)
             self.assertEqual(report["runtimes"]["pi"]["capabilities"]["native_package"]["status"], expected)
 
+    def test_pi_node_probe_ambiguity_remains_unknown(self):
+        for code in ["probe_timeout", "probe_output_limit", "version_unrecognized"]:
+            with self.subTest(code=code):
+                def version(argv, **unused):
+                    return {"status": "unknown", "code": code} if argv[0].endswith("node") else {
+                        "status": "available", "version": "1.3.0", "code": "version_observed"}
+                report = STATUS.build_report("pi", env=self.env, home=self.home, cwd=self.cwd,
+                    which=lambda name: "/native/" + name if name in {"pi", "node"} else None, probe=version)
+                capability = report["runtimes"]["pi"]["capabilities"]["native_package"]
+                self.assertEqual(capability["status"], "unknown")
+                self.assertEqual(capability["code"], "pi_node_version_unverified")
+                self.assertIn("node --version", capability["next_step"])
+
     def test_missing_executable_is_reported_without_invoking_a_shell(self):
         result = STATUS.probe_version([str(self.base / "missing")], timeout=0.2)
         self.assertEqual(result["code"], "executable_missing")

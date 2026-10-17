@@ -244,9 +244,12 @@ def _capabilities(runtime, cli, catalog, env, platform, lookup, probe):
         node = probe([str(node_path), "--version"], env=env) if node_path else {"status": "missing"}
         versions = {"pi": cli.get("version"), "node": node.get("version")}
         requirements = catalog["runtimes"]["pi"]["native_package"]["requirements"]
-        if not all(_version_at_least(versions.get(item["tool"]),
-                                    tuple(int(part) for part in item["minimum"].split(".")))
-                   for item in requirements):
+        if node["status"] == "unknown":
+            native = {"status": "unknown", "code": "pi_node_version_unverified",
+                      "next_step": "Inspect Node with node --version in this host, then retry setup status."}
+        elif not all(_version_at_least(versions.get(item["tool"]),
+                                      tuple(int(part) for part in item["minimum"].split(".")))
+                     for item in requirements):
             native = {"status": "unavailable", "code": "pi_runtime_minimum_unmet",
                       "next_step": "Use the Pi and Node minimums in this report's native_package requirements."}
     result = {
