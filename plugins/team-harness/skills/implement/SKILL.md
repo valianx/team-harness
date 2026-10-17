@@ -13,8 +13,12 @@ directly to [validate](../validate/SKILL.md) without waiting for another operato
 Applicable validation is part of completing implementation unless the operator
 explicitly asks to stop before it. Record assessments as pending until executed.
 
-Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
-its configured local or Obsidian mode. Main coordinates with native tools and
+Use [workspace](../workspace/SKILL.md) to reuse the bound file home or verified
+gpt-space effort. Main retains remote progress and useful returns in that Page;
+dispatch separates context locator, checkout and optional local operational
+storage. File-only helpers receive actual paths, never remote IDs or URLs.
+Do not create a local Markdown mirror or replace an unavailable remote identity.
+Main coordinates with native tools and
 permissions. Reuse authorization for unchanged work and ask only for a missing
 decision. Specialists provide evidence and recommendations; Main judges them.
 

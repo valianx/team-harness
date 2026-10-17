@@ -5,10 +5,13 @@ description: Discover Team Harness workflows and begin lightweight intake.
 
 # Init
 
-Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
-its configured local or Obsidian mode. Main coordinates with native tools and
-permissions. Reuse authorization for unchanged work and ask only for a missing
-decision. Specialists provide evidence and recommendations; Main judges them.
+Use [workspace](../workspace/SKILL.md) to reuse the effort's bound context before
+consulting defaults: a file home in local/Obsidian mode or a verified native
+Space effort in `gpt-space` mode. Main coordinates with native tools and
+permissions and persists specialist returns in that context. Pass repository
+and optional local operational storage separately. Reuse authorization for
+unchanged work and ask only for a missing decision. Specialists provide
+evidence and recommendations; Main judges them.
 
 Stay in the native general agent. Discover current skills: spec for written
 intent and tasks, pipeline for explicitly chosen broader coordination, review-pr

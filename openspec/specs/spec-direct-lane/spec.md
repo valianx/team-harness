@@ -75,7 +75,21 @@ When a concrete bug warrants it within approved scope or the live operator reque
 - **THEN** Main can use the normal relevant evidence without opening another test phase or reporting the proof as performed
 
 ### Requirement: The operator plan remains a lightweight view of canonical work
-The coordinator SHALL present a concise plan in the operator's language with the intended result, current status, work steps and their expected results, progress derived from canonical tasks, next action and links to existing OpenSpec sources. It SHALL expose the four development phases and the selected capabilities' purposes, scopes, execution status, actual outcomes and evidence links, distinguishing future work, missing evidence and explicit omissions from completed checks. It SHALL use the active runtime's workspace preferences, create no local duplicate in Obsidian mode, preserve unrelated plans and reuse the same source-bound view across later work sessions. It SHALL refresh the view after intent or task changes and at phase milestones. The plan SHALL NOT introduce independent requirements, task completion, approval authority or a separate mandatory state schema, and its existence SHALL NOT activate a pipeline.
+The coordinator SHALL present a concise plan in the operator's language with the
+intended result, current status, work steps and their expected results, progress
+derived from canonical tasks, next action and links to existing OpenSpec sources.
+It SHALL expose the four development phases and the selected capabilities'
+purposes, scopes, execution status, actual outcomes and evidence links,
+distinguishing future work, missing evidence and explicit omissions from completed
+checks. It SHALL use the active runtime's workspace preferences, create no local
+duplicate in Obsidian or remote mode, preserve unrelated plans and reuse the same
+source-bound view with its original date across later work sessions. File modes
+SHALL retain `01-plan.md`; remote mode SHALL keep the logical plan in the bound
+effort Page and handoff in that same effort without required local plan or
+handoff copies. It SHALL refresh the view during work after intent or task
+changes and at phase milestones. The plan SHALL NOT introduce independent
+requirements, task completion, approval authority or a separate mandatory state
+schema, and its existence SHALL NOT activate a pipeline.
 
 #### Scenario: The operator uses an Obsidian workspace
 - **WHEN** a validated spec change is ready for presentation and workspace preferences select Obsidian
@@ -86,7 +100,7 @@ The coordinator SHALL present a concise plan in the operator's language with the
 - **THEN** the coordinator refreshes the existing source-bound plan from canonical tasks instead of creating another dated view
 
 #### Scenario: An existing plan belongs to another workflow
-- **WHEN** the default destination contains a user or pipeline plan
+- **WHEN** the default file destination contains a user or pipeline plan
 - **THEN** the coordinator preserves it and places the spec view in a separate workspace directory
 
 #### Scenario: Scope or lifecycle changes
@@ -96,6 +110,10 @@ The coordinator SHALL present a concise plan in the operator's language with the
 #### Scenario: The operator asks which tools ran
 - **WHEN** a phase reaches a reporting milestone
 - **THEN** the same plan distinguishes executed assessments and their actual outcomes, not-applicable capabilities with reasons, pending dependencies, and explicitly declined or deferred work, with links to evidence and the next action
+
+#### Scenario: Spec uses a native Space effort throughout work
+- **WHEN** the selected context is remote during Spec, Implementation, Validation or handoff
+- **THEN** Main keeps the same source-bound plan current in the effort Page with phase status, original date, canonical task progress and useful source/evidence links, without local plan or handoff mirrors
 
 ### Requirement: Dependent repositories stay sequential in the spec lane
 For one bounded objective without a public-contract break, the coordinator SHALL work across repositories in dependency order without requiring pipeline activation solely because of repository count. It SHALL reuse repository-local OpenSpec changes and keep one common dated plan under active runtime workspace preferences, using Obsidian when selected. It SHALL preserve the original plan on expansion and classify, validate and deliver each repository separately under existing authority.

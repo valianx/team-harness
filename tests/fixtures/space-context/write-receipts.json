@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "create_success": {"metadata":{"page_id":"page_created","url":"https://chatgpt.com/space/page_created"}},
+  "create_unknown": {"error":{"code":"timeout","commit_status":"unknown","message":"Save outcome unavailable","details":{"page_id":"page_observed"}}},
+  "partial_patch": {
+    "new_sequence": 12,
+    "operation_results": [
+      {"operation_index":0,"status":"applied","affected_blocks":[{"block_id":"block_a","hash":"hash_after"}],"created_block_ids":[],"continuation_position":null,"preceding_block_id":null},
+      {"operation_index":1,"status":"applied","ignored_reason":"block_deleted","affected_blocks":[],"created_block_ids":[],"continuation_position":null,"preceding_block_id":null},
+      {"operation_index":2,"status":"rejected","error_code":"edit_conflict","rejection_reason":"patch_hash_mismatch","affected_blocks":[],"created_block_ids":[],"continuation_position":null,"preceding_block_id":null}
+    ],
+    "recovery":{"action":"repair_rejected_operations","message":"Reread and rebuild the rejected operation only","retryable":false}
+  },
+  "legacy_applied": {"operation_results":[{"operation_index":0,"affected_blocks":[{"block_id":"block_a","hash":"hash_after"}],"created_block_ids":[],"continuation_position":null,"preceding_block_id":null}]},
+  "not_committed_conflict": {"error":{"code":"edit_conflict","commit_status":"not_committed","message":"The target changed","details":{"operation_results":[{"operation_index":0,"status":"rejected","error_code":"edit_conflict","rejection_reason":"patch_hash_mismatch","affected_blocks":[],"created_block_ids":[],"continuation_position":null,"preceding_block_id":null}]},"recovery":{"action":"reread_and_rebuild","message":"Read current blocks before constructing a new edit","retryable":false}}},
+  "unknown_conflict": {"error":{"code":"edit_conflict","commit_status":"unknown","message":"An earlier attempt may have committed","details":{"operation_results":[{"operation_index":0,"status":"rejected","error_code":"edit_conflict","affected_blocks":[],"created_block_ids":[],"continuation_position":null,"preceding_block_id":null}]}}},
+  "schema_rejected": {"error":{"code":"invalid_page_schema","commit_status":"not_committed","message":"Operation not supported"}},
+  "unknown_error": {"error":{"code":"transport_error","message":"No completed response"}}
+}

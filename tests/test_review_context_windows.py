@@ -123,6 +123,7 @@ if __name__ == "__main__":
         "test_context_round_trip_requires_supported_schema",
     ]
     suite = unittest.TestSuite(cases.ReviewContextTests(name) for name in names)
+    suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(cases.PageWorkspaceTests))
     suite.addTest(
         WindowsReviewArtifactLifecycleTests(
             "test_cleanup_run_removes_read_only_snapshot_object"

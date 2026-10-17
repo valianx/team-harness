@@ -45,7 +45,7 @@ focused contract/invariant method. OpenCode discovers the native `full-audit` sk
 then architecture and implementation detail. It includes affected
 data models and frontend wireframes, and reuses existing OpenSpec intent.
 The document stays together regardless of length; ask explicitly to split it.
-Design-only work ends with the proposal in the configured local or Obsidian workspace.
+Design-only work ends with the proposal in the selected workspace context.
 
 `spec` is the lightweight path: the current agent carries planning,
 implementation, validation and PR preparation with independent reviewers.
@@ -59,7 +59,7 @@ and continues the authorized work. Workspace and Obsidian support preserve
 useful context; voice and language guidance preserve the operator's preferences.
 
 The workspace skill is the common method for substantive work, including direct
-tasks outside a pipeline. It reuses one local or Obsidian home for decisions,
+tasks outside a pipeline. It reuses one local, Obsidian or native GPT Space home for decisions,
 evidence and handoffs without requiring Context Harness or creating empty records
 for brief conversations and read-only status requests.
 
@@ -269,12 +269,21 @@ native discovery; the installer does not present an Obsidian selector.
 The identity routes use the same token-free schema in Claude Code, Codex, and
 OpenCode; see [GitHub identity routing](./docs/github-identities.md).
 
-Logs mode controls where pipeline workspaces are stored:
+`workspace-mode` selects retained context across workflows:
 
 | Mode | Where | When to use |
 |---|---|---|
 | `local` | `./workspaces/` in each project | Default. Simple, no extra config. |
 | `obsidian` | Obsidian vault path you explicitly configure | Cross-project visibility. Workspaces appear as searchable notes in your vault. |
+| `gpt-space` | An effort Page beneath a verified `workspace` Page in the selected Space | Native remote context during work and across sessions. Requires TH 3.48.0 and a capable host. |
+
+Absent `workspace-mode`, valid legacy `logs-mode` remains readable; invalid
+canonical values report an error. Existing effort bindings win over new defaults.
+Setup verifies and saves non-secret `workspace-space-id` and
+`workspace-container-page-id`. Current Codex Pages is supported; hosts without
+that native capability retain the locator and report unavailable. Main maintains
+the Page during work. File tools use separate scoped local storage, without a
+second Markdown context home. Documentation stays outside the `workspace` branch.
 
 ### Update
 
@@ -391,7 +400,7 @@ Full contract: docs/dev-mode.md.
 | [Agent tree](./docs/agent-tree.md) | How `th:orchestrator` and the leaf specialists relate at runtime |
 | [Contributor instructions](./AGENTS.md) | Repository workflows, working agreements, validation and benchmarks |
 | [Knowledge base](./docs/knowledge.md) | Decisions, patterns, stack notes, and constraints accumulated across features |
-| [Integration guide](./docs/integration.md) | Optional knowledge integrations; workspace context has no remote dependency |
+| [Integration guide](./docs/integration.md) | Optional knowledge integrations; file context has no remote dependency |
 | [External tools](./docs/upstream-tools.md) | OpenSpec, Superpowers, TEA and quality analyzers: selection, execution, shared workspace and upstream ownership |
 | [Troubleshooting](./docs/troubleshooting.md) | SSH/HTTPS errors, duplicate agents, missing dispatch rule |
 | [Changelog](./CHANGELOG.md) | Release history |

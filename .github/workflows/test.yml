@@ -65,11 +65,16 @@ jobs:
       - run: node tests/test_openspec_launcher.mjs
       - run: node tests/test_sync_skills_platform.mjs
       - run: node tests/test_hook_outputs.mjs
+      - run: node tests/test_workspace_context.mjs
+      - run: node tests/test_space_context.mjs
+      - run: node tests/test_resume_session_workspace.mjs
+      - run: node tests/test_workspace_bound_hooks.mjs
       - run: node tests/test_th_update_windows.mjs
       - run: python tests/test_install_bootstrap_windows.py
       - run: python tests/test_windows_artifact_fs.py
       - run: python tests/test_review_context_windows.py
       - run: python tests/test_codex_update_convergence.py
+      - run: python tests/test_workspace_config.py
       - run: python tests/test_codex_binary_resolution.py
       - name: Verify portable workflow regressions on Windows
         run: python tests/test_inline_git_hardening.py

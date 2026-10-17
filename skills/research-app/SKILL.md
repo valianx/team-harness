@@ -16,7 +16,7 @@ destination-project context from the conversation and existing evidence. If the
 target is ambiguous, resolve it before analysis and continue independent context
 preparation. An exploratory objective is valid without a destination project;
 state assumptions rather than inventing project needs or choosing an example app.
-Reuse [workspace](../workspace/SKILL.md) and its absolute local or Obsidian path.
+Reuse the bound [context](../workspace/SKILL.md); keep file-tool storage separate.
 
 Follow the upstream complete-source boundary: ordinary analysis of a complete
 source repository uses normal repository research, without REA readiness or
@@ -44,16 +44,16 @@ evidence and gain no implicit execution authority.
 
 ## Preserve evidence and interpret it
 
-Keep complete original supported Evidence and artifacts under `research/rea/` in
-the selected workspace. Retain identities, profiles, provenance, limitations,
+Keep complete original Evidence/artifacts under `research/rea/` in declared real
+local operational storage. Retain identities, profiles, provenance, limitations,
 omissions and diagnostics; verify the actual output destinations. Link summaries
 and views to their original Evidence and use supported views for focused questions
 instead of repeating completed analysis. Preserve a supported portable original
 before closing a connection when later reuse needs it; retained IDs alone do not
 survive a connection or become references for separate CLI calls.
 
-Main writes the concise interpretation in `research/00-research.md`, linking the
-original results. State application scope, answered and open questions, findings
+Main retains interpretation in the same Page, or `research/00-research.md` in file
+modes, linking portable original results. State scope, open questions, findings
 and coverage limits. Separate observations, inferences and unknowns; static
 relationships do not establish runtime behavior, and process success does not
 establish exhaustive coverage.

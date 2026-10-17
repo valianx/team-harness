@@ -2,8 +2,8 @@
 # Save session
 
 Preserve enough context to resume the effort without rediscovering its decisions.
-The current agent writes `00-session-handoff.md` in the selected workspace; this
-does not start a pipeline or require another agent.
+Main saves a logical handoff in the selected effort Page, or
+`00-session-handoff.md` in file modes; no pipeline or extra agent is required.
 
 Use [workspace](../workspace/SKILL.md) to select or reuse the effort's home.
 An existing binding takes precedence over the current checkout name or date.
@@ -22,14 +22,15 @@ If the operator only asks to preview a handoff, show it without saving. Native
 permissions govern the write; a refusal is reported as a write outcome, not an
 operator decline or permission to widen access.
 
-Use this compact Markdown structure. Preserve metadata used by existing readers;
-Obsidian mode alone does not require extra frontmatter:
+Use this compact structure. Preserve the locator, verified source association,
+original date, phase/task progress and useful evidence links; file readers retain
+their metadata. Main uses guarded native edits and readback in remote mode:
 
 ```markdown
 # Session Handoff: {feature}
 
-Workspace: {selected absolute workspace}
-Source: {canonical Git common directory or projectless working directory}
+Workspace: {selected context locator}
+Source: {verified association; preserve existing file source metadata}
 
 ### What Worked
 - {confirmed approach or decision}
@@ -44,5 +45,6 @@ Source: {canonical Git common directory or projectless working directory}
 Keep secrets, credentials and raw execution logs out of the handoff. Preserve
 the operator's language and the shared
 [voice guidance](../../agents/_shared/operational-rules.md#voice).
-After a successful write, report its location; retain a precise pending reason
-if it could not be saved.
+After verified persistence, report its location. Missing tools, access loss or an
+uncertain write preserve the binding and pending reason; reconcile before retry,
+without a local Markdown mirror or replacement effort.

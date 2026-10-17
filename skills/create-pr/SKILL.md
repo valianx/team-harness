@@ -45,8 +45,8 @@ unrelated commit or change global settings to repair a local gap.
 - Inspect the full base-to-candidate diff and worktree status. Preserve unrelated
   tracked or untracked changes; do not stage, discard, or fold them into the PR.
 - Keep maintained tests, tools, fixtures, and required shipped generated outputs that
-  belong to the candidate. Keep transient reports, logs, and scratch material in the
-  existing workspace or a temporary directory; do not add them to the repository.
+  belong to the candidate. Main retains narrative in the bound context; place logs,
+  scratch and captures in declared real local operational storage, outside commits.
   Apply [workspace's artifact guidance](../workspace/SKILL.md#keep-context-useful)
   in every consumer repository, including provider-generated work files and local
   installations. A necessary durable project artifact may remain; explain its role
@@ -69,7 +69,7 @@ unrelated commit or change global settings to repair a local gap.
   the candidate. Reuse applicable evidence rather than starting an unrequested full
   review round.
 - Direct and spec flows create no new pipeline state, gates, or checklist files. Reuse
-  an existing workspace or temporary body file, and add no scripts, generated copies,
+  a declared local operational body file, and add no scripts, generated copies,
   or duplicate lifecycle content as new administrative preparation material.
 
 Prepare the title, body, issue references, and any required metadata from the repository

@@ -22,11 +22,9 @@ this file in full.
 
 ## Research Mode
 
-Produces a neutral, evidence-based report with options and a recommendation —
-never an architecture proposal. Output:
-`{workspace}/research/00-research.md`, where Main supplies the absolute
-workspace path. Direct research does not require a state, event, or knowledge
-context file.
+Produce an evidence-based report with options and a recommendation, not a proposal:
+`research/00-research.md` in file modes, or return it for Main's remote persistence.
+Use supplied context without state/event scaffolding.
 
 1. **Define the research question** — technology migration, library
    comparison, approach evaluation, or feasibility study.

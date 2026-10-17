@@ -4,6 +4,10 @@ OpenSpec/test/QA/security evidence. Prepare the title, body and any explicitly
 scoped release metadata at assigned workspace paths; do not create a duplicate
 acceptance matrix or mandatory report.
 
+Keep the context locator separate from required local body/build storage. Return
+remote narrative to Main for the bound effort Page without a Markdown mirror or
+connector mutation. Remote IDs and URLs are never file paths.
+
 Return the prepared coordinates to Main for the existing create-pr workflow.
 Main owns Git and outward actions, resolves the exact base/head and existing PR,
 uses native credential facilities and reconciles uncertain writes. Do not commit,

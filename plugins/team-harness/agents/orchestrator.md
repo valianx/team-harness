@@ -14,8 +14,9 @@ do not copy its tool matrix into role prompts.
 
 ## Startup kernel
 
-Read only the current skill and needed references. Use `workspace` for retained
-context, pass its absolute home to specialists, and keep local or Obsidian mode.
+Read the current skill and needed references. Use `workspace`; dispatch locator,
+checkout and optional operational directory separately. Main persists remote
+returns in the bound effort Page during work.
 
 ## Direct execution decision
 

@@ -5,20 +5,29 @@ This is read-only: never create, repair, migrate, or update configuration from
 a direct mode.
 
 1. Read only `${CODEX_HOME:-$HOME/.codex}/.team-harness.json`.
-2. If the native file is absent, report that setup has not converged, use safe
-   defaults for this operation, and recommend `$team-harness:setup`. Never read
+2. Reuse an existing effort binding before resolving defaults. If the native file
+   is absent, report that setup has not converged, default an unbound effort to
+   local, and recommend `$team-harness:setup`. Never read
    Claude Code or opencode configuration as a fallback.
-3. If the native file is malformed, report a concise warning and use safe
-   defaults. Do not hide corruption by consulting another runtime's file.
-4. Accept only correctly typed values. Ignore an invalid individual key and
-   name it in one warning:
-   - `logs-mode`: `local` or `obsidian`.
+3. If the native file is malformed, report unavailable preference data; do not
+   invent a replacement workspace or consult another runtime's file. Independent
+   authorized work can continue with its existing binding.
+4. Resolve workspace selection through the shared method. Own-key presence of
+   `workspace-mode` is authoritative, including null or invalid values. Accept
+   `local`, `obsidian` or `gpt-space`; only when it is absent may valid legacy
+   `logs-mode: local | obsidian` select the mode. Invalid selection stays explicit;
+   absence of both selectors defaults to local. Diagnose conflicting selectors
+   once and preserve their bytes. Reading never migrates settings.
+   - `workspace-space-id` and `workspace-container-page-id`: both opaque IDs for
+     remote selection, verified through Main's actual native reads before use.
+     IDs and URLs never become filesystem paths.
    - `logs-path`: a non-empty absolute path whose canonical target is
      accessible and is neither a filesystem root nor the user home.
    - `logs-subfolder`: a normalized, non-empty relative path without `.`, `..`,
      glob, or empty segments. Canonicalize the combined external target and
      require it to remain strictly contained below the validated `logs-path`;
-     otherwise reject the external workspace and use safe defaults.
+     otherwise report an invalid destination without local fallback.
+   Accept other correctly typed preferences, naming any invalid key once:
    - `language`: two lowercase letters.
    - `english_learning`, `obsidian_tasks`, and `flow_telemetry.enabled`:
      booleans.
@@ -37,10 +46,13 @@ a direct mode.
    GitHub routes are consulted only immediately before a GitHub CLI or git
    remote operation; they never authorize an outward write or choose a pipeline
    posture.
-6. Reading workspace settings does not authorize creating a workspace. Direct
-   mode remains workspace-free unless the operator's actual bounded task asks
-   for a file output. Pipeline activation independently revalidates the same
-   configuration before choosing its workspace.
+6. Reading workspace settings creates no context. Brief intake and read-only
+   status stay artifact-free; substantive work uses the shared workspace method
+   within the task's existing authorization. `gpt-space` requires TH 3.48.0 and
+   actual native Pages capability. Missing tools, access loss or incomplete
+   destination data retain the remote locator and pending status. They never
+   create a competing local home. Main persists useful context; file tools use
+   separate declared operational storage without a Markdown context mirror.
 
 Cross-runtime values may be copied only by an explicit `$team-harness:setup`
 import. Direct modes never inspect compatibility sources.

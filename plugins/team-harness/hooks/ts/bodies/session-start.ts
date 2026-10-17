@@ -6,12 +6,12 @@
 //   1. loadWorkflowDiscovery  — native workflow entry-point summary
 //   2. loadLanguage           — .team-harness.json `language`
 //   3. loadEnglishLearning    — .team-harness.json `english_learning` (opt-in)
-//   4. loadWorkspaceMode      — .team-harness.json `logs-mode`/`logs-path`/`logs-subfolder`
+//   4. loadWorkspaceMode      — canonical/legacy workspace preference and destination
 //
 // Security (SEC-DR-A/B/C):
 //   A — each config-derived value is validated with a FULL-STRING check.
 //       language must match ^[a-z]{2}$.
-//       logs-path is rejected if it contains any control character.
+//       logs-path must be a safe native absolute vault path.
 //   B — the additionalContext is emitted via a fixed template; only validated/derived
 //       tokens are interpolated; no raw config bytes flow into the output.
 //   C — rejected config values contribute nothing and never echo the raw value.
@@ -23,7 +23,10 @@
 // It is a session-initialization hook; it must not source _hook-profile.sh.
 // (Enforcement: Suite 117 / AC-11 / CLAUDE.md §5 Hook enforcement floors.)
 
+import { homedir } from "node:os";
+import * as path from "node:path";
 import type { NormalizedInput, NormalizedDecision } from "../shim/normalized-v1.js";
+import { selectWorkspacePreference } from "../../../skills/workspace/scripts/workspace-preference.mjs";
 
 // ---------------------------------------------------------------------------
 // SessionStartReader interface — injected by the entry module.
@@ -120,15 +123,40 @@ function loadEnglishLearning(config: Record<string, unknown>): string | null {
 // Load 3 — workspace mode
 // ---------------------------------------------------------------------------
 
-function loadWorkspaceMode(config: Record<string, unknown>): string | null {
-  const logsMode = typeof config["logs-mode"] === "string" ? config["logs-mode"] : "";
-  if (logsMode !== "obsidian") return null;
+function validObsidianBasePath(base: string, homeDirectory: string): boolean {
+  if (!path.isAbsolute(base) || CONTROL_CHAR_RE.test(base)
+    || /[*?[\]]/.test(base)) return false;
+  const root = path.parse(base).root;
+  if (path.sep === "\\" && (root === "/" || root === "\\")) return false;
+  const parts = base.split(path.sep === "\\" ? /[\\/]/ : /\//);
+  if (parts.includes("..")) return false;
+
+  // Diagnostics are lexical; native writes retain access and symlink checks.
+  const normalized = path.resolve(base);
+  return normalized !== path.parse(normalized).root
+    && path.relative(homeDirectory, normalized) !== "";
+}
+
+function loadWorkspaceMode(config: Record<string, unknown>, homeDirectory?: string): string | null {
+  const preference = selectWorkspacePreference(config);
+  const conflict = preference.conflict
+    ? " Team Harness workspace selector conflict: workspace-mode takes precedence; preserve both settings until an explicit repair."
+    : "";
+  if (preference.status === "invalid") {
+    return "Team Harness workspace selection is invalid. Preserve the configuration and reuse any valid bound effort. Resolve the invalid preference with the current workspace skill before selecting a new context home." + conflict;
+  }
+  if (preference.mode === "gpt-space") {
+    return "Team Harness workspace mode: gpt-space is configured. Reuse the bound effort Page through the current workspace skill. Native Pages access is unavailable to this hook; Main must verify the host's capability and destination, preserving the remote locator and reporting pending or unavailable operations when needed. Optional local telemetry requires an explicit local TH_WORKSPACE binding and never becomes the context home." + conflict;
+  }
+  if (preference.mode === "local") {
+    return "Team Harness workspace mode: local is selected. Use the current workspace skill to preserve an existing effort binding before resolving a new file workspace." + conflict;
+  }
 
   const logsPath = typeof config["logs-path"] === "string" ? config["logs-path"] : "";
-  if (!logsPath) return null;
+  const invalidDestination = "Team Harness workspace destination is invalid or incomplete for the selected Obsidian preference. Preserve the selection and resolve its destination with the current workspace skill." + conflict;
+  if (!logsPath) return invalidDestination;
 
-  // SEC-DR-A: reject logs-path containing any control character.
-  if (CONTROL_CHAR_RE.test(logsPath)) return null;
+  if (!validObsidianBasePath(logsPath, homeDirectory ?? homedir())) return invalidDestination;
 
   const logsSub =
     typeof config["logs-subfolder"] === "string" && config["logs-subfolder"]
@@ -137,10 +165,10 @@ function loadWorkspaceMode(config: Record<string, unknown>): string | null {
 
   if (CONTROL_CHAR_RE.test(logsSub) || logsSub.includes("\\") || /^[A-Za-z]:/.test(logsSub)
     || Buffer.byteLength(logsSub, "utf8") > 1024
-    || logsSub.split("/").some(part => !part || part === "." || part === ".." || /[*?[\]{}]/.test(part))) return null;
+    || logsSub.split("/").some(part => !part || part === "." || part === ".." || /[*?[\]{}]/.test(part))) return invalidDestination;
 
   // SEC-DR-B: only validated/derived tokens interpolated.
-  return `Team Harness workspace mode: obsidian is configured. Use the current workspace skill across workflows to reuse the task's existing workspace or resolve a new one under ${logsPath}/${logsSub}/{repo}/{YYYY-MM-DD}_{feature}/. Preserve its original date and association when resuming. Native runtime permissions govern writes.`;
+  return `Team Harness workspace mode: obsidian is configured. Use the current workspace skill across workflows to reuse the task's existing workspace or resolve a new one under ${logsPath}/${logsSub}/{repo}/{YYYY-MM-DD}_{feature}/. Preserve its original date and association when resuming. Native runtime permissions govern writes.` + conflict;
 }
 
 // ---------------------------------------------------------------------------
@@ -155,17 +183,18 @@ function loadWorkspaceMode(config: Record<string, unknown>): string | null {
 //   3. english-learning directive — gated on boolean config["english_learning"]
 //      only (no language gate; scoping handled by the directive's own
 //      message-level exemption).
-//   4. workspace-mode directive — gated on config["logs-mode"] === "obsidian".
+//   4. workspace-mode directive — selected by the shared canonical/legacy resolver.
 //
 // Security (SEC-DR-A/B): delegates validation to the private load functions;
 // no new interpolation site is introduced here. Config bytes reach the output
-// ONLY via LANG_RE-validated `language` (loadLanguage) or CONTROL_CHAR_RE-
-// validated `logs-path` (loadWorkspaceMode) or exact-true booleans
+// ONLY via LANG_RE-validated `language` (loadLanguage), validated native
+// workspace paths (loadWorkspaceMode), or exact-true booleans
 // (loadEnglishLearning). No raw config string is interpolated directly.
 // ---------------------------------------------------------------------------
 
 export function composeSessionDirectives(
-  config: Record<string, unknown> | null
+  config: Record<string, unknown> | null,
+  homeDirectory?: string
 ): string[] {
   const directives: string[] = [];
 
@@ -186,7 +215,7 @@ export function composeSessionDirectives(
 
   // Load 4 — workspace mode.
   if (config !== null) {
-    const wsDirective = loadWorkspaceMode(config);
+    const wsDirective = loadWorkspaceMode(config, homeDirectory);
     if (wsDirective !== null) directives.push(wsDirective);
   }
 

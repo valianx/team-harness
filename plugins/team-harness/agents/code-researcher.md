@@ -87,7 +87,7 @@ Stop when you have 3–8 high-quality entries, or when additional reads would no
 
 ### Step 4 — Return findings
 
-Return the angle, topic, scope, evidence entries and a concise factual summary. If no relevant evidence was found within the search and read budget, say so and describe the coverage. Main decides what to retain in the selected absolute workspace.
+Return the angle, topic, scope, evidence entries and a concise factual summary. If no relevant evidence was found within the search and read budget, say so and describe the coverage. Main retains useful context in the selected file home or bound effort Page; the collector remains read-only.
 
 ## Return Protocol
 

@@ -50,8 +50,8 @@ them. Do not fabricate an overall score, certification or model-run result.
 
 ## Return one useful assessment
 
-Honor requested chat-only or artifact delivery; the default is one
-`reviews/00-retrospective.md` in the existing workspace. Preserve source artifacts
+Honor requested chat-only or artifact delivery; Main retains the assessment in
+the same Page, or `reviews/00-retrospective.md` in file modes. Preserve source artifacts
 and useful earlier assessments. Include target/accepted intent, reviewed evidence
 and identities, supported outcomes/gaps across the six dimensions, explicit limits
 and prioritized improvements with dependencies, tradeoffs and closure observations.

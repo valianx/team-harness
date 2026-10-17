@@ -1,8 +1,10 @@
 
 # Workflow status
 
-Use [workspace](../workspace/SKILL.md) read-only to discover the configured local
-or Obsidian efforts. Read each existing plan, tasks or handoff. Historical
+Use [workspace](../workspace/SKILL.md) read-only for bound file or Page efforts.
+Verify exact remote IDs, parent/Space and source associations; incomplete,
+ambiguous or unavailable discovery stays pending without creation or fallback.
+Read each existing plan, tasks or handoff. Historical
 `00-state.md` or control logs may supply additional context; do not impose v4
 fields on v5 or require either schema for current work.
 

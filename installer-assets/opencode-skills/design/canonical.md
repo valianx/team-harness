@@ -1,10 +1,10 @@
 
 # Design
 
-Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
-its configured local or Obsidian mode. Main coordinates with native tools and
-permissions. Reuse authorization for unchanged work and ask only for a missing
-decision. Specialists provide evidence and recommendations; Main judges them.
+Use [workspace](../workspace/SKILL.md) to reuse the bound file or Page context.
+Main retains useful returns there; required file artifacts use declared real
+local storage. Reuse authority and ask only for a missing decision;
+specialists advise and Main judges their evidence.
 
 Clarify the outcome, scope, constraints and decisions using the supplied sources
 and relevant project context. Read a supplied issue through the active host's

@@ -66,8 +66,8 @@ executable or native skill, and prepare only the selected active-host capability
   --agent codex --global --yes`; resolve the duplicate basename by owner/source and objective,
   and do not overwrite TH's project/module skill.
 
-Report `installed`, `discoverable` and `usable` separately, pass the existing local/Obsidian
-workspace to the selected flow, and report a concrete recovery for pending activation. Do not
+Report `installed`, `discoverable` and `usable` separately, pass the selected context
+locator and separate operational storage for file output, and report a concrete recovery for pending activation. Do not
 modify project manifests without separate product scope or install inactive-host capabilities.
 
 Resolve all helpers relative to this skill and use them for every managed
@@ -83,7 +83,8 @@ write:
 ## Routing
 
 With no targeted intent, run the complete flow. For a targeted request, change
-only that concern and still ensure the native settings document exists.
+only that concern. A requested workspace change must pass destination verification
+before any settings write; failure preserves existing configuration bytes.
 Provider targets `openspec`, `superpowers`, `tea`, and explicit quality capabilities use the route above and do
 not enter this settings flow. TH settings targets are `workspace`, `language`, `english-learning`, `context7`,
 `agents`, `features`, `github-accounts`, `clickup`, and `obsidian-tasks`.
@@ -113,7 +114,7 @@ migration, and preserve every unrelated value.
    from the bounded Team Harness source. For targeted setup, inspect the
    already installed root; do not require a marketplace refresh. For a full
    setup, use a marketplace refresh only when the selected root is not already
-   resolvable locally; a targeted setup never requires network access. Inspect
+   resolvable locally; targeted version resolution uses local metadata. Inspect
    the installed selection first:
 
    ```bash
@@ -154,12 +155,17 @@ migration, and preserve every unrelated value.
    fi
    ```
    The helper deep-fills missing keys, copies opaque values without printing
-   them, preserves existing native values, and records provenance. Never merge
-   sources silently.
+   them, preserves existing native values, and records provenance. Workspace
+   selectors and their mode-specific destination form one preference group:
+   any native selection/destination wins across alias names. Imported remote
+   data is unverified until the native procedure below succeeds. Never merge
+   sources silently or add another import authorization ceremony.
 
-2. Create or migrate native configuration on every setup, including targeted
-   setup. This adds safe defaults only when keys are absent and stamps the
-   installed version without replacing operator values:
+2. Reconcile owned native metadata. For full setup or a `workspace` target,
+   defer this write until step 5 validates the complete selected destination.
+   Other targets may ensure metadata immediately. This seeds matching local
+   selectors only when both are absent, preserves existing representation,
+   conflicts, IDs and incomplete destinations, and reports diagnostics:
 
    ```bash
    if [ -n "${SELECTED_VERSION:-}" ]; then
@@ -172,7 +178,7 @@ migration, and preserve every unrelated value.
    When no validated manifest was available, omit the version argument so
    existing metadata remains untouched and report the missing source. The
    helper's no-version default preserves existing metadata; it does not invent
-   a release value.
+   a release value. Ensure/update never contact Pages or move context.
 
 3. If code is stale, run `$team-harness:update` before continuing. After
    update, read `skills/setup/SKILL.md` from the validated installed root and
@@ -211,7 +217,15 @@ migration, and preserve every unrelated value.
 5. Gather only requested values, showing current values as defaults. Apply all
    selected settings in one `manage_config.py set` command.
 
-   - Workspace defaults to `local`. For `obsidian`, require an existing
+   - Resolve workspace selection through [workspace](../workspace/SKILL.md).
+     Reuse the current effort's binding before defaults; a default change never
+     migrates it. A present `workspace-mode` wins even when invalid. Only its
+     absence permits valid legacy `logs-mode: local | obsidian`; absence of both
+     defaults to local. Report conflicts once without repair. Blank input keeps
+     the existing representation; pass a selector to `set` only for an explicit
+     workspace choice. Explicit local/Obsidian selection writes both selectors
+     equal; remote selection removes the stale alias.
+   - For `obsidian`, require an existing
      absolute vault path plus a safe relative subfolder. Reject filesystem
      roots, the user home, traversal, globs, and symlink escapes. Preserve the
      configured destination as a Team Harness preference; writing there remains
@@ -219,6 +233,27 @@ migration, and preserve every unrelated value.
      non-escalated live write probe remains authoritative before reporting the
      external workspace ready. If that probe fails, report the exact target and
      native refusal rather than rewriting global policy.
+   - For `gpt-space`, require TH 3.48.0 and actual native Pages tools, then follow
+     [native Space setup](../workspace/references/native-space.md) and the current
+     provider skill. Main verifies the Space's real root Page, complete child
+     discovery and exact container ID/title `workspace`/parent/Space association.
+     Use the metadata guards before any create; incomplete or ambiguous discovery
+     cannot prove absence. Reuse a verified stored ID and retain observed IDs
+     after uncertain writes. Never use a Space ID as a Page parent.
+     Read back the actual destination before persisting both opaque settings,
+     `workspace-space-id` and `workspace-container-page-id`, with canonical mode
+     `gpt-space`. The helper validates their data, not native access. It removes
+     `logs-mode` and rejects an incomplete/invalid destination without a write.
+     Feed actual remote outcomes, command result and selected settings readback
+     to `classifySpaceSetup`. Failed/unknown config persistence is partial
+     readiness: retain the observed IDs and repair persistence without creating
+     another Page. Report configured, accessible, readable and writable outcomes
+     separately; a local filesystem probe provides no remote readiness evidence.
+     A host without native Pages capability preserves existing remote identity
+     and reports unavailable, with no local fallback. Do not provision endpoints,
+     tokens or connectors, claim older-reader support, or claim Claude/OpenCode
+     remote execution. File tools use separate declared operational storage;
+     plans, investigation and handoffs stay in the same effort Page.
    - Preserve the native `sandbox_mode`, `approval_policy`,
      `approvals_reviewer`, `network_access`, and `writable_roots` values. Native
      permission settings and server-side GitHub branch protection remain
@@ -312,7 +347,8 @@ migration, and preserve every unrelated value.
     `codex features list` only when step 4 ran. Report one compact result:
     native config path, workspace/language, agent scope and twenty agent statuses,
     GitHub route count when configured, feature-flag status when checked, MCP registrations,
-    workspace destination, pending activation or same-conversation reconnect,
+    workspace destination and diagnostics, separate remote configuration/access/
+    read/write outcomes, pending activation or same-conversation reconnect,
     and any exact native access failure observed while writing there. Report
     that native execution policy was preserved; never print
     imported opaque values, secrets, or environment-variable values.

@@ -34,5 +34,5 @@ Ask the operator: "What would you like to learn? You can ask about a concept, a 
 - The orchestrator will classify `learn` as a read-only direct mode. It may
   dispatch the `mentor` only for an optional teaching-pack or deep background
   research; the ordinary answer stays inline in the current conversation.
-- Output: the answer in chat with a short inline diagram. For codebase questions where the repo is open, the first answer SHOWS the real code by default (snippets quoted verbatim with `file:line`, walked in execution order, named entry points) and the inline diagram is a code-grounded data-flow pipeline of the real symbols. The teaching-pack file (`{workspace}/00-teaching-pack-{topic-slug}.md`) is an optional end-of-session artifact — not the default deliverable.
+- Output: answer inline with a short diagram. For codebase questions, show real code with `file:line`, execution order and named entry points. An optional teaching pack is retained by Main in the bound Page, or `00-teaching-pack-{topic-slug}.md` in file modes; honor explicit file deliverables separately.
 - The `--resume` flag resumes an existing teaching pack without re-covering already-taught layers.

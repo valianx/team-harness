@@ -8,7 +8,7 @@ description: Investigate code behavior with file:line evidence and optional exte
 Analyze the input: $ARGUMENTS
 
 The current general agent coordinates, synthesizes and persists the work.
-Preserve the selected absolute workspace and the operator's native permissions;
+Preserve the bound [context](../workspace/SKILL.md) and native permissions;
 do not dispatch a nested orchestrator. Ask what to investigate only when the
 request supplies no question or topic.
 
@@ -25,7 +25,7 @@ may help with external knowledge or several independent findings.
 `researcher`, `code-researcher` and `research-consolidator` return evidence or
 advisory synthesis through native transport without writing files, executing
 shell commands, delegating or publishing. Main compares the evidence and saves
-useful findings and conclusions as `{workspace}/research/00-research.md`. Retain file:line references, excerpts,
+useful findings in the same Page, or `research/00-research.md` in file modes. Retain file:line references, excerpts,
 citations, confidence, conflicts, skipped lanes and failures. Include
 `## Code vs Docs Conflicts` when code and external sources were both used.
 
@@ -41,8 +41,8 @@ These two skills are DISTINCT and do NOT duplicate:
 | | `/th:research-code` (this skill) | `/th:cross-repo` |
 |--|----------------------------------|-----------------|
 | **Question answered** | "What does this code actually do?" (evidence-gathering) | "Does this system obey its contracts/invariants?" (auditing) |
-| **Route** | Current general agent coordinates and persists `{workspace}/research/00-research.md` | Standalone audit utility; uses native bounded dispatch when useful |
-| **Output** | One `{workspace}/research/00-research.md` (hybrid code + web evidence, conflict detection) | `00-consolidated.md` or the caller's integral report; profile/contract evidence and useful annexes |
+| **Route** | Main coordinates and persists the synthesis in the bound context | Standalone audit utility; uses native bounded dispatch when useful |
+| **Output** | One logical report (`research/00-research.md` in file modes), with code/web evidence and conflicts | One consolidated or caller-owned report, with profile/contract evidence and useful annexes |
 | **Use when** | "How does the retry logic work across service A and service B?" | "Does service A honor the idempotency contract declared in the shared API profile?" |
 
 Use `/th:research-code --multi-repo` to understand how code works across multiple repos.

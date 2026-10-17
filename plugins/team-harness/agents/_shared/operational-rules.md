@@ -14,8 +14,12 @@ of narrating tool use.
 ## Assignment and ownership
 
 Main assigns a bounded objective, owned files or a read-only scope, the
-canonical repository and worktree, the selected local or Obsidian workspace,
-relevant inputs and the useful result to return. Native host permissions remain
+canonical repository and worktree, the selected context locator and any required
+absolute operational directory, relevant inputs and the useful result to return.
+File modes retain their existing notes. In `gpt-space`, return useful narrative
+to Main for persistence in the effort Page; do not write a local Markdown mirror
+or mutate the connector. A remote ID/URL is not a filesystem destination.
+Native host permissions remain
 the authority for reads and writes. Treat the assignment as context and
 ownership, not as a second authorization system.
 

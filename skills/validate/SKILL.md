@@ -12,10 +12,10 @@ selected real measurements through the shared reference. Run selected find-bugs,
 audit or NFR work for their bounded questions, not as an automatic general audit.
 An absent selected provider or metric remains pending with recovery.
 
-Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
-its configured local or Obsidian mode. Main coordinates with native tools and
-permissions. Reuse authorization for unchanged work and ask only for a missing
-decision. Specialists provide evidence and recommendations; Main judges them.
+Use [workspace](../workspace/SKILL.md) to reuse the bound file or Page context.
+Keep repository/worktree and any real local operational directory separate.
+Main persists useful specialist returns in that context and judges them;
+reuse authority for unchanged work and ask only for a missing decision.
 
 Compare the actual candidate with the objective and relevant scenarios. Reuse
 candidate-bound test results and assessments whose relevant inputs are unchanged.

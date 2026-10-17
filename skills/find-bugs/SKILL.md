@@ -6,8 +6,8 @@ description: Investigate concrete functional defects in a project or module with
 # Find bugs
 
 Main coordinates the requested diagnosis in the native general agent. Resolve
-the named repository or module and preserve the selected local or Obsidian
-workspace. A clean checkout is valid input; this workflow does not require a
+the repository or module and preserve the bound [context](../workspace/SKILL.md).
+A clean checkout is valid input; this workflow does not require a
 branch diff or start the `review-pr` flow.
 
 Start with a concrete behavioral question. Trace inputs and preconditions
@@ -52,9 +52,9 @@ related occurrences within the agreed scope and state the search limit.
 Additional project analyzers are optional and must answer a distinct question;
 they do not replace contextual investigation or create a second review loop.
 
-Write the diagnostic report to `research/00-find-bugs.md` in the selected
-workspace. Keep raw JSON/SARIF, command output and temporary fixtures in that
-workspace or permitted temporary storage, never as unrequested repository
+Main retains diagnosis in the same Page, or `research/00-find-bugs.md` in file
+modes. Keep JSON/SARIF, command output and fixtures in declared real local
+operational storage, never as unrequested repository
 files. Separate source observations, observed runtime behavior and inferred
 outcomes. Identify material unverified steps or environmental assumptions and
 the smallest missing observation that could resolve each uncertainty. Include

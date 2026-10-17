@@ -76,8 +76,8 @@ name: issue
    - Issue: #{number}
    ...
    ```
-   The coordinator tracks the batch in the selected workspace using its current
-   task list and result reports; do not require a separate legacy batch protocol.
+   Main tracks the batch in the bound file or Page context using its current task
+   list and returned results; do not create a separate batch protocol or report mirror.
 
 ---
 name: issue
@@ -89,11 +89,10 @@ name: issue
    - **Label**: classify as one of: `bug`, `enhancement`, `feature`, `refactor`, `docs`, `security`
    - **Body**: structured with the template below
 
-2. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — create an issue". When `has_gh=true`, create with `gh issue create`. When `has_gh=false` and a token + GitHub origin are available, use the curl POST fallback. When neither is available, write the SDD body to `{workspace}/inputs/issue-create.md` and prompt the operator to paste it into GitHub, then reply with the new issue number.
+2. **Detection + fallback:** see `agents/_shared/gh-fallback.md` § "Tier B — create an issue". Prepare `inputs/issue-create.md` in declared real local operational storage, separate from the bound context. Use `gh issue create --body-file <absolute-body-file>` when available; otherwise preserve the existing curl fallback or operator-paste route. Main retains outcome and pending action in the same context.
 
-   Create the issue with auto-label, auto-assign, and **SDD-compliant body**:
+   Supply title, label and `--assignee "@me"` with this **SDD-compliant body**:
    ```
-   gh issue create --title "{title}" --label "{label}" --assignee "@me" --body "$(cat <<'EOF'
    ## User Story
    As a {role}, I want {action}, so that {benefit}.
 
@@ -111,8 +110,6 @@ name: issue
    - **Patterns:** {existing patterns to follow, or "TBD by architect"}
    - **Constraints:** {technical limitations, or "none identified"}
    - **Dependencies:** {other issues or systems, or "none"}
-   EOF
-   )"
    ```
 
    **SDD rules:** min 2 AC, max 20. AC always in Given/When/Then with checkbox. Scope always explicit.

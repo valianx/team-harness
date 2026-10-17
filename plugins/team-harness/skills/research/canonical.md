@@ -21,9 +21,9 @@ research directly. An architect or research consolidator can help with a complex
 synthesis, but a fixed agent count or extra consolidation stage is not required.
 
 Follow the [research method](../../agents/ref-architect-modes.md#research-mode)
-for the report. The caller supplies the absolute workspace path; preserve its
-local or Obsidian destination, language and voice. Main saves useful evidence and
-recommendations as `research/00-research.md` there, retaining citations, confidence,
+for the report. Reuse the bound [context](../workspace/SKILL.md), language and voice.
+Main retains synthesis in the same Page; file modes use `research/00-research.md`.
+Keep any required native artifacts in declared real local storage, retaining citations, confidence,
 conflicts, skipped lanes and failures. Main decides whether a material gap blocks
 the answer and needs bounded follow-up; amend the same report when it does.
 Report the conclusion, tradeoffs and remaining uncertainty without activating

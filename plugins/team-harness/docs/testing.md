@@ -96,6 +96,9 @@ contracts listed below.
 | `test_hook_registration.mjs` | Retained context/observation hook registration, launcher bundles and OpenCode integration; retired enforcement wiring is absent. |
 | `test_openspec_launcher.mjs` | Executes the Windows npm JavaScript entrypoint transport with literal arguments and paths containing spaces/symbols; checks missing runtime and invalid input. Runs in Linux and native Windows CI. |
 | `test_sync_skills_platform.mjs` | Shared setup asset byte/mode drift and OpenCode cross-repo source propagation, read-only drift detection and stable regeneration. Runs in the full suite and native Windows CI. |
+| `test_workspace_context.mjs` | Shared selector truth table, bound file/remote context, portable source identity and separate operational-path validation. |
+| `test_space_context.mjs` | Native metadata-only container/effort selection, complete discovery, uncertain/partial write receipts and setup persistence outcomes. No live service. |
+| `test_workspace_config.py` | Isolated native settings writes, cross-name imports, default/update preservation and remote destination validation. |
 | `test_codex_binary_resolution.py` | Resolves a real Windows directory junction or POSIX directory symlink, executes the pinned binary with an empty PATH, and rejects relative, missing, traversal, control-character, directory and non-executable candidates. |
 | `test_pipeline_control_plane.mjs` | Legacy v5 helper compatibility: closed leases/results, actual Git scope reconciliation, Main-only mutation, safe specialist exports, canonical log replay/projections, causal recovery, Freeze quality, capsules, and the administrative close of a workspace without a control log (symlinked control or events paths refused) |
 | `test_lane_marker_identity.py` | Lane-marker byte identity |

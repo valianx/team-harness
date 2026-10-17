@@ -9,10 +9,10 @@ directly to [validate](../validate/SKILL.md) without waiting for another operato
 Applicable validation is part of completing implementation unless the operator
 explicitly asks to stop before it. Record assessments as pending until executed.
 
-Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
-its configured local or Obsidian mode. Main coordinates with native tools and
-permissions. Reuse authorization for unchanged work and ask only for a missing
-decision. Specialists provide evidence and recommendations; Main judges them.
+Use [workspace](../workspace/SKILL.md) to reuse the bound file or Page context.
+Keep repository/worktree and any real local operational directory separate.
+Main persists useful specialist returns in that context and judges them;
+reuse authority for unchanged work and ask only for a missing decision.
 
 Read the existing objective and relevant OpenSpec tasks. Before database or
 frontend implementation, use [sketch](../sketch/SKILL.md) to create/update and

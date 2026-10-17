@@ -11,8 +11,9 @@ Parse the user's input to extract:
 2. **Language:** look for `--lang <code>` flag. Default: `en`. Examples: `--lang es`, `--lang pt`.
 3. **Folder:** look for `--folder <name>` flag. Default: derived from the topic name (kebab-case).
 4. **Destination:** look for an explicit `--vault <name>` and optional
-   `--folder <name>`. Without one, use the caller's selected absolute workspace
-   as the documentation destination. Resolve a vault through the active runtime's
+   `--folder <name>`. Otherwise file modes use the selected home; remote mode
+   requires a declared file deliverable directory or explicit documentation target,
+   outside the effort branch. Resolve a vault through the active runtime's
    configured mapping; do not assume a host-specific config path.
 
 ## Examples
@@ -43,10 +44,11 @@ Task: documentation
 Type: docs
 Topics: {parsed topic list}
 Language: {parsed language code, default: en}
-Workspace: {absolute workspace path supplied by the caller}
+Context: {bound file or Page locator; Main retains useful returns here}
+Operational directory: {real absolute file directory when required}
 Folder: {parsed folder name, default: derived from topic}
 Vault: {parsed vault name or null}
-Output: {explicit absolute destination for the generated pages}
+Output: {explicit documentation destination, separate from remote effort context}
 
 Operator request: {original user input}
 ```

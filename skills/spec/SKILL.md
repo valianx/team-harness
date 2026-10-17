@@ -106,13 +106,13 @@ returns here for candidate assembly, validation and closure.
 ## Operator plan
 
 Use [assets/plan.md](assets/plan.md) as a small reading view, in the operator's language.
-Use [workspace](../workspace/SKILL.md) to select or reuse the effort's home, then
-create `01-plan.md` there. Supply the change slug, source association and original
-creation date to its existing path-resolution method; do not initialize a pipeline
-or persist identity/control files. Obsidian mode creates no local copy.
-Reuse the same plan on later days by matching its `mode: spec`, change slug and canonical source
-path. Preserve an existing user or pipeline plan; use a separate `<date>_<change>-spec` directory
-for a collision. Do not infer a pipeline or approval from the document's existence.
+Use [workspace](../workspace/SKILL.md) to reuse the bound locator before defaults.
+Main keeps the logical plan in the same effort Page in remote mode; file modes
+retain `01-plan.md`. Preserve original date, slug and verified source association
+across days/checkouts. Keep repository/worktree and optional operational directory
+separate; do not persist control files or a local Markdown mirror. Preserve an
+existing plan; file-name collisions use `<date>_<change>-spec`, while ambiguous
+remote identity needs resolution before mutation. A plan grants no approval.
 
 Keep the view short: objective, phase progress, canonical task count, next action
 and links to intent and actual results. Record each capability's scope, outcome
@@ -148,14 +148,15 @@ against its exact local branch/artifact or a contract fixture and record that re
 require a merge or deployment merely to continue coding; if only a deployed dependency can
 support a check, show that check as pending and continue work that does not depend on it.
 
-Keep one common `01-plan.md`, with repository-labelled steps, dependency order, per-repository
-progress and source/PR links. Preserve its original path and creation date when adding a repo;
-retain the original `source` as its lookup anchor and link additional canonical changes under
-Sources. For a new multi-repository plan, use the resolver's initiative mode with sibling
-repositories; for non-siblings, use the initiating repository's single workspace as the common
-home. Both honor the configured Obsidian destination. Create only the plan, not per-service
-workspace copies or pipeline control files. An accepted author review adds its report to that
-same workspace. Revisit all source links after each approved archive.
+Keep one common logical plan with repository-labelled steps, dependencies, progress
+and source/PR links. Preserve its locator, original date and owning source when
+adding repositories; link additional canonical changes under Sources. Remote
+efforts support verified non-sibling associations without changing their owner.
+File modes retain `01-plan.md` and existing formulas: sibling repositories may
+use the initiative root; non-siblings keep the initiating repository's single
+workspace as their common home, honoring the selected Obsidian destination.
+Main retains review returns in this context, without per-service copies or control
+files. Revisit source links after each approved archive.
 
 ## Changing coordination needs
 

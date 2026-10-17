@@ -2,6 +2,8 @@
 mode: spec
 change: "{{change_slug}}"
 source: "{{canonical_change_path}}"
+created: "{{original_creation_date}}"
+source_association: "{{verified_source_identity}}"
 ---
 
 # {{work_title}}

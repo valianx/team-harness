@@ -24,7 +24,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 
 // entry/session-start.cc.ts
 var fs = __toESM(require("node:fs"), 1);
-var path = __toESM(require("node:path"), 1);
+var path2 = __toESM(require("node:path"), 1);
 var os = __toESM(require("node:os"), 1);
 
 // shim/normalized-v1.ts
@@ -179,6 +179,35 @@ function inboundCC(raw) {
 }
 
 // bodies/session-start.ts
+var import_node_os = require("node:os");
+var path = __toESM(require("node:path"), 1);
+
+// ../../skills/workspace/scripts/workspace-preference.mjs
+var import_node_util = require("node:util");
+var FILE_MODES = ["local", "obsidian"];
+var MODES = [...FILE_MODES, "gpt-space"];
+function selectWorkspacePreference(config = {}) {
+  if (config === null || typeof config !== "object" || Array.isArray(config)) {
+    return { status: "invalid", mode: null, selected_from: "default", conflict: false, reason_code: "invalid_configuration" };
+  }
+  const canonical = Object.hasOwn(config, "workspace-mode");
+  const legacy = Object.hasOwn(config, "logs-mode");
+  const selected_from = canonical ? "workspace-mode" : legacy ? "logs-mode" : "default";
+  const mode = selected_from === "default" ? "local" : config[selected_from];
+  const conflict = canonical && legacy && !(0, import_node_util.isDeepStrictEqual)(config["workspace-mode"], config["logs-mode"]);
+  if (!(canonical ? MODES : FILE_MODES).includes(mode)) {
+    return {
+      status: "invalid",
+      mode: null,
+      selected_from,
+      conflict,
+      reason_code: canonical ? "invalid_workspace_mode" : "invalid_logs_mode"
+    };
+  }
+  return { status: "selected", mode, selected_from, conflict, reason_code: conflict ? "selector_conflict" : null };
+}
+
+// bodies/session-start.ts
 function languageName(code) {
   const NAMES = {
     en: "English",
@@ -222,17 +251,36 @@ Failure modes to guard. (a) Do not over-correct \u2014 the default tendency is t
 
 Affective posture. Keep the signal brief, neutral, and non-punitive \u2014 the goal is to help, not to grade. This learning signal targets the operator's English only; your own prose stays under the standard neutral-register voice rules.`;
 }
-function loadWorkspaceMode(config) {
-  const logsMode = typeof config["logs-mode"] === "string" ? config["logs-mode"] : "";
-  if (logsMode !== "obsidian") return null;
-  const logsPath = typeof config["logs-path"] === "string" ? config["logs-path"] : "";
-  if (!logsPath) return null;
-  if (CONTROL_CHAR_RE.test(logsPath)) return null;
-  const logsSub = typeof config["logs-subfolder"] === "string" && config["logs-subfolder"] ? config["logs-subfolder"] : "work-logs";
-  if (CONTROL_CHAR_RE.test(logsSub) || logsSub.includes("\\") || /^[A-Za-z]:/.test(logsSub) || Buffer.byteLength(logsSub, "utf8") > 1024 || logsSub.split("/").some((part) => !part || part === "." || part === ".." || /[*?[\]{}]/.test(part))) return null;
-  return `Team Harness workspace mode: obsidian is configured. Use the current workspace skill across workflows to reuse the task's existing workspace or resolve a new one under ${logsPath}/${logsSub}/{repo}/{YYYY-MM-DD}_{feature}/. Preserve its original date and association when resuming. Native runtime permissions govern writes.`;
+function validObsidianBasePath(base, homeDirectory) {
+  if (!path.isAbsolute(base) || CONTROL_CHAR_RE.test(base) || /[*?[\]]/.test(base)) return false;
+  const root = path.parse(base).root;
+  if (path.sep === "\\" && (root === "/" || root === "\\")) return false;
+  const parts = base.split(path.sep === "\\" ? /[\\/]/ : /\//);
+  if (parts.includes("..")) return false;
+  const normalized = path.resolve(base);
+  return normalized !== path.parse(normalized).root && path.relative(homeDirectory, normalized) !== "";
 }
-function composeSessionDirectives(config) {
+function loadWorkspaceMode(config, homeDirectory) {
+  const preference = selectWorkspacePreference(config);
+  const conflict = preference.conflict ? " Team Harness workspace selector conflict: workspace-mode takes precedence; preserve both settings until an explicit repair." : "";
+  if (preference.status === "invalid") {
+    return "Team Harness workspace selection is invalid. Preserve the configuration and reuse any valid bound effort. Resolve the invalid preference with the current workspace skill before selecting a new context home." + conflict;
+  }
+  if (preference.mode === "gpt-space") {
+    return "Team Harness workspace mode: gpt-space is configured. Reuse the bound effort Page through the current workspace skill. Native Pages access is unavailable to this hook; Main must verify the host's capability and destination, preserving the remote locator and reporting pending or unavailable operations when needed. Optional local telemetry requires an explicit local TH_WORKSPACE binding and never becomes the context home." + conflict;
+  }
+  if (preference.mode === "local") {
+    return "Team Harness workspace mode: local is selected. Use the current workspace skill to preserve an existing effort binding before resolving a new file workspace." + conflict;
+  }
+  const logsPath = typeof config["logs-path"] === "string" ? config["logs-path"] : "";
+  const invalidDestination = "Team Harness workspace destination is invalid or incomplete for the selected Obsidian preference. Preserve the selection and resolve its destination with the current workspace skill." + conflict;
+  if (!logsPath) return invalidDestination;
+  if (!validObsidianBasePath(logsPath, homeDirectory ?? (0, import_node_os.homedir)())) return invalidDestination;
+  const logsSub = typeof config["logs-subfolder"] === "string" && config["logs-subfolder"] ? config["logs-subfolder"] : "work-logs";
+  if (CONTROL_CHAR_RE.test(logsSub) || logsSub.includes("\\") || /^[A-Za-z]:/.test(logsSub) || Buffer.byteLength(logsSub, "utf8") > 1024 || logsSub.split("/").some((part) => !part || part === "." || part === ".." || /[*?[\]{}]/.test(part))) return invalidDestination;
+  return `Team Harness workspace mode: obsidian is configured. Use the current workspace skill across workflows to reuse the task's existing workspace or resolve a new one under ${logsPath}/${logsSub}/{repo}/{YYYY-MM-DD}_{feature}/. Preserve its original date and association when resuming. Native runtime permissions govern writes.` + conflict;
+}
+function composeSessionDirectives(config, homeDirectory) {
   const directives = [];
   directives.push(loadWorkflowDiscovery());
   if (config !== null) {
@@ -244,7 +292,7 @@ function composeSessionDirectives(config) {
     if (elDirective !== null) directives.push(elDirective);
   }
   if (config !== null) {
-    const wsDirective = loadWorkspaceMode(config);
+    const wsDirective = loadWorkspaceMode(config, homeDirectory);
     if (wsDirective !== null) directives.push(wsDirective);
   }
   return directives;
@@ -264,7 +312,7 @@ function makeReader() {
   return {
     readConfig() {
       try {
-        const configPath = path.join(os.homedir(), ".claude", ".team-harness.json");
+        const configPath = path2.join(os.homedir(), ".claude", ".team-harness.json");
         const raw = fs.readFileSync(configPath, "utf8");
         return JSON.parse(raw);
       } catch {

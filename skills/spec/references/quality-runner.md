@@ -50,8 +50,9 @@ change a failing machine verdict into a pass.
 
 ## Workspace manifest
 
-The conventional location is `<workspace>/.team-harness/quality.json`. This is
-coordinator-owned operational state: it must be an absolute, regular,
+The conventional location is `<operational-directory>/.team-harness/quality.json`.
+The file-only `--workspace` argument means this real local operational directory,
+never a Page locator. The coordinator-owned manifest must be an absolute, regular,
 non-symlink file below the execution workspace. A workspace may be disjoint
 from the checkout, contain its isolated worktree, or be an ignored child of the
 checkout; in the last case the runner also proves the manifest is ignored and
@@ -279,7 +280,7 @@ Use this bounded sequence when Validation selects CRAP:
    defer the selected check with a reason.
 3. Run the native complexity and coverage commands against the clean candidate.
    Keep their raw output, any temporary adapter and the manifest under the
-   selected local or Obsidian workspace. Normalize only unambiguous
+   declared real local operational directory. Normalize only unambiguous
    repository-relative `(path, symbol)` pairs; name omitted functions and do
    not convert unknown coverage to zero.
 4. Invoke the runner with `--policy-mode measure` and an explicit `crap` check.
@@ -324,12 +325,13 @@ required checks explicitly:
 ```bash
 node /absolute/path/to/loaded/pipeline/skill/scripts/quality-runner.mjs \
   --repo /absolute/path/to/repository \
-  --workspace /absolute/path/to/workspace \
-  --manifest /absolute/path/to/workspace/.team-harness/quality.json \
+  --workspace /absolute/path/to/operational-directory \
+  --manifest /absolute/path/to/operational-directory/.team-harness/quality.json \
   --base 0123456789abcdef0123456789abcdef01234567 \
   --candidate HEAD \
   --checkpoint validation \
   --checks test,format_check,lint,crap \
+  --required-checks test,format_check,lint,crap \
   --policy-mode measure
 ```
 

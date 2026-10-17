@@ -41,6 +41,7 @@ export const opencodeOverrides = new Set([
 ]);
 
 const codexSpecialMappings = new Map([
+  ["workspace", "Resolve local, Obsidian or gpt-space context through the shared workspace contract. Main owns native Pages operations when available; preserve remote identity and report unavailable capability on other hosts. Keep context locator, checkout and optional local operational storage separate."],
   ["bootstrap", "Initialize AGENTS.md and native Codex project conventions; use CLAUDE.md only when explicitly requested for compatibility."],
   ["background", "Use Codex subagents for bounded background work. Never launch or require the `claude` binary."],
   ["clickup", "Store persistent values in the Codex-native Team Harness configuration. Preserve all opaque keys and never print credentials."],
@@ -69,6 +70,7 @@ const codexSpecialMappings = new Map([
 ]);
 
 const opencodeSpecialMappings = new Map([
+  ["workspace", "Resolve the canonical workspace preference from native OpenCode settings, preserving legacy selection and existing bindings. Remote mode requires an actual native Space capability; preserve its locator and report unavailable without local fallback. Do not invent a transport or credentials."],
   ["review-pr", "Main coordinates native OpenCode PR-review subagents and consolidates advisory results; no required consolidator. Check only selected roles and their effective native permission rules. The installed compatibility projection uses permission with default deny and read/glob/grep allow, excluding bash/task, edit and external writes. Check the active OpenCode version/config schema before translating newer names such as permissions, shell or subagent; never inject those fields into a legacy configuration. Preserve OPENCODE_CONFIG_DIR/project scope and the independent writing authority of implementers. Native enforcement and model-backed dispatch must be verified separately from Go/JavaScript projection tests. Follow the canonical phase references progressively; do not require Claude paths or binaries."],
   ["bootstrap", "Initialize `AGENTS.md` and opencode-native project conventions unless the operator explicitly requests a Claude compatibility file."],
   ["clickup", "Store persistent values in the opencode-native Team Harness configuration. Preserve all opaque keys and never print credentials."],

@@ -11,9 +11,9 @@ Generate `.d2` diagram files using the D2 declarative language that **communicat
 
 ## Workspace and Runtime Paths
 
-For a direct invocation without a bound workspace, use the [workspace skill](../workspace/SKILL.md) to resolve or create the configured local/Obsidian home before writing. The current agent is Main; no parent workflow is required.
+Reuse the bound [context](../workspace/SKILL.md), or resolve it for direct work. Main retains narrative returns in the same Page or file home; specialists do not create Pages.
 
-Before writing, consume the `workspace` and optional `deliverable_target` supplied by Main. `workspace` is the absolute shared local or Obsidian home already resolved for this effort; it is not a repository-relative template. Set `output_dir` to the explicit target directory when supplied, otherwise to `workspace`. If the target names a file, use its parent as `output_dir`, keep that exact `source_file`, and derive `render_file` and `summary_file` alongside it. Otherwise use `source_file = {output_dir}/diagram.d2`, `render_file = {output_dir}/diagram.svg`, and `summary_file = {output_dir}/05-diagram.md`. Resolve references and render helpers from `skill_root`, the active installation directory containing this document. Never derive output from the current working directory or read another runtime's configuration.
+Set `output_dir` to the explicit `deliverable_target` or declared real local operational directory; file modes may use their bound home. For a file target, preserve its exact `source_file` and parent; otherwise use `{output_dir}/diagram.d2`. Derive `render_file` alongside (default `diagram.svg`). Only file modes create `summary_file` (default `05-diagram.md`); remote mode returns decisions to Main. Resolve references/helpers from this installation's `skill_root`, never inferred cwd or another runtime's configuration. URLs/IDs are not paths; unsupported upload stays pending, and local links are not remote attachments.
 
 ---
 
@@ -433,7 +433,7 @@ This produces fewer syntax errors than writing everything at once and makes debu
 The skill produces:
 - `{source_file}` — the D2 source (primary output, version-controllable)
 - `{render_file}` — compiled SVG (or PNG if requested)
-- `{summary_file}` — design decision summary
+- `{summary_file}` — file-mode summary; remote decisions return to Main
 
 The `.d2` file is the authoritative output. It is readable, diffable, and can be re-rendered with different themes or layouts at any time.
 
@@ -441,7 +441,7 @@ The `.d2` file is the authoritative output. It is readable, diffable, and can be
 
 ## Obsidian Output Mode
 
-When `logs-mode: obsidian` is active in the resolved runtime context, the diagrammer agent follows this extended contract so the diagram displays inline in Obsidian. Local mode uses the same resolved output directory.
+For a selected file context in `obsidian` mode, follow this embed contract. Local mode uses its resolved directory; remote mode retains sources/renders locally and returns decisions to Main without a Markdown mirror.
 
 ### What the agent does in obsidian mode
 
@@ -461,7 +461,7 @@ When `logs-mode: obsidian` is active in the resolved runtime context, the diagra
 
 ### CLI-absent degradation
 
-When the `d2` CLI is not installed, the agent does NOT hard-fail. Instead it writes the source (`diagram.d2`) and appends this marker to `05-diagram.md`:
+When the `d2` CLI is absent, preserve `diagram.d2` and return render pending to Main. In file modes append this marker to `05-diagram.md`:
 
 ```markdown
 ## Rendered Diagram

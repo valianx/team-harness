@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
-import { lstat, readdir } from "node:fs/promises";
+import { lstat, readdir, realpath } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
+import { validateContextBinding } from "../../workspace/scripts/workspace-context.mjs";
+import { selectSpaceEffort } from "../../workspace/scripts/space-context.mjs";
 
 const SAFE_SEGMENT = /^[A-Za-z0-9._-]+$/;
 const DATED_WORKSPACE = /^\d{4}-\d{2}-\d{2}_(.+)$/;
@@ -17,6 +19,16 @@ async function realDirectory(candidate) {
   }
 }
 
+async function retainedDirectory(candidate) {
+  if (!(await realDirectory(candidate))) return false;
+  try {
+    // Native comparison retains Windows casing rules without adopting a redirected target.
+    return path.relative(candidate, await realpath(candidate)) === "";
+  } catch {
+    return false;
+  }
+}
+
 async function regularFile(candidate) {
   try {
     const value = await lstat(candidate);
@@ -24,6 +36,16 @@ async function regularFile(candidate) {
   } catch {
     return false;
   }
+}
+
+async function resolveWorkspaceHandoff({ base, feature, workspace, candidates }) {
+  const handoff = path.join(workspace, "00-session-handoff.md");
+  const state = path.join(workspace, "00-state.md");
+  const result = { base, feature, workspace, workspace_name: path.basename(workspace), handoff, state, candidates };
+  if (!(await regularFile(handoff))) {
+    return { status: "handoff-missing", reason_code: "HANDOFF_NOT_FOUND", ...result };
+  }
+  return { status: "resolved", reason_code: null, ...result, state_available: await regularFile(state) };
 }
 
 export async function resolveWorkspace({ basePath, feature } = {}) {
@@ -59,34 +81,37 @@ export async function resolveWorkspace({ basePath, feature } = {}) {
     return { status: "ambiguous", reason_code: "WORKSPACE_AMBIGUOUS", base, feature, candidates: names };
   }
 
-  const workspace = path.join(base, names[0]);
-  const handoff = path.join(workspace, "00-session-handoff.md");
-  const state = path.join(workspace, "00-state.md");
-  if (!(await regularFile(handoff))) {
-    return {
-      status: "handoff-missing",
-      reason_code: "HANDOFF_NOT_FOUND",
-      base,
-      feature,
-      workspace,
-      workspace_name: names[0],
-      handoff,
-      state,
-      candidates: names,
-    };
+  return resolveWorkspaceHandoff({ base, feature, workspace: path.join(base, names[0]), candidates: names });
+}
+
+/** Resolve retained file or native Page context without creating a destination. */
+export async function resolveContextWorkspace({ binding, remoteCandidates, listingComplete = false } = {}) {
+  const validated = validateContextBinding(binding);
+  if (validated.status !== "ready") return { ...validated, binding, create_allowed: false };
+  const context = validated.binding.context;
+  if (context.kind === "file") {
+    const workspace = path.resolve(context.path);
+    const base = path.dirname(workspace);
+    const feature = path.basename(workspace);
+    if (!(await retainedDirectory(workspace))) {
+      return { status: "not-found", reason_code: "WORKSPACE_NOT_FOUND", base, feature, candidates: [] };
+    }
+    return resolveWorkspaceHandoff({ base, feature, workspace, candidates: [feature] });
   }
-  return {
-    status: "resolved",
-    reason_code: null,
-    base,
-    feature,
-    workspace,
-    workspace_name: names[0],
-    handoff,
-    state,
-    state_available: await regularFile(state),
-    candidates: names,
-  };
+  const selected = selectSpaceEffort({
+    containerId: context.container_page_id,
+    boundEffortId: context.effort_page_id,
+    sourceAssociations: context.source_associations,
+    candidates: remoteCandidates,
+    listingComplete,
+  });
+  if (selected.status === "ready" && selected.page.container_space_id !== context.space_id) {
+    return { status: "destination-conflict", reason_code: "bound_effort_space_conflict", binding: validated.binding, create_allowed: false };
+  }
+  return { ...selected, binding: validated.binding, create_allowed: false,
+    ...(selected.status === "ready" ? { handoff: {
+      kind: "gpt-space", page_id: context.effort_page_id, url: context.url, section: "Session Handoff",
+    } } : {}) };
 }
 
 function parseArguments(argv) {

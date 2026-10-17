@@ -16,7 +16,7 @@ $ARGUMENTS — describe what to diagram. Examples:
 ## Flags
 
 - `--vault [name]` — write the `.excalidraw` file to the named Obsidian vault
-  instead of the selected workspace. The active runtime resolves the vault
+  instead of the declared artifact directory. The active runtime resolves the vault
   mapping; the skill does not assume a host-specific config path.
 - `--folder <name>` — subfolder within the vault (only with `--vault`). Default: vault root.
 
@@ -28,8 +28,8 @@ $ARGUMENTS — describe what to diagram. Examples:
 ```
 Direct Mode Task: diagram
 Description: {$ARGUMENTS without flags}
-Workspace: {absolute workspace path supplied by the caller}
-Output: {explicit absolute destination; workspace/diagram.excalidraw by default}
+Context: {bound file or Page locator; Main retains narrative returns}
+Output: {explicit real local artifact directory; diagram.excalidraw by default}
 Vault: {vault name or null}
 Vault path: {resolved path from the active runtime or null}
 Folder: {folder name or null}

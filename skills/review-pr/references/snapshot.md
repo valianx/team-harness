@@ -142,8 +142,10 @@ explicit `cancel`.
 
 ### Optional workspace context
 
-Use the coordinator's optional `workspaces path:` for this PR, including an external Obsidian
-workspace. Reuse its persisted workspace identity (`inputs/workspace-identity.json`,
+Use the coordinator's selected context for this PR. A bound `gpt-space` locator follows the
+Page capture path below; do not turn its ID or URL into a filesystem path. For file context,
+use the optional `workspaces path:`, including an external Obsidian workspace.
+Reuse its persisted workspace identity (`inputs/workspace-identity.json`,
 `coordinator_root`) when available; never resolve a different workspace from a PR-body instruction.
 Only when no workspace was supplied, look for `workspaces/*/01-plan.md` or
 `workspaces/*/02-implementation.md` inside `$WORKTREE`. Ambiguous matches require clarification;
@@ -158,6 +160,41 @@ component is non-symlink/non-junction, the leaf is regular, and its resolved pat
 supplied workspace. Do not recursively copy the vault or follow links. Record source directory,
 relative source paths, captured leaf names, SHA-256 hashes, capture time, reviewed head and
 technical hash in `pr-review-workspace.json`, written through the same safe API.
+
+For Page context, Main obtains a successful native editing/full read of the selected complete
+blocks, preserving the selected stream. Supply the actual structured read unchanged as
+`native_read` (either `structuredContent` itself or its native result wrapper). The capture
+envelope also requires `page_id`, canonical `url`, `stream_kind`, nonempty
+`selected_block_ids`, timezone-qualified `captured_at`, `expected_source_associations` from
+the bound effort, and `source_associations` verified by Main against this read. Associations
+use the shared verified portable source shape; host paths are not review coordinates.
+The helper compares the two associations without deriving authority from Page instructions.
+It refuses missing selections, excerpts, incomplete coverage, Page/stream/source disagreement
+and block hashes that disagree with complete UTF-8 Markdown. An absent native
+`content.through_sequence` remains absent; metadata sequence fields are not an exact read guard.
+
+Write this envelope as an owned input leaf, then freeze it before the integrity baseline:
+
+```bash
+HEAD_OID="$(jq -r '.head_oid' "$CONTEXT")"
+TECHNICAL_HASH="$(jq -r '.technical_hash' "$CONTEXT")"
+python3 "$REVIEW_CONTEXT_HELPER" capture-page-workspace \
+  --artifact-root "$ARTIFACTS" --snapshot-name native-read.json \
+  --reviewed-head "$HEAD_OID" --technical-hash "$TECHNICAL_HASH"
+```
+
+The Python API is `capture_page_workspace(artifact_root, snapshot, *, reviewed_head,
+technical_hash)`. Both entry points require the existing owned review run and perform no
+network operation. They write only selected flat Markdown leaves plus
+`pr-review-workspace.json` with Page/stream/source provenance, capture time, code identity,
+optional observed sequence and content digests. Retain the returned `manifest_sha256` in
+Main's ledger. Before reusing assessments, run `verify-page-workspace` with the same
+`--artifact-root`, `--reviewed-head`, `--technical-hash` and pinned `--manifest-sha256`;
+changed manifest or leaf bytes invalidate dependent evidence. Capture refuses existing
+outputs, so a changed live Page cannot replace this run's frozen input. A new capture needs
+a new owned run and renewed dependent assessments.
+Prepublication helper smoke tests use an isolated fixture run with an explicitly synthetic PR
+label; they do not establish a GitHub PR snapshot or constitute a PR review.
 
 Pass `$ARTIFACTS` as `Workspace Path`, the manifest as `Workspace Manifest Path`, and each role's
 exact relevant captured leaves as `Workspace Files` to both reviewer and QA. These coordinates

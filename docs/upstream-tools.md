@@ -14,6 +14,11 @@ documents when each capability runs, native invocation, shared workspace outputs
 installation/update ownership and compatibility limits. It ships with the spec
 skill so Claude Code, Codex and OpenCode read the same integration guidance.
 
+In `gpt-space`, Main retains useful provider results in the bound effort Page.
+Documented file-output settings use scoped local operational storage; canonical
+OpenSpec stays in its repository. Verify actual destinations and report unsupported
+attachment delivery explicitly; a local path is not a portable Page attachment.
+
 Quality capabilities are selected per objective and stack, not installed universally:
 
 - Semgrep CE supplies local rule-based candidates for `find-bugs` and applicable PR evidence.

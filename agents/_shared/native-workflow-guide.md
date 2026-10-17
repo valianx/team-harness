@@ -33,12 +33,17 @@ language, English learning, voice and workspace fields. Never print the whole
 configuration, which can contain credentials. Respect existing instructions.
 
 Use the installed `workspace` skill across workflows and substantive direct work
-to select or reuse the configured local or Obsidian home for retained context.
-Every flow respects that mode; workspace examples use the resolved absolute home.
-Write retained context notes in Markdown (`.md`) using the workspace skill's method.
-It owns the common workspace method; keep brief conversation and read-only status
-free of unnecessary writes. Pass the selected absolute workspace to specialists
-and preserve it across sessions and worktrees. Keep temporary scripts, execution
-logs and review evidence outside tracked product files. Follow the
+to select or reuse `workspace-mode: local | obsidian | gpt-space`. An existing
+binding wins over changed defaults. File modes retain Markdown in their absolute
+home; in remote mode Main maintains useful context during work and at handoff in
+the source-bound effort Page beneath the verified `workspace` container.
+It owns the common method; keep brief conversation and read-only status free of
+unnecessary writes. Pass context locator, checkout and optional local operational
+directory separately to specialists. Main persists their remote narrative returns;
+reviewers receive pinned excerpts or immutable captures and stay read-only.
+Remote IDs/URLs are never file roots. Use declared local storage for tools that
+require files, without another Markdown home. Unavailable native capability
+preserves identity and leaves updates pending, without local fallback. Keep
+temporary scripts, execution logs and review evidence outside tracked product files. Follow the
 selected skill's OpenSpec lifecycle and include completed archive with the
 implementation in the same PR.

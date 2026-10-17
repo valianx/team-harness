@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.48.0] - 2026-10-17
+
+### Added
+
+- Use local, Obsidian or native GPT Space context throughout work with compatible preferences and immutable review captures.
+
 ## [3.47.1] - 2026-10-17
 
 ### Fixed

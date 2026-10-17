@@ -9,8 +9,12 @@ Start when the operator selects this workflow. Main remains the current native
 general agent and coordinates Spec, Implementation, Validation and Publication.
 No nested orchestrator or TH permission ledger is needed.
 
-Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
-its configured local or Obsidian mode. Main coordinates with native tools and
+Use [workspace](../workspace/SKILL.md) to reuse the bound file home or verified
+gpt-space effort. Main maintains remote plan/progress/handoff in the same Page
+under `workspace`; it persists specialist narrative returns. Pass context locator,
+checkout and optional local operational storage separately. File-only helpers
+never receive a Page ID/URL as a path; no local Markdown mirror is required.
+Unavailable capability preserves identity and pending updates. Main coordinates with native tools and
 permissions. Reuse authorization for unchanged work and ask only for a missing
 decision. Specialists provide evidence and recommendations; Main judges them.
 

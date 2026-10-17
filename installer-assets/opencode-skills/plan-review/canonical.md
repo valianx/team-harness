@@ -7,8 +7,8 @@ or approval prerequisite.
 
 ## Input
 
-1. Use the explicitly supplied absolute workspace and read its `01-plan.md`
-   and bound OpenSpec change. If no workspace is supplied, ask the caller to
+1. Read the supplied bound context's logical plan (`01-plan.md` in file modes)
+   and repository-local OpenSpec. If no locator is supplied, ask the caller to
    select one; do not search by date, mtime, or newest directory.
 2. Read the current OpenSpec artifacts and the plan. Use supplied validation or
    review notes and, for a corrected plan, any supplied relevant delta, previous
@@ -19,14 +19,14 @@ or approval prerequisite.
 
 ## Review
 
-The coordinator dispatches exactly one read-only review per explicit invocation.
+Main supplies pinned plan excerpts/captures to one read-only review per invocation.
 Claude Code and OpenCode use their semantic `plan-reviewer` role. Codex has no registered
 `plan-reviewer`: read the canonical [role guidance](../../agents/plan-reviewer.md)
 and pass its body to one available native read-only review assignment, preserving
 that assignment's existing model, effort, tools and permissions. The review checks
-canonical OpenSpec coherence and `01-plan.md` projection fidelity; it does not
+canonical OpenSpec coherence and logical plan fidelity; it does not
 define acceptance, run a security design panel or create a second semantic plan.
-Main may persist the returned report at `{workspace}/reviews/01-plan-review.md`.
+Main retains the return in the same Page, or `reviews/01-plan-review.md` in file modes.
 
 The report must distinguish a functional defect, a security finding, a structural contradiction,
 and an editorial concern. It must include file/section pointers and a concise verdict. A plan
@@ -41,9 +41,9 @@ Print the combined `pass|concerns|fail` verdict and the artifact pointer:
 
 ```text
 Plan review: {pass|concerns|fail} — {one-line finding summary}
-Report: {workspace}/reviews/01-plan-review.md
+Report: {retained context location}
 ```
 
-If OpenSpec changes, Main regenerates `01-plan.md`; only a new explicit
+If OpenSpec changes, Main updates that plan; only a new explicit
 `/th:plan-review` invocation reviews the updated artifacts. No panel is
 re-fired automatically.

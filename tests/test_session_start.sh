@@ -26,6 +26,8 @@ set -u
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 HOOK="$REPO_ROOT/hooks/ts/dist/session-start.cjs"
+VAULT_BASE=$(node -e 'const path = require("node:path"); process.stdout.write(path.join(require("node:os").tmpdir(), "th-session-vault").split(path.sep).join("/"));')
+VAULT_JSON=$(VAULT_BASE="$VAULT_BASE" node -e 'process.stdout.write(JSON.stringify(process.env.VAULT_BASE));')
 
 if [ ! -f "$HOOK" ]; then
     echo "ERROR: $HOOK not found — run 'npm --prefix hooks/ts run build'"
@@ -398,16 +400,16 @@ rm -rf "$TMP"
 
 echo
 echo "=== Workspace: obsidian + valid logs-path → base-path directive in additionalContext ==="
-TMP=$(make_tmp_home '{"logs-mode":"obsidian","logs-path":"/vault/work","logs-subfolder":"work-logs"}')
+TMP=$(make_tmp_home "{\"logs-mode\":\"obsidian\",\"logs-path\":$VAULT_JSON,\"logs-subfolder\":\"work-logs\"}")
 assert_output_contains "ws-obsidian-context: additionalContext present" "$TMP" '"additionalContext"'
-assert_output_contains "ws-obsidian-path: logs-path/subfolder substring in directive" "$TMP" "/vault/work/work-logs"
+assert_output_contains "ws-obsidian-path: logs-path/subfolder substring in directive" "$TMP" "$VAULT_BASE/work-logs"
 assert_output_contains "ws-obsidian-event: SessionStart event present" "$TMP" '"SessionStart"'
 rm -rf "$TMP"
 
 echo
 echo "=== Workspace: obsidian + no logs-subfolder → default subfolder work-logs used ==="
-TMP=$(make_tmp_home '{"logs-mode":"obsidian","logs-path":"/vault/work"}')
-assert_output_contains "ws-default-subfolder: default work-logs applied" "$TMP" "/vault/work/work-logs"
+TMP=$(make_tmp_home "{\"logs-mode\":\"obsidian\",\"logs-path\":$VAULT_JSON}")
+assert_output_contains "ws-default-subfolder: default work-logs applied" "$TMP" "$VAULT_BASE/work-logs"
 rm -rf "$TMP"
 
 echo
@@ -465,7 +467,7 @@ rm -rf "$TMP"
 
 echo
 echo "=== Combined: valid language + obsidian → ONE JSON with retained directives ==="
-TMP=$(make_tmp_home_config '{"language":"es","logs-mode":"obsidian","logs-path":"/vault/work","logs-subfolder":"work-logs"}')
+TMP=$(make_tmp_home_config "{\"language\":\"es\",\"logs-mode\":\"obsidian\",\"logs-path\":$VAULT_JSON,\"logs-subfolder\":\"work-logs\"}")
 COMBINED_OUT=$(run_hook "$TMP")
 
 _assert_combined() {
@@ -502,7 +504,7 @@ done
 echo "$COMBINED_OUT" | grep -qF "Spanish"
 _assert_combined "combined-language: language directive present (Spanish)" "$?" "language directive missing"
 
-echo "$COMBINED_OUT" | grep -qF "/vault/work/work-logs"
+echo "$COMBINED_OUT" | grep -qF "$VAULT_BASE/work-logs"
 _assert_combined "combined-workspace: workspace base-path present" "$?" "workspace base-path directive missing"
 
 echo "$COMBINED_OUT" | grep -qF "current coordinator"
@@ -582,6 +584,155 @@ else
     echo "  [FAIL] el-type-safe: non-boolean value changed or leaked into output"
 fi
 rm -rf "$TMP" "$BASELINE"
+
+echo
+echo "=== Workspace: shared canonical and legacy preference cases ==="
+if node --input-type=module - "$REPO_ROOT" <<'NODE'
+import assert from "node:assert/strict";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+const root = process.argv[2];
+const fixture = JSON.parse(readFileSync(join(root, "tests/fixtures/workspace-preferences.json"), "utf8"));
+const contracts = {
+    "invalid:null": {
+        required: /workspace selection is invalid/,
+        forbidden: /workspace mode: (local|obsidian|gpt-space)|(?:fixture|example)\/vault/,
+    },
+    "selected:local": {
+        required: /workspace mode: local/,
+        forbidden: /workspace mode: (obsidian|gpt-space)|(?:fixture|example)\/vault/,
+    },
+    "selected:obsidian": {
+        required: /workspace mode: obsidian/,
+        forbidden: /workspace mode: (local|gpt-space)/,
+    },
+    "selected:gpt-space": {
+        required: /^(?=[\s\S]*workspace mode: gpt-space)(?=[\s\S]*unavailable to this hook)/,
+        forbidden: /(?:fixture|example)\/vault|workspace mode: (local|obsidian)/,
+    },
+};
+const home = mkdtempSync(join(tmpdir(), "th-session-preferences-"));
+try {
+    mkdirSync(join(home, ".claude"));
+    for (const { name, config, expected } of fixture.cases) {
+        const contract = contracts[`${expected.status}:${expected.mode}`];
+        const selected = { "logs-path": "/fixture/vault", ...config };
+        if (expected.status === "selected" && expected.mode === "obsidian") {
+            selected["logs-path"] = join(tmpdir(), "fixture-vault");
+        }
+        const source = JSON.stringify(selected);
+        const path = join(home, ".claude/.team-harness.json");
+        writeFileSync(path, source);
+        const result = spawnSync(process.execPath, [join(root, "hooks/ts/dist/session-start.cjs")], {
+            input: "{}", encoding: "utf8", env: { ...process.env, HOME: home, USERPROFILE: home },
+        });
+        assert.equal(result.status, 0, name);
+        const directive = JSON.parse(result.stdout).hookSpecificOutput.additionalContext;
+        assert.match(directive, contract.required, name);
+        assert.doesNotMatch(directive, contract.forbidden, name);
+        assert.equal((directive.match(/workspace selector conflict/g) ?? []).length,
+            Number(expected.conflict), `${name}: conflict is diagnosed once`);
+        assert.equal(readFileSync(path, "utf8"), source, `${name}: reading does not repair configuration`);
+    }
+    console.log(`  [PASS] ${fixture.cases.length} shared workspace preference cases`);
+} finally { rmSync(home, { recursive: true, force: true }); }
+NODE
+then
+    PASS=$((PASS + 1))
+else
+    FAIL=$((FAIL + 1))
+    FAILURES+=("shared workspace preference cases")
+fi
+
+echo
+echo "=== Workspace: native Obsidian base validation from canonical source ==="
+if node --input-type=module - "$REPO_ROOT" <<'NODE'
+import assert from "node:assert/strict";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+const root = process.argv[2];
+const { composeSessionDirectives } = await import(pathToFileURL(path.join(root, "hooks/ts/bodies/session-start.ts")));
+const home = path.join(tmpdir(), "th-session-private-value-home");
+const vault = path.join(tmpdir(), "th-session-private-value-vault");
+const windows = process.platform === "win32";
+const cases = [
+    { name: "empty", base: "", valid: false },
+    { name: "null", base: null, valid: false },
+    { name: "list", base: ["private-value"], valid: false },
+    { name: "object", base: { value: "private-value" }, valid: false },
+    { name: "number", base: 7, valid: false },
+    { name: "boolean", base: true, valid: false },
+    { name: "relative", base: "private-value/vault", valid: false },
+    { name: "unexpanded home", base: "~private-value/vault", valid: false },
+    { name: "native root", base: path.parse(vault).root, valid: false },
+    { name: "normalized root", base: path.parse(vault).root + ".", valid: false },
+    { name: "native home", base: home, valid: false },
+    { name: "normalized home", base: home + path.sep + ".", valid: false },
+    { name: "native home case", base: home.toUpperCase(), valid: !windows },
+    { name: "parent traversal", base: vault + path.sep + "../outside", valid: false },
+    { name: "star glob", base: vault + "*", valid: false },
+    { name: "question glob", base: vault + "?", valid: false },
+    { name: "open bracket glob", base: vault + "[archive", valid: false },
+    { name: "close bracket glob", base: vault + "]archive", valid: false },
+    { name: "C0 control", base: vault + "\nprivate-value", valid: false },
+    { name: "DEL control", base: vault + "\x7fprivate-value", valid: false },
+    { name: "unavailable native vault", base: vault, valid: true },
+    { name: "home child", base: path.join(home, "Vault"), valid: true },
+    { name: "Unicode", base: path.join(vault, "Vúlt_資料"), valid: true },
+    { name: "literal spaces", base: path.join(vault, " personal "), valid: true },
+    { name: "literal parent prefix", base: path.join(vault, "..personal"), valid: true },
+    { name: "literal braces", base: vault + "{archive}", valid: true },
+    { name: "native backslashes", base: vault + String.raw`\personal`, valid: true },
+    { name: "POSIX literal backslash traversal", base: vault + String.raw`\..\personal`, valid: !windows },
+    { name: "long lexical base", base: vault + (path.sep + "segment").repeat(600), valid: true },
+    { name: "Windows drive", base: String.raw`C:\private-value\Vault`, valid: windows },
+    { name: "Windows slash drive", base: "C:/private-value/Vault", valid: windows },
+    { name: "Windows UNC", base: String.raw`\\server\share\private-value\Vault`, valid: windows },
+    { name: "Windows drive root", base: "C:\\", valid: false },
+    { name: "Windows UNC root", base: String.raw`\\server\share`, valid: false },
+    { name: "Windows drive relative", base: "C:private-value", valid: false },
+    { name: "native root relative", base: "/private-value/Vault", valid: !windows },
+];
+let count = 0;
+for (const selector of ["workspace-mode", "logs-mode"]) {
+    for (const { name, base, valid } of cases) {
+        const config = {
+            [selector]: "obsidian", "logs-path": base, "logs-subfolder": " ",
+            language: "es", "unrelated-private-field": "UNRELATED_PRIVATE_SENTINEL",
+        };
+        const before = structuredClone(config);
+        const reflectsPath = valid && typeof base === "string" && base.includes("private-value");
+        const directive = composeSessionDirectives(config, home).join("\n");
+        assert.equal(directive.includes("workspace mode: obsidian is configured"), valid, `${selector}/${name}: configured status`);
+        assert.equal(directive.includes("workspace destination is invalid or incomplete"), !valid, `${selector}/${name}: destination status`);
+        assert.equal(directive.includes("private-value"), reflectsPath, `${selector}/${name}: invalid bytes are not reflected`);
+        assert.doesNotMatch(directive, /UNRELATED_PRIVATE_SENTINEL|workspace mode: (local|gpt-space)/, `${selector}/${name}: no reflection or fallback`);
+        assert.match(directive, /Spanish/, `${selector}/${name}: language remains independent`);
+        assert.deepEqual(config, before, `${selector}/${name}: reading does not repair configuration`);
+        count++;
+    }
+}
+process.env.HOME = home;
+process.env.USERPROFILE = home;
+for (const selector of ["workspace-mode", "logs-mode"]) {
+    const directive = composeSessionDirectives({
+        [selector]: "obsidian", "logs-path": home, "logs-subfolder": "work-logs",
+    }).join("\n");
+    assert.match(directive, /workspace destination is invalid or incomplete/, `${selector}: native home default`);
+    assert.doesNotMatch(directive, /private-value|workspace mode: obsidian is configured/, `${selector}: native home does not reflect`);
+    count++;
+}
+console.log(`  [PASS] ${count} native Obsidian base cases from canonical source`);
+NODE
+then
+    PASS=$((PASS + 1))
+else
+    FAIL=$((FAIL + 1))
+    FAILURES+=("native Obsidian base validation from canonical source")
+fi
 
 # ===========================================================================
 # Summary

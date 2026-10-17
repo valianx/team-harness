@@ -3,22 +3,13 @@
 
 ## Destination
 
-Before writing, use the absolute output path supplied by the caller. For an
-Obsidian destination, resolve the named vault through the active runtime's
-configured mapping and keep paths relative to that vault root. If no output
-path or vault was supplied, use the selected workspace or ask the operator for
-the missing destination. Do not assume a host-specific configuration path and
-do not create configuration merely to run this skill.
-
-The legacy lookup details below are retained only as background; the active
-runtime owns configuration and destination selection.
-
-1. Use the explicit absolute destination or the active runtime's vault mapping.
-2. If the operator has not selected a destination, use the selected workspace
-   or ask for the missing destination before writing.
-3. Keep paths relative to the selected vault root only after that root is known.
-
-> Vault paths come from the active runtime's mapping or the explicit absolute destination supplied by the caller.
+Use the explicit absolute output path or runtime-resolved vault mapping.
+Otherwise use declared real local operational storage (the bound home in file
+modes); resolve a missing destination before writing. A Page locator is not a path.
+Keep vault-relative links relative to its known root. Do not create configuration
+or assume another host's mapping. Main retains useful narrative in the same Page,
+linking the native `.canvas` artifact; unsupported upload stays pending, and a bare
+local path is not a remote attachment.
 
 ---
 

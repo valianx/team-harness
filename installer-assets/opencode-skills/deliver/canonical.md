@@ -12,10 +12,10 @@ For completed repository changes, continue the Publication phase of
 Recover the evidence, workspace, review decision and requested endpoint. Local
 completion is valid when no PR is requested; PR preparation does not imply publication.
 
-Use [workspace](../workspace/SKILL.md) to reuse the effort's absolute home in
-its configured local or Obsidian mode. Main coordinates with native tools and
-permissions. Reuse authorization for unchanged work and ask only for a missing
-decision. Specialists provide evidence and recommendations; Main judges them.
+Use [workspace](../workspace/SKILL.md) to reuse the bound file or Page context.
+Keep repository/worktree and any real local operational directory separate.
+Main persists useful specialist returns in that context and judges them;
+reuse authority for unchanged work and ask only for a missing decision.
 
 Inspect the candidate, existing validation and unresolved findings. Resolve a
 specific effort through the workspace skill; ask only if the target is ambiguous.

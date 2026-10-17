@@ -11,9 +11,9 @@ Generate `.c4` architecture diagram files using the LikeC4 DSL that **communicat
 
 ## Workspace and Runtime Paths
 
-For a direct invocation without a bound workspace, use the [workspace skill](../workspace/SKILL.md) to resolve or create the configured local/Obsidian home before writing. The current agent is Main; no parent workflow is required.
+Reuse the bound [context](../workspace/SKILL.md), or resolve it for direct work. Main retains narrative returns in the same Page or file home; specialists do not create Pages.
 
-Before writing, consume the `workspace` and optional `deliverable_target` supplied by Main. `workspace` is the absolute shared local or Obsidian home already resolved for this effort; it is not a repository-relative template. Set `output_dir` to the explicit target directory when supplied, otherwise to `workspace`. If the target names a file, use its parent as `output_dir`, keep that exact `source_file`, and derive `summary_file` alongside it. Otherwise use `source_file = {output_dir}/diagram.c4` and `summary_file = {output_dir}/05-diagram.md`; exported views stay in `output_dir`. Resolve references and render helpers from `skill_root`, the active installation directory containing this document. Never derive output from the current working directory or read another runtime's configuration.
+Set `output_dir` to the explicit `deliverable_target` or declared real local operational directory; file modes may use their bound home. For a file target, preserve its exact `source_file` and parent; otherwise use `{output_dir}/diagram.c4`. Keep exports alongside. Only file modes create `summary_file` (default `05-diagram.md`); remote mode returns decisions to Main. Resolve references/helpers from this installation's `skill_root`, never inferred cwd or another runtime's configuration. URLs/IDs are not paths; unsupported upload stays pending, and local links are not remote attachments.
 
 ---
 
@@ -384,7 +384,7 @@ Icons appear in rendered views as small logos on elements. Use them to distingui
 
 The skill produces:
 - `{source_file}` — the LikeC4 DSL source (primary output)
-- `{summary_file}` — summary of design decisions
+- `{summary_file}` — file-mode summary; remote decisions return to Main
 - `{output_dir}/diagram_*.png` — exported PNGs (if CLI export succeeded)
 
 The `.c4` file is the authoritative output. It is readable, diffable, and can be re-rendered at any time.
@@ -393,7 +393,7 @@ The `.c4` file is the authoritative output. It is readable, diffable, and can be
 
 ## Obsidian Output Mode
 
-When `logs-mode: obsidian` is active in the resolved runtime context, the diagrammer agent follows this extended contract so the diagrams display inline in Obsidian. Local mode uses the same resolved output directory.
+For a selected file context in `obsidian` mode, follow this embed contract. Local mode uses its resolved directory; remote mode retains sources/renders locally and returns decisions to Main without a Markdown mirror.
 
 ### What the agent does in obsidian mode
 
@@ -414,7 +414,7 @@ When `logs-mode: obsidian` is active in the resolved runtime context, the diagra
 
 ### CLI-absent degradation
 
-When `npx likec4` is not available (Node.js not installed, network unavailable), the agent does NOT hard-fail. Instead it writes the source (`diagram.c4`) and appends this marker to `05-diagram.md`:
+When LikeC4 is unavailable, preserve `diagram.c4` and return render pending to Main. In file modes append this marker to `05-diagram.md`:
 
 ```markdown
 ## Rendered Diagrams

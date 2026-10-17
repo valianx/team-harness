@@ -7,8 +7,8 @@ not activate a pipeline or replace Main with another coordinator.
 
 ## Establish the product and endpoint
 
-Reuse [workspace](../workspace/SKILL.md) and its selected absolute local or
-Obsidian home. Read the current product/design records, affected implementation,
+Reuse the bound [context](../workspace/SKILL.md); Main retains useful returns there.
+Read the product/design records, affected implementation,
 components, tokens, assets and supplied references. Resolve the surface, users,
 primary task, real content, constraints and requested endpoint from that context.
 
@@ -66,13 +66,14 @@ present. Before frontend implementation, present or reuse an accurate structural
 wireframe through [sketch](../sketch/SKILL.md). A visual comp does not silently
 replace that preview or require a second proposal.
 
-A design-only request ends with a reviewable visual result at the selected
-workspace or explicit destination and unresolved decisions, before production
+A design-only request ends with a visual result in declared real local artifact
+storage or the explicit destination and unresolved decisions, before production
 edits. Explicitly requested implementation or improvement continues through
 authorized scoped changes, relevant project checks and upstream rendered
 assessment after material decisions, without another blanket approval.
 
-Retain the visual output and applicable upstream finish evidence. Report actual
+Link native visual artifacts from the context; unsupported upload stays pending.
+Retain upstream finish evidence. Report actual
 screens, states, themes, device classes and omissions. Check existing screenshots
 or fixtures for target and freshness; label them as qualified evidence, not a
 fresh render. If the app or a required capability cannot run, preserve supported

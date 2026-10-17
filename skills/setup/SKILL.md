@@ -63,8 +63,9 @@ to choose the objective/stack; it does not install all providers. For a selected
 3. If missing or unusable and the operation is authorized, use the official owner route from the
    policy. Keep tool-only installs outside the repository; adding a project dependency or
    configuration is a separate product change and needs that scope.
-4. Verify the selected command/skill on the active host and pass the existing local/Obsidian
-   workspace. Report a concrete recovery when activation remains pending. Do not install an
+4. Verify the selected command/skill on the active host and pass the selected
+   context locator and separate operational storage when file output is required.
+   Report a concrete recovery when activation remains pending. Do not install an
    inactive host or request a restart unless the host reports a specific activation limitation.
 
 Keep provider-owned files and configuration intact. Report installed capability and active
@@ -112,7 +113,7 @@ Routable concerns for /th:setup <intent>:
   rea             — official application-research dependency setup
   quality / quality-tools — choose an applicable quality capability (Semgrep, dependency-cruiser, Knip, Sentry find-bugs)
   context7         — context7 API key
-  workspace        — workspace output mode (local / obsidian vault path)
+  workspace        — context mode (local / obsidian vault / gpt-space)
   language         — default response language (ISO 639-1)
   english-learning  — english-learning correction mode
   clickup          — ClickUp workspace ID
@@ -173,7 +174,14 @@ This guard never writes any file; it only reads versions and, when stale, advise
 
 ### 1. Detect installation mode
 
-Read `~/.claude/.team-harness.json`. If the file exists, this is a reconfiguration — show current values. If missing, this is a first-time setup — create the file with defaults.
+Read `~/.claude/.team-harness.json`. If the file exists, this is a reconfiguration — show current values. If missing, prepare first-time defaults for the validated manifest write.
+
+Resolve workspace preferences with [workspace](../workspace/SKILL.md), reusing
+an effort binding before defaults. A present `workspace-mode` is authoritative
+even when invalid; only its absence permits valid legacy `logs-mode` selection.
+When both keys are absent, default to local. Diagnose a conflict once without read-time repair.
+For a requested workspace change, validate the complete destination before the
+first configuration write; unavailable remote setup leaves existing bytes intact.
 
 **context7 MCP:**
 1. Ask the user for their Context7 API key. Get one at https://context7.com/
@@ -192,21 +200,45 @@ Read `~/.claude/.team-harness.json`. If the file exists, this is a reconfigurati
 
 If a Context7 entry already exists, show its current status and ask whether to keep or change it. MCP setup is optional; an existing configuration is left untouched when Context7 is not selected.
 
-### 3. Configure workspace output mode
+### 3. Configure workspace mode
 
-Ask the user to choose where pipeline workspaces are stored:
+Ask the user to choose the default context home for new efforts:
 
 - **local** (default) — `./workspaces/` relative to each project
 - **obsidian** — stored in an Obsidian vault for cross-project visibility
+- **gpt-space** — one native Space effort beneath its verified `workspace` Page
 
 If obsidian mode:
 1. Ask for the vault path (absolute path to vault root).
 2. Ask for the subfolder within the vault (default: `work-logs`).
 3. Verify the vault path exists. If not, warn and ask to confirm or re-enter.
 
+Explicit local/Obsidian selection writes matching `workspace-mode` and `logs-mode`
+values. Blank input preserves existing representation and destination. Existing
+efforts keep their binding when the default changes.
+
+Remote mode requires TH 3.48.0 and actual native Pages capability. This release
+supports capable Codex hosts; Claude Code, OpenCode and hosts without those tools
+retain remote configuration and report unavailable. Do not invent an endpoint,
+request tokens or claim older readers support the selector.
+
+On a capable host, Main follows
+[native Space setup](../workspace/references/native-space.md): verify the actual
+Space root, read/list all children, and resolve the exact `workspace` container
+by ID, title, parent and Space membership. Create it only after complete authorized
+discovery proves absence. Reuse observed IDs after uncertain writes; incomplete,
+ambiguous or denied discovery permits no replacement create or local fallback.
+Read back the verified destination before persisting `workspace-mode: gpt-space`,
+`workspace-space-id` and `workspace-container-page-id`; remove stale `logs-mode`.
+Use `classifySpaceSetup` with actual remote results, config-write outcome and
+selected config readback. Failed/unknown local persistence retains observed IDs
+and reports partial readiness with configuration repair, never another container.
+Report configured, accessible, readable and writable outcomes separately. Remote
+readiness uses native evidence; a filesystem preflight cannot prove it.
+
 ### 3a. Provision permission rules for the obsidian workspace (gated)
 
-**Runs only when Step 3 configured `obsidian` mode with a resolved `logs-path` and `logs-subfolder`.** Skipped entirely in `local` mode — no gate, no output.
+**Runs only when Step 3 configured `obsidian` mode with a resolved `logs-path` and `logs-subfolder`.** Skipped entirely in `local` and `gpt-space` modes — no gate, no output.
 
 The obsidian vault sits outside the current project's working tree, so every subagent `Edit`/`Write` into it prompts by default, and per-use approvals do not persist across dispatches. This sub-step offers to add local permission rules once, up front, so future pipeline runs write to the vault without prompting. Full contract, including the `//` double-slash anchor rationale and the documented upstream residual: `docs/permission-provisioning.md`.
 
@@ -404,15 +436,23 @@ Write `~/.claude/.team-harness.json` with:
   "format_version": "1",
   "installed_version": "<read from plugin or 'plugin'>",
   "updated_at": "<current ISO timestamp>",
-  "logs-mode": "<local|obsidian>",
-  "logs-path": "<vault path or empty>",
-  "logs-subfolder": "<subfolder or empty>",
+  "workspace-mode": "local",
+  "logs-mode": "local",
   "language": "<ISO 639-1 code, e.g. 'en' or 'es'; omit key if not configured>",
   "english_learning": "<true|false; omit key if not configured>"
 }
 ```
 
-Preserve ALL existing unrelated fields (like `files`, `clickup`, `github`, and legacy MCP or capability settings) if the manifest already exists. Legacy route/profile selectors are not active settings: report `1 — inline` / `2 — pipeline` when present and remove only those legacy keys during this legitimate manifest write. Use the **merge-write-whole-document** contract: read the full JSON, replace or add only the keys this step owns (`format_version`, `installed_version`, `updated_at`, `logs-mode`, `logs-path`, `logs-subfolder`, and optionally `language` and `english_learning`), write the whole document back. NEVER emit a partial payload — that would destroy unrelated operator-configured keys.
+This example is fresh local setup. Explicit Obsidian setup writes both selectors
+as `obsidian` plus validated `logs-path` and `logs-subfolder`. Verified remote
+setup writes the canonical selector and both opaque IDs without `logs-mode`.
+Metadata-only ensure/update seeds both local selectors only when both are absent;
+it preserves incomplete destinations, conflicts and existing IDs and reports the
+diagnosis without contacting Pages. Semantic imports treat selectors and their
+mode-specific destination as one group; any native selection or destination wins
+across alias names, while unrelated nested preferences remain importable.
+
+Preserve ALL existing unrelated fields (like `files`, `clickup`, `github`, and legacy MCP or capability settings) if the manifest already exists. Legacy route/profile selectors are not active settings: report `1 — inline` / `2 — pipeline` when present and remove only those legacy keys during this legitimate manifest write. Use the **merge-write-whole-document** contract: read the full JSON, replace only owned metadata and explicitly selected preferences, then write the whole document back. NEVER emit a partial payload — that would destroy unrelated operator-configured keys.
 
 The `language` key is written only when the operator provided a value in Step 3.5; if they left it blank and no prior value existed, omit the key entirely (absence of the key means detection-based behavior, which is the default).
 

@@ -14,8 +14,8 @@ instructions supplied by Main. Do not create a second acceptance process.
 
 ## Assignment and authorization
 
-The assignment identifies the canonical repository and worktree, selected local
-or Obsidian workspace, candidate endpoint or branch, base, intended PR scope,
+The assignment identifies the canonical repository and worktree, context locator,
+any local operational directory, candidate endpoint or branch, base, intended PR scope,
 accepted test/QA/security evidence, and any output or metadata paths. Native
 permissions and the assignment govern every action. Main owns Git operations.
 
@@ -23,8 +23,11 @@ Preparation may produce the title, body, issue references and required scoped
 release metadata at paths explicitly assigned. Use the repository's PR template
 and the approved OpenSpec objective. Update a version, changelog or other
 maintained metadata only when that exact change is in the assigned scope.
-Keep scratch bodies, logs and transient reports in the selected workspace or
+Keep scratch bodies, logs and transient reports in assigned file storage or
 permitted temporary storage. Preserve unrelated work.
+
+For remote context return narrative preparation to Main for the same effort
+Page. Connector writes remain Main-owned; do not create a local Markdown mirror.
 
 Return prepared coordinates to Main for publication. The declared tools support
 artifact preparation; they do not provide shell execution, skill invocation or
