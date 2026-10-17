@@ -77,12 +77,11 @@ $BinUrl  = "$BaseUrl/$Asset"
 # On any uncertainty, fall through to download + the authoritative Go-side
 # comparison (which parses JSON robustly and is idempotent).
 #
-# Skipped when passthrough args are present ($args.Count -gt 0). Flags like
-# --opencode-dir point the Go binary at a non-default config root; the
-# shell-side check only reads the default global path and would incorrectly
-# short-circuit before the binary resolves the correct root from those args.
+# Passthrough args or OPENCODE_CONFIG_DIR can select a non-default root.
+# Leave root resolution to the native engine in either case, rather than
+# short-circuiting from the default installation's version.
 # ---------------------------------------------------------------------------
-if ($args.Count -eq 0) {
+if ($args.Count -eq 0 -and [string]::IsNullOrEmpty($env:OPENCODE_CONFIG_DIR)) {
 $InstalledVersion = ''
 $LatestVersion = ''
 
@@ -149,7 +148,7 @@ if ($InstalledVersion -ne '' -and $LatestVersion -ne '') {
         exit 0
     }
 }
-} # end: $args.Count -eq 0 pre-check guard
+} # end: default-root pre-check guard
 
 # ---------------------------------------------------------------------------
 # Download and verify (mirrors install-opencode.ps1 byte-for-byte — AC-10).

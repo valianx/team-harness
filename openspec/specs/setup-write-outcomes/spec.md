@@ -17,7 +17,7 @@ The shared OpenCode installation ledger SHALL validate every record and resolve 
 - **THEN** update and removal reuse its ownership, including supported default-root legacy records, while case-distinct or unproven roots remain independent
 
 ### Requirement: Bootstrap forwards substantive update requests
-The Unix OpenCode updater SHALL NOT short-circuit a scope, configuration-directory or provider-tier request solely because the global installation already has the current release. Supported separated and equals-form arguments SHALL reach the installer unchanged. Root resolution SHALL prefer the explicit directory over OPENCODE_CONFIG_DIR, then project scope and the global default; selected paths SHALL receive the same validation without falling back after an invalid override.
+The OpenCode updaters SHALL NOT short-circuit a scope, configuration-directory or provider-tier request solely because the global installation already has the current release. Supported separated and equals-form arguments SHALL reach the installer unchanged. Root resolution SHALL prefer the explicit directory over OPENCODE_CONFIG_DIR, then project scope and the global default; selected paths SHALL receive the same validation without falling back after an invalid override.
 
 #### Scenario: The global version is current but a project is stale
 - **WHEN** update is requested with project scope
@@ -58,6 +58,24 @@ Supported Windows bootstrap entrypoints SHALL preserve each forwarded argument, 
 #### Scenario: Custom installation directory contains spaces
 - **WHEN** an operator supplies a directory argument containing spaces
 - **THEN** the installer receives exactly one unchanged directory value.
+
+### Requirement: Release bootstraps verify executable downloads
+Every release bootstrap SHALL compare the downloaded binary's SHA256 digest against the exact asset-name entry in the published SHA256SUMS before executing or unblocking that binary. Hexadecimal comparison SHALL ignore letter case. Missing hash tools, failed downloads, missing exact entries and digest mismatches SHALL return failure without running the binary. Success and failure SHALL remove temporary downloads, and successful launch SHALL preserve the child's exit status.
+
+#### Scenario: The checksum cannot verify the selected asset
+- **WHEN** verification fails or only a similarly named asset is listed
+- **THEN** the bootstrap refuses execution, returns failure and removes its temporary download directory
+
+#### Scenario: The published digest uses uppercase hexadecimal
+- **WHEN** the exact asset's digest matches the downloaded binary regardless of letter case
+- **THEN** the bootstrap executes that same verified file and preserves its arguments and exit status
+
+### Requirement: Native lifecycle help preserves installation state
+Native plan, apply, update, uninstall and model-setup commands SHALL handle --help and -h before dispatching operations, returning success with guidance without modifying managed assets, preferences or ownership records.
+
+#### Scenario: Help accompanies a mutating command
+- **WHEN** help is requested for an existing OpenCode or Codex installation
+- **THEN** the command returns guidance and preserves all installation bytes
 
 ### Requirement: Reconciliation preserves additional nested MCP settings
 Claude and OpenCode MCP reconciliation SHALL preserve custom headers and recognize a desired nested object already contained in the existing configuration as current, without repeated backups or writes.

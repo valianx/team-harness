@@ -82,7 +82,7 @@ fi
 # SHA256SUMS lines have the format: <hash>  <bare-filename>
 # awk '$2==a' anchors the exact bare name — no substring match.
 # (c) Abort as a distinct branch when the entry is absent (never skip-verify).
-EXPECTED=$(awk -v a="$ASSET" '$2==a {print $1}' "$TMP/SHA256SUMS")
+EXPECTED=$(awk -v a="$ASSET" '$2==a {print $1}' "$TMP/SHA256SUMS" | tr '[:upper:]' '[:lower:]')
 if [ -z "$EXPECTED" ]; then
     echo "Error: no SHA256SUMS entry for '${ASSET}'; refusing to run unverified binary." >&2
     echo "  The release may not include this platform. See: https://github.com/${REPO}/releases" >&2
@@ -93,7 +93,7 @@ fi
 # Use extract-and-compare, NOT 'sha256sum -c SHA256SUMS' (that would fail on
 # the four other asset entries in the file).
 # (a) No re-fetch occurs between this point and chmod/exec — verified file IS executed.
-ACTUAL=$($HASH_CMD "$TMP/install" | awk '{print $1}')
+ACTUAL=$($HASH_CMD "$TMP/install" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
 if [ "$ACTUAL" != "$EXPECTED" ]; then
     echo "Error: checksum verification failed for ${ASSET}." >&2
     echo "  Expected: ${EXPECTED}" >&2

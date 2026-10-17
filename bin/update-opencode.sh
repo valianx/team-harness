@@ -200,13 +200,13 @@ if ! curl -fsSL --max-time 120 -o "$TMP/install" "$BIN_URL"; then
 fi
 
 # Anchored exact-asset-name match — no substring match (mirrors install-opencode.sh).
-EXPECTED=$(awk -v a="$ASSET" '$2==a {print $1}' "$TMP/SHA256SUMS")
+EXPECTED=$(awk -v a="$ASSET" '$2==a {print $1}' "$TMP/SHA256SUMS" | tr '[:upper:]' '[:lower:]')
 if [ -z "$EXPECTED" ]; then
     echo "Error: no SHA256SUMS entry for '${ASSET}'; refusing to run unverified binary." >&2
     exit 1
 fi
 
-ACTUAL=$($HASH_CMD "$TMP/install" | awk '{print $1}')
+ACTUAL=$($HASH_CMD "$TMP/install" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
 if [ "$ACTUAL" != "$EXPECTED" ]; then
     echo "Error: checksum verification failed for ${ASSET}." >&2
     echo "  Expected: ${EXPECTED}" >&2

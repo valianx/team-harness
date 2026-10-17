@@ -85,6 +85,7 @@ if not defined ARCH (
 )
 
 set ASSET=install-windows-%ARCH%.exe
+set SUMS_URL=%BASE_URL%/SHA256SUMS
 set URL=%BASE_URL%/%ASSET%
 
 REM Create a temp dir.
@@ -95,20 +96,38 @@ if errorlevel 1 (
     exit /b 1
 )
 set INSTALLER=%TMP_DIR%\install.exe
+set SUMS_PATH=%TMP_DIR%\SHA256SUMS
 
 echo DEPRECATED: This script is the legacy install path. 1>&2
 echo   Canonical install: /plugin marketplace add valianx/team-harness 1>&2
 echo   Then: /plugin install th ^&^& /th:setup  (inside Claude Code) 1>&2
-echo Downloading %ASSET% from latest release...
-curl -fsSL --max-time 120 -o "%INSTALLER%" "%URL%"
+echo Downloading SHA256SUMS...
+curl -fsSL --max-time 30 -o "%SUMS_PATH%" "%SUMS_URL%"
 if errorlevel 1 (
-    echo Error: download failed from %URL% 1>&2
-    echo   This usually means: (a) no release has been tagged yet, (b) GitHub is 1>&2
-    echo   unreachable from this network, or (c) your firewall blocks github.com. 1>&2
+    echo Error: download failed from %SUMS_URL% 1>&2
     echo   Releases: https://github.com/%REPO%/releases 1>&2
     rmdir /s /q "%TMP_DIR%" 1>nul 2>nul
     exit /b 1
 )
+echo Downloading %ASSET% from latest release...
+curl -fsSL --max-time 120 -o "%INSTALLER%" "%URL%"
+if errorlevel 1 (
+    echo Error: download failed from %URL% 1>&2
+    echo   This usually means: ^(a^) no release has been tagged yet, ^(b^) GitHub is 1>&2
+    echo   unreachable from this network, or ^(c^) your firewall blocks github.com. 1>&2
+    echo   Releases: https://github.com/%REPO%/releases 1>&2
+    rmdir /s /q "%TMP_DIR%" 1>nul 2>nul
+    exit /b 1
+)
+
+REM Keep paths in the local environment; never interpolate them as PowerShell code.
+powershell.exe -NoProfile -NonInteractive -Command "$ErrorActionPreference='Stop'; $expected=$null; Get-Content -LiteralPath $env:SUMS_PATH | ForEach-Object { $fields=$_ -split '\s+'; if ($fields.Count -ge 2 -and $fields[1] -eq $env:ASSET) { $expected=$fields[0] } }; if ([string]::IsNullOrEmpty($expected)) { exit 1 }; $actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $env:INSTALLER).Hash; if ($actual -ine $expected) { exit 1 }; exit 0"
+if errorlevel 1 (
+    echo Error: checksum verification failed for %ASSET%. 1>&2
+    rmdir /s /q "%TMP_DIR%" 1>nul 2>nul
+    exit /b 1
+)
+echo Checksum verified.
 
 echo Launching installer...
 "%INSTALLER%" %FORWARD_ARGS%
