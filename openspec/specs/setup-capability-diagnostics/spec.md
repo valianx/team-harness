@@ -1,8 +1,9 @@
-## Purpose
+# setup-capability-diagnostics Specification
 
+## Purpose
 Help operators identify a minimal useful Team Harness installation, inspect supported coding hosts without changing them, and configure only the capabilities they choose.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Explicit read-only inventory
 
