@@ -112,7 +112,7 @@ test('headless dialogs receive matching cancellation and notifications cannot bl
 
 test('EOF and unterminated frames reject every affected pending command', async t => {
   for (const truncated of [false, true]) {
-    const { client } = await transport(t);
+    const { client } = await transport(t, 'eof');
     const pending = [client.request({ type: 'eof', truncated }), client.request({ type: 'stall' })];
     const results = await Promise.allSettled(pending);
     assert.deepEqual(results.map(result => result.status), ['rejected', 'rejected']);

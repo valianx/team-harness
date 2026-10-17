@@ -17,6 +17,8 @@ const option = name => {
   return index < 0 ? undefined : process.argv[index + 1];
 };
 const scenario = process.env.TH_PI_FIXTURE_SCENARIO || 'normal';
+// EOF needs an owned fd: Node protects process.stdout from closing its Windows pipe handle.
+const eofOutput = scenario === 'eof' ? fs.createWriteStream('', { fd: 1, autoClose: true }) : null;
 const log = value => {
   if (process.env.TH_PI_FIXTURE_LOG) fs.appendFileSync(process.env.TH_PI_FIXTURE_LOG, JSON.stringify(value) + '\n');
 };
@@ -39,7 +41,7 @@ const usage = { input: 5, output: 7, cacheRead: 2, cacheWrite: 1, reasoning: 3, 
 let output = Promise.resolve();
 const emit = value => {
   const bytes = Buffer.from(JSON.stringify(value) + (scenario === 'fragmented' ? '\r\n' : '\n'));
-  if (scenario !== 'fragmented') { process.stdout.write(bytes); return; }
+  if (scenario !== 'fragmented') { (eofOutput ?? process.stdout).write(bytes); return; }
   output = output.then(async () => {
     for (let start = 0; start < bytes.length; start += 3) {
       process.stdout.write(bytes.subarray(start, start + 3));
@@ -164,8 +166,9 @@ process.stdin.on('data', chunk => {
       process.stderr.write('d'.repeat(command.bytes));
       setTimeout(() => response(command), 20);
     } else if (command.type === 'eof') {
-      if (command.truncated) process.stdout.write('{"type":');
-      process.stdout.end();
+      const writer = eofOutput ?? process.stdout;
+      if (command.truncated) writer.write('{"type":');
+      writer.end();
     } else if (command.type === 'ui') {
       uiCommand = command;
       for (const [index, method] of ['select', 'confirm', 'input', 'editor'].entries())
