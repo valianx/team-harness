@@ -46,8 +46,8 @@ The Go binary installs agents and skills for OpenCode or Codex through explicit
 subcommands. Claude Code uses the marketplace path above. The bootstrap scripts
 `bin/install.sh`, `bin/install.ps1`, and `bin/install.cmd` print the native
 Claude Code commands and exit without downloading when called with no
-subcommand. They download and forward arguments only for `plan`, `apply`,
-`update`, or `uninstall`.
+subcommand. They download and forward arguments for `plan`, `apply`, `update`,
+`uninstall`, or the explicit `setup models` action.
 
 Examples:
 
@@ -74,15 +74,14 @@ permission settings remain operator-owned.
 
 ### Native model selection
 
-The default installation leaves agent model metadata unchanged. Choose the model
-and reasoning effort with the active runtime's native controls. OpenCode also
-supports the explicit opt-in provider tier
-`install apply --runtime opencode --opencode-tier <provider>`;
-see [OpenCode model configuration](./opencode-model-config.md). Codex's role
+Choose the chat model and reasoning effort with the active runtime's native controls.
+OpenCode and Pi offer [guided worker model profiles](../skills/setup/references/worker-models.md)
+for reasoning, general and mechanical work, with role overrides and inheritance
+by default. Existing OpenCode provider tiers remain compatible when profiles are
+absent; see [OpenCode model configuration](./opencode-model-config.md). Codex's role
 projection and ephemeral model override are documented in the
 [Codex runtime guide](./codex-runtime.md#roles-and-model-projection). Claude Code
-and OpenCode continue to use their own native approval settings when no tier is
-selected.
+and OpenCode retain their native approval settings.
 
 ### Non-interactive install (CI / scripts)
 

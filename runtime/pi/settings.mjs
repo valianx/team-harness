@@ -6,11 +6,13 @@ import { isAbsolute, join, parse, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 import { selectWorkspacePreference } from "../../skills/workspace/scripts/workspace-preference.mjs";
+import { validatePiWorkerModels } from "./worker-models.mjs";
 
 const keys = new Set([
   "workspace-mode", "logs-mode", "logs-path", "logs-subfolder",
   "workspace-space-id", "workspace-container-page-id", "language", "english_learning",
   "flow_telemetry.enabled", "clickup.workspace_id", "obsidian_tasks",
+  "worker-models",
 ]);
 const workspaceKeys = new Set([
   "workspace-mode", "logs-mode", "logs-path", "logs-subfolder",
@@ -110,7 +112,7 @@ export async function showSettings(agentDir) {
 function validateSetting(key, value) {
   if (!keys.has(key)) throw new Error("Unsupported Pi setting");
   const invalid = () => { throw new Error(`Invalid Pi setting: ${key}`); };
-  if (token.test(JSON.stringify(value))) invalid();
+  if (key !== "worker-models" && token.test(JSON.stringify(value))) invalid();
   if (key === "workspace-mode" && !["local", "obsidian", "gpt-space"].includes(value)) invalid();
   if (key === "logs-mode" && !["local", "obsidian"].includes(value)) invalid();
   if (idKeys.includes(key) && (typeof value !== "string" || !opaqueId.test(value))) invalid();
@@ -202,7 +204,7 @@ export async function ensureSettings(agentDir, { version } = {}) {
   return publish(root, before, after);
 }
 
-export async function setSettings(agentDir, { assignments = [], removals = [], version } = {}) {
+export async function setSettings(agentDir, { assignments = [], removals = [], version, workerModelCatalog, workerRoles } = {}) {
   const root = resolveAgentDir(agentDir);
   const before = await readSettings(root);
   const after = structuredClone(before);
@@ -210,7 +212,7 @@ export async function setSettings(agentDir, { assignments = [], removals = [], v
   let workspaceChanged = false;
   for (const raw of assignments) {
     const [key, value] = assignment(raw);
-    setValue(after, key, value);
+    setValue(after, key, key === "worker-models" ? validatePiWorkerModels(value, { catalog: workerModelCatalog, roles: workerRoles }) : value);
     if (["workspace-mode", "logs-mode"].includes(key)) selected.set(key, value);
     workspaceChanged ||= workspaceKeys.has(key);
   }
@@ -250,7 +252,7 @@ async function main(args) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main(process.argv.slice(2)).then(result => process.stdout.write(`${JSON.stringify(result)}\n`)).catch(error => {
-    process.stderr.write(`Pi settings: ${error.code ? "settings operation failed" : error.message}\n`);
+    process.stderr.write(`Pi settings: ${error.code === "MODEL_CATALOG_UNAVAILABLE" ? "Use /th-worker-models with the native Pi catalog" : error.code ? "settings operation failed" : error.message}\n`);
     process.exitCode = 1;
   });
 }

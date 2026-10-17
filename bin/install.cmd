@@ -11,10 +11,17 @@ REM only when a native-engine subcommand was requested explicitly. The manifest
 REM dispatcher accepts supported flags before the subcommand, for example
 REM --runtime codex apply.
 set "FORWARD_ARGS=%*"
+set "SETUP_PENDING="
 
 :inspect_args
 set "CURRENT_ARG=%~1"
 if not defined CURRENT_ARG set "CURRENT_ARG=__no_argument__"
+if /i "%~1"=="setup" goto :setup_action
+if defined SETUP_PENDING if /i "%~1"=="models" goto :download
+if defined SETUP_PENDING if /i "%~1"=="plan" goto :native_notice
+if defined SETUP_PENDING if /i "%~1"=="apply" goto :native_notice
+if defined SETUP_PENDING if /i "%~1"=="update" goto :native_notice
+if defined SETUP_PENDING if /i "%~1"=="uninstall" goto :native_notice
 if /i "%~1"=="plan" goto :download
 if /i "%~1"=="apply" goto :download
 if /i "%~1"=="update" goto :download
@@ -25,16 +32,25 @@ if /i "%~1"=="--opencode-dir" goto :skip_value
 if /i "%~1"=="--codex-dir" goto :skip_value
 if /i "%~1"=="--memory-url" goto :skip_value
 if /i "%~1"=="--opencode-tier" goto :skip_value
+if /i "%~1"=="--worker-models-file" goto :skip_value
+if /i "%~1"=="--opencode-cli" goto :skip_value
 if /i "%~1"=="--force" goto :next_arg
 if /i "%~1"=="--non-interactive" goto :next_arg
 if /i "%~1"=="--yes" goto :next_arg
+if /i "%~1"=="--dry-run" goto :next_arg
 if /i "%CURRENT_ARG:~0,10%"=="--runtime=" goto :next_arg
 if /i "%CURRENT_ARG:~0,8%"=="--scope=" goto :next_arg
 if /i "%CURRENT_ARG:~0,15%"=="--opencode-dir=" goto :next_arg
 if /i "%CURRENT_ARG:~0,12%"=="--codex-dir=" goto :next_arg
 if /i "%CURRENT_ARG:~0,13%"=="--memory-url=" goto :next_arg
 if /i "%CURRENT_ARG:~0,16%"=="--opencode-tier=" goto :next_arg
+if /i "%CURRENT_ARG:~0,21%"=="--worker-models-file=" goto :next_arg
+if /i "%CURRENT_ARG:~0,15%"=="--opencode-cli=" goto :next_arg
 goto :native_notice
+
+:setup_action
+set "SETUP_PENDING=1"
+goto :next_arg
 
 :skip_value
 shift
@@ -50,7 +66,7 @@ echo   /plugin marketplace add valianx/team-harness
 echo   /plugin install th
 echo   /th:setup
 echo.
-echo For opencode or Codex, pass an explicit subcommand (plan, apply, update, or uninstall).
+echo For opencode or Codex, pass plan, apply, update, uninstall, or setup models (OpenCode).
 exit /b 0
 
 :download

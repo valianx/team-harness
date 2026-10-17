@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.51.0] - 2026-10-17
+
+### Added
+
+- Choose native worker models by workload or role in OpenCode and Pi while preserving the chat model and existing Pi conversations.
+
 ## [3.50.0] - 2026-10-17
 
 ### Added

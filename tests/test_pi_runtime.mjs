@@ -665,6 +665,40 @@ test('a fresh native selection is inherited by new workers while an existing con
   assert.equal((await value.followUp(launched.worker_id, { task: 'same conversation' })).worker_id, launched.worker_id);
 });
 
+test('new dispatch snapshots its selected model before asynchronous preparation and follow-ups keep that binding', async t => {
+  let calls = 0;
+  const selected = { model: { provider: 'fixture', id: 'fixture-model' }, thinking: 'high' };
+  const { value, options, directory, references } = await manager(t, 'normal', {
+    selectWorkerModel(role, inherited) {
+      calls++;
+      assert.equal(role, 'reviewer');
+      assert.equal(inherited.thinking, 'high');
+      return selected;
+    },
+  });
+  const log = path.join(directory, 'profile-launch.jsonl');
+  options.env.TH_PI_FIXTURE_LOG = log;
+  const pending = value.dispatch({ role: 'reviewer', task: 'selection before preparation' });
+  pending.catch(() => {});
+  let launched;
+  try {
+    assert.equal(calls, 1, 'selection must be captured before dispatch returns its first pending promise');
+    selected.model.id = 'later-preference';
+    selected.thinking = 'off';
+    options.parent.model.id = 'later-primary';
+  } finally { launched = await pending; }
+  await value.wait(launched.worker_id, { timeout_ms: 1000 });
+  assert.deepEqual(references.at(-1).model, { provider: 'fixture', id: 'fixture-model' });
+  assert.equal(references.at(-1).thinking_level, 'high');
+  options.selectWorkerModel = () => { throw Object.assign(new Error('Selected model is missing'), { code: 'MODEL_SELECTION_MISSING' }); };
+  await value.followUp(launched.worker_id, { task: 'keep original profile binding' });
+  await value.wait(launched.worker_id, { timeout_ms: 1000 });
+  assert.equal(references.at(-1).session_id, launched.session_id);
+  assert.deepEqual(references.at(-1).model, { provider: 'fixture', id: 'fixture-model' });
+  await assert.rejects(value.dispatch({ role: 'reviewer', task: 'refuse new missing selection' }), { code: 'MODEL_SELECTION_MISSING' });
+  assert.equal((await fs.readFile(log, 'utf8')).trim().split('\n').map(JSON.parse).filter(item => item.kind === 'launch').length, 1);
+});
+
 test('missing native usage dimensions stay visible without fabricated zero totals', async t => {
   const { value } = await manager(t, 'partial-usage');
   const launched = await value.dispatch({ role: 'reviewer', task: 'incomplete telemetry' });

@@ -24,6 +24,11 @@ import { execSync } from "node:child_process";
 import * as path from "node:path";
 import * as os from "node:os";
 import * as url from "node:url";
+import {
+  EXCLUDED_ROLES,
+  resolveWorkerSelection,
+  validateWorkerModels,
+} from "../../skills/setup/scripts/worker-models.mjs";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1231,6 +1236,72 @@ function insertModelLine(content, concrete) {
   return content.slice(0, idx) + `\nmodel: ${concrete}` + content.slice(idx);
 }
 
+function workerFrontmatter(content = "") {
+  const text = content.replaceAll("\r\n", "\n");
+  const end = text.startsWith("---\n") ? text.indexOf("\n---", 4) : -1;
+  return { text, end, lines: end < 0 ? [] : text.slice(4, end).split("\n") };
+}
+
+function workerFrontmatterField(content, key) {
+  const { lines } = workerFrontmatter(content);
+  const first = lines.findIndex(line => line.startsWith(`${key}:`));
+  if (first < 0) return "";
+  let last = first + 1;
+  while (last < lines.length && /^[ \t]/.test(lines[last])) last++;
+  return lines.slice(first, last).join("\n");
+}
+
+function replaceWorkerFrontmatterField(content, key, replacement) {
+  const { text, end, lines } = workerFrontmatter(content);
+  if (end < 0) return content;
+  const filtered = [];
+  let index = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith(`${key}:`)) {
+      if (index < 0) index = filtered.length;
+      while (i + 1 < lines.length && /^[ \t]/.test(lines[i + 1])) i++;
+      continue;
+    }
+    filtered.push(lines[i]);
+  }
+  if (replacement) {
+    if (index < 0) index = filtered.length;
+    if (key === "model") {
+      const mode = filtered.findIndex(line => line.startsWith("mode:"));
+      if (mode >= 0) index = mode;
+    }
+    filtered.splice(index, 0, replacement);
+  }
+  return `---\n${filtered.join("\n")}${text.slice(end)}`;
+}
+
+/** Apply only explicit worker preferences; absent preferences retain legacy projection. */
+function transformToOpencodeWorkerModels(filePath, content, repoRoot, preferences, options = {}) {
+  validateWorkerModels(preferences);
+  const result = preferences === undefined && options.legacyProvider
+    ? transformToOpencodeTiered(filePath, content, repoRoot, options.legacyProvider)
+    : transformToOpencode(filePath, content, repoRoot);
+  if (result.surface !== "agent") return result;
+  const role = path.basename(filePath, ".md");
+  result.content = applyModeByRole(result.content, role, content);
+  if (preferences === undefined) return result;
+  const source = parseFrontmatter(content).frontmatter;
+  const existing = parseFrontmatter(options.existingContent ?? "").frontmatter;
+  if (EXCLUDED_ROLES.includes(role) || [source.mode, existing.mode].some(mode => ["primary", "all"].includes(mode))) {
+    for (const key of ["model", "variant", "temperature", "top_p"]) {
+      result.content = replaceWorkerFrontmatterField(result.content, key, workerFrontmatterField(options.existingContent, key));
+    }
+    if (["primary", "all"].includes(existing.mode)) {
+      result.content = replaceWorkerFrontmatterField(result.content, "mode", workerFrontmatterField(options.existingContent, "mode"));
+    }
+    return result;
+  }
+  const { selection } = resolveWorkerSelection(preferences, role);
+  result.content = replaceWorkerFrontmatterField(result.content, "model", selection.mode === "model"
+    ? `model: ${JSON.stringify(`${selection.provider}/${selection.model}`)}` : "");
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // Inverse transform: opencode -> CC
 // ---------------------------------------------------------------------------
@@ -1394,6 +1465,8 @@ async function isAlreadyIdentical(outputPath, newContent) {
  */
 async function runTransform(direction, repoRoot, options = {}) {
   const { dryRun = false } = options;
+  const workerModelsPresent = direction === DIRECTION_TO_OPENCODE && options.workerModels !== undefined;
+  if (workerModelsPresent) validateWorkerModels(options.workerModels);
 
   const sourceFiles =
     direction === DIRECTION_TO_OPENCODE
@@ -1475,6 +1548,24 @@ async function runTransform(direction, repoRoot, options = {}) {
       continue;
     }
 
+    if (workerModelsPresent && transformed.surface === "agent") {
+      let existingContent;
+      try {
+        const handle = await fs.open(realOutputPath, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
+        try {
+          existingContent = await handle.readFile("utf8");
+        } finally {
+          await handle.close();
+        }
+      } catch (err) {
+        if (err.code !== "ENOENT") {
+          batch.push({ source: srcPath, output: realOutputPath, status: "rejected", reason: "Existing primary metadata unavailable" });
+          continue;
+        }
+      }
+      transformed = transformToOpencodeWorkerModels(srcPath, content, repoRoot, options.workerModels, { existingContent });
+    }
+
     batch.push({
       source: srcPath,
       output: realOutputPath,
@@ -1527,6 +1618,7 @@ export {
   rejectPollutionKeys,
   transformToOpencode,
   transformToOpencodeTiered,
+  transformToOpencodeWorkerModels,
   applyModeByRole,
   transformToCC,
   validateOutputPath,

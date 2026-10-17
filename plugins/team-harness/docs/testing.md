@@ -91,6 +91,7 @@ contracts listed below.
 | `test_pi_generation.mjs` | Canonical eligible role catalog, native tool projection, inert references and deterministic generated freshness. |
 | `test_pi_settings.mjs`, `test_pi_shared_routes.py` | Pi settings preservation and atomic validation, shared workspace representations, custom roots and narrowly shared runtime selectors. |
 | `test_pi_runtime.mjs` | Public RPC transport, bounded worker lifecycle, owned sessions, cancellation and usage receipts with deterministic child fixtures. |
+| `test_worker_models.mjs`, `test_pi_worker_models.mjs` | Neutral worker profiles, exact identities, precedence, native catalog/UI and preservation; aggregate and native Pi platform matrix. Go/JS transforms share independently expected `fixtures/worker-models.json`. |
 | `test_pi_native.mjs`, `test_pi_native_workers.mjs` | Isolated Pi 1.3.0 package lifecycle and actual native worker/session/accounting integration with a canned provider, no external model requests. CI provisions `TH_PI_TEST_ROOT` for Linux/Windows and Node 22.19/24; native suites are separate from the hermetic aggregate. |
 | `test_agent_frontmatter.py` | YAML frontmatter parses for every `agents/*.md`, via PyYAML. Catches the silent-agent-drop class: an unquoted `": "` in a description breaks parsing, and Claude Code then drops the agent from the registered `subagent_type` list with no error surfaced |
 | `test_opencode_agent_frontmatter.sh` | The same, for the opencode transform |

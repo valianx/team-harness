@@ -1,6 +1,6 @@
 {
   "name": "@valianx/team-harness-pi",
-  "version": "3.50.0",
+  "version": "3.51.0",
   "private": true,
   "description": "Team Harness workflows and bounded specialists for native Pi sessions.",
   "license": "MIT",

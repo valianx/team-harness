@@ -36,6 +36,8 @@ jobs:
         run: node tests/test_pi_native.mjs
       - run: node tests/test_pi_generation.mjs
       - run: node tests/test_pi_settings.mjs
+      - run: node tests/test_worker_models.mjs
+      - run: node tests/test_pi_worker_models.mjs
       - name: Verify bounded RPC with immediate failure diagnostics
         timeout-minutes: 2
         run: node --test --test-reporter=tap --test-timeout=60000 tests/test_pi_runtime.mjs

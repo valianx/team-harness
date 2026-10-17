@@ -13,6 +13,7 @@ set -eu
 # `--runtime codex apply`; inspect those flags before deciding whether this
 # bootstrap should download anything.
 has_subcommand=false
+setup_pending=false
 expect_value=false
 for arg in "$@"; do
     if [ "$expect_value" = true ]; then
@@ -21,13 +22,22 @@ for arg in "$@"; do
     fi
     case "$arg" in
         plan|apply|update|uninstall)
+            [ "$setup_pending" = false ] || break
             has_subcommand=true
             break
             ;;
-        --runtime|--scope|--opencode-dir|--codex-dir|--memory-url|--opencode-tier)
+        setup)
+            setup_pending=true
+            ;;
+        models)
+            [ "$setup_pending" = true ] || break
+            has_subcommand=true
+            break
+            ;;
+        --runtime|--scope|--opencode-dir|--codex-dir|--memory-url|--opencode-tier|--worker-models-file|--opencode-cli)
             expect_value=true
             ;;
-        --runtime=*|--scope=*|--opencode-dir=*|--codex-dir=*|--memory-url=*|--opencode-tier=*|--force|--non-interactive|--yes)
+        --runtime=*|--scope=*|--opencode-dir=*|--codex-dir=*|--memory-url=*|--opencode-tier=*|--worker-models-file=*|--opencode-cli=*|--force|--non-interactive|--yes|--dry-run)
             ;;
         *)
             break
@@ -41,7 +51,7 @@ if [ "$has_subcommand" != true ]; then
         echo "  /plugin install th"
         echo "  /th:setup"
         echo
-        echo "For opencode or Codex, pass an explicit subcommand (plan, apply, update, or uninstall)."
+        echo "For opencode or Codex, pass plan, apply, update, uninstall, or setup models (OpenCode)."
         exit 0
 fi
 

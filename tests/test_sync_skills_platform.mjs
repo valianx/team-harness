@@ -14,14 +14,23 @@ const targets = [
   join(rootDir, "installer-assets/opencode-skills/setup/scripts/manage_github_identities.py"),
 ];
 const content = "#!/usr/bin/env python3\nprint('fixture')\n";
+const referenceSource = join(rootDir, "skills/setup/references/worker-models.md");
+const referenceTargets = targets.map(target => join(dirname(dirname(target)), "references/worker-models.md"));
+const referenceBytes = "Opaque reference resource fixture.\n";
 const setupResources = [
   { name: "setup_status.py", content: "#!/usr/bin/env python3\nprint('status fixture')\n", mode: 0o755 },
   { name: "setup_requirements.json", content: '{"schema_version":1}\n', mode: 0o644 },
+  { name: "worker-models.mjs", content: await readFile(new URL("../skills/setup/scripts/worker-models.mjs", import.meta.url), "utf8"), mode: 0o644 },
+  { name: "worker-model-profiles.json", content: await readFile(new URL("../skills/setup/scripts/worker-model-profiles.json", import.meta.url), "utf8"), mode: 0o644 },
 ];
 
 try {
   await mkdir(join(rootDir, "skills/setup/scripts"), { recursive: true });
   for (const target of targets) await mkdir(join(target, ".."), { recursive: true });
+  for (const file of [referenceSource, ...referenceTargets]) {
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, referenceBytes, { mode: 0o644 });
+  }
   await writeFile(source, content, { mode: 0o755 });
   await chmod(source, 0o755);
   for (const target of targets) {
@@ -92,8 +101,8 @@ try {
 
   assert.equal(await readFile(source, "utf8"), content);
 
-  // Manual lifecycle overrides must receive both the optional executable and
-  // its data catalog; checking drift must never repair either resource.
+  // Manual lifecycle overrides receive shared modules and data alongside the
+  // optional diagnostic; checking drift must never repair these resources.
   await syncSharedSetupAssets({ check: false, rootDir });
   for (const asset of setupResources) {
     const target = join(dirname(targets[0]), asset.name);
@@ -109,6 +118,19 @@ try {
       }
     }
   }
+
+  for (const directory of targets.map(dirname)) {
+    const contract = await import(pathToFileURL(join(directory, "worker-models.mjs")).href);
+    assert.deepEqual(contract.resolveWorkerSelection(undefined, "architect"), {
+      selection: { mode: "inherit" }, profile: "reasoning", source: "inherit",
+    }, "installed shared consumers load their adjacent neutral category data");
+  }
+
+  await writeFile(referenceTargets[0], "stale reference fixture\n");
+  await assert.rejects(syncSharedSetupAssets({ check: true, rootDir }), /shared setup assets are stale/);
+  assert.equal(await readFile(referenceTargets[0], "utf8"), "stale reference fixture\n");
+  await syncSharedSetupAssets({ check: false, rootDir });
+  for (const file of referenceTargets) assert.equal(await readFile(file, "utf8"), referenceBytes);
 
   // Cross-repository analysis is a shared domain workflow. Its OpenCode
   // projection must follow source changes instead of retaining a manual fork.
@@ -177,6 +199,8 @@ try {
       await readFile(join(fixtureRoot, "skills/setup/scripts", asset.name)),
       "Pi lifecycle projects the canonical diagnostic resources");
   }
+  const piModels = await import(pathToFileURL(join(piRoot, "setup/scripts/worker-models.mjs")).href);
+  assert.equal(piModels.resolveWorkerSelection(undefined, "cleaner").profile, "mechanical");
   assert.ok(opencodeGenerated.includes("cross-repo"), "cross-repo must receive a generated OpenCode projection");
   assert.ok(opencodeGenerated.includes("full-audit") && codexGenerated.includes("full-audit"), "full-audit must be discovered on both runtimes");
   const projectedRouting = join(fixtureRoot, "installer-assets/opencode-skills/full-audit/canonical.md");

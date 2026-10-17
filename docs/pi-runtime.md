@@ -34,7 +34,10 @@ The current Pi session coordinates through `th_worker_dispatch` and
 control supports status, follow-up, bounded wait, collect and cancel. Reference
 documents and the orchestrator are excluded from the worker catalog.
 
-Workers inherit the current native model and thinking selection. Canonical model
+Workers inherit the current native model and thinking selection by default. Use
+`/th-worker-models` for [guided workload/role choices](../skills/setup/references/worker-models.md).
+Changes bind only new conversations; queued/open workers, follow-ups and restored
+sessions keep their selected model/thinking. Canonical model
 aliases remain metadata. An unavailable provider resource is reported rather than
 changing the model or enabling unrelated extensions. Only explicitly selected
 resources load in workers; read-only roles exclude shell and mutation tools.

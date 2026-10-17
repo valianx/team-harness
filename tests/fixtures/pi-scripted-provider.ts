@@ -76,6 +76,10 @@ export default function (pi: ExtensionAPI) {
       id: "synthetic-native-v1", name: "Synthetic fixture; no inference",
       reasoning: true, input: ["text"], contextWindow: 131072, maxTokens: 4096,
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    }, {
+      id: "synthetic-mechanical-v1", name: "Synthetic nonreasoning fixture; no inference",
+      reasoning: false, input: ["text"], contextWindow: 131072, maxTokens: 4096,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     }],
     streamSimple(model: Model<Api>, transcript: TranscriptContext, options?: SimpleStreamOptions) {
       const stream = createAssistantMessageEventStream();
@@ -85,7 +89,8 @@ export default function (pi: ExtensionAPI) {
       };
       queueMicrotask(() => {
         try {
-          if (model.provider !== "th-scripted-fixture" || model.id !== "synthetic-native-v1" || guard!.attempts) {
+          if (model.provider !== "th-scripted-fixture"
+              || !["synthetic-native-v1", "synthetic-mechanical-v1"].includes(model.id) || guard!.attempts) {
             throw new Error("The native fixture selected a real provider or attempted network access");
           }
           if (options?.signal?.aborted) throw new Error("Synthetic request aborted");

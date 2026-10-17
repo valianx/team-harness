@@ -441,17 +441,20 @@ async function syncProjection({ check, rootDir, names, runtime, targetRoot, over
 }
 
 export async function syncSharedSetupAssets({ check, rootDir }) {
-  for (const [name, executable] of [
+  for (const [name, executable, directory = "scripts"] of [
     ["manage_github_identities.py", true],
     ["setup_status.py", true],
     ["setup_requirements.json", false],
+    ["worker-models.mjs", false],
+    ["worker-model-profiles.json", false],
+    ["worker-models.md", false, "references"],
   ]) {
-    await syncSetupAsset({ check, rootDir, name, executable });
+    await syncSetupAsset({ check, rootDir, name, executable, directory });
   }
 }
 
-async function syncSetupAsset({ check, rootDir, name, executable }) {
-  const source = join(rootDir, "skills/setup/scripts", name);
+async function syncSetupAsset({ check, rootDir, name, executable, directory }) {
+  const source = join(rootDir, "skills/setup", directory, name);
   const [bytes, sourceStat] = await Promise.all([readFile(source), lstat(source)]);
   // Git records the owner execute bit; other permission bits depend on umask.
   // Windows does not expose that bit, so content remains its portable check.
@@ -459,8 +462,8 @@ async function syncSetupAsset({ check, rootDir, name, executable }) {
     throw new Error(`shared setup asset source is not executable: ${relative(rootDir, source)}`);
   }
   const targets = [
-    join(rootDir, "plugins/team-harness/skills/setup/scripts", name),
-    join(rootDir, "installer-assets/opencode-skills/setup/scripts", name),
+    join(rootDir, "plugins/team-harness/skills/setup", directory, name),
+    join(rootDir, "installer-assets/opencode-skills/setup", directory, name),
   ];
   let stale = false;
   for (const target of targets) {

@@ -84,6 +84,9 @@ class BootstrapRoutingTests(unittest.TestCase):
             ("--opencode-dir=C:\\fixture space", "update"),
             ("--opencode-dir", "C:\\fixture space", "plan"),
             ("--opencode-tier=anthropic", "apply"),
+            ("--runtime", "opencode", "setup", "models", "--dry-run"),
+            ("--worker-models-file=C:\\fixture space\\draft.json", "--opencode-cli=C:\\native CLI.exe", "setup", "models"),
+            ("--worker-models-file", "C:\\fixture space\\draft.json", "--opencode-cli", "C:\\native CLI.exe", "--dry-run", "setup", "models"),
         ):
             with self.subTest(args=args):
                 result = self.run_bootstrap(*args)
@@ -256,6 +259,14 @@ function Unblock-File { param([string]$Path) }
                      trailing_value],
                     ["--runtime", "codex", "apply", "--codex-dir", path_with_spaces, "", quote_value,
                      trailing_value],
+                    "",
+                ),
+                (
+                    "install.ps1",
+                    ["--runtime", "opencode", "--worker-models-file", path_with_spaces + "draft.json",
+                     "--opencode-cli", path_with_spaces + "native CLI.exe", "setup", "models", "--dry-run"],
+                    ["--runtime", "opencode", "--worker-models-file", path_with_spaces + "draft.json",
+                     "--opencode-cli", path_with_spaces + "native CLI.exe", "setup", "models", "--dry-run"],
                     "",
                 ),
             )

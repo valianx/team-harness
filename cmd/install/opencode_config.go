@@ -333,15 +333,14 @@ func writeOpencodeTeamHarnessConfig(path string, cfg opencodeSetupValues, placer
 	}
 	reportWorkspacePreference(raw)
 
-	// Apply the per-provider cost-tiering selection (#424). cfg.CostTierProvider
-	// already reflects the resolved precedence (flag > persisted > absent) —
-	// write it verbatim; an empty selection clears any prior persisted value
-	// so an explicit opt-out (re-run without --opencode-tier and without a
-	// prior persisted key) stays absent, matching the baseline contract (AC-7).
-	if cfg.CostTierProvider != "" {
-		raw["opencode.cost_tier_provider"] = mustMarshalJSON(cfg.CostTierProvider)
-	} else {
-		delete(raw, "opencode.cost_tier_provider")
+	// New worker profiles own selection while present; retain inactive legacy
+	// preferences so opting into profiles does not silently migrate them.
+	if _, workerProfilesPresent := raw["worker-models"]; !workerProfilesPresent {
+		if cfg.CostTierProvider != "" {
+			raw["opencode.cost_tier_provider"] = mustMarshalJSON(cfg.CostTierProvider)
+		} else {
+			delete(raw, "opencode.cost_tier_provider")
+		}
 	}
 
 	// Set installer-managed keys — always from the installer, never from the
@@ -461,6 +460,9 @@ func persistResolvedTierProvider(path, provider string, placer *opencodePlacer) 
 		if readErr != nil {
 			return readErr
 		}
+	}
+	if _, workerProfilesPresent := raw["worker-models"]; workerProfilesPresent {
+		return nil
 	}
 
 	if provider != "" {

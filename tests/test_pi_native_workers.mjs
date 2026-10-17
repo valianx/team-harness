@@ -27,7 +27,7 @@ function nativeParent(args, options) {
   const child = spawn(node, [rpcEntry, ...args], { ...options, shell: false, stdio: ["pipe", "pipe", "pipe"] });
   const pending = new Map();
   const listeners = new Set();
-  let sequence = 0, buffer = "", diagnostics = "", closed = false, failure;
+  let sequence = 0, buffer = "", diagnostics = "", closed = false, failure, dialogHandler;
   const exit = new Promise(resolve => child.once("close", (code, signal) => {
     closed = true;
     rejectAll(new Error(`Native Pi exited (${code}/${signal}): ${diagnostics}`));
@@ -66,12 +66,36 @@ function nativeParent(args, options) {
         const waiter = pending.get(record.id);
         if (waiter) { pending.delete(record.id); waiter.resolve(record); }
       }
+      if (record.type === "extension_ui_request" && ["select", "confirm"].includes(record.method)) {
+        try {
+          const answer = dialogHandler?.(record);
+          child.stdin.write(JSON.stringify({ type: "extension_ui_response", id: record.id,
+            ...(record.method === "confirm" ? { confirmed: answer === true }
+              : answer === undefined ? { cancelled: true } : { value: answer }) }) + "\n");
+        } catch (error) {
+          rejectAll(error);
+          child.stdin.write(JSON.stringify({ type: "extension_ui_response", id: record.id, cancelled: true }) + "\n");
+        }
+      }
       for (const listener of listeners) {
         if (listener.type === record.type) { listeners.delete(listener); listener.resolve(record); }
       }
     }
   });
   return {
+    dialogs(answers) {
+      const remaining = [...answers], observed = [];
+      dialogHandler = request => {
+        observed.push(request);
+        assert.ok(remaining.length, `Unexpected native dialog: ${request.title}`);
+        const choice = remaining.shift();
+        if (request.method === "confirm" || choice === undefined) return choice;
+        const selected = choice instanceof RegExp ? request.options.find(option => choice.test(option)) : choice;
+        assert.ok(request.options.includes(selected), `Expected native choice ${choice}: ${request.options.join(", ")}`);
+        return selected;
+      };
+      return { observed, done() { assert.equal(remaining.length, 0, "Every planned native choice must have been consumed"); } };
+    },
     async request(type, extra = {}) {
       if (failure) throw failure;
       const id = `parent-${++sequence}`;
@@ -142,6 +166,8 @@ test("native Pi workers preserve role/session identity and attribute synthetic u
         max_stderr_bytes: 65536, max_result_bytes: 16384 },
     },
   };
+  const auth = JSON.stringify({ unrelated: { type: "api_key", key: "synthetic-preserve-canary" } });
+  await writeFile(path.join(agentDir, "auth.json"), auth);
   await writeFile(path.join(agentDir, ".team-harness.json"), JSON.stringify(settings));
   await writeFile(path.join(agentDir, "settings.json"), JSON.stringify({
     compaction: { enabled: false }, retry: { enabled: false },
@@ -183,6 +209,8 @@ test("native Pi workers preserve role/session identity and attribute synthetic u
   }
 
   const initial = await parent.request("get_state");
+  assert.ok((await parent.request("get_commands")).commands.some(command => command.name === "th-worker-models"),
+    "The native extension must expose guided worker model configuration");
   assert.equal(initial.model.provider, "th-scripted-fixture");
   assert.equal(initial.model.id, "synthetic-native-v1");
   assert.equal(initial.thinkingLevel, "high");
@@ -293,6 +321,87 @@ test("native Pi workers preserve role/session identity and attribute synthetic u
     assert.deepEqual((await tool("th_worker_control", { worker_id: worker.worker_id, operation: "collect" })).usage, expectedUsage);
     assert.equal((await tool("th_worker_control", { worker_id: worker.worker_id, operation: "collect" })).usage, undefined);
     assert.deepEqual((await parent.request("get_session_stats")).tokens, { input: 44, output: 28, cacheRead: 20, cacheWrite: 12, total: 104 });
+    assert.equal((await probe()).external_requests, 0);
+  });
+  async function configure(answers) {
+    const dialogs = parent.dialogs(answers);
+    assert.equal((await parent.request("prompt", { message: "/th-worker-models" })).disposition, "handled");
+    dialogs.done();
+    return dialogs.observed;
+  }
+  async function assertPrimaryUnchanged() {
+    const current = await parent.request("get_state");
+    assert.deepEqual(current.model, initial.model);
+    assert.equal(current.thinkingLevel, "high");
+    assert.equal(current.sessionId, initial.sessionId);
+    assert.equal(await readFile(path.join(agentDir, "auth.json"), "utf8"), auth);
+  }
+  await t.test("guided native cancellation at provider, model, role and confirmation leaves preferences and primary state unchanged", async () => {
+    const before = await readFile(path.join(agentDir, ".team-harness.json"), "utf8");
+    const nativeBefore = await readFile(path.join(agentDir, "settings.json"), "utf8");
+    for (const answers of [
+      [/^reasoning:/, undefined],
+      [/^reasoning:/, "Provider: th-scripted-fixture", undefined],
+      ["Role overrides", /^reviewer /, undefined],
+      ["Preview and save", false],
+    ]) {
+      await configure(answers);
+      assert.equal(await readFile(path.join(agentDir, ".team-harness.json"), "utf8"), before);
+      assert.equal(await readFile(path.join(agentDir, "settings.json"), "utf8"), nativeBefore);
+      await assertPrimaryUnchanged();
+    }
+  });
+  let selectedWorker;
+  await t.test("confirmed native profile uses the chosen model and public nonreasoning clamp only for a new worker", async () => {
+    const dialogs = await configure([
+      /^reasoning:/, "Provider: th-scripted-fixture", "Model: synthetic-mechanical-v1",
+      "Role overrides", /^reviewer /, "Use profile: reasoning", "Preview and save", true,
+    ]);
+    const preview = dialogs.find(dialog => dialog.method === "confirm").message;
+    assert.match(preview, /reviewer/);
+    assert.match(preview, /reasoning/);
+    assert.match(preview, /synthetic-mechanical-v1/);
+    assert.match(preview, /metadata/i);
+    const saved = JSON.parse(await readFile(path.join(agentDir, ".team-harness.json"), "utf8"));
+    assert.deepEqual(saved["worker-models"].profiles.reasoning,
+      { mode: "model", provider: "th-scripted-fixture", model: "synthetic-mechanical-v1" });
+    assert.deepEqual(saved["worker-models"].role_overrides, { reviewer: { profile: "reasoning" } });
+    assert.deepEqual(saved["pi-workers"], settings["pi-workers"]);
+    selectedWorker = (await tool("th_worker_dispatch", { role: "reviewer", task: "explicit nonreasoning worker" })).details;
+    const finished = (await tool("th_worker_control", { worker_id: selectedWorker.worker_id, operation: "wait", timeout_ms: 15000 })).details;
+    assert.equal(finished.operation.status, "completed");
+    const output = JSON.parse(finished.operation.text);
+    assert.deepEqual(output.model, { provider: "th-scripted-fixture", id: "synthetic-mechanical-v1" });
+    assert.equal(output.thinking_level, "off");
+    const reference = (await parent.request("get_entries")).entries.findLast(entry => entry.type === "custom"
+      && entry.customType === "th-pi-worker" && entry.data.worker_id === selectedWorker.worker_id).data;
+    assert.deepEqual(reference.model, output.model);
+    assert.equal(reference.thinking_level, "off");
+    assert.deepEqual((await tool("th_worker_control", { worker_id: selectedWorker.worker_id, operation: "collect" })).usage, expectedUsage);
+    await assertPrimaryUnchanged();
+  });
+  await t.test("saving another native profile affects future dispatches while reload and follow-up retain the original session selection", async () => {
+    await configure([/^reasoning:/, "Inherit primary model", "Preview and save", true]);
+    assert.equal((await parent.request("prompt", { message: "/th-scripted-fixture-reload" })).disposition, "handled");
+    const repeated = await tool("th_worker_control", { worker_id: selectedWorker.worker_id, operation: "collect" });
+    assert.equal(repeated.usage, undefined);
+    assert.equal(repeated.details.session_id, selectedWorker.session_id);
+    await tool("th_worker_control", { worker_id: selectedWorker.worker_id, operation: "follow_up", task: "retain explicit worker selection" });
+    const followUp = (await tool("th_worker_control", { worker_id: selectedWorker.worker_id, operation: "wait", timeout_ms: 15000 })).details;
+    assert.equal(followUp.operation.status, "completed");
+    assert.equal(followUp.session_id, selectedWorker.session_id);
+    assert.equal(followUp.session_file, selectedWorker.session_file);
+    const oldOutput = JSON.parse(followUp.operation.text);
+    assert.deepEqual(oldOutput.model, { provider: "th-scripted-fixture", id: "synthetic-mechanical-v1" });
+    assert.equal(oldOutput.thinking_level, "off");
+    assert.deepEqual((await tool("th_worker_control", { worker_id: selectedWorker.worker_id, operation: "collect" })).usage, expectedUsage);
+    assert.equal((await tool("th_worker_control", { worker_id: selectedWorker.worker_id, operation: "collect" })).usage, undefined);
+    const later = (await tool("th_worker_dispatch", { role: "reviewer", task: "new inherited worker" })).details;
+    const finished = (await tool("th_worker_control", { worker_id: later.worker_id, operation: "wait", timeout_ms: 15000 })).details;
+    assert.equal(finished.operation.status, "completed");
+    assert.deepEqual(JSON.parse(finished.operation.text).model, { provider: "th-scripted-fixture", id: "synthetic-native-v1" });
+    assert.equal(JSON.parse(finished.operation.text).thinking_level, "high");
+    await assertPrimaryUnchanged();
     assert.equal((await probe()).external_requests, 0);
   });
   t.diagnostic("Synthetic native Pi provider only; external requests/model inference: 0. Node launcher, not a compiled-binary activation claim.");

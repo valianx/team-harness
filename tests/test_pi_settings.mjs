@@ -183,6 +183,57 @@ test("invalid settings never partially write or expose rejected values", async (
   });
 });
 
+test("worker-model assignments require native catalog evidence and preserve healthy settings on refusal", async () => {
+  const { setSettings, readSettings } = await import(moduleUrl);
+  await temporary(async root => {
+    const path = join(root, ".team-harness.json");
+    const profiles = { schema_version: 1, profiles: { reasoning: { mode: "model", provider: "fixture", model: "selected" },
+      general: { mode: "inherit" }, mechanical: { mode: "inherit" } }, role_overrides: {} };
+    const original = { "workspace-mode": "local", "worker-models": profiles,
+      opaque: { keep: [false, null] }, credentials: { token: "CANARY_PRESERVE" } };
+    const before = JSON.stringify(original);
+    await writeFile(path, before);
+    const assignments = ['language="es"', `worker-models=${JSON.stringify(profiles)}`];
+    await assert.rejects(setSettings(root, { assignments }), error => error.code === "MODEL_CATALOG_UNAVAILABLE");
+    await assert.rejects(setSettings(root, { assignments, workerModelCatalog: [] }), error => {
+      assert.equal(error.code, "MODEL_SELECTION_MISSING");
+      assert.deepEqual(error.selection, { provider: "fixture", model: "selected" });
+      return true;
+    });
+    const invalid = { ...profiles, role_overrides: { orchestrator: { mode: "inherit" } } };
+    await assert.rejects(setSettings(root, { assignments: [`worker-models=${JSON.stringify(invalid)}`],
+      workerModelCatalog: [{ provider: "fixture", id: "selected" }] }));
+    assert.equal(await readFile(path, "utf8"), before);
+    assert.deepEqual(await readdir(root), [".team-harness.json"]);
+    await assert.rejects(cli(root, "set", "--set", `worker-models=${JSON.stringify(profiles)}`), error => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /th-worker-models/);
+      assert.equal(error.stderr.includes("CANARY"), false);
+      return true;
+    });
+    assert.equal(await readFile(path, "utf8"), before);
+    await setSettings(root, { assignments, workerModelCatalog: [{ provider: "fixture", id: "selected" }], workerRoles: ["reviewer"] });
+    const saved = await readSettings(root);
+    assert.deepEqual(saved["worker-models"], profiles);
+    assert.deepEqual(saved.opaque, original.opaque);
+    assert.deepEqual(saved.credentials, original.credentials);
+    assert.equal(saved.language, "es");
+    assert.equal(await readFile(`${path}.bak`, "utf8"), before);
+    if (process.platform !== "win32") assert.equal((await lstat(path)).mode & 0o777, 0o600);
+  });
+});
+
+test("worker native IDs follow the shared identity contract without treating a catalog model ID as a credential", async () => {
+  const { setSettings, readSettings } = await import(moduleUrl);
+  await temporary(async root => {
+    const model = "sk-native-model-identity-1234567890";
+    const profiles = { schema_version: 1, profiles: { reasoning: { mode: "model", provider: "fixture", model },
+      general: { mode: "inherit" }, mechanical: { mode: "inherit" } } };
+    await setSettings(root, { assignments: [`worker-models=${JSON.stringify(profiles)}`], workerModelCatalog: [{ provider: "fixture", id: model }] });
+    assert.equal((await readSettings(root))["worker-models"].profiles.reasoning.model, model);
+  });
+});
+
 test("CLI repeated assignments and removals publish one complete remote change", async () => {
   const { readSettings } = await import(moduleUrl);
   await temporary(async root => {
@@ -223,7 +274,9 @@ test("a failed atomic rename preserves old settings and cleans the unpublished t
       syncBuiltinESMExports();
       const { setSettings } = await import(pathToFileURL(process.argv[2]));
       try {
-        await setSettings(process.argv[3], { assignments: ['language="es"'] });
+        await setSettings(process.argv[3], { assignments: ['worker-models=' + JSON.stringify({ schema_version: 1,
+          profiles: { reasoning: { mode: "model", provider: "fixture", model: "selected" }, general: { mode: "inherit" }, mechanical: { mode: "inherit" } } })],
+          workerModelCatalog: [{ provider: "fixture", id: "selected" }] });
         process.stdout.write("unexpected success");
         process.exitCode = 1;
       } catch (error) {

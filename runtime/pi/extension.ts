@@ -1,9 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Type } from "@earendil-works/pi-ai";
+import { Type, clampThinkingLevel } from "@earendil-works/pi-ai";
 import { defineTool, getAgentDir, getPackageDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { readSettings } from "./settings.mjs";
+import { readSettings, setSettings } from "./settings.mjs";
+import { getPiModelCatalog, guidePiWorkerModels, resolvePiWorkerSelection } from "./worker-models.mjs";
 import { WorkerManager, validateWorkerProfile, workerConfiguration, workerFailureCode } from "./worker.mjs";
 import { inspectPiWorkspace } from "./context.mjs";
 
@@ -61,12 +62,14 @@ export default function extension(pi: ExtensionAPI) {
   let manager: WorkerManager | undefined;
   let initializing: Promise<WorkerManager> | undefined;
   let owner: string | undefined;
-  let settings: object = {};
+  let settings: Record<string, unknown> = {};
+  let modelRegistry: ExtensionContext["modelRegistry"];
   let generation = 0;
 
   const ensure = async (ctx: ExtensionContext) => {
     const current = ctx.sessionManager.getSessionId();
     if (owner && owner !== current) throw new Error("The previous native worker context is stale");
+    modelRegistry = ctx.modelRegistry;
     if (manager) {
       manager.updateParentSelection(ctx.model, ctx.thinkingLevel ?? "off");
       return manager;
@@ -82,6 +85,9 @@ export default function extension(pi: ExtensionAPI) {
         const value = new WorkerManager({
           ...configuration, packageRoot, agentDir, catalog,
           parent: { session_id: current, cwd: ctx.cwd, model: ctx.model, thinking_level: ctx.thinkingLevel ?? "off" },
+          selectWorkerModel: (role, inherited) => resolvePiWorkerSelection(settings["worker-models"], role, {
+            roles: catalog.agents.map(agent => agent.name), registry: modelRegistry, inherited, clampThinkingLevel,
+          }),
           parentEntries: () => ctx.sessionManager.getEntries(),
           onReference: reference => {
             if (generation !== selectedGeneration || owner !== current) throw new Error("Native worker context is stale");
@@ -110,14 +116,40 @@ export default function extension(pi: ExtensionAPI) {
   };
   const refused = (operation: string, error?: unknown) => ({
     isError: true, content: [{ type: "text" as const, text: "Native Pi worker operation is unavailable or invalid." }],
-    details: { status: "unavailable", operation, reason_code: workerFailureCode(error) },
+    details: { status: "unavailable", operation, reason_code: workerFailureCode(error),
+      ...(error && typeof error === "object" && "code" in error && error.code === "MODEL_SELECTION_MISSING"
+        && "selection" in error ? { selected_model: error.selection } : {}) },
+  });
+  pi.registerCommand("th-worker-models", {
+    description: "Choose native models for new TH worker conversations without changing the chat model.",
+    handler: async (_args, ctx) => {
+      try {
+        const agentDir = getAgentDir();
+        const current = await readSettings(agentDir);
+        const catalog = JSON.parse(await fs.readFile(path.join(packageRoot, "runtime/pi/agents.json"), "utf8"));
+        const roles = catalog.agents.map(agent => agent.name);
+        const selected = await guidePiWorkerModels(ctx, current["worker-models"], roles);
+        if (!selected) return;
+        await setSettings(agentDir, { assignments: [`worker-models=${JSON.stringify(selected)}`],
+          workerModelCatalog: getPiModelCatalog(ctx.modelRegistry), workerRoles: roles });
+        settings = await readSettings(agentDir);
+        ctx.ui.notify("TH worker models saved for future conversations. Catalog presence does not verify execution.", "info");
+      } catch (error) {
+        const gap = error?.code === "MODEL_SELECTION_MISSING" ? ` (${error.selection.provider}/${error.selection.model})` : "";
+        ctx.ui.notify(`TH worker model configuration unavailable${gap}. Check the native catalog and retry /th-worker-models.`, "error");
+      }
+    },
   });
   pi.registerTool(defineTool({
     name: "th_worker_dispatch", label: "TH worker dispatch",
-    description: "Delegate a bounded task to an eligible TH specialist using the active native model and conversation ownership.",
+    description: "Delegate a bounded task to an eligible TH specialist using its configured or inherited model and native conversation ownership.",
     parameters: Type.Object({ role: Type.String(), task: Type.String(), cwd: Type.Optional(Type.String()) }, { additionalProperties: false }),
     async execute(_id, params, _signal, _update, ctx) {
-      try { return result(await (await ensure(ctx)).dispatch(params), ctx); } catch (error) { return refused("dispatch", error); }
+      try {
+        const value = await ensure(ctx);
+        settings = await readSettings(getAgentDir());
+        return result(await value.dispatch(params), ctx);
+      } catch (error) { return refused("dispatch", error); }
     },
   }));
   pi.registerTool(defineTool({

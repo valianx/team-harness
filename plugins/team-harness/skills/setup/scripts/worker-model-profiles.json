@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "profiles": ["reasoning", "general", "mechanical"],
+  "default_profile": "general",
+  "excluded_roles": ["main", "primary", "coordinator", "orchestrator"],
+  "identity_limits": {
+    "provider_bytes": 128,
+    "model_bytes": 256,
+    "role_bytes": 128
+  },
+  "role_profiles": {
+    "adversary": "reasoning",
+    "agent-builder": "reasoning",
+    "architect": "reasoning",
+    "cleaner": "mechanical",
+    "code-researcher": "general",
+    "d2-diagrammer": "general",
+    "delivery": "mechanical",
+    "diagrammer": "general",
+    "documenter": "general",
+    "gcp-cost-analyzer": "reasoning",
+    "gcp-infra": "reasoning",
+    "implementer": "general",
+    "init-project": "general",
+    "inline-reviewer": "reasoning",
+    "likec4-diagrammer": "general",
+    "mentor": "general",
+    "plan-reviewer": "reasoning",
+    "pr-review-qa": "reasoning",
+    "pr-review-security": "reasoning",
+    "pr-review-verifier": "reasoning",
+    "qa": "reasoning",
+    "research-consolidator": "general",
+    "researcher": "general",
+    "reviewer": "reasoning",
+    "reviewer-consolidator": "general",
+    "security": "reasoning",
+    "tester": "general",
+    "translator": "general",
+    "ux-reviewer": "reasoning"
+  }
+}
