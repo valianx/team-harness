@@ -257,6 +257,83 @@ class PageWorkspaceTests(unittest.TestCase):
             with self.assertRaises(MODULE.ContextError):
                 self.verify(root, receipt)
 
+    def test_competing_complete_capture_after_preflight_wins_without_replacement(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
+            before = {file.name: file.read_bytes() for file in root.iterdir()}
+            winner = page_workspace_snapshot()
+            block = winner["native_read"]["content"]["blocks"][0]
+            block["markdown"] = "# Winning capture\n"
+            block["hash"] = hashlib.sha256(block["markdown"].encode()).hexdigest()
+            real_promote = MODULE.promote_artifact
+            published = {}
+
+            def publish_winner_before_outer_promotion(root, temporary, final, **kwargs):
+                if not published:
+                    with patch.object(MODULE, "promote_artifact", real_promote):
+                        receipt = self.capture(root, winner)
+                    leaves = [receipt["manifest"], *receipt["workspace_files"]]
+                    published.update(receipt=receipt, files={Path(name).name: Path(name).read_bytes() for name in leaves})
+                return real_promote(root, temporary, final, **kwargs)
+
+            with patch.object(MODULE, "promote_artifact", side_effect=publish_winner_before_outer_promotion), self.assertRaises(MODULE.ContextError):
+                self.capture(root)
+            self.assertEqual({file.name: file.read_bytes() for file in root.iterdir()}, {**before, **published["files"]})
+            manifest = self.verify(root, published["receipt"])
+            self.assertEqual(len(manifest["files"]), 2)
+            self.assertEqual(MODULE.safe_read_leaf(root, manifest["files"][0]["captured_leaf"]), b"# Winning capture\n")
+
+    def test_capture_refuses_foreign_regular_leaves_created_at_atomic_publication(self):
+        for final in ["pr-review-workspace-page-001.md", "pr-review-workspace-page-002.md", "pr-review-workspace.json"]:
+            with self.subTest(leaf=final), tempfile.TemporaryDirectory() as directory:
+                root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
+                before = {file.name: file.read_bytes() for file in root.iterdir()}
+                foreign = b"foreign bytes must survive capture publication\n"
+                real_link = MODULE.artifact_fs.link
+                real_replace = MODULE.artifact_fs.replace
+                injections = []
+
+                def publish_with_competitor(operation, source, destination, **kwargs):
+                    if destination == final and not injections:
+                        injections.append((source, destination, kwargs.get("src_dir_fd"), kwargs.get("dst_dir_fd")))
+                        with patch.object(MODULE.artifact_fs, "link", real_link), patch.object(MODULE.artifact_fs, "replace", real_replace):
+                            MODULE.write_artifact_leaf(root, final, foreign)
+                    return operation(source, destination, **kwargs)
+
+                def link_with_competitor(source, destination, **kwargs):
+                    return publish_with_competitor(real_link, source, destination, **kwargs)
+
+                def replace_with_competitor(source, destination, **kwargs):
+                    return publish_with_competitor(real_replace, source, destination, **kwargs)
+
+                with patch.object(MODULE.artifact_fs, "link", side_effect=link_with_competitor), \
+                        patch.object(MODULE.artifact_fs, "replace", side_effect=replace_with_competitor), \
+                        self.assertRaises(MODULE.ContextError) as caught:
+                    self.capture(root)
+                self.assertEqual(len(injections), 1)
+                self.assertTrue(injections[0][0].startswith("tmp-pinned-"))
+                self.assertEqual(injections[0][1], final)
+                self.assertIsNotNone(injections[0][2])
+                self.assertEqual(injections[0][2], injections[0][3])
+                self.assertEqual(caught.exception.__cause__.errno, errno.EEXIST)
+                self.assertEqual({file.name: file.read_bytes() for file in root.iterdir()}, {**before, final: foreign})
+                with self.assertRaisesRegex(MODULE.ContextError, "already exists"):
+                    self.capture(root)
+                self.assertEqual((root / final).read_bytes(), foreign)
+                MODULE._discard_artifact_leaf(root, final)
+                receipt = self.capture(root)
+                self.assertEqual(len(self.verify(root, receipt)["files"]), 2)
+
+    def test_capture_store_keeps_generic_artifact_replacement_compatible(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
+            MODULE.write_artifact_leaf(root, "review.md", b"old review\n")
+            MODULE.write_artifact_leaf(root, "tmp-new-review", b"new review\n")
+            MODULE.promote_artifact(root, "tmp-new-review", "review.md")
+            self.assertEqual(MODULE.safe_read_leaf(root, "review.md"), b"new review\n")
+            self.assertFalse((root / "tmp-new-review").exists())
+            self.assertFalse(any(file.name.startswith("tmp-pinned-") for file in root.iterdir()))
+
     def test_replaced_manifest_and_wrong_code_identity_cannot_validate_as_reusable(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(MODULE.create_review_run(Path(directory), 34)["artifact_root"])
@@ -386,8 +463,8 @@ class PageWorkspaceTests(unittest.TestCase):
                 failure = OSError(errno.ENOSPC, "injected after actual publication")
                 real_promote = MODULE.promote_artifact
 
-                def publish_then_fail(root, temporary, final):
-                    real_promote(root, temporary, final)
+                def publish_then_fail(root, temporary, final, **kwargs):
+                    real_promote(root, temporary, final, **kwargs)
                     if final == failed_leaf:
                         raise failure
 
@@ -430,8 +507,8 @@ class PageWorkspaceTests(unittest.TestCase):
                 failure = OSError(errno.ENOSPC, "injected publication failure")
                 real_promote = MODULE.promote_artifact
 
-                def replace_owned_output_then_fail(root, temporary, final):
-                    real_promote(root, temporary, final)
+                def replace_owned_output_then_fail(root, temporary, final, **kwargs):
+                    real_promote(root, temporary, final, **kwargs)
                     if final == "pr-review-workspace-page-002.md":
                         target = root / "pr-review-workspace-page-001.md"
                         target.unlink()
@@ -460,8 +537,8 @@ class PageWorkspaceTests(unittest.TestCase):
             failure = OSError(errno.ENOSPC, "injected after publication")
             real_promote = MODULE.promote_artifact
 
-            def publish_then_fail(root, temporary, final):
-                real_promote(root, temporary, final)
+            def publish_then_fail(root, temporary, final, **kwargs):
+                real_promote(root, temporary, final, **kwargs)
                 if final == "pr-review-workspace-page-002.md":
                     raise failure
 
@@ -486,8 +563,8 @@ class PageWorkspaceTests(unittest.TestCase):
             failure = OSError(errno.ENOSPC, "injected publication failure")
             real_promote = MODULE.promote_artifact
 
-            def alias_owned_output_then_fail(root, temporary, final):
-                real_promote(root, temporary, final)
+            def alias_owned_output_then_fail(root, temporary, final, **kwargs):
+                real_promote(root, temporary, final, **kwargs)
                 if final == "pr-review-workspace-page-002.md":
                     os.link(target, external_alias)
                     raise failure
@@ -511,8 +588,8 @@ class PageWorkspaceTests(unittest.TestCase):
             failure = LegacyContextError("injected primary failure")
             real_promote = MODULE.promote_artifact
 
-            def publish_then_fail(root, temporary, final):
-                real_promote(root, temporary, final)
+            def publish_then_fail(root, temporary, final, **kwargs):
+                real_promote(root, temporary, final, **kwargs)
                 if final == "pr-review-workspace-page-002.md":
                     raise failure
 
@@ -567,8 +644,8 @@ class PageWorkspaceTests(unittest.TestCase):
                     finally:
                         real_close(directory_fd)
 
-            def publish_then_fail(root, temporary, final):
-                real_promote(root, temporary, final)
+            def publish_then_fail(root, temporary, final, **kwargs):
+                real_promote(root, temporary, final, **kwargs)
                 if final == "pr-review-workspace-page-002.md":
                     raise failure
 
@@ -679,8 +756,8 @@ class PageWorkspaceTests(unittest.TestCase):
                     return
                 real_close(descriptor)
 
-            def publish_then_fail(root, temporary, final):
-                real_promote(root, temporary, final)
+            def publish_then_fail(root, temporary, final, **kwargs):
+                real_promote(root, temporary, final, **kwargs)
                 if final == "pr-review-workspace-page-002.md":
                     raise failure
 

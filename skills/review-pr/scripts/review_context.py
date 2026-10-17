@@ -144,7 +144,7 @@ def safe_read_leaf(root: Path, name: str, *, limit: int = 2_000_000, require_una
         os.close(directory_fd)
 
 
-def promote_artifact(root: Path, temporary_name: str, final_name: str) -> None:
+def promote_artifact(root: Path, temporary_name: str, final_name: str, *, exclusive: bool = False) -> None:
     temporary_name = _safe_leaf(temporary_name)
     final_name = _safe_leaf(final_name)
     _, directory_fd = _open_directory(root)
@@ -189,12 +189,21 @@ def promote_artifact(root: Path, temporary_name: str, final_name: str) -> None:
             if (staged.st_dev, staged.st_ino) != (pinned.st_dev, pinned.st_ino):
                 artifact_fs.unlink(staging, dir_fd=directory_fd)
                 raise ContextError("pinned staging artifact identity mismatch")
-            artifact_fs.replace(
-                staging,
-                final_name,
-                src_dir_fd=directory_fd,
-                dst_dir_fd=directory_fd,
-            )
+            if exclusive:
+                artifact_fs.link(
+                    staging,
+                    final_name,
+                    src_dir_fd=directory_fd,
+                    dst_dir_fd=directory_fd,
+                    follow_symlinks=False,
+                )
+            else:
+                artifact_fs.replace(
+                    staging,
+                    final_name,
+                    src_dir_fd=directory_fd,
+                    dst_dir_fd=directory_fd,
+                )
             promoted = _regular_stat_at(directory_fd, final_name)
             if (promoted.st_dev, promoted.st_ino) != (pinned.st_dev, pinned.st_ino):
                 raise ContextError("promoted artifact identity mismatch")
@@ -2335,7 +2344,7 @@ def capture_page_workspace(artifact_root: Path, snapshot: dict[str, Any], *, rev
         for temporary, final_name, pinned in staged:
             metadata = os.fstat(pinned)
             attempted.append((final_name, (metadata.st_dev, metadata.st_ino)))
-            promote_artifact(root, temporary.name, final_name)
+            promote_artifact(root, temporary.name, final_name, exclusive=True)
     except Exception as error:
         capture_error = error
         cleanup_errors = []
