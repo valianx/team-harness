@@ -579,6 +579,17 @@ fi
 
 echo
 echo "############################################################"
+echo "# Read-only setup inventory and capability requirements"
+echo "############################################################"
+if [ -n "$PY" ] && $PY "$TESTS_DIR/test_setup_status.py"; then
+    echo "setup-status: PASS"
+else
+    echo "setup-status: FAIL (see diagnostic test output; Python required)"
+    FAILED=$((FAILED + 1))
+fi
+
+echo
+echo "############################################################"
 echo "# Maintained plan-review A/B tooling (hermetic, no model calls)"
 echo "############################################################"
 if [ -n "$PY" ]; then

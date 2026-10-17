@@ -129,6 +129,7 @@ behavior remains covered by its executable suites.
 | `test_update_opencode_sh.sh` | Cheap confirmation pre-check and literal forwarding of scope, directory, provider and empty-tier requests |
 | `test_bin_tty_execbit.py`, `test_bin_tty_behavioral.sh` | `bin/` TTY openability and exec bit (#473) |
 | `test_github_identity_routes.py` | Cross-runtime GitHub route validation, longest-prefix resolution, isolated/account-switch strategies, config preservation, secret rejection, and generated-helper byte/mode identity |
+| `test_setup_status.py` | Read-only setup inventory, isolated roots, conservative package/activation evidence, bounded private probes, interpreter alternatives and optional capability requirements; Linux aggregate and native Windows CI. |
 | `test_plan_review_benchmark.py`, `test_plan_review_analysis.py` | Maintained plan-review A/B preparation, bounded execution adapters, resume, provenance, native usage and study-bound adjudication with hermetic Git/process/event fixtures; no model calls. |
 | `tools/harness-migrate/test_harness_migrate.mjs`, `test_transform_conformance.mjs` | The bidirectional transform and its cross-language conformance |
 

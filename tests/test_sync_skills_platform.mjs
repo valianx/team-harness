@@ -14,6 +14,10 @@ const targets = [
   join(rootDir, "installer-assets/opencode-skills/setup/scripts/manage_github_identities.py"),
 ];
 const content = "#!/usr/bin/env python3\nprint('fixture')\n";
+const setupResources = [
+  { name: "setup_status.py", content: "#!/usr/bin/env python3\nprint('status fixture')\n", mode: 0o755 },
+  { name: "setup_requirements.json", content: '{"schema_version":1}\n', mode: 0o644 },
+];
 
 try {
   await mkdir(join(rootDir, "skills/setup/scripts"), { recursive: true });
@@ -24,6 +28,13 @@ try {
     await writeFile(target, content, { mode: 0o755 });
     // Fixture modes must not inherit a developer's restrictive umask.
     await chmod(target, 0o755);
+  }
+  for (const asset of setupResources) {
+    for (const directory of [dirname(source), ...targets.map(dirname)]) {
+      const file = join(directory, asset.name);
+      await writeFile(file, asset.content, { mode: asset.mode });
+      await chmod(file, asset.mode);
+    }
   }
 
   // Native Windows does not expose the Git executable bit through lstat().mode.
@@ -80,6 +91,24 @@ try {
   }
 
   assert.equal(await readFile(source, "utf8"), content);
+
+  // Manual lifecycle overrides must receive both the optional executable and
+  // its data catalog; checking drift must never repair either resource.
+  await syncSharedSetupAssets({ check: false, rootDir });
+  for (const asset of setupResources) {
+    const target = join(dirname(targets[0]), asset.name);
+    await writeFile(target, "stale diagnostic resource\n");
+    await assert.rejects(syncSharedSetupAssets({ check: true, rootDir }), /shared setup assets are stale/);
+    assert.equal(await readFile(target, "utf8"), "stale diagnostic resource\n");
+    await syncSharedSetupAssets({ check: false, rootDir });
+    for (const directory of targets.map(dirname)) {
+      const projected = join(directory, asset.name);
+      assert.equal(await readFile(projected, "utf8"), asset.content);
+      if (process.platform !== "win32") {
+        assert.equal((await lstat(projected)).mode & 0o100, asset.mode & 0o100);
+      }
+    }
+  }
 
   // Cross-repository analysis is a shared domain workflow. Its OpenCode
   // projection must follow source changes instead of retaining a manual fork.
@@ -143,6 +172,11 @@ try {
   assert.equal(typeof packagedSettings.readSettings, "function", "the lifecycle settings helper resolves its packaged dependencies");
   assert.ok((await lstat(join(piRoot, "setup/scripts/manage_github_identities.py"))).isFile(),
     "the lifecycle identity helper is present under the declared Pi skill path");
+  for (const asset of setupResources) {
+    assert.deepEqual(await readFile(join(piRoot, "setup/scripts", asset.name)),
+      await readFile(join(fixtureRoot, "skills/setup/scripts", asset.name)),
+      "Pi lifecycle projects the canonical diagnostic resources");
+  }
   assert.ok(opencodeGenerated.includes("cross-repo"), "cross-repo must receive a generated OpenCode projection");
   assert.ok(opencodeGenerated.includes("full-audit") && codexGenerated.includes("full-audit"), "full-audit must be discovered on both runtimes");
   const projectedRouting = join(fixtureRoot, "installer-assets/opencode-skills/full-audit/canonical.md");

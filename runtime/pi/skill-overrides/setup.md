@@ -4,6 +4,21 @@ Run in the current Pi session. Keep the primary session as coordinator and use
 Pi's package, extension, skill and authentication ownership. Preserve unrelated
 packages, settings, credentials and the active model/thinking selection.
 
+## Read-only status and setup choices
+
+Handle `status` and `status --all` before package maintenance or settings writes; report and return.
+Bind the actual native agent directory, selected TH package root and global/project scope through Pi discovery below.
+Verify Python 3.8+ with bounded literal argv: `python3`, then `python`; Windows uses `py` with `-3`, `python`, `python3`.
+Invoke its verified executable/prefix with this skill's absolute `scripts/setup_status.py` path and
+`--runtime pi --root ABS_AGENT_DIR --package-root ABS_PACKAGE_ROOT --scope SCOPE`.
+Only explicit `--all` inventories other hosts; detection does not authorize configuring them.
+Use `scripts/setup_requirements.json` for prerequisites; Pi's minimum native package does not require Python or Go.
+Without an interpreter, inspect native evidence and report a partial diagnostic/recovery, not failed Pi installation.
+Keep CLI, package, configuration and activation separate; standalone inspection leaves activation unknown.
+Never print raw settings/command output. Offer minimal setup or reuse first, preserving workspace/language defaults.
+Skip unselected optional integrations and their surveys; prepare only capabilities the operator chose.
+Preserve model/thinking and unavailable Space bindings; offer alternatives only for explicitly selected new work.
+
 Bind the loaded TH package's absolute root, selected Git/local source and install
 scope from native package discovery and its `package.json` manifest. The package
 root differs from the agent directory. Resolve the latter through Pi's native

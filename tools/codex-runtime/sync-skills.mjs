@@ -441,16 +441,26 @@ async function syncProjection({ check, rootDir, names, runtime, targetRoot, over
 }
 
 export async function syncSharedSetupAssets({ check, rootDir }) {
-  const source = join(rootDir, "skills/setup/scripts/manage_github_identities.py");
+  for (const [name, executable] of [
+    ["manage_github_identities.py", true],
+    ["setup_status.py", true],
+    ["setup_requirements.json", false],
+  ]) {
+    await syncSetupAsset({ check, rootDir, name, executable });
+  }
+}
+
+async function syncSetupAsset({ check, rootDir, name, executable }) {
+  const source = join(rootDir, "skills/setup/scripts", name);
   const [bytes, sourceStat] = await Promise.all([readFile(source), lstat(source)]);
   // Git records the owner execute bit; other permission bits depend on umask.
   // Windows does not expose that bit, so content remains its portable check.
-  if (process.platform !== "win32" && (sourceStat.mode & 0o100) === 0) {
+  if (executable && process.platform !== "win32" && (sourceStat.mode & 0o100) === 0) {
     throw new Error(`shared setup asset source is not executable: ${relative(rootDir, source)}`);
   }
   const targets = [
-    join(rootDir, "plugins/team-harness/skills/setup/scripts/manage_github_identities.py"),
-    join(rootDir, "installer-assets/opencode-skills/setup/scripts/manage_github_identities.py"),
+    join(rootDir, "plugins/team-harness/skills/setup/scripts", name),
+    join(rootDir, "installer-assets/opencode-skills/setup/scripts", name),
   ];
   let stale = false;
   for (const target of targets) {
@@ -467,7 +477,7 @@ export async function syncSharedSetupAssets({ check, rootDir }) {
       if (error?.code !== "ENOENT") throw error;
     }
     const bytesMatch = current?.equals(bytes) ?? false;
-    const modeMatches = process.platform === "win32" || (currentMode & 0o100) !== 0;
+    const modeMatches = process.platform === "win32" || ((currentMode & 0o100) !== 0) === executable;
     if (bytesMatch && modeMatches) continue;
     stale = true;
     if (check) {
@@ -478,8 +488,9 @@ export async function syncSharedSetupAssets({ check, rootDir }) {
       continue;
     }
     await mkdir(dirname(target), { recursive: true });
-    if (!bytesMatch) await writeFile(target, bytes, { mode: 0o755 });
-    await chmod(target, 0o755);
+    const mode = executable ? 0o755 : 0o644;
+    if (!bytesMatch) await writeFile(target, bytes, { mode });
+    await chmod(target, mode);
   }
   if (check && stale) throw new Error("shared setup assets are stale");
 }
