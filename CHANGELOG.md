@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.52.0] - 2026-10-20
+
+### Added
+
+- Build a simple functional test dashboard in consumer projects with API, frontend and mixed batch guides.
+
 ## [3.51.1] - 2026-10-17
 
 ### Fixed

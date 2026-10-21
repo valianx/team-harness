@@ -300,3 +300,4 @@ superseded unless a bullet explicitly records the current two-posture contract.
 - [constraint] Setup diagnostics distinguish native package files, configuration and observed activation; optional capabilities never become universal installation prerequisites.
 - [decision] OpenCode/Pi worker profiles resolve role→workload→inherit; native catalogs validate choices, primary models and existing Pi conversations remain operator-owned.
 - [constraint] Every release bootstrap verifies the exact asset checksum before execution; native lifecycle help preserves installation state, and updater shortcuts must respect the selected configuration root.
+- [decision] Consumer test dashboards reuse ui-design and existing runners; batches carry API requests or test references, while trusted project configuration owns execution.

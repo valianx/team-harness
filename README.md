@@ -18,6 +18,7 @@ The current general agent selects and reads the relevant skill:
 | Propose a functional and technical solution | [`design`](skills/design/SKILL.md) |
 | Inspect a proposed solution before implementation | [`sketch`](skills/sketch/SKILL.md), on demand in any flow |
 | Create or refine product-grounded visual UI with Impeccable | [`ui-design`](skills/ui-design/SKILL.md) |
+| Inspect and run functional API/frontend cases in a consumer dashboard | [`test-dashboard`](skills/test-dashboard/SKILL.md) |
 | Broader coordination and recoverable execution | [`pipeline`](skills/pipeline/SKILL.md) |
 | Review an existing pull request | [`review-pr`](skills/review-pr/SKILL.md) |
 | Assess architecture, relationships and technical debt | [`audit`](skills/audit/SKILL.md) |

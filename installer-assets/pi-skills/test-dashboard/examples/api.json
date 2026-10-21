@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "login-api",
+  "name": "Login API checks",
+  "cases": [
+    {
+      "id": "api-login-valid",
+      "name": "Accept valid credentials",
+      "flow": "Login",
+      "service": "auth",
+      "type": "api",
+      "timeoutMs": 10000,
+      "request": {
+        "method": "POST",
+        "path": "/auth/login",
+        "headers": { "Content-Type": "application/json" },
+        "body": { "email": "${TEST_EMAIL}", "password": "${TEST_PASSWORD}" }
+      },
+      "expect": { "status": 200, "present": ["/accessToken"], "json": { "/user/email": "${TEST_EMAIL}" } }
+    },
+    {
+      "id": "api-profile",
+      "name": "Read the authenticated profile",
+      "flow": "Login",
+      "service": "users",
+      "type": "api",
+      "request": { "method": "GET", "path": "/me", "headers": { "Authorization": "Bearer ${API_TOKEN}" } },
+      "expect": { "status": 200, "json": { "/email": "${TEST_EMAIL}" } }
+    }
+  ]
+}
