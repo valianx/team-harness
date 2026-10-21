@@ -72,6 +72,7 @@ text. Keep mode names and invocations exact.
 | `spike` | Prototype quickly to test a technical hypothesis. | Claude Code + opencode + Codex |
 | `test` | Design and run tests for a feature or component. | Claude Code + opencode + Codex |
 | `test-cross-browser` | Run a suite across browser engines and branded channels. | Claude Code + opencode + Codex |
+| `test-dashboard` | Build a simple consumer dashboard to inspect and run API/frontend batches. | Claude Code + opencode + Codex + Pi |
 | `test-pipeline` | Run the test pipeline for a feature. | Claude Code + opencode + Codex |
 | `tmux` | Orchestrate runtime-native coding-agent sessions through tmux. | Claude Code + opencode + Codex |
 | `todo` | Manage one-note-per-task Obsidian Tasks entries. | Claude Code + opencode + Codex |

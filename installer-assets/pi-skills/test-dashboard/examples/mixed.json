@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "login-mixed",
+  "name": "Login functional checks",
+  "cases": [
+    {
+      "id": "auth-ready",
+      "name": "Auth service is ready",
+      "flow": "Login",
+      "service": "auth",
+      "type": "api",
+      "request": { "method": "GET", "path": "/health" },
+      "expect": { "status": 200, "json": { "/status": "ok" } }
+    },
+    {
+      "id": "ui-login",
+      "name": "Complete login in the browser",
+      "flow": "Login",
+      "service": "web",
+      "type": "frontend",
+      "runner": "web-e2e",
+      "test": "login-valid",
+      "dependsOn": ["auth-ready"],
+      "timeoutMs": 30000
+    }
+  ]
+}

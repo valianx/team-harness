@@ -351,6 +351,7 @@ run_node_suite "version-preflight" "test_version_preflight.mjs" "node not found 
 run_node_suite "workspace-identity" "test_workspace_identity.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "workspace-context" "test_workspace_context.mjs" "node not found — install Node.js to run this suite"
 run_node_suite "space-context" "test_space_context.mjs" "node not found — install Node.js to run this suite"
+run_node_suite "test-dashboard-batches" "test_test_dashboard_batch.mjs" "node not found — install Node.js to run this suite"
 
 echo
 echo "############################################################"

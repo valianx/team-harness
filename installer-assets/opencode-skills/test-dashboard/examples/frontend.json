@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "auth-frontend",
+  "name": "Authentication screen checks",
+  "cases": [
+    {
+      "id": "ui-login",
+      "name": "Sign in with valid credentials",
+      "flow": "Login",
+      "service": "web",
+      "type": "frontend",
+      "runner": "web-e2e",
+      "test": "login-valid",
+      "timeoutMs": 30000
+    },
+    {
+      "id": "ui-registration",
+      "name": "Show validation for incomplete registration",
+      "flow": "Registration",
+      "service": "web",
+      "type": "frontend",
+      "runner": "web-e2e",
+      "test": "registration-required-fields"
+    }
+  ]
+}
