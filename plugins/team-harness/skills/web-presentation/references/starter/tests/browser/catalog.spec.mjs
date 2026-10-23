@@ -49,6 +49,18 @@ test('catalog layouts occupy independently specified stage regions', async ({ pa
   }
 });
 
+test('native shadow SVG geometry is measured and a collapsed diagram fails', async ({ page }, testInfo) => {
+  await page.goto(route(catalog.url, 'catalog-mermaid'));
+  const before = await healthy(page, testInfo, 'shadow-svg-healthy');
+  expect(before.counts.svgs, 'Native shadow content must enter the geometry measurement set').toBeGreaterThan(0);
+  const diagram = page.locator(`${activeSelector} [data-harness-region="visual"] svg`);
+  await diagram.evaluate(svg => { svg.style.width = '0px'; svg.style.height = '0px'; });
+  const report = await inspection(page);
+  await record(page, testInfo, 'shadow-svg-collapsed-negative', report);
+  expect(report.ready).toBe(false);
+  expect(report.diagnostics.some(item => item.check === 'element-measurement' && item.slide === 'catalog-mermaid' && item.region === 'visual')).toBe(true);
+});
+
 test('native reveal facts are hidden, then visible in all three ordered states', async ({ page }, testInfo) => {
   await page.goto(route(catalog.url, 'catalog-reveals'));
   const lines = page.locator(`${activeSelector} li`);
