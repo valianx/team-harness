@@ -3,7 +3,7 @@
   "title": "Payment platform",
   "theme": "presentation",
   "direction": "right",
-  "sources": [{ "id": "note", "title": "Synthetic payment architecture", "locator": "fixtures/sources/documentation.md", "status": "read" }],
+  "sources": [{ "id": "note", "title": "Synthetic payment architecture", "locator": "fixtures/sources/payment-sample.md", "status": "read" }],
   "nodes": [
     { "id": "gateway", "kind": "gateway", "label": "API Gateway", "description": "Accepts incoming payment requests.", "evidence": [{ "source": "note", "locator": "Payment entry" }] },
     { "id": "orchestrator", "kind": "service", "label": "Payment Orchestrator", "parent": "processing", "description": "Coordinates payment processing and persistence.", "evidence": [{ "source": "note", "locator": "Processing" }] },

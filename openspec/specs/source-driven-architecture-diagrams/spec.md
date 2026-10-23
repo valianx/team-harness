@@ -1,8 +1,9 @@
-## Purpose
+# source-driven-architecture-diagrams Specification
 
+## Purpose
 Turn operator-supplied architecture sources into traceable, readable interactive diagrams that can be revised conversationally and hosted independently.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Source-led skill entry
 
