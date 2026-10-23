@@ -3,6 +3,8 @@
 
 ## Current workflow guidance
 
+- [decision] Web presentations use a project-owned pinned Slidev addon archive; Team Harness updates never upgrade an existing deck.
+
 - [decision] Pi owns its TH package and preferences; specialists use public bounded RPC and native session/usage receipts, with canonical references kept inert.
 
 - [decision] `workspace-mode` separates context from optional local tool storage; native Space efforts live under verified `workspace`, Main persists remote returns, and unavailable capability preserves identity without fallback.

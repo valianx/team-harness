@@ -1,0 +1,31 @@
+{
+  "name": "harness-presentation",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare": "node scripts/prepare-project.mjs",
+    "dev": "slidev slides.md",
+    "check": "node scripts/check-source.mjs",
+    "update": "node scripts/update-slide.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/serve.mjs",
+    "kit:identity": "node scripts/kit-identity.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "@fontsource/inter": "5.3.0",
+    "@slidev/theme-default": "0.25.0",
+    "slidev-addon-harness": "file:vendor/slidev-addon-harness-1.0.0.tgz",
+    "vue": "3.5.44"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@slidev/cli": "53.0.0",
+    "@slidev/parser": "53.0.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+import test from 'node:test';
+
+test('kit identity verifies actual archive integrity without mutating consumer files', async (t) => {
+  const { kitIdentity } = await import('../scripts/kit-identity.mjs');
+  const root = await mkdtemp(join(tmpdir(), 'harness-identity-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(join(root, 'vendor'));
+  const bytes = Buffer.from('owned archive');
+  await writeFile(join(root, 'vendor', 'kit-1.0.0.tgz'), bytes);
+  const packageText = JSON.stringify({ dependencies: { 'slidev-addon-harness': 'file:vendor/kit-1.0.0.tgz', '@slidev/theme-default': '0.25.0' }, devDependencies: { '@slidev/cli': '53.0.0' } });
+  const lock = { packages: { 'node_modules/slidev-addon-harness': { version: '1.0.0', resolved: 'file:vendor/kit-1.0.0.tgz', integrity: 'sha512-' + createHash('sha512').update(bytes).digest('base64') } } };
+  const lockText = JSON.stringify(lock);
+  await writeFile(join(root, 'package.json'), packageText);
+  await writeFile(join(root, 'package-lock.json'), lockText);
+  const result = await kitIdentity(root);
+  assert.equal(result.kit.version, '1.0.0');
+  assert.equal(result.kit.archive, 'vendor/kit-1.0.0.tgz');
+  assert.equal(result.kit.sha256, '5f495d11ea532ca9b664724cb8c04232e14752ed9189bc2f7e599ec29f9c395d');
+  assert.equal(result.engine, '53.0.0');
+  assert.equal(result.theme, '0.25.0');
+  assert.ok(!JSON.stringify(result).includes(root));
+  assert.equal(await readFile(join(root, 'package.json'), 'utf8'), packageText);
+  assert.equal(await readFile(join(root, 'package-lock.json'), 'utf8'), lockText);
+  await writeFile(join(root, 'vendor', 'kit-1.0.0.tgz'), 'unreviewed new archive');
+  await assert.rejects(kitIdentity(root), /integrity|archive/i);
+});

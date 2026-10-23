@@ -83,6 +83,7 @@ text. Keep mode names and invocations exact.
 | `update` | Update the installed Team Harness runtime. | Claude Code + opencode + Codex |
 | `validate` | Validate an implementation against criteria and relevant checks. | Claude Code + opencode + Codex |
 | `verify` | Run the inline verification fan over a committed range and decide its ship join. | Claude Code + opencode + Codex |
+| `web-presentation` | Turn proposal sources into reusable Slidev decks and preserve incremental edits. | Claude Code + opencode + Codex + Pi |
 | `workspace` | Reuse local, Obsidian or native GPT Space context; capability depends on the host. | Claude Code + opencode + Codex |
 
 Do not load another skill, create pipeline state, dispatch an agent, or perform

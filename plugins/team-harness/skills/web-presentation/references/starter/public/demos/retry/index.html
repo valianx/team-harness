@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Retry identity simulation</title>
+<style>body{margin:0;padding:24px;font:18px/1.4 system-ui,sans-serif;color:#173632;background:#edf3ef}label{display:block;font-weight:600}input,button{font:inherit;padding:8px 12px;border:2px solid #3d756a;border-radius:6px;margin:8px 8px 8px 0}button{background:#235d51;color:white;cursor:pointer}:focus-visible{outline:3px solid #ba6400;outline-offset:3px}p{margin:12px 0}small{display:block}</style>
+<form id="retry"><label for="delivery">Delivery key</label><input id="delivery" name="delivery" value="delivery-42" autocomplete="off"><button type="submit">Send attempt</button></form>
+<p id="result" role="status">No attempts sent.</p><small>Local simulation only. No network request or partner contract.</small>
+<script>const attempts=new Map();document.querySelector('#retry').addEventListener('submit',event=>{event.preventDefault();const key=document.querySelector('#delivery').value.trim();if(!key){document.querySelector('#result').textContent='Enter a delivery key.';return;}const count=(attempts.get(key)||0)+1;attempts.set(key,count);document.querySelector('#result').textContent=`Key ${key}: attempt ${count}. Identity unchanged.`;});</script>
+</html>

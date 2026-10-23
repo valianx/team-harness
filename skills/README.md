@@ -50,7 +50,7 @@ prerequisite.
   `/th:research`, `/th:research-app`, `/th:learn`, `/th:spike`, `/th:test`, `/th:test-cross-browser`,
   `/th:test-pipeline`, `/th:validate`, `/th:define-ac`, `/th:security`,
   `/th:audit`, `/th:find-bugs`, `/th:full-audit`, `/th:review-pr`, `/th:deliver`, `/th:diagram`,
-  `/th:likec4-diagram`, `/th:d2-diagram`, `/th:reactflow-diagram`, `/th:translate`, `/th:bootstrap`,
+  `/th:likec4-diagram`, `/th:d2-diagram`, `/th:reactflow-diagram`, `/th:web-presentation`, `/th:translate`, `/th:bootstrap`,
   `/th:eval`, `/th:gcp-costs`, `/th:cross-repo`, and `/th:inline`.
 - **Utility and discovery skills:** `/th:modes`, `/th:lint`, `/th:pipelines`,
   `/th:kg`, `/th:tmux`, `/th:background`, `/th:update`, `/th:report-issue`,

@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.slidev/
+playwright-report/
+test-results/
+evidence/

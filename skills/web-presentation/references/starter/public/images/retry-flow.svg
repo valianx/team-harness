@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 300" role="img" aria-labelledby="title desc">
+  <title id="title">Proposed retry identity flow</title>
+  <desc id="desc">An accepted order retains one delivery key. Repeated attempts present that key to a partner for deduplication, which requires partner validation.</desc>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 8 4 0 8Z" fill="#82c8b5"/></marker></defs>
+  <rect width="720" height="300" rx="16" fill="#20292d"/>
+  <g fill="#28383b" stroke="#82c8b5" stroke-width="2"><rect x="24" y="84" width="190" height="120" rx="12"/><rect x="266" y="84" width="190" height="120" rx="12"/><rect x="508" y="84" width="188" height="120" rx="12"/></g>
+  <g stroke="#82c8b5" stroke-width="3" marker-end="url(#arrow)"><path d="M214 144H254"/><path d="M456 144H496"/></g>
+  <g fill="#eeeae0" font-family="sans-serif" font-size="25" text-anchor="middle"><text x="119" y="135">Accepted</text><text x="119" y="169">order</text><text x="361" y="135">One delivery</text><text x="361" y="169">key</text><text x="602" y="135">Partner</text><text x="602" y="169">deduplication</text></g>
+  <text x="360" y="258" fill="#b4bfbd" font-family="sans-serif" font-size="22" text-anchor="middle">Proposed · partner support requires validation</text>
+</svg>
