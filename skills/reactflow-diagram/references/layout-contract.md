@@ -36,6 +36,10 @@ npx playwright install chromium
 DIAGRAM_EVIDENCE_DIR="/absolute/workspace/diagram-evidence" npm run test:browser
 ```
 
+The install lifecycle prepares a missing `.gitignore` from `gitignore.txt`, which
+survives runtime packaging. With scripts disabled, run `node scripts/prepare-project.mjs`;
+an existing consumer ignore file is preserved.
+
 Browser provisioning is a one-time environment step. A compatible installed
 Chromium can instead be selected with `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
 Keep `DIAGRAM_EVIDENCE_DIR` outside distributed assets; retain diagnostics,

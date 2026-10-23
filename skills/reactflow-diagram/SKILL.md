@@ -44,6 +44,10 @@ Read [design-system.md](references/design-system.md) and
 the copied project owns its local source, dependencies and assets. The viewer has
 no source-upload UI or AI backend.
 
+`npm ci` prepares `.gitignore` from the package-safe `gitignore.txt` when absent,
+preserving an existing ignore file. If lifecycle scripts are disabled, run
+`node scripts/prepare-project.mjs` explicitly before creating build/evidence files.
+
 ## Review and delivery
 
 Run the starter's model, geometry, build and browser checks; inspect the actual

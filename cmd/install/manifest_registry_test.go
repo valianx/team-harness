@@ -388,6 +388,25 @@ func TestIsCopyableProjectedSkillPath_Allowlist(t *testing.T) {
 // AC-4: nested references/ files are emitted
 // ---------------------------------------------------------------------------
 
+func TestBuildOpencodeManifests_DiagramProjectPreparationEmitted(t *testing.T) {
+	_, components, err := buildOpencodeManifests()
+	if err != nil {
+		t.Fatalf("buildOpencodeManifests: %v", err)
+	}
+	emitted := make(map[string]bool)
+	for _, component := range components {
+		for _, file := range component.Emits.Files {
+			emitted[file] = true
+		}
+	}
+	for _, file := range []string{"package.json", "gitignore.txt", "scripts/prepare-project.mjs"} {
+		want := "{config_root}/skills/reactflow-diagram/references/starter/" + file
+		if !emitted[want] {
+			t.Errorf("copied-project preparation asset not emitted: %s", want)
+		}
+	}
+}
+
 // TestBuildOpencodeManifests_NestedReferencesEmitted verifies that a complex
 // skill's references/ subtree is emitted. The test uses the real embedded file
 // skills/d2-diagram/references/dsl-reference.md (verified present in the build
