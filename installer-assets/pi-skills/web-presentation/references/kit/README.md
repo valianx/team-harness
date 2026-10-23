@@ -15,6 +15,7 @@ build verification; retain the prior archive and lockfile to reverse it.
 
 ```yaml
 theme: default
+colorSchema: dark
 addons:
   - harness
 canvasWidth: 1280

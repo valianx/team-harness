@@ -163,7 +163,7 @@ test('pending, denied and cross-origin frames preserve an honest accessible fall
     await expect(frame).toHaveAttribute('data-harness-frame-state', expected);
     await expect(frame.getByRole('link', { name: 'Open static fallback' })).toBeVisible();
     await expect(frame.locator('[data-harness-fallback] img')).toBeVisible();
-    expect(await frame.locator('[data-harness-fallback] img').evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
+    await expect.poll(() => frame.locator('[data-harness-fallback] img').evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
     const exit = frame.getByRole('button', { name: 'Return to presentation' });
     await exit.click();
     if (await frame.getAttribute('data-harness-frame-state') === 'unverified') {

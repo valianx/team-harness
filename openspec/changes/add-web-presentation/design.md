@@ -5,6 +5,9 @@ interactive-presentation contract remains intact. This addition targets repeated
 technical proposals and incremental source editing, with Slidev owning the engine.
 The repository's npm and OpenCode distributions must both retain consumer assets.
 
+Documentation budget: extended — the independently distributed addon reference
+defines its layout regions, slots, native metadata and frame API; max 180 lines.
+
 ## Goals / Non-Goals
 
 The design separates source content, reusable kit and interpretation/validation
