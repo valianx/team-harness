@@ -192,7 +192,7 @@ then scaffold a copied project outside the installation:
 
 ```bash
 node skills/web-presentation/references/scripts/pack-kit.mjs --check
-node --test skills/web-presentation/references/scripts/packaging.test.mjs
+node --test skills/web-presentation/references/scripts/*.test.mjs
 node skills/web-presentation/references/scripts/create-deck.mjs --template feature --out /absolute/workspace/deck
 cd /absolute/workspace/deck
 npm ci

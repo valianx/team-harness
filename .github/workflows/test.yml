@@ -147,7 +147,7 @@ jobs:
       - name: Verify archive identity and scaffold outside the installation
         run: |
           node skills/web-presentation/references/scripts/pack-kit.mjs --check
-          node --test skills/web-presentation/references/scripts/packaging.test.mjs
+          node --test skills/web-presentation/references/scripts/*.test.mjs
           node skills/web-presentation/references/scripts/create-deck.mjs --template feature --out "$WEB_PRESENTATION_PROJECT"
       - name: Install the copied project's locked dependencies
         run: npm ci --prefix "$WEB_PRESENTATION_PROJECT" --no-audit --no-fund
