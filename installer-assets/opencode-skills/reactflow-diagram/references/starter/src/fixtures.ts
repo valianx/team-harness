@@ -1,4 +1,4 @@
-import sample from '../fixtures/sample.json';
+import sample from '../fixtures/payment-demo.json';
 import type { Architecture } from './types';
 
 const clone = (): Architecture => ({ ...structuredClone(sample), views: [] }) as Architecture;

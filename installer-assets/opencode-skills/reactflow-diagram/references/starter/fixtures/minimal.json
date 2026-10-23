@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "title": "Minimal generated architecture",
+  "theme": "presentation",
+  "direction": "right",
+  "sources": [{ "id": "note", "title": "Synthetic payment architecture", "locator": "fixtures/sources/payment-sample.md", "status": "read" }],
+  "nodes": [{ "id": "gateway", "kind": "gateway", "label": "API Gateway", "description": "Accepts incoming payment requests.", "evidence": [{ "source": "note", "locator": "Payment entry" }] }],
+  "edges": [],
+  "review": { "unresolved": [], "decisions": ["Synthetic replacement-input fixture isolates a single gateway and omits optional collection defaults; no complete payment-flow claim."] }
+}

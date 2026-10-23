@@ -2,12 +2,13 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import '@xyflow/react/dist/style.css';
 import './styles.css';
+import editableModel from '../fixtures/sample.json';
 import { FIXTURES } from './fixtures';
 import { ArchitectureViewer } from './viewer';
 
 const query = new URLSearchParams(location.search);
-const fixture = query.get('fixture') ?? 'sample';
-const model = FIXTURES[fixture] ?? FIXTURES.sample;
+const fixture = query.get('fixture');
+const model = fixture === null ? editableModel : FIXTURES[fixture] ?? FIXTURES.sample;
 const embedded = query.get('embed');
 
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode>

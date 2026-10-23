@@ -5,7 +5,7 @@
 The starter validates the internal model before measuring real components,
 headers, ports and edge labels after fonts are ready. ELK derives hierarchy and
 routing; React Flow consumes the resulting positions and complete route sections.
-Keep geometry out of `sample.json`.
+Edit `fixtures/sample.json`; demonstration fixtures use a separate immutable model.
 
 The supported directions are `right` and `down`, with at most two group levels:
 root → group → subgroup → node. Diagram-space defaults are leaf width 256,

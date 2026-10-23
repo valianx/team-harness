@@ -184,8 +184,8 @@ DIAGRAM_EVIDENCE_DIR=/absolute/workspace/diagram-evidence npm run test:browser
 DIAGRAM_EVIDENCE_DIR=/absolute/workspace/static-evidence DIAGRAM_SERVER_COMMAND='npm run preview -- --host 127.0.0.1 --port 4178' npm run test:browser -- tests/browser/production.spec.ts
 ```
 
-These checks do not prove arbitrary source interpretation; source fidelity needs
-an identified source-to-artifact assessment. No model calls run in this lane.
+CI also replaces the editable model with a one-node input and checks the rebuild.
+These checks need a separate source-fidelity assessment and invoke no models.
 
 ## When to add a test
 
