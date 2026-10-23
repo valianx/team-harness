@@ -61,6 +61,36 @@ test('native shadow SVG geometry is measured and a collapsed diagram fails', asy
   expect(report.diagnostics.some(item => item.check === 'element-measurement' && item.slide === 'catalog-mermaid' && item.region === 'visual')).toBe(true);
 });
 
+test('loaded media clipped by a nonzero ancestor fails its visual region check', async ({ page }, testInfo) => {
+  await page.goto(route(catalog.url, 'catalog-image'));
+  await healthy(page, testInfo, 'media-clipping-healthy-control');
+  await page.locator(`${activeSelector} [data-harness-region="visual"]`).evaluate(async visual => {
+    const wrapper = document.createElement('div');
+    wrapper.id = 'injected-media-clip';
+    wrapper.style.cssText = 'width:1px;height:1px;overflow:hidden';
+    const image = document.createElement('img');
+    image.id = 'injected-clipped-image';
+    image.alt = 'Required visual clipped by its wrapper';
+    image.src = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="180"><rect width="300" height="180" fill="#82c8b5"/></svg>')}`;
+    image.style.cssText = 'display:block;width:300px;height:180px;max-width:none;max-height:none';
+    wrapper.append(image);
+    visual.replaceChildren(wrapper);
+    await image.decode();
+  });
+  const image = page.locator('#injected-clipped-image');
+  expect(await image.evaluate(element => element.complete && element.naturalWidth === 300 && element.naturalHeight === 180)).toBe(true);
+  const bounds = await image.boundingBox();
+  expect(bounds.width).toBeGreaterThan(100);
+  expect(bounds.height).toBeGreaterThan(50);
+  const report = await inspection(page);
+  await record(page, testInfo, 'media-ancestor-clipped-negative', report);
+  expect(report.diagnostics).not.toContainEqual(expect.objectContaining({ check: 'element-overflow', element: '#injected-clipped-image' }));
+  const diagnostic = report.diagnostics.find(item => item.check === 'element-clipping' && item.element === '#injected-clipped-image');
+  expect(diagnostic, 'A loaded media box inside the safe region cannot conceal ancestor clipping').toBeDefined();
+  expect(diagnostic).toMatchObject({ slide: 'catalog-image', region: 'visual' });
+  expect(diagnostic.message).toContain('#injected-media-clip');
+});
+
 test('native reveal facts are hidden, then visible in all three ordered states', async ({ page }, testInfo) => {
   await page.goto(route(catalog.url, 'catalog-reveals'));
   const lines = page.locator(`${activeSelector} li`);

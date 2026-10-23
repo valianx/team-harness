@@ -135,6 +135,15 @@ export function inspectSlide(options = {}) {
     elements.push(element);
     const region = closestAcross(element, '[data-harness-region]');
     if (region && !contained(measured, rect(region))) add('element-overflow', regionName(element), label(element), 'Element exceeds its safe region.');
+    if (element.matches('img,iframe,svg,video,canvas,.mermaid,[data-harness-check]')) {
+      for (let ancestor = parentAcross(element); ancestor && ancestor !== root; ancestor = parentAcross(ancestor)) {
+        const style = getComputedStyle(ancestor);
+        const box = rect(ancestor);
+        const clippedX = /(hidden|clip|auto|scroll)/.test(style.overflowX) && (measured.x < box.x - tolerance || measured.x + measured.width > box.x + box.width + tolerance);
+        const clippedY = /(hidden|clip|auto|scroll)/.test(style.overflowY) && (measured.y < box.y - tolerance || measured.y + measured.height > box.y + box.height + tolerance);
+        if (clippedX || clippedY) { add('element-clipping', regionName(element), label(element), `Media is clipped by ${label(ancestor)}.`); break; }
+      }
+    }
   }
   counts.elements = elements.length;
   for (let i = 0; i < elements.length; i++) for (let j = i + 1; j < elements.length; j++) {

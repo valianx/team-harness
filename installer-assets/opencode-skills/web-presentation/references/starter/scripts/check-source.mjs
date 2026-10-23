@@ -26,7 +26,7 @@ export async function inspectDeck(projectRoot = process.cwd(), entry = 'slides.m
     if (/\b(?:TODO|TBD|FIXME)\b|\{\{\s*(?:insert|replace|your)[^}]*\}\}|\[(?:insert|replace|your)[^\]]*\]/i.test(content))
       add('placeholder', 'Unfinished placeholder remains in visible slide content.');
     const refs = new Set();
-    for (const match of content.matchAll(/!?\[[^\]]*\]\(\s*<?([^\s)>]+)>?(?:\s+[^)]*)?\)|\b(?:src|href|fallback|poster)\s*=\s*["']([^"']+)["']/g)) refs.add(match[1] ?? match[2]);
+    for (const match of content.matchAll(/!?\[[^\]]*\]\(\s*(?:<([^<>\n]+)>|([^\s)>]+))(?:\s+[^)]*)?\)|\b(?:src|href|fallback|poster)\s*=\s*["']([^"']+)["']/g)) refs.add(match[1] ?? match[2] ?? match[3]);
     for (const url of refs) {
       if (/^(?:https?:)?\/\//i.test(url)) {
         resources.external.push({ slide: label, file, url, verification: 'network/authentication/framing not established by source check' });
