@@ -7,6 +7,14 @@ function liveContent(content) {
   return content.replace(/^\s*(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\s*\1\s*$/gm, '').replace(/<!--[\s\S]*?-->/g, '');
 }
 
+function frontmatterResources(frontmatter = {}) {
+  return ['background', 'image'].flatMap((field) => {
+    const value = frontmatter?.[field];
+    const color = field === 'background' ? /^(?:#|rgb|hsl)/ : /^(?:#|rgb)/;
+    return typeof value === 'string' && value && !color.test(value) ? [{ field, url: value }] : [];
+  });
+}
+
 export async function inspectDeck(projectRoot = process.cwd(), entry = 'slides.md') {
   const deck = await loadDeck(projectRoot, entry);
   const diagnostics = [];
@@ -27,22 +35,33 @@ export async function inspectDeck(projectRoot = process.cwd(), entry = 'slides.m
       add('placeholder', 'Unfinished placeholder remains in visible slide content.');
     const refs = new Set();
     for (const match of content.matchAll(/!?\[[^\]]*\]\(\s*(?:<([^<>\n]+)>|([^\s)>]+))(?:\s+[^)]*)?\)|\b(?:src|href|fallback|poster)\s*=\s*["']([^"']+)["']/g)) refs.add(match[1] ?? match[2] ?? match[3]);
-    for (const url of refs) {
+    const references = [...refs].map(url => ({ url, source: slide.source.filepath }));
+    for (const { field, url } of frontmatterResources(slide.frontmatter)) {
+      const owner = slide.importChain?.find(importer => Object.hasOwn(importer.frontmatter, field)) ?? slide.source;
+      references.push({ url, source: owner.filepath });
+    }
+    if (slide.index === 0) {
+      const headmatterRefs = frontmatterResources(deck.data.headmatter.defaults).map(item => item.url);
+      if (typeof deck.data.headmatter.favicon === 'string' && deck.data.headmatter.favicon) headmatterRefs.push(deck.data.headmatter.favicon);
+      for (const url of new Set(headmatterRefs)) references.push({ url, source: deck.filepath });
+    }
+    for (const { url, source } of references) {
+      const resourceFile = relative(deck.root, source);
       if (/^(?:https?:)?\/\//i.test(url)) {
-        resources.external.push({ slide: label, file, url, verification: 'network/authentication/framing not established by source check' });
+        resources.external.push({ slide: label, file: resourceFile, url, verification: 'network/authentication/framing not established by source check' });
         continue;
       }
       if (/^(?:#|data:|mailto:|tel:|javascript:)/i.test(url)) continue;
       let path;
       try {
         const clean = decodeURIComponent(url.split(/[?#]/, 1)[0]);
-        path = clean.startsWith('/') ? resolve(deck.root, 'public', `.${clean}`) : resolve(dirname(slide.source.filepath), clean);
+        path = clean.startsWith('/') ? resolve(deck.root, 'public', `.${clean}`) : resolve(dirname(source), clean);
         const actual = await realpath(path);
         if (!inside(deck.root, actual)) throw new Error('outside project');
         await access(actual);
-        resources.local.push({ slide: label, file, url, path: relative(deck.root, actual) });
+        resources.local.push({ slide: label, file: resourceFile, url, path: relative(deck.root, actual) });
       } catch (error) {
-        add('missing-asset', `Local resource is missing or outside the project: ${url}`, { url });
+        add('missing-asset', `Local resource is missing or outside the project: ${url}`, { file: resourceFile, url });
       }
     }
   }

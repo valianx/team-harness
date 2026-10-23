@@ -9,7 +9,7 @@ const evidence = resolve(process.env.WEB_PRESENTATION_EVIDENCE_DIR || resolve(tm
 const rel = relative(project, evidence);
 if (rel === '' || (rel !== '..' && !rel.startsWith('../') && !isAbsolute(rel)))
   throw new Error('WEB_PRESENTATION_EVIDENCE_DIR must be outside the consumer project.');
-const baseURL = process.env.WEB_PRESENTATION_BASE_URL || 'http://127.0.0.1:4177/';
+const baseURL = process.env.WEB_PRESENTATION_BASE_URL || 'http://localhost:4177/';
 const staticOnly = process.env.WEB_PRESENTATION_STATIC === '1';
 const run = process.env.WEB_PRESENTATION_RUN_DIR || resolve(evidence, `run-${Date.now()}-${process.pid}`);
 process.env.WEB_PRESENTATION_RUN_DIR = run;

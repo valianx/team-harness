@@ -46,6 +46,12 @@ uses `--without-notes`; verify a synthetic private note canary is absent using a
 included-notes build as a positive control. Inventory external resources and
 remaining sensitive content; note exclusion alone is not a privacy audit.
 
+The source inventory checks literal Markdown/HTML references, native slide
+`background`/`image` fields, and explicit root `favicon` and
+`defaults.background`/`defaults.image` fields. Native color values are excluded.
+It does not evaluate arbitrary metadata, expressions or CSS, select which layout
+consumes a field, or establish runtime loading or external access.
+
 Deliver editable sources, `dist/`, actual commands/results, captures and specific
 gaps. A missing, skipped, uncollected or failing required check leaves that behavior
 pending even if the build succeeds. Preview reports its observed address and

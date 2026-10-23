@@ -134,7 +134,7 @@ export async function startCatalog(testInfo) {
   const log = createWriteStream(testInfo.outputPath('catalog-server.log'));
   const child = spawn(process.execPath, [resolve(directory, 'node_modules/@slidev/cli/bin/slidev.mjs'), 'slides.md', '--port', String(port)], { cwd: directory, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
   child.stdout.pipe(log); child.stderr.pipe(log);
-  const url = `http://127.0.0.1:${port}/`;
+  const url = `http://localhost:${port}/`;
   try {
     const deadline = Date.now() + 60_000;
     while (true) {
