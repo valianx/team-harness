@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "title": "Payment platform",
+  "theme": "presentation",
+  "direction": "right",
+  "sources": [{ "id": "note", "title": "Synthetic payment architecture", "locator": "fixtures/sources/documentation.md", "status": "read" }],
+  "nodes": [
+    { "id": "gateway", "kind": "gateway", "label": "API Gateway", "description": "Accepts incoming payment requests.", "evidence": [{ "source": "note", "locator": "Payment entry" }] },
+    { "id": "orchestrator", "kind": "service", "label": "Payment Orchestrator", "parent": "processing", "description": "Coordinates payment processing and persistence.", "evidence": [{ "source": "note", "locator": "Processing" }] },
+    { "id": "database", "kind": "database", "label": "PostgreSQL", "parent": "payments", "description": "Stores payment state.", "evidence": [{ "source": "note", "locator": "Persistence" }] },
+    { "id": "events", "kind": "queue", "label": "Payment Events", "parent": "payments", "description": "Publishes completed payment events.", "evidence": [{ "source": "note", "locator": "Events" }] },
+    { "id": "provider", "kind": "external", "label": "Notification Provider", "description": "Receives payment event notifications.", "evidence": [{ "source": "note", "locator": "Notifications" }] }
+  ],
+  "groups": [
+    { "id": "payments", "label": "Payment platform", "evidence": [{ "inference": "Visual boundary for payment-owned components." }] },
+    { "id": "processing", "label": "Processing", "parent": "payments", "evidence": [{ "inference": "Nested visual grouping for the orchestration component." }] }
+  ],
+  "edges": [
+    { "id": "request", "from": "gateway", "to": "orchestrator", "label": "HTTPS", "evidence": [{ "source": "note", "locator": "Payment entry" }] },
+    { "id": "persistence", "from": "orchestrator", "to": "database", "label": "SQL", "evidence": [{ "source": "note", "locator": "Persistence" }] },
+    { "id": "publish", "from": "orchestrator", "to": "events", "label": "Publish event", "evidence": [{ "source": "note", "locator": "Events" }] },
+    { "id": "notification", "from": "events", "to": "provider", "label": "Notification", "evidence": [{ "source": "note", "locator": "Notifications" }] }
+  ],
+  "review": { "unresolved": [], "decisions": ["Groups are explicitly identified as visual inferences."] },
+  "views": [
+    { "id": "request-view", "label": "Payment request", "nodeIds": ["gateway", "orchestrator"], "edgeIds": ["request"], "continuations": [{ "edge": "persistence", "view": "persistence-view" }] },
+    { "id": "persistence-view", "label": "Persistence and events", "nodeIds": ["orchestrator", "database", "events"], "edgeIds": ["persistence", "publish"], "continuations": [{ "edge": "notification", "view": "notification-view" }] },
+    { "id": "notification-view", "label": "Notifications", "nodeIds": ["events", "provider"], "edgeIds": ["notification"] }
+  ],
+  "steps": [
+    { "id": "request", "title": "Receive a payment", "description": "The gateway forwards the request to the payment orchestrator.", "focus": ["gateway", "orchestrator", "request"] },
+    { "id": "persist", "title": "Store the payment", "description": "The orchestrator persists payment state.", "focus": ["orchestrator", "database", "persistence"] },
+    { "id": "notify", "title": "Notify downstream systems", "description": "Published events reach the notification provider.", "focus": ["events", "provider", "notification"] }
+  ]
+}

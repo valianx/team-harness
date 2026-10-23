@@ -77,6 +77,46 @@ jobs:
             ${{ runner.temp }}/meeting-presentations/testing/runs/*/captures/
           if-no-files-found: warn
 
+  architecture-diagram:
+    name: source-driven architecture diagram (Chromium)
+    runs-on: ubuntu-latest
+    env:
+      DIAGRAM_PROJECT: ${{ runner.temp }}/architecture-diagrams/project
+      DIAGRAM_EVIDENCE_DIR: ${{ runner.temp }}/architecture-diagrams/evidence
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Copy the maintained starter outside the installation
+        run: node -e "require('node:fs').cpSync('skills/reactflow-diagram/references/starter', process.env.DIAGRAM_PROJECT, {recursive:true})"
+      - name: Install the copied project's locked dependencies
+        run: npm ci --prefix "$DIAGRAM_PROJECT" --no-audit --no-fund
+      - name: Provision Chromium explicitly
+        run: npm exec --prefix "$DIAGRAM_PROJECT" -- playwright install --with-deps chromium
+      - name: Check model, geometry and bounded measurement behavior
+        run: npm --prefix "$DIAGRAM_PROJECT" test
+      - name: Build independent local assets
+        run: npm --prefix "$DIAGRAM_PROJECT" run build
+      - name: Check measured browser geometry and interactions
+        run: npm --prefix "$DIAGRAM_PROJECT" run test:browser -- tests/browser/geometry.spec.ts tests/browser/viewer.spec.ts
+      - name: Check the copied production build on a static server
+        env:
+          DIAGRAM_SERVER_COMMAND: npm run preview -- --host 127.0.0.1 --port 4178
+          DIAGRAM_EVIDENCE_DIR: ${{ runner.temp }}/architecture-diagrams/production-evidence
+        run: npm --prefix "$DIAGRAM_PROJECT" run test:browser -- tests/browser/production.spec.ts
+      - name: Retain geometry, captures and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: architecture-diagram-evidence
+          path: |
+            ${{ runner.temp }}/architecture-diagrams/evidence/
+            ${{ runner.temp }}/architecture-diagrams/production-evidence/
+          if-no-files-found: warn
+
   windows-hooks:
     name: native Windows hooks and filesystem
     runs-on: windows-latest
