@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.54.0] - 2026-10-23
+
+### Added
+
+- Turn proposal sources into portable Slidev decks with reusable layouts and preserved incremental edits. Fixes #712
+
+### Fixed
+
+- Keep diagram connections visible while advancing presentation steps.
+
 ## [3.53.0] - 2026-10-23
 
 ### Added

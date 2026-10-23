@@ -1,0 +1,34 @@
+{
+  "purpose": "Independent source assessment of authored Markdown; no generated deck or geometry is prescribed.",
+  "cases": [
+    {
+      "id": "feature-retry-safety",
+      "source": "feature.md",
+      "current": ["Accepted orders retain notification status", "Operators manually retry failed partner notifications", "Notification failure does not revoke order acceptance"],
+      "proposed": ["Reuse one delivery key across retries", "Partner deduplicates the repeated key", "Record responses against the original delivery"],
+      "assumptions": ["Partner duplicate-key support has not been validated"],
+      "unresolved": ["Retryable failures", "Retry limit", "Terminal recovery"],
+      "mustNotInvent": ["Dates", "Retry count", "Latency metrics", "Partner contract guarantee"],
+      "demoLimit": "Local simulation without a partner connection"
+    },
+    {
+      "id": "integration-stock-reservation",
+      "source": "integration.md",
+      "current": ["Harbor requests warehouse availability before accepting a cart", "Availability does not reserve stock"],
+      "proposed": ["Harbor requests a reservation", "Warehouse returns an outcome before cart acceptance"],
+      "direction": ["Harbor to Warehouse: reservation request", "Warehouse to Harbor: reservation outcome"],
+      "unresolved": ["Timeout", "Reservation lifetime", "Query or cancellation of uncertain reservation"],
+      "mustNotInvent": ["SLA", "Rollout date", "Contract values"]
+    },
+    {
+      "id": "architecture-telemetry-boundary",
+      "source": "architecture.md",
+      "current": ["One handler receives and indexes telemetry", "Index failure fails the request"],
+      "proposed": ["Intake publishes accepted events", "Separate indexer consumes from broker"],
+      "direction": ["Telemetry client to Intake", "Intake to Broker", "Broker to Indexer", "Indexer to Search index"],
+      "unresolved": ["Acceptance", "Replay", "Ordering", "Retention", "Delivery semantics", "Operating ownership", "Rollback"],
+      "mustNotInvent": ["Selected broker product", "Throughput metric", "Delivery guarantee", "Migration date"],
+      "qualification": "Independent recovery is a motivation, not measured improvement"
+    }
+  ]
+}

@@ -35,6 +35,7 @@ hooks/ts/node_modules/
 
 # Explicit presentation browser-test tooling.
 tests/presentation/node_modules/
+skills/web-presentation/references/starter/node_modules/
 
 # opencode test suites (test_opencode_session_enforcement.sh, test_opencode_config_resolver.sh)
 # compile scratch CJS bundles of *.opencode.ts entries straight into dist/ for their own

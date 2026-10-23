@@ -371,6 +371,12 @@ func TestIsCopyableProjectedSkillPath_Allowlist(t *testing.T) {
 	}{
 		{"some-skill/SKILL.md", true},
 		{"some-skill/references/x.md", true},
+		{"web-presentation/references/starter/vendor/slidev-addon-harness-1.0.0.tgz", true},
+		{"web-presentation/references/kit/layouts/h-cover.vue", true},
+		{"web-presentation/.cache/kit.tgz", false},
+		{"web-presentation/references/_private/kit.tgz", false},
+		{"web-presentation/references/kit.wasm", false},
+		{"web-presentation/references/kit.zip", false},
 		{"some-skill/references/tool.exe", false},
 		{"some-skill/references/binary", false},
 		{"some-skill/.venv/main.py", false},
@@ -403,6 +409,77 @@ func TestBuildOpencodeManifests_DiagramProjectPreparationEmitted(t *testing.T) {
 		want := "{config_root}/skills/reactflow-diagram/references/starter/" + file
 		if !emitted[want] {
 			t.Errorf("copied-project preparation asset not emitted: %s", want)
+		}
+	}
+}
+
+func TestBuildOpencodeManifests_WebPresentationPayload(t *testing.T) {
+	modules, components, err := buildOpencodeManifests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	emitted := make(map[string]string)
+	for _, component := range components {
+		for _, file := range component.Emits.Files {
+			emitted[file] = component.Source
+		}
+	}
+	for _, file := range []string{
+		"SKILL.md",
+		"references/scripts/create-deck.mjs",
+		"references/starter/package-lock.json",
+		"references/starter/gitignore.txt",
+		"references/starter/scripts/prepare-project.mjs",
+		"references/starter/vendor/slidev-addon-harness-1.0.0.tgz",
+		"references/kit/layouts/h-cover.vue",
+		"references/templates/feature/slides.md",
+		"references/templates/integration/slides.md",
+		"references/templates/architecture/slides.md",
+	} {
+		want := "{config_root}/skills/web-presentation/" + file
+		source, ok := emitted[want]
+		if !ok {
+			t.Errorf("presentation consumer asset not emitted: %s", want)
+			continue
+		}
+		data, err := fs.ReadFile(EmbeddedAssets(), source)
+		if err != nil || len(data) == 0 {
+			t.Errorf("presentation consumer asset unreadable or empty: %s (%v)", source, err)
+		}
+	}
+	_, cleanup := ledgerTestEnv(t)
+	defer cleanup()
+	configRoot := t.TempDir()
+	placer := newOpencodePlacerAt(configRoot)
+	var selected []string
+	for _, component := range components {
+		if strings.HasPrefix(component.Source, "installer-assets/opencode-skills/web-presentation/") {
+			selected = append(selected, component.Component)
+		}
+	}
+	plan, err := ComputePlan(modules, components, selected, placer, EmbeddedAssets(), opencodeRuntimeTransform)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ApplyPlan(plan, placer); err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range []string{
+		"references/starter/vendor/slidev-addon-harness-1.0.0.tgz",
+		"references/starter/gitignore.txt",
+		"references/kit/layouts/h-cover.vue",
+	} {
+		source := emitted["{config_root}/skills/web-presentation/"+file]
+		expected, err := fs.ReadFile(EmbeddedAssets(), source)
+		if err != nil {
+			t.Fatal(err)
+		}
+		actual, err := os.ReadFile(filepath.Join(configRoot, "skills", "web-presentation", filepath.FromSlash(file)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(expected, actual) {
+			t.Errorf("installed inert asset differs from emitted payload: %s", file)
 		}
 	}
 }

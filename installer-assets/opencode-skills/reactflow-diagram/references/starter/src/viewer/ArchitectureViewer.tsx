@@ -142,6 +142,8 @@ function Viewer({ model, evidence }: { model: Architecture; evidence?: Validatio
     return {
       id: placed.id, type: placed.kind, parentId: placed.parent, position: { x: placed.x, y: placed.y },
       width: placed.width, height: placed.height, style: { width: placed.width, height: placed.height },
+      // Retain initialized handle bounds when focus or selection rebuilds controlled nodes.
+      measured: { width: placed.width, height: placed.height },
       className: `${focused ? 'is-focused' : ''}${step && !focused ? ' is-dimmed' : ''}`,
       data: { component, kind: placed.kind, direction: visibleModel.direction, sourcePort: local(source), targetPort: local(target), focused, dimmed: !!step && !focused },
       selected: placed.id === selectedId, selectable: true, draggable: false, connectable: false,

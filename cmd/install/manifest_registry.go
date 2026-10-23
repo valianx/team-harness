@@ -37,6 +37,8 @@ func isInvocableAgent(name string, isDir bool) bool {
 // .svg, .png, .mjs (deterministic pipeline runners), and the
 // interactive-presentation scaffold sources (.ts/.tsx/.css/.js plus .lock for
 // the uv/npm lockfiles that pin the scaffold's dependency versions).
+// .vue preserves Slidev addon source; .tgz preserves its inert, project-owned
+// npm archive. Installation copies the archive without unpacking or executing it.
 //
 // Note: .py is on the allowlist because render_excalidraw.py is a legitimate
 // first-party skill asset. .venv Python files share the .py extension but are
@@ -58,6 +60,8 @@ var opencodeCopyableSkillExt = map[string]bool{
 	".css":  true,
 	".js":   true,
 	".lock": true,
+	".vue":  true,
+	".tgz":  true,
 }
 
 // buildSkillComponents returns one ComponentManifest per projected opencode

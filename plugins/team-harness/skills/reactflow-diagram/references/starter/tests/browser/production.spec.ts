@@ -28,9 +28,33 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720
     await expect(page.locator('.react-flow__edge')).toHaveCount(4);
     const paths = () => page.locator('.react-flow__edge-path').evaluateAll(paths => paths.map(path => path.getAttribute('d')));
     const before = await paths();
+    expect(before).toHaveLength(4);
+    expect(before.every(path => !!path)).toBe(true);
+    const edgeRemovals = await page.locator('.react-flow__edges').evaluateHandle(container => {
+      const removed: string[] = [];
+      const record = (mutations: MutationRecord[]) => {
+        for (const mutation of mutations) for (const node of mutation.removedNodes) {
+          if (!(node instanceof Element)) continue;
+          const selector = '.react-flow__edge, .react-flow__edge-path';
+          const edges = [...(node.matches(selector) ? [node] : []), ...node.querySelectorAll(selector)];
+          removed.push(...edges.map(edge => edge.getAttribute('data-id') ?? edge.getAttribute('d')!));
+        }
+      };
+      const observer = new MutationObserver(record);
+      observer.observe(container, { childList: true, subtree: true });
+      return () => {
+        record(observer.takeRecords());
+        observer.disconnect();
+        return removed;
+      };
+    });
     await page.getByRole('button', { name: 'Next step' }).click();
     await expect(page.getByTestId('step-narrative')).toContainText('Store the payment');
     expect(await paths()).toEqual(before);
+    const removed = await edgeRemovals.evaluate(stop => stop());
+    await edgeRemovals.dispose();
+    await testInfo.attach('presentation-edge-removals.json', { body: JSON.stringify({ before, removed }, null, 2), contentType: 'application/json' });
+    expect(removed, 'Presentation steps must keep routed edges mounted.').toEqual([]);
 
     await page.getByRole('combobox', { name: 'Perspective' }).selectOption('request-view');
     await expect(page.getByTestId('view-context')).toBeVisible();

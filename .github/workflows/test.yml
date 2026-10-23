@@ -130,6 +130,61 @@ jobs:
             ${{ runner.temp }}/architecture-diagrams/minimal-evidence/
           if-no-files-found: warn
 
+  reusable-web-presentation:
+    name: reusable Slidev kit (Chromium)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Configure copied-project and evidence paths
+        run: |
+          echo "WEB_PRESENTATION_PROJECT=$RUNNER_TEMP/web-presentations/feature" >> "$GITHUB_ENV"
+          echo "WEB_PRESENTATION_EVIDENCE_DIR=$RUNNER_TEMP/web-presentations/dev-evidence" >> "$GITHUB_ENV"
+      - name: Verify archive identity and scaffold outside the installation
+        run: |
+          node skills/web-presentation/references/scripts/pack-kit.mjs --check
+          node --test skills/web-presentation/references/scripts/*.test.mjs
+          node skills/web-presentation/references/scripts/create-deck.mjs --template feature --out "$WEB_PRESENTATION_PROJECT"
+      - name: Install the copied project's locked dependencies
+        run: npm ci --prefix "$WEB_PRESENTATION_PROJECT" --no-audit --no-fund
+      - name: Provision Chromium explicitly
+        run: npm exec --prefix "$WEB_PRESENTATION_PROJECT" -- playwright install --with-deps chromium
+      - name: Check source identity, updates, geometry and delivery tools
+        run: |
+          npm --prefix "$WEB_PRESENTATION_PROJECT" run kit:identity
+          npm --prefix "$WEB_PRESENTATION_PROJECT" run check
+          npm --prefix "$WEB_PRESENTATION_PROJECT" test
+      - name: Check development geometry, reveals and interaction
+        run: npm --prefix "$WEB_PRESENTATION_PROJECT" run test:browser
+      - name: Build the independent static artifact under a subpath
+        run: npm --prefix "$WEB_PRESENTATION_PROJECT" run build -- --base /talks/example/
+      - name: Check the actual static output
+        env:
+          WEB_PRESENTATION_STATIC: '1'
+          WEB_PRESENTATION_BASE_URL: http://127.0.0.1:4173/talks/example/
+          WEB_PRESENTATION_SERVER_COMMAND: npm run preview -- --base /talks/example/ --port 4173 --host 127.0.0.1
+          WEB_PRESENTATION_EVIDENCE_DIR: ${{ runner.temp }}/web-presentations/static-evidence
+        run: npm --prefix "$WEB_PRESENTATION_PROJECT" run test:browser -- tests/browser/production.spec.mjs
+      - name: Reuse the kit for an independent architecture deck
+        run: |
+          node skills/web-presentation/references/scripts/create-deck.mjs --template architecture --out "$RUNNER_TEMP/web-presentations/architecture"
+          npm ci --prefix "$RUNNER_TEMP/web-presentations/architecture" --no-audit --no-fund
+          npm --prefix "$RUNNER_TEMP/web-presentations/architecture" run check
+          npm --prefix "$RUNNER_TEMP/web-presentations/architecture" run build -- --base /talks/architecture/
+      - name: Retain browser and static evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reusable-web-presentation-evidence
+          path: |
+            ${{ runner.temp }}/web-presentations/dev-evidence/
+            ${{ runner.temp }}/web-presentations/static-evidence/
+          if-no-files-found: warn
+
   windows-hooks:
     name: native Windows hooks and filesystem
     runs-on: windows-latest

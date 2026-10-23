@@ -187,6 +187,27 @@ DIAGRAM_EVIDENCE_DIR=/absolute/workspace/static-evidence DIAGRAM_SERVER_COMMAND=
 CI also replaces the editable model with a one-node input and checks the rebuild.
 These checks need a separate source-fidelity assessment and invoke no models.
 
+The reusable Slidev kit has its own Chromium CI lane. Verify archive freshness,
+then scaffold a copied project outside the installation:
+
+```bash
+node skills/web-presentation/references/scripts/pack-kit.mjs --check
+node --test skills/web-presentation/references/scripts/*.test.mjs
+node skills/web-presentation/references/scripts/create-deck.mjs --template feature --out /absolute/workspace/deck
+cd /absolute/workspace/deck
+npm ci
+npm run check
+npm test
+npx playwright install chromium
+WEB_PRESENTATION_EVIDENCE_DIR=/absolute/workspace/deck-evidence npm run test:browser
+npm run build -- --base /talks/example/
+WEB_PRESENTATION_STATIC=1 WEB_PRESENTATION_BASE_URL=http://127.0.0.1:4173/talks/example/ WEB_PRESENTATION_SERVER_COMMAND='npm run preview -- --base /talks/example/ --port 4173 --host 127.0.0.1' WEB_PRESENTATION_EVIDENCE_DIR=/absolute/workspace/static-evidence npm run test:browser
+```
+
+These checks cover native Markdown updates, shared layouts, actual DOM bounds,
+reveals, focus/fallbacks and static subpath delivery. Source fidelity and visual
+readability still require assessment of the actual authored artifact.
+
 ## When to add a test
 
 Add one when you change code that has an exit code. A new runtime behavior needs an observable test case. A new installer behaviour needs a Go test. A new agent file is picked up automatically by `test_agent_frontmatter.py` — no manual registration.
