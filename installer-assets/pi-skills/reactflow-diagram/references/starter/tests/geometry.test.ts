@@ -155,6 +155,33 @@ test('intended contacts at the source and target boundary are permitted', () => 
   assert.deepEqual(checkGeometry(fixture.model, fixture.geometry), []);
 });
 
+for (const direction of ['right', 'down'] as const) for (const endpoint of ['source', 'target'] as const) {
+  test(`${direction} route cannot traverse its ${endpoint} body at the endpoint contact`, () => {
+    const fixture = horizontal();
+    const route = fixture.geometry.edges[0];
+    const point = { x: endpoint === 'source' ? 0 : 700, y: 250 };
+    if (endpoint === 'source') {
+      route.sourcePort = point;
+      route.sections[0].points[0] = point;
+    } else {
+      route.targetPort = point;
+      route.sections[0].points[1] = point;
+    }
+    if (direction === 'down') {
+      fixture.model.direction = 'down';
+      for (const node of fixture.geometry.nodes) {
+        [node.x, node.y] = [node.y, node.x];
+        [node.absX, node.absY] = [node.absY, node.absX];
+      }
+      const rotate = ({ x, y }: { x: number; y: number }) => ({ x: y, y: x });
+      route.sourcePort = rotate(route.sourcePort);
+      route.targetPort = rotate(route.targetPort);
+      route.sections[0].points = route.sections[0].points.map(rotate);
+    }
+    diagnostic(checkGeometry(fixture.model, fixture.geometry), 'route-collision', ['request', endpoint === 'source' ? 'a' : 'b']);
+  });
+}
+
 function crossBoundary(): { model: Architecture; geometry: Geometry } {
   return {
     model: architecture([{ id: 'a', parent: 'group' }, { id: 'b' }], [{ id: 'request', from: 'a', to: 'b' }], [{ id: 'group' }]),

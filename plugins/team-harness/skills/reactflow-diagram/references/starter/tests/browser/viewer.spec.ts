@@ -119,14 +119,14 @@ test('measures local Inter labels without clipping and reserves group headers', 
   expect(await page.locator('.component-label').first().evaluate(element => getComputedStyle(element).fontFamily)).toContain('Inter');
   const headers = await page.locator('.react-flow__node-group').evaluateAll(groups => groups.map(group => {
     const header = group.querySelector('.group-header')!.getBoundingClientRect();
-    return { id: group.getAttribute('data-id')!, bottom: header.bottom };
+    const id = group.getAttribute('data-id')!;
+    const children = [...group.closest('.react-flow')!.querySelectorAll(`[data-parent="${id}"]`)];
+    return { id, bottom: header.bottom, childCount: children.length, childTop: Math.min(...children.map(child => child.getBoundingClientRect().top)) };
   }));
   expect(headers.map(header => header.id).sort()).toEqual(['payments', 'processing']);
   for (const header of headers) {
-    const children = page.locator(`.react-flow [data-parent="${header.id}"]`);
-    await expect(children).toHaveCount(header.id === 'payments' ? 3 : 1);
-    const childTop = await children.evaluateAll(children => Math.min(...children.map(child => child.getBoundingClientRect().top)));
-    expect(childTop).toBeGreaterThanOrEqual(header.bottom);
+    expect(header.childCount).toBe(header.id === 'payments' ? 3 : 1);
+    expect(header.childTop).toBeGreaterThanOrEqual(header.bottom);
   }
 });
 

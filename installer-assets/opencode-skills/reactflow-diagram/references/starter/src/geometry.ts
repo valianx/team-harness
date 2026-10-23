@@ -91,10 +91,10 @@ export function checkGeometry(model: Architecture, geometry: Geometry): Diagnost
       if (![a.x, a.y, b.x, b.y].every(Number.isFinite)) { fail('route', [route.id], 'Nonfinite route point'); continue; }
       if (outside(a.x, a.y) || outside(b.x, b.y)) fail('clipping', [route.id], 'Route is outside diagram bounds');
       for (const node of geometry.nodes) {
-        if ((node.id === edge.from && index === 0) || (node.id === edge.to && index === segments.length - 1)) continue;
+        const endpointContact = (node.id === edge.from && index === 0) || (node.id === edge.to && index === segments.length - 1);
         const intendedAncestor = node.kind === 'group' && (ancestor(edge.from, node.id) || ancestor(edge.to, node.id));
         const obstacle = intendedAncestor ? header(node) : rect(node);
-        if (segmentIntersects(a, b, obstacle, intendedAncestor ? 0 : T.edgeClearance)) fail('route-collision', [route.id, node.id], 'Route crosses a body or reserved header');
+        if (segmentIntersects(a, b, obstacle, intendedAncestor || endpointContact ? 0 : T.edgeClearance)) fail('route-collision', [route.id, node.id], 'Route crosses a body or reserved header');
       }
     }
     for (const [nodeId, point] of [[edge.from, route.sourcePort], [edge.to, route.targetPort]] as const) {
