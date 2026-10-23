@@ -1,0 +1,182 @@
+{
+  "format": "source-fidelity-expectations/v1",
+  "purpose": "Independent semantic expectations for assessing actual authored artifacts; not a generated architecture model or extraction-test result.",
+  "assessment_policy": {
+    "author_receives": "Only the source files named for the case, without this expectations file.",
+    "assessor_records": ["case_id", "actual_artifact_and_revision", "assessor", "represented_facts", "omissions", "unresolved_questions", "recorded_decisions"],
+    "generated_ids": "Do not prescribe IDs; compare continuity of logical identities when revisions are assessed.",
+    "fidelity_is_separate_from": ["schema validation", "geometry validation", "browser rendering"],
+    "live_execution": "No model run or benchmark is authorized by these fixtures."
+  },
+  "cases": [
+    {
+      "case_id": "DOC-01",
+      "source_refs": [{"id": "doc", "path": "documentation.md", "locator": "Scope, Boundaries, Components, Directed relationships", "availability": "readable"}],
+      "expected_components": [
+        {"name": "Web Gateway", "role": "gateway", "group": null, "source_ref": "doc#Components"},
+        {"name": "Order API", "role": "service", "group": "Ordering", "source_ref": "doc#Components"},
+        {"name": "Orders Database", "role": "database", "group": "Ordering", "source_ref": "doc#Components"},
+        {"name": "Order Events", "role": "queue/broker", "group": "Parcel Platform", "source_ref": "doc#Components"},
+        {"name": "Fulfillment Partner", "role": "external system", "group": null, "source_ref": "doc#Components"}
+      ],
+      "expected_groups": [
+        {"name": "Parcel Platform", "parent": null, "source_ref": "doc#Boundaries"},
+        {"name": "Ordering", "parent": "Parcel Platform", "source_ref": "doc#Boundaries"},
+        {"name": "Analytics (reserved)", "parent": "Parcel Platform", "empty": true, "source_ref": "doc#Boundaries"}
+      ],
+      "expected_relationships": [
+        {"from": "Web Gateway", "to": "Order API", "label": "Create order over HTTPS", "direction": "from-to", "source_ref": "doc#Directed relationships"},
+        {"from": "Order API", "to": "Orders Database", "label": "Persist order", "direction": "from-to", "source_ref": "doc#Directed relationships"},
+        {"from": "Order API", "to": "Order Events", "label": "Publish OrderAccepted", "direction": "from-to", "source_ref": "doc#Directed relationships"},
+        {"from": "Order Events", "to": "Fulfillment Partner", "label": "Deliver OrderAccepted", "direction": "from-to", "source_ref": "doc#Directed relationships"}
+      ],
+      "expected_omissions": ["Billing", "Tracing", "Infrastructure", "Relationships to Analytics (reserved)"],
+      "unresolved_questions": [],
+      "ambiguity_decisions": [{"claim": "Group meaning", "decision": "Visual containment only; do not invent a C4 classification."}],
+      "correction_invariants": []
+    },
+    {
+      "case_id": "CODE-01",
+      "source_refs": [{"id": "code", "path": "checkout.ts", "locator": "OrdersDatabase, ReceiptQueue, MailProvider, checkoutApi, receiptWorker", "availability": "readable"}],
+      "expected_components": [
+        {"name": "Checkout API", "role": "service", "source_ref": "code#checkoutApi"},
+        {"name": "Orders Database", "role": "database boundary", "source_ref": "code#OrdersDatabase"},
+        {"name": "Receipt Queue", "role": "queue/broker boundary", "source_ref": "code#ReceiptQueue"},
+        {"name": "Receipt Worker", "role": "service", "source_ref": "code#receiptWorker"},
+        {"name": "Mail Provider", "role": "external system boundary", "source_ref": "code#MailProvider"}
+      ],
+      "expected_groups": [],
+      "expected_relationships": [
+        {"from": "Checkout API", "to": "Orders Database", "label": "Save order", "direction": "from-to", "source_ref": "code#database.save"},
+        {"from": "Checkout API", "to": "Receipt Queue", "label": "Publish order", "direction": "from-to", "source_ref": "code#queue.publish"},
+        {"from": "Receipt Queue", "to": "Receipt Worker", "label": "Deliver order", "direction": "from-to", "source_ref": "code#queue.subscribe callback"},
+        {"from": "Receipt Worker", "to": "Mail Provider", "label": "Send receipt", "direction": "from-to", "source_ref": "code#mail.sendReceipt"}
+      ],
+      "expected_omissions": ["Unspecified adapter implementations", "Deployment groups", "Transport protocols not shown in code"],
+      "unresolved_questions": [],
+      "ambiguity_decisions": [{"claim": "Queue-to-worker direction", "decision": "Depict delivered messages into the callback; a subscription call does not reverse event flow."}],
+      "correction_invariants": []
+    },
+    {
+      "case_id": "CHAT-01",
+      "source_refs": [{"id": "chat", "path": "conversation.md", "locator": "Operator — initial request", "availability": "readable"}],
+      "expected_components": [
+        {"name": "Vehicle Feed", "role": "external system", "group": null, "source_ref": "chat#Operator — initial request"},
+        {"name": "Location Gateway", "role": "gateway", "group": "Dispatch", "source_ref": "chat#Operator — initial request"},
+        {"name": "Position Stream", "role": "queue/broker", "group": "Dispatch", "source_ref": "chat#Operator — initial request"},
+        {"name": "Map Service", "role": "service", "group": "Dispatch", "source_ref": "chat#Operator — initial request"},
+        {"name": "Positions Cache", "role": "database", "group": "Dispatch", "source_ref": "chat#Operator — initial request"}
+      ],
+      "expected_groups": [{"name": "Dispatch", "parent": null, "source_ref": "chat#Operator — initial request"}],
+      "expected_relationships": [
+        {"from": "Vehicle Feed", "to": "Location Gateway", "label": "Send positions", "direction": "from-to", "source_ref": "chat#Operator — initial request"},
+        {"from": "Location Gateway", "to": "Position Stream", "label": "Publish positions", "direction": "from-to", "source_ref": "chat#Operator — initial request"},
+        {"from": "Position Stream", "to": "Map Service", "label": "Deliver positions", "direction": "from-to", "source_ref": "chat#Operator — initial request"},
+        {"from": "Map Service", "to": "Positions Cache", "label": "Read latest position", "direction": "from-to", "source_ref": "chat#Operator — initial request"}
+      ],
+      "expected_omissions": ["Route Planner", "Read-response reverse edge"],
+      "unresolved_questions": [],
+      "ambiguity_decisions": [],
+      "correction_invariants": []
+    },
+    {
+      "case_id": "IMAGE-01",
+      "source_refs": [
+        {"id": "image", "path": "source-image.svg", "locator": "Commerce and Billing boxes; solid arrows; damaged Reconcile connector and legend", "availability": "readable"},
+        {"id": "image-png", "path": "source-image.png", "locator": "Raster rendition of the same source, not independent evidence", "availability": "readable", "rendition_of": "image"}
+      ],
+      "expected_components": [
+        {"name": "Web Gateway", "role": "gateway", "group": "Commerce", "source_ref": "image#left box"},
+        {"name": "Invoice Service", "role": "service", "group": "Billing", "source_ref": "image#upper Billing box"},
+        {"name": "Ledger", "role": "database", "group": "Billing", "source_ref": "image#lower Billing box"},
+        {"name": "Payment Partner", "role": "external system", "group": null, "source_ref": "image#right box outside Commerce"}
+      ],
+      "expected_groups": [
+        {"name": "Commerce", "parent": null, "source_ref": "image#outer box"},
+        {"name": "Billing", "parent": "Commerce", "source_ref": "image#inner box"}
+      ],
+      "expected_relationships": [
+        {"from": "Web Gateway", "to": "Invoice Service", "label": "Submit invoice", "direction": "from-to", "source_ref": "image#first solid arrow"},
+        {"from": "Invoice Service", "to": "Payment Partner", "label": "Request payment", "direction": "from-to", "source_ref": "image#second solid arrow"},
+        {"endpoints": ["Invoice Service", "Ledger"], "label": "Reconcile", "direction": "unresolved", "source_ref": "image#damaged vertical connector"}
+      ],
+      "expected_omissions": ["Invented reverse arrows", "Inferred C4 boundary types"],
+      "unresolved_questions": [{"id": "image-reconcile-direction", "question": "Does Invoice Service initiate reconciliation toward Ledger, or does Ledger initiate it toward Invoice Service?", "material": true, "resolution_policy": "Obtain owner clarification before treating either directed relationship as sourced."}],
+      "ambiguity_decisions": [{"claim": "Reconcile direction", "expected_status": "unresolved", "decision": "Retain draft status. The dashed damaged line does not establish a two-way relationship; clear neighboring arrowheads remain usable evidence."}],
+      "correction_invariants": []
+    },
+    {
+      "case_id": "MISSING-01",
+      "source_refs": [
+        {"id": "brief", "path": "missing-source.md", "locator": "Available brief, Missing material attachment, Operator scope", "availability": "readable"},
+        {"id": "archive-policy", "uri": "https://sources.invalid/synthetic/archive-policy.pdf", "locator": "Archive path", "availability": "intentionally-inaccessible", "material": true}
+      ],
+      "expected_components": [
+        {"name": "Ingestion API", "role": "service", "source_ref": "brief#Available brief"},
+        {"name": "Record Stream", "role": "queue/broker", "source_ref": "brief#Available brief"},
+        {"name": "Archive Store", "role": "database", "source_ref": "brief#Available brief"}
+      ],
+      "expected_groups": [],
+      "expected_relationships": [{"from": "Ingestion API", "to": "Record Stream", "label": "Publish RecordAccepted", "direction": "from-to", "source_ref": "brief#Available brief"}],
+      "expected_omissions": ["Unconfirmed intermediary retention service", "Settled direct Record Stream-to-Archive Store relationship"],
+      "unresolved_questions": [{"id": "missing-archive-path", "question": "Which downstream components and directed writes connect Record Stream to Archive Store?", "material": true, "source_ref": "archive-policy#Archive path", "resolution_policy": "Request an accessible attachment or explicit operator scope reduction; preserve useful partial work."}],
+      "ambiguity_decisions": [{"claim": "Complete archive path", "expected_status": "incomplete", "decision": "Do not mark missing attachment reviewed or fidelity complete; the current requested scope remains draft."}],
+      "correction_invariants": []
+    },
+    {
+      "case_id": "CONFLICT-01",
+      "source_refs": [
+        {"id": "context", "path": "conflicting-overview.md", "locator": "Stock reservation source context", "availability": "readable"},
+        {"id": "app", "path": "conflicting-a.md", "locator": "Components and reserve-stock", "availability": "readable"},
+        {"id": "integration", "path": "conflicting-b.md", "locator": "Components and reserve-stock", "availability": "readable"}
+      ],
+      "expected_components": [
+        {"name": "Inventory Service", "role": "service", "source_refs": ["app#Components", "integration#Components"]},
+        {"name": "Reservation API", "role": "service", "source_refs": ["app#Components", "integration#Components"]}
+      ],
+      "expected_groups": [],
+      "expected_relationships": [{"endpoints": ["Inventory Service", "Reservation API"], "label": "Reserve stock", "direction": "unresolved", "conflicting_claims": [{"from": "Inventory Service", "to": "Reservation API", "source_ref": "app#reserve-stock"}, {"from": "Reservation API", "to": "Inventory Service", "source_ref": "integration#reserve-stock"}]}],
+      "expected_omissions": ["Fabricated source precedence", "Two settled operations or a request/response pair"],
+      "unresolved_questions": [{"id": "conflict-initiator", "question": "Which service initiates the single reserve-stock operation, and which description should be corrected?", "material": true, "resolution_policy": "Expose both source claims and obtain operator clarification; neither source supersedes the other."}],
+      "ambiguity_decisions": [{"claim": "Reserve stock direction", "expected_status": "contradictory", "decision": "Keep affected architecture draft. Do not combine mutually exclusive claims into a sourced bidirectional flow."}],
+      "correction_invariants": []
+    },
+    {
+      "case_id": "CORRECTION-01",
+      "baseline_case": "DOC-01",
+      "source_refs": [
+        {"id": "doc", "path": "documentation.md", "locator": "All sections, except statements superseded by correction", "availability": "readable"},
+        {"id": "correction", "path": "correction.md", "locator": "Parcel Desk — operator correction", "availability": "readable", "supersedes": ["doc#Order API name", "doc#Order Events to Fulfillment Partner delivery"]}
+      ],
+      "expected_components": [
+        {"name": "Web Gateway", "role": "gateway", "group": null, "source_ref": "doc#Components"},
+        {"name": "Order Intake and Validation Service", "previous_name": "Order API", "same_logical_identity": true, "role": "service", "group": "Ordering", "source_ref": "correction#1"},
+        {"name": "Orders Database", "role": "database", "group": "Ordering", "source_ref": "doc#Components"},
+        {"name": "Order Events", "role": "queue/broker", "group": "Parcel Platform", "source_ref": "doc#Components"},
+        {"name": "Fulfillment Partner", "role": "external system", "group": null, "source_ref": "doc#Components"}
+      ],
+      "expected_groups": [
+        {"name": "Parcel Platform", "parent": null, "source_ref": "doc#Boundaries"},
+        {"name": "Ordering", "parent": "Parcel Platform", "source_ref": "doc#Boundaries"},
+        {"name": "Analytics (reserved)", "parent": "Parcel Platform", "empty": true, "source_ref": "doc#Boundaries"}
+      ],
+      "expected_relationships": [
+        {"from": "Web Gateway", "to": "Order Intake and Validation Service", "label": "Create order over HTTPS", "direction": "from-to", "source_refs": ["doc#Directed relationships", "correction#1"]},
+        {"from": "Order Intake and Validation Service", "to": "Orders Database", "label": "Persist order", "direction": "from-to", "source_refs": ["doc#Directed relationships", "correction#1"]},
+        {"from": "Order Intake and Validation Service", "to": "Order Events", "label": "Publish OrderAccepted", "direction": "from-to", "source_refs": ["doc#Directed relationships", "correction#3"]},
+        {"from": "Order Intake and Validation Service", "to": "Fulfillment Partner", "label": "Notify accepted order by webhook", "direction": "from-to", "source_ref": "correction#2"}
+      ],
+      "expected_omissions": ["Superseded Order Events-to-Fulfillment Partner delivery", "Duplicate notification", "Additional replacement service"],
+      "unresolved_questions": [],
+      "ambiguity_decisions": [{"claim": "Source precedence", "decision": "The operator explicitly supersedes only the affected name and partner relationship; other baseline facts remain current."}],
+      "correction_invariants": [
+        {"invariant": "Renamed service keeps its generated node ID because it is the same logical service."},
+        {"invariant": "Web Gateway, Orders Database, Order Events, Fulfillment Partner and all three groups retain IDs and unaffected evidence."},
+        {"invariant": "Gateway request, persistence and publication retain their relationship IDs and directed topology after the display-name change."},
+        {"invariant": "Exactly one current partner notification exists, from the renamed service; no requirement to retain the superseded relationship ID."},
+        {"invariant": "New name and webhook retain correction evidence; superseded delivery is not presented as current sourced fact."},
+        {"invariant": "Retain group membership and empty analytics group; reassess fidelity and renew affected model/measurement/layout/geometry/rendered evidence."}
+      ]
+    }
+  ]
+}

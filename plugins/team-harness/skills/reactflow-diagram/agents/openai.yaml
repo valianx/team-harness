@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Reactflow Diagram"
+  short_description: "Team Harness Reactflow Diagram workflow"
+  default_prompt: "Use $team-harness:reactflow-diagram for this request."

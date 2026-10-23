@@ -56,6 +56,7 @@ text. Keep mode names and invocations exact.
 | `pipelines` | Show the current state of all durable pipelines. | Claude Code + opencode + Codex |
 | `plan` | Break broad scope into labeled implementation tasks. | Claude Code + opencode + Codex |
 | `plan-review` | Audit a Stage 1 plan against its shape and substance rules. | Claude Code + opencode + Codex |
+| `reactflow-diagram` | Turn architecture sources into interactive diagrams with measured layout and source details. | Claude Code + opencode + Codex + Pi |
 | `recover` | Resume an interrupted persisted pipeline. | Claude Code + opencode + Codex |
 | `reload` | Activate installed resources and verify the current conversation's runtime components. | opencode + Codex |
 | `report-issue` | Prepare and file a guarded Team Harness GitHub issue. | Claude Code + opencode + Codex |

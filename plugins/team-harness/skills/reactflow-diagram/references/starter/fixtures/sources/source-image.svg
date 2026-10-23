@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="680" viewBox="0 0 1400 680" role="img" aria-labelledby="title description">
+  <title id="title">Commerce source sketch with a damaged reconciliation connector</title>
+  <desc id="description">Commerce contains Web Gateway and a Billing subgroup containing Invoice Service and Ledger. Clear arrows show Web Gateway to Invoice Service and Invoice Service to external Payment Partner. The connector between Invoice Service and Ledger is labeled Reconcile, but its arrowhead is lost in a scan crease and direction is unresolved.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M 0 0 L 12 6 L 0 12 Z" fill="#172f45"/>
+    </marker>
+  </defs>
+  <rect width="1400" height="680" fill="#ffffff"/>
+  <g font-family="DejaVu Sans, sans-serif" fill="#172f45">
+    <text x="60" y="55" font-size="28" font-weight="bold">Commerce — supplied architecture sketch</text>
+    <text x="60" y="86" font-size="18">Scope: request handling and reconciliation. Arrow direction matters.</text>
+    <rect x="60" y="120" width="930" height="410" rx="16" fill="#f3f7fb" stroke="#6b8094" stroke-width="2"/>
+    <text x="82" y="155" font-size="22" font-weight="bold">Commerce</text>
+    <rect x="490" y="185" width="450" height="305" rx="12" fill="#e5eef7" stroke="#6b8094" stroke-width="2"/>
+    <text x="510" y="218" font-size="21" font-weight="bold">Billing</text>
+    <rect x="110" y="260" width="235" height="82" rx="9" fill="#ffffff" stroke="#172f45" stroke-width="2"/>
+    <text x="227" y="295" text-anchor="middle" font-size="21" font-weight="bold">Web Gateway</text>
+    <text x="227" y="321" text-anchor="middle" font-size="16">gateway</text>
+    <rect x="535" y="260" width="260" height="82" rx="9" fill="#ffffff" stroke="#172f45" stroke-width="2"/>
+    <text x="665" y="295" text-anchor="middle" font-size="21" font-weight="bold">Invoice Service</text>
+    <text x="665" y="321" text-anchor="middle" font-size="16">service</text>
+    <rect x="535" y="404" width="260" height="64" rx="9" fill="#ffffff" stroke="#172f45" stroke-width="2"/>
+    <text x="665" y="432" text-anchor="middle" font-size="21" font-weight="bold">Ledger</text>
+    <text x="665" y="455" text-anchor="middle" font-size="16">database</text>
+    <rect x="1080" y="260" width="260" height="82" rx="9" fill="#ffffff" stroke="#172f45" stroke-width="2"/>
+    <text x="1210" y="295" text-anchor="middle" font-size="21" font-weight="bold">Payment Partner</text>
+    <text x="1210" y="321" text-anchor="middle" font-size="16">external system</text>
+    <path d="M 345 301 H 535" stroke="#172f45" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+    <text x="440" y="284" text-anchor="middle" font-size="17">Submit invoice</text>
+    <path d="M 795 301 H 1080" stroke="#172f45" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+    <text x="938" y="284" text-anchor="middle" font-size="17">Request payment</text>
+    <path d="M 665 342 V 404" stroke="#996600" stroke-width="4" stroke-dasharray="7 5" fill="none"/>
+    <path d="M 646 350 L 680 360 L 648 374 L 681 388 L 650 399" stroke="#d7c9aa" stroke-width="11" fill="none"/>
+    <text x="713" y="369" font-size="17" fill="#805200">Reconcile</text>
+    <text x="713" y="391" font-size="15" fill="#805200">arrowhead unreadable</text>
+    <path d="M 72 574 H 148" stroke="#172f45" stroke-width="3" marker-end="url(#arrow)"/>
+    <text x="170" y="581" font-size="18">Solid arrowhead: direction is legible.</text>
+    <path d="M 72 615 H 148" stroke="#996600" stroke-width="4" stroke-dasharray="7 5"/>
+    <text x="170" y="622" font-size="18">Damaged connector: direction is unknown; do not assume two-way flow.</text>
+    <text x="60" y="658" font-size="16" fill="#566a7b">The sketch does not say whether Invoice Service initiates reconciliation or Ledger initiates it.</text>
+  </g>
+</svg>

@@ -168,6 +168,25 @@ from `run-all.sh`. Reports, captures and meaningful content bounds remain in the
 external workspace; visual judgment complements these checks. Other browsers,
 live model authoring and host workflow activation are outside this evidence.
 
+The architecture diagram starter has a separate Chromium lane. It copies the kit
+outside the installation and checks model/geometry invariants, actual rendered
+bounds/routes, interactions and a production static server. Reproduce with a fresh
+external project and evidence directory (Chromium must be provisioned explicitly):
+
+```bash
+cp -R skills/reactflow-diagram/references/starter /absolute/workspace/diagram
+cd /absolute/workspace/diagram
+npm ci
+npm test
+npm run build
+npx playwright install chromium
+DIAGRAM_EVIDENCE_DIR=/absolute/workspace/diagram-evidence npm run test:browser
+DIAGRAM_EVIDENCE_DIR=/absolute/workspace/static-evidence DIAGRAM_SERVER_COMMAND='npm run preview -- --host 127.0.0.1 --port 4178' npm run test:browser -- tests/browser/production.spec.ts
+```
+
+CI also replaces the editable model with a one-node input and checks the rebuild.
+These checks need a separate source-fidelity assessment and invoke no models.
+
 ## When to add a test
 
 Add one when you change code that has an exit code. A new runtime behavior needs an observable test case. A new installer behaviour needs a Go test. A new agent file is picked up automatically by `test_agent_frontmatter.py` — no manual registration.
