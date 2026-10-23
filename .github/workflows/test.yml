@@ -80,9 +80,6 @@ jobs:
   architecture-diagram:
     name: source-driven architecture diagram (Chromium)
     runs-on: ubuntu-latest
-    env:
-      DIAGRAM_PROJECT: ${{ runner.temp }}/architecture-diagrams/project
-      DIAGRAM_EVIDENCE_DIR: ${{ runner.temp }}/architecture-diagrams/evidence
     steps:
       - uses: actions/checkout@v4
         with:
@@ -90,6 +87,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Configure copied-project paths on the runner
+        run: |
+          echo "DIAGRAM_PROJECT=$RUNNER_TEMP/architecture-diagrams/project" >> "$GITHUB_ENV"
+          echo "DIAGRAM_EVIDENCE_DIR=$RUNNER_TEMP/architecture-diagrams/evidence" >> "$GITHUB_ENV"
       - name: Copy the maintained starter outside the installation
         run: node -e "require('node:fs').cpSync('skills/reactflow-diagram/references/starter', process.env.DIAGRAM_PROJECT, {recursive:true})"
       - name: Install the copied project's locked dependencies
