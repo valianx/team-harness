@@ -3,6 +3,8 @@ import { test, expect, type Page } from '@playwright/test';
 async function ready(page: Page, fixture = 'sample') {
   await page.goto(`/?fixture=${fixture}`);
   await expect(page.locator('[data-layout-state="ready"]')).toBeVisible();
+  const viewer = await page.locator('.architecture-viewer').boundingBox();
+  await page.mouse.move(viewer!.x + 12, viewer!.y + 12);
 }
 
 async function selectedComponentIsVisible(page: Page) {
@@ -89,11 +91,11 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720
       expect(await focused.evaluateAll(nodes => nodes.map(node => node.getAttribute('data-id')).sort())).toEqual([...ids].sort());
       await expect.poll(async () => {
         const canvas = await page.getByTestId('diagram-canvas').boundingBox();
-        const cards = await focused.evaluateAll(nodes => nodes.map(node => {
+        const cards = await page.locator('.react-flow__node.is-focused:not(.react-flow__node-group), .react-flow__edge.is-focused .react-flow__edge-path, .edge-label.is-focused').evaluateAll(nodes => nodes.map(node => {
           const box = node.getBoundingClientRect();
           return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
         }));
-        return !!canvas && cards.length === ids.length && cards.every(card => card.left >= canvas.x + 4 && card.right <= canvas.x + canvas.width - 4 && card.top >= canvas.y + 4 && card.bottom <= canvas.y + canvas.height - 4);
+        return !!canvas && cards.length >= ids.length && cards.every(card => card.left >= canvas.x + 4 && card.right <= canvas.x + canvas.width - 4 && card.top >= canvas.y + 4 && card.bottom <= canvas.y + canvas.height - 4);
       }).toBe(true);
     };
     await visible(['gateway', 'orchestrator']);

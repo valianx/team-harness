@@ -14,8 +14,11 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720
     await page.setViewportSize(viewport);
     await page.goto('/?fixture=sample');
     await expect(page.locator('[data-layout-state="ready"]')).toBeVisible();
+    const viewer = await page.locator('.architecture-viewer').boundingBox();
+    await page.mouse.move(viewer!.x + 12, viewer!.y + 12);
     await expect(page.getByRole('heading', { name: 'Payment platform', exact: true })).toBeVisible();
-    await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+    await expect(page.getByRole('combobox', { name: 'Perspective' })).toHaveValue('');
+    await expect(page.locator('.react-flow__edge')).toHaveCount(4);
 
     await page.locator('.react-flow__node-service').focus();
     await page.keyboard.press('Enter');
@@ -57,6 +60,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720
     expect(removed, 'Presentation steps must keep routed edges mounted.').toEqual([]);
 
     await page.getByRole('combobox', { name: 'Perspective' }).selectOption('request-view');
+    await expect(page.locator('.react-flow__edge')).toHaveCount(1);
     await expect(page.getByTestId('view-context')).toBeVisible();
     await page.getByRole('button', { name: /Continue SQL in Persistence and events/ }).click();
     await expect(page.getByRole('combobox', { name: 'Perspective' })).toHaveValue('persistence-view');

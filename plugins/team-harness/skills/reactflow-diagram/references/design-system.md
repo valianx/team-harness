@@ -1,9 +1,11 @@
 # Viewer and visual contract
 
-Copy the starter's components and local assets. Its shared token module and CSS
-own typography, component dimensions, ports, spacing, group headers and motion.
-Use the supported `presentation` theme; change a shared token only when a measured
-fixture demonstrates the need, then rerun the affected checks.
+Copy the starter's components and local assets. Adapt graph backgrounds, colors
+and component appearance in `src/styles.css` to the source context and audience.
+The model's `presentation` theme selects the kit; it does not mandate its default
+palette. Keep graph dimensions, typography, ports, spacing and group headers in
+shared tokens consumed by measurement and layout; rerun affected checks after
+changing them. Preserve the standard controls in `src/viewer/controls.css`.
 
 | Variant | Meaning |
 | --- | --- |
@@ -19,13 +21,27 @@ recognizable; move extended explanations into `description`, which remains
 available in details. Source locators and inference decisions belong with those
 details. Avoid copying private documents or credentials into a public build.
 
+Inspect legibility at the intended logical viewport and fitted zoom. Higher pixel
+density improves sharpness without enlarging text; adapt shared graph tokens or
+explicit perspectives when the overview becomes too dense.
+
 ## Interaction
 
-The viewer provides title, perspective and fit controls; a pan/zoom canvas;
-keyboard-accessible node/relationship details; and previous/next presentation
-steps with narrative. The details panel reserves space beside the canvas.
-Presentation steps change focus and narrative while preserving geometry and
-necessary ancestors. Reduced motion changes transitions.
+Reuse the standard control appearance and placement: title, perspective and Fit
+view at the top; legend, zoom, presentation steps, validation and perspective
+context at the bottom. Controls float over the canvas and reserve no layout space.
+On fine-hover devices they hide outside the viewer and appear for hover, visible
+keyboard focus or open control popups; on coarse pointers they remain visible.
+Visibility changes never resize the canvas, move the camera or alter graph geometry.
+On narrow canvases the control stacks scroll independently, keeping their content
+accessible and leaving room to pan the diagram between them.
+
+The initial perspective is the complete architecture. Automatic framing and Fit
+view preserve aspect ratio inside the centered 90% canvas rectangle, including
+target nodes and their connecting routes and labels, subject to zoom limits.
+This is 90% of the limiting dimension, not 90% of the area. Manual pan/zoom remains
+available. Details reserve their own space; source warnings and errors stay visible.
+Steps preserve geometry and necessary ancestors. Respect reduced motion.
 
 Inspect loading, empty, invalid model/layout, unresolved sources, missing
 validation and unusable-container states as applicable. A source draft can have

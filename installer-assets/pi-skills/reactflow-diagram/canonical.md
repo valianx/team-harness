@@ -38,7 +38,8 @@ Read [design-system.md](references/design-system.md) and
 `references/starter/` into the output directory and edit its
 `fixtures/sample.json`. Reuse its renderer, tokens, measurement and layout;
 the copied project owns its local source, dependencies and assets. The viewer has
-no source-upload UI or AI backend.
+no source-upload UI or AI backend. Adapt graph backgrounds and component visuals
+to the context; preserve the standard controls described in the design reference.
 
 `npm ci` prepares `.gitignore` from the package-safe `gitignore.txt` when absent,
 preserving an existing ignore file. If lifecycle scripts are disabled, run
@@ -50,7 +51,7 @@ Run the starter's model, geometry, build and browser checks; inspect the actual
 render at both documented viewports, including details, perspectives and steps.
 Use explicit views when density requires them, retaining every relationship's
 membership or declared exclusion. Repair the reported model or layout cause;
-coordinates, hidden relationships and diagram-specific CSS are not repairs.
+coordinates, hidden relationships and ad hoc geometry overrides are not repairs.
 
 Compare the actual generated artifact with the source inventory. Retain the source
 case, artifact revision, assessor, represented facts, omissions, inferences,
