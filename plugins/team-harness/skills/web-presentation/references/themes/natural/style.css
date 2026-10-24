@@ -1,0 +1,20 @@
+@import './styles/harness-theme-base.css';
+
+.harness-slide {
+  --h-background: #f5f1e7;
+  --h-surface: #e8eddf;
+  --h-line: #748269;
+  --h-text: #243c30;
+  --h-muted: #50604f;
+  --h-accent: #386348;
+  --h-code-background: #e3e9d9;
+  --h-code-text: #284331;
+  --h-control-hover: #dbe5d1;
+  --h-error: #922c32;
+  color-scheme: light;
+  background-color: var(--h-background);
+}
+
+.harness-slide:is(.h-cover, .h-section) {
+  background-image: radial-gradient(ellipse at 94% 8%, #c8d7ba66, transparent 58%);
+}

@@ -142,3 +142,27 @@ Loading an external document does not verify its interactions.
 ::visual::
 
 <HarnessFrame src="CROSS_ORIGIN_FIXTURE" title="Controlled cross-origin demo" fallback="/images/retry-flow.svg" fallback-alt="Static delivery identity flow" :timeout-ms="1500" />
+
+---
+layout: h-content
+routeAlias: catalog-code
+title: Read the contract and its code
+footer: Catalog · text, links and highlighted code
+---
+
+Check `delivery.key` before retrying.
+
+> A retry keeps its original identity.
+
+[Review the contract](#catalog-code)
+
+<div style="--slidev-code-font-size: 22px">
+
+```ts
+const delivery = { key: 'order-42', attempt: 2 }
+function retry(key: string) {
+  return { key, accepted: true }
+}
+```
+
+</div>

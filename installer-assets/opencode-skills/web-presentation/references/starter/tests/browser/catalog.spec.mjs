@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { activeSelector, healthy, inspection, record, route, settle, startCatalog } from './support.mjs';
+import { access } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { activeSelector, healthy, inspection, project, record, route, settle, startCatalog } from './support.mjs';
 
 let catalog;
 test.beforeAll(async ({}, testInfo) => { catalog = await startCatalog(testInfo); });
@@ -9,7 +11,178 @@ const cases = [
   ['catalog-cover', 'h-cover'], ['catalog-section', 'h-section'],
   ['catalog-reveals', 'h-content'], ['catalog-compare', 'h-compare'],
   ['catalog-image', 'h-visual'], ['catalog-mermaid', 'h-visual'], ['catalog-local-frame', 'h-demo'],
+  ['catalog-code', 'h-content'],
 ];
+
+async function renderedContrast(locator, kind = 'text') {
+  return locator.evaluateAll((elements, kind) => {
+    const color = value => {
+      const component = value => value.endsWith('%') ? parseFloat(value) / 100 : Number(value);
+      const srgb = value.match(/^color\(srgb\s+([^)]*)\)$/);
+      if (srgb) {
+        const [channels, alpha] = srgb[1].split('/').map(value => value.trim());
+        const result = [...channels.split(/\s+/).map(component), alpha === undefined ? 1 : component(alpha)];
+        if (result.length !== 4 || result.some(value => !Number.isFinite(value) || value < 0 || value > 1))
+          throw new Error(`Unsupported computed sRGB color: ${value}`);
+        return result;
+      }
+      const match = value.match(/^rgba?\(([^)]+)\)$/);
+      if (!match) throw new Error(`Unsupported computed color: ${value}`);
+      const channels = match[1].split(/[\s,/]+/).filter(Boolean);
+      const result = [...channels.slice(0, 3).map(value => value.endsWith('%') ? component(value) : Number(value) / 255), channels[3] === undefined ? 1 : component(channels[3])];
+      if (![3, 4].includes(channels.length) || result.some(value => !Number.isFinite(value) || value < 0 || value > 1))
+        throw new Error(`Unsupported computed RGB color: ${value}`);
+      return result;
+    };
+    const over = (front, back) => {
+      const alpha = front[3] + back[3] * (1 - front[3]);
+      return alpha ? [...front.slice(0, 3).map((value, index) => (value * front[3] + back[index] * back[3] * (1 - front[3])) / alpha), alpha] : [0, 0, 0, 0];
+    };
+    const luminance = value => value.slice(0, 3).map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+    return elements.map(element => {
+      const style = getComputedStyle(element);
+      let ink = color(kind === 'outline' ? style.outlineColor : style.color);
+      let background = [0, 0, 0, 0];
+      const layers = [], unsupported = [];
+      for (let node = element; node; node = node.parentElement) {
+        const paint = getComputedStyle(node);
+        const label = node.id ? `#${node.id}` : `${node.tagName.toLowerCase()}.${[...node.classList].join('.')}`;
+        if (paint.backgroundImage !== 'none' && background[3] < 1) unsupported.push(`${label}: ${paint.backgroundImage}`);
+        if (paint.filter !== 'none' || paint.mixBlendMode !== 'normal') unsupported.push(`${label}: filter or blend changes the paint`);
+        const fill = kind === 'outline' && node === element ? [0, 0, 0, 0] : color(paint.backgroundColor);
+        ink = over(ink, fill);
+        background = over(background, fill);
+        const opacity = Number(paint.opacity);
+        ink[3] *= opacity;
+        background[3] *= opacity;
+        layers.push({ element: label, color: paint.backgroundColor, opacity });
+      }
+      ink = over(ink, [1, 1, 1, 1]);
+      background = over(background, [1, 1, 1, 1]);
+      const a = luminance(ink), b = luminance(background);
+      const bounds = element.getBoundingClientRect();
+      return {
+        text: element.textContent.trim(), kind, color: kind === 'outline' ? style.outlineColor : style.color,
+        foreground: ink, background, ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), layers, unsupported,
+        visible: bounds.width > 0 && bounds.height > 0 && style.visibility === 'visible',
+        disabled: element.matches(':disabled'), outlineStyle: style.outlineStyle, outlineWidth: parseFloat(style.outlineWidth),
+      };
+    });
+  }, kind);
+}
+
+function readable(samples, label, minimum = 4.5) {
+  expect(samples.length, `${label}: rendered samples must exist`).toBeGreaterThan(0);
+  for (const sample of samples) {
+    expect(sample.visible, `${label}: ${sample.text} is measurable`).toBe(true);
+    expect(sample.unsupported, `${label}: unsupported background paint cannot count as measured contrast`).toEqual([]);
+    expect(sample.ratio, `${label}: ${sample.text}; foreground ${sample.foreground}; background ${sample.background}`).toBeGreaterThanOrEqual(minimum);
+  }
+}
+
+async function frameTextContrast(page, frame, testInfo, name) {
+  const samples = await renderedContrast(frame.locator('.harness-frame-status, .harness-frame-placeholder strong, .harness-frame-placeholder p, .harness-frame-fallback a, .harness-frame-fallback p'));
+  await record(page, testInfo, `${name}-text-contrast`, { state: await frame.getAttribute('data-harness-frame-state'), samples });
+  expect(samples.length).toBeGreaterThanOrEqual(3);
+  readable(samples, name);
+}
+
+async function frameControlContrast(page, frame, testInfo, name) {
+  const buttons = frame.locator('button');
+  const disabled = [];
+  for (const button of await buttons.all()) {
+    if (await button.isDisabled()) {
+      disabled.push(...await renderedContrast(button));
+      continue;
+    }
+    const states = [];
+    await page.locator(activeSelector).focus();
+    await page.mouse.move(0, 0);
+    states.push({ state: 'normal', samples: await renderedContrast(button) });
+    await button.hover();
+    states.push({ state: 'hover', samples: await renderedContrast(button) });
+    await page.mouse.move(0, 0);
+    await page.keyboard.press('Tab');
+    await button.focus();
+    await expect(button).toBeFocused();
+    expect(await button.evaluate(element => element.matches(':focus-visible')), 'A real keyboard focus indicator must be present').toBe(true);
+    states.push({ state: 'focus', samples: await renderedContrast(button), outline: await renderedContrast(button, 'outline') });
+    const index = await button.evaluate(element => [...element.closest('[data-harness-frame]').querySelectorAll('button')].indexOf(element));
+    await record(page, testInfo, `${name}-control-${index}-contrast`, { states });
+    for (const state of states) {
+      readable(state.samples, `${name}: ${state.state}`);
+      if (state.outline) {
+        expect(state.outline[0].outlineStyle).not.toBe('none');
+        expect(state.outline[0].outlineWidth).toBeGreaterThan(0);
+        readable(state.outline, `${name}: focus outline against its adjacent parent surface`, 3);
+      }
+    }
+  }
+  if (disabled.length) await record(page, testInfo, `${name}-disabled-control-observations`, { disabled, reason: 'Unavailable controls are measured but exempt from active-control contrast requirements.' });
+}
+
+test('catalog text and highlighted code meet contrast on their rendered surfaces', async ({ page }, testInfo) => {
+  await page.goto(route(catalog.url, 'catalog-code'));
+  await settle(page);
+  const root = page.locator(activeSelector);
+  const paletteSelected = await access(resolve(project, 'styles/harness-theme-base.css')).then(() => true, error => {
+    if (error.code === 'ENOENT') return false;
+    throw error;
+  });
+  test.skip(!paletteSelected, 'The unselected legacy default does not include styles/harness-theme-base.css.');
+  const codeText = await root.evaluate(element => getComputedStyle(element).getPropertyValue('--h-code-text').trim());
+  expect(codeText, 'A selected palette must load its --h-code-text value before contrast can be assessed').not.toBe('');
+  const highlighted = root.locator('pre');
+  await highlighted.evaluate(element => element.closest('[style*="--slidev-code-font-size"]')?.style.removeProperty('--slidev-code-font-size'));
+  expect(await highlighted.evaluate(element => getComputedStyle(element).fontSize), 'The selected theme must supply 22px without the legacy fixture override').toBe('22px');
+  await healthy(page, testInfo, 'palette-code-native-font');
+  const groups = [
+    ['pre code', root.locator('pre code')],
+    ['body', root.locator('.harness-body > p').first()],
+    ['muted', root.locator('blockquote p')],
+    ['footer', root.locator('.harness-footer > div')],
+    ['page label', root.locator('.harness-page')],
+    ['link', root.locator('.harness-body a')],
+    ['inline code', root.locator('.harness-body p > code')],
+  ];
+  const samples = [];
+  for (const [label, locator] of groups) samples.push({ label, samples: await renderedContrast(locator) });
+  const tokens = root.locator('pre code span[style]').filter({ hasText: /[A-Za-z0-9]/ });
+  expect(await tokens.count(), 'The real highlighter must render meaningful syntax tokens').toBeGreaterThan(3);
+  samples.push({ label: 'syntax tokens', samples: await renderedContrast(tokens) });
+  await record(page, testInfo, 'catalog-code-rendered-contrast', { codeText, groups: samples });
+  for (const group of samples) readable(group.samples, group.label);
+});
+
+test('contrast measurements reject translucent text and report unsupported background paint', async ({ page }, testInfo) => {
+  await page.goto(route(catalog.url, 'catalog-code'));
+  await settle(page);
+  const body = page.locator(`${activeSelector} .harness-body`);
+  const text = body.locator('p').first();
+  await body.evaluate(element => { element.style.opacity = '0.1'; });
+  const faded = await renderedContrast(text);
+  await record(page, testInfo, 'translucent-text-contrast-negative', { samples: faded });
+  expect(faded[0].ratio, 'Ancestor opacity must lower actual text contrast').toBeLessThan(4.5);
+  await body.evaluate(element => { element.style.opacity = '1'; });
+  await text.evaluate(element => { element.style.color = 'color(srgb 1 1 1 / 50%)'; element.style.backgroundColor = '#000'; });
+  const translucentSrgb = await renderedContrast(text);
+  await record(page, testInfo, 'native-srgb-alpha-contrast-control', { samples: translucentSrgb });
+  expect(translucentSrgb[0].ratio, 'Half-opacity white on black has independently calculated contrast 5.2808:1').toBeCloseTo(5.2808, 3);
+  await text.evaluate(element => { element.style.removeProperty('color'); element.style.removeProperty('background-color'); });
+  await body.evaluate(element => { element.style.opacity = '1'; element.style.backgroundImage = 'linear-gradient(90deg, #000, #fff)'; });
+  const gradient = await renderedContrast(text);
+  await record(page, testInfo, 'unsupported-background-contrast-negative', { samples: gradient });
+  expect(gradient[0].unsupported.length, 'A nominal backgroundColor must not conceal unmeasured gradient paint').toBeGreaterThan(0);
+});
+
+test('ready frame controls keep readable normal, hover and keyboard-focus states', async ({ page }, testInfo) => {
+  await page.goto(route(catalog.url, 'catalog-local-frame'));
+  const frame = page.locator(`${activeSelector} [data-harness-frame]`);
+  await expect(frame).toHaveAttribute('data-harness-frame-state', 'ready');
+  await settle(page);
+  await frameTextContrast(page, frame, testInfo, 'ready-frame');
+  await frameControlContrast(page, frame, testInfo, 'ready-frame');
+});
 
 test('catalog layouts occupy independently specified stage regions', async ({ page }, testInfo) => {
   for (const [alias, layout] of cases) {
@@ -213,6 +386,16 @@ test('pending, denied and cross-origin frames preserve an honest accessible fall
       await expect(frame.getByRole('button', { name: 'Enter demo', exact: true })).toBeFocused();
     } else await expect(page.locator(activeSelector)).toBeFocused();
     await healthy(page, testInfo, alias);
+    await frameTextContrast(page, frame, testInfo, alias);
+    if (alias === 'catalog-pending-frame') {
+      await frameControlContrast(page, frame, testInfo, alias);
+      await page.route('**/retry-flow.svg?contrast-fallback-error', route => route.fulfill({ status: 404, body: 'Missing fallback fixture' }));
+      await frame.locator('[data-harness-fallback] img').evaluate(image => { image.src += '?contrast-fallback-error'; });
+      await expect(frame.locator('.harness-frame-fallback-error')).toBeVisible();
+      const fallbackError = await renderedContrast(frame.locator('.harness-frame-fallback-error'));
+      await record(page, testInfo, 'failed-fallback-text-contrast', { samples: fallbackError });
+      readable(fallbackError, 'Failed fallback explanation');
+    }
   }
 });
 

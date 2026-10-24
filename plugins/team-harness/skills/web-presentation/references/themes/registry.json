@@ -1,0 +1,7 @@
+{
+  "technical": { "colorSchema": "dark" },
+  "natural": { "colorSchema": "light" },
+  "cosmic": { "colorSchema": "dark" },
+  "editorial": { "colorSchema": "light" },
+  "workshop": { "colorSchema": "light" }
+}

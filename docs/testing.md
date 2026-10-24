@@ -204,6 +204,8 @@ npm run build -- --base /talks/example/
 WEB_PRESENTATION_STATIC=1 WEB_PRESENTATION_BASE_URL=http://127.0.0.1:4173/talks/example/ WEB_PRESENTATION_SERVER_COMMAND='npm run preview -- --base /talks/example/ --port 4173 --host 127.0.0.1' WEB_PRESENTATION_EVIDENCE_DIR=/absolute/workspace/static-evidence npm run test:browser
 ```
 
+Pass `--visual-theme technical|natural|cosmic|editorial|workshop` when scaffolding to repeat the catalog and static checks for a selected palette; CI exercises all five.
+
 These checks cover native Markdown updates, shared layouts, actual DOM bounds,
 reveals, focus/fallbacks and static subpath delivery. Source fidelity and visual
 readability still require assessment of the actual authored artifact.

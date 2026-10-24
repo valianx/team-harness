@@ -1,0 +1,21 @@
+@import './styles/harness-theme-base.css';
+
+.harness-slide {
+  --h-background: #fff8df;
+  --h-surface: #f5e9ba;
+  --h-line: #8f7b43;
+  --h-text: #142e50;
+  --h-muted: #4a5c6c;
+  --h-accent: #174fc3;
+  --h-code-background: #e4ebf7;
+  --h-code-text: #153e8c;
+  --h-control-hover: #e5eafb;
+  --h-error: #962c25;
+  color-scheme: light;
+  background-color: var(--h-background);
+}
+
+.harness-slide:is(.h-cover, .h-section) {
+  background-color: #f4cd50;
+  background-image: linear-gradient(110deg, transparent 68%, #f9de8a 68%);
+}

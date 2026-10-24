@@ -122,10 +122,15 @@ export async function copyForFixture(directory, entry) {
 }
 
 export async function startCatalog(testInfo) {
+  const { loadDeck } = await import(pathToFileURL(resolve(project, 'scripts/deck.mjs')).href);
+  const { data } = await loadDeck(project);
+  const colorSchema = data.slides[0]?.frontmatter.colorSchema;
   const external = createServer((_request, response) => { response.setHeader('Content-Type', 'text/html'); response.end('<!doctype html><html lang="en"><title>Controlled external fixture</title><button>External control</button></html>'); });
   await new Promise(resolve => external.listen(0, '127.0.0.1', resolve));
   const externalUrl = `http://127.0.0.1:${external.address().port}/`;
-  const raw = (await readFile(resolve(fixtures, 'catalog.md'), 'utf8')).replace('CROSS_ORIGIN_FIXTURE', externalUrl);
+  let raw = (await readFile(resolve(fixtures, 'catalog.md'), 'utf8')).replace('CROSS_ORIGIN_FIXTURE', externalUrl);
+  if (colorSchema === 'light' || colorSchema === 'dark')
+    raw = raw.replace(/^colorSchema: dark$/m, `colorSchema: ${colorSchema}`);
   const directory = await copyForFixture(testInfo.outputPath('catalog-project'), raw);
   const socket = createServer();
   await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
