@@ -1,4 +1,5 @@
 /* Standard viewer controls; contextual diagram styling belongs in styles.css. */
+.diagram-canvas { container: diagram-canvas / inline-size; }
 .viewer-toolbar { padding: 22px 28px; display: flex; align-items: center; gap: 24px; justify-content: space-between; background: #1d2426; border-bottom: 1px solid var(--line); flex: 0 0 auto; z-index: 5; }
 .diagram-title { min-width: 0; }
 .diagram-title .eyebrow { margin-bottom: 6px; }
@@ -21,7 +22,7 @@
 .canvas-navigation { position: absolute; right: 20px; bottom: 19px; display: flex; align-items: center; z-index: 4; border: 1px solid #425052; border-radius: 6px; background: #222b2d; padding: 1px; }
 .canvas-navigation output { color: #afbeb4; min-width: 39px; text-align: center; font-size: 10px; font-variant-numeric: tabular-nums; }
 .canvas-navigation .icon-button { height: 26px; width: 25px; font-size: 18px; font-weight: 400; }
-.viewer-footer { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 24px; background: #1f282b; border-top: 1px solid #3c4b4d; padding: 18px 26px; z-index: 6; }
+.viewer-footer { position: relative; flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 24px; background: #1f282b; border-top: 1px solid #3c4b4d; padding: 18px 26px; z-index: 6; }
 .presentation-steps { min-width: 0; display: flex; align-items: center; gap: 17px; }
 .step-button { border: 1px solid #425940; height: 32px; width: 32px; flex: 0 0 auto; }
 .step-narrative { min-width: 0; display: flex; align-items: center; gap: 19px; }
@@ -46,7 +47,7 @@
 .view-context .eyebrow { font-size: 8px; }
 .view-context button { background: transparent; display: inline-flex; align-items: center; gap: 7px; color: #b2d5ad; border: 1px solid #526f4d; padding: 4px 8px; font-size: 10px; }
 
-@media (max-width: 1150px) {
+@container diagram-canvas (max-width: 1150px) {
   .viewer-toolbar { padding: 18px 22px; gap: 16px; }
   .diagram-title h1 { font-size: 18px; }
   .toolbar-controls { gap: 7px; }
@@ -55,7 +56,7 @@
   .step-narrative p { max-width: 380px; }
 }
 
-@media (max-width: 820px) {
+@container diagram-canvas (max-width: 820px) {
   .viewer-toolbar { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
   .diagram-title { width: auto; flex: 1 1 180px; }
   .toolbar-controls { width: auto; min-width: 0; flex: 1 1 320px; flex-wrap: wrap; gap: 8px; }
@@ -86,7 +87,7 @@
 .viewer-chrome-aux { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 24px; }
 .viewer-chrome-aux :is(.canvas-legend, .canvas-navigation) { position: static; }
 
-@media (max-width: 820px) {
+@container diagram-canvas (max-width: 820px) {
   /* Keep an open pan area when stacked details leave little canvas height. */
   .viewer-chrome-top, .viewer-chrome-bottom {
     max-height: calc(50% - 24px); overflow-y: auto; overflow-x: hidden;

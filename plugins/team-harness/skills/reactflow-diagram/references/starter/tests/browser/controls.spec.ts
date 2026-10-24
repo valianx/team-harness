@@ -131,6 +131,26 @@ test('open native select and validation stay visible while mouse focus alone doe
   await page.keyboard.press('Escape');
 });
 
+test('desktop validation popover receives hits above overlapping canvas navigation', async ({ page }, testInfo) => {
+  await ready(page);
+  await reveal(page);
+  await page.getByTestId('validation-status').locator('summary').click();
+  await page.mouse.move(0, 0);
+  await visibility(page, '1');
+  const result = await page.evaluate(() => {
+    const popup = document.querySelector('.validation-popover')!, navigation = document.querySelector('.canvas-navigation')!;
+    const a = popup.getBoundingClientRect(), b = navigation.getBoundingClientRect();
+    const left = Math.max(a.left, b.left), right = Math.min(a.right, b.right), top = Math.max(a.top, b.top), bottom = Math.min(a.bottom, b.bottom);
+    const hit = document.elementFromPoint((left + right) / 2, (top + bottom) / 2);
+    return { intersection: { width: right - left, height: bottom - top }, popupReceivesHit: !!hit && popup.contains(hit), hit: hit?.className };
+  });
+  await testInfo.attach('validation-stacking.json', { body: JSON.stringify(result, null, 2), contentType: 'application/json' });
+  await page.screenshot({ path: testInfo.outputPath('validation-above-navigation.png') });
+  expect(result.intersection.width).toBeGreaterThan(1);
+  expect(result.intersection.height).toBeGreaterThan(1);
+  expect(result.popupReceivesHit, 'Validation content must paint and receive hits above navigation underneath.').toBe(true);
+});
+
 test('touch controls remain visible and respond to zoom and fit taps', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, hasTouch: true, isMobile: true, reducedMotion: 'reduce' });
   const page = await context.newPage();
@@ -354,3 +374,61 @@ for (const width of [820, 390]) {
     await context.close();
   });
 }
+
+test('embedded viewer adapts controls to its canvas width with a desktop sidebar', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/?fixture=sample&embed=fixed');
+  await page.locator('[data-embed-host]').evaluate(element => { (element as HTMLElement).style.width = '650px'; });
+  await expect(page.locator('[data-layout-state="ready"]')).toBeVisible();
+  await page.getByRole('combobox', { name: 'Perspective' }).selectOption('request-view');
+  await expect(page.locator('[data-layout-state="ready"]')).toBeVisible();
+  await page.locator('.react-flow__node-service').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('complementary', { name: 'Selection details' })).toBeVisible();
+  await reveal(page);
+  const canvas = await page.getByTestId('diagram-canvas').boundingBox();
+  expect(canvas!.width).toBeCloseTo(344, 0);
+  const surfaces = await page.evaluate(() => {
+    const rect = (selector: string) => { const r = document.querySelector(selector)!.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }; };
+    return { top: rect('.viewer-chrome-top'), bottom: rect('.viewer-chrome-bottom'), fidelity: rect('.fidelity-status') };
+  });
+  await testInfo.attach('embedded-overlay-surfaces.json', { body: JSON.stringify({ canvas, ...surfaces }, null, 2), contentType: 'application/json' });
+  await page.screenshot({ path: testInfo.outputPath('embedded-before-control-scroll.png') });
+  expect(surfaces.fidelity.right, 'Source status must not overflow from canvas controls into selected details.').toBeLessThanOrEqual(canvas!.x + canvas!.width);
+  expect(surfaces.top.bottom + 48).toBeLessThanOrEqual(surfaces.bottom.top + 1);
+  const beforeScrolling = await geometry(page);
+  const targets = page.locator('.viewer-toolbar button:not(:disabled), .viewer-toolbar select, .viewer-footer button:not(:disabled), .canvas-navigation button, .validation-status summary, .view-context button');
+  const outside: string[] = [];
+  for (const target of await targets.all()) {
+    await target.scrollIntoViewIfNeeded();
+    const result = await target.evaluate(element => {
+      const r = element.getBoundingClientRect(), canvas = document.querySelector('.diagram-canvas')!.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return { inside: r.left >= canvas.left && r.right <= canvas.right && r.top >= canvas.top && r.bottom <= canvas.bottom, receivesHit: !!hit && element.contains(hit), name: element.getAttribute('aria-label') ?? element.textContent };
+    });
+    if (!result.inside || !result.receivesHit) outside.push(result.name ?? 'Unnamed control');
+  }
+  await testInfo.attach('embedded-control-targets.json', { body: JSON.stringify({ canvas, outside }, null, 2), contentType: 'application/json' });
+  await page.screenshot({ path: testInfo.outputPath('embedded-sidebar-controls.png') });
+  expect(outside, 'Controls must stay in their canvas instead of overflowing into selected details.').toEqual([]);
+  expect(await geometry(page)).toEqual(beforeScrolling);
+  const fit = page.getByRole('button', { name: 'Fit diagram' });
+  await fit.scrollIntoViewIfNeeded();
+  await fit.click();
+  await expect.poll(async () => Math.abs((await fittedContent(page)).occupancy - 0.9)).toBeLessThan(0.005);
+  await page.mouse.move(0, 0);
+  await page.locator('button:focus, select:focus').evaluateAll(elements => elements.forEach(element => (element as HTMLElement).blur()));
+  await visibility(page, '0');
+  const clean = await geometry(page);
+  await reveal(page);
+  expect(await geometry(page)).toEqual(clean);
+  const validation = page.getByTestId('validation-status').locator('summary');
+  await validation.scrollIntoViewIfNeeded();
+  await validation.click();
+  await page.locator('.validation-popover p').scrollIntoViewIfNeeded();
+  await expect(page.locator('.validation-popover p')).toBeVisible();
+  const close = page.getByRole('button', { name: 'Close details' });
+  await close.click();
+  await expect(page.getByRole('complementary', { name: 'Selection details' })).toHaveCount(0);
+});

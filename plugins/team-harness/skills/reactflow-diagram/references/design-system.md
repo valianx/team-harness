@@ -21,6 +21,10 @@ recognizable; move extended explanations into `description`, which remains
 available in details. Source locators and inference decisions belong with those
 details. Avoid copying private documents or credentials into a public build.
 
+Inspect legibility at the intended logical viewport and fitted zoom. Higher pixel
+density improves sharpness without enlarging text; adapt shared graph tokens or
+explicit perspectives when the overview becomes too dense.
+
 ## Interaction
 
 Reuse the standard control appearance and placement: title, perspective and Fit
@@ -29,7 +33,7 @@ context at the bottom. Controls float over the canvas and reserve no layout spac
 On fine-hover devices they hide outside the viewer and appear for hover, visible
 keyboard focus or open control popups; on coarse pointers they remain visible.
 Visibility changes never resize the canvas, move the camera or alter graph geometry.
-On narrow screens the control stacks scroll independently, keeping their content
+On narrow canvases the control stacks scroll independently, keeping their content
 accessible and leaving room to pan the diagram between them.
 
 The initial perspective is the complete architecture. Automatic framing and Fit
