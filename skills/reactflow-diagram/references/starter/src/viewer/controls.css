@@ -56,18 +56,17 @@
 }
 
 @media (max-width: 820px) {
-  .viewer-toolbar { flex-wrap: wrap; gap: 14px; padding: 17px 18px; }
-  .diagram-title { width: 100%; }
-  .toolbar-controls { width: 100%; }
+  .viewer-toolbar { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+  .diagram-title { width: auto; flex: 1 1 180px; }
+  .toolbar-controls { width: auto; min-width: 0; flex: 1 1 320px; flex-wrap: wrap; gap: 8px; }
+  .perspective-label { min-width: 0; flex: 1 1 130px; max-width: 210px; }
   .fidelity-status { margin-left: auto; }
-  .perspective-label select { max-width: 210px; }
-  .canvas-context { left: 18px; top: 14px; }
-  .canvas-count { display: none; }
-  .canvas-limit { top: 44px; right: 18px; }
+  .perspective-label select { width: 100%; max-width: 210px; }
+  .canvas-context { flex-wrap: wrap; }
   .canvas-legend { left: 18px; bottom: 18px; max-width: 220px; gap: 9px; font-size: 8px; }
-  .viewer-footer { gap: 12px; padding: 14px 18px; flex-wrap: wrap; }
-  .presentation-steps { width: 100%; gap: 12px; }
-  .step-narrative { flex: 1; gap: 12px; }
+  .viewer-footer { gap: 8px; padding: 8px 12px; flex-wrap: wrap; }
+  .presentation-steps { width: auto; flex: 1 1 320px; gap: 8px; }
+  .step-narrative { flex: 1; gap: 8px; }
   .step-index { font-size: 16px; }
   .step-index > span { font-size: 9px; }
   .step-narrative p { max-width: none; }
@@ -86,6 +85,23 @@
 .viewer-chrome-top .canvas-limit { position: static; align-self: flex-end; margin: 8px 20px; }
 .viewer-chrome-aux { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 24px; }
 .viewer-chrome-aux :is(.canvas-legend, .canvas-navigation) { position: static; }
+
+@media (max-width: 820px) {
+  /* Keep an open pan area when stacked details leave little canvas height. */
+  .viewer-chrome-top, .viewer-chrome-bottom {
+    max-height: calc(50% - 24px); overflow-y: auto; overflow-x: hidden;
+    overscroll-behavior: contain; scrollbar-gutter: stable; scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, #8fa99c calc(var(--chrome-opacity, 1) * 100%), transparent) transparent;
+    pointer-events: var(--chrome-pointer-events, auto);
+  }
+  .viewer-chrome-top .canvas-context { flex: 0 0 auto; min-height: 0; padding: 7px 12px; }
+  .viewer-chrome-top .canvas-limit { flex: 0 0 auto; margin: 6px 12px; }
+  .viewer-chrome-aux { gap: 8px; padding: 6px 12px; }
+  .view-context { max-height: none; overflow: visible; padding: 8px 12px; gap: 8px; }
+  .view-context button { max-width: 100%; text-align: left; overflow-wrap: anywhere; }
+  .validation-status { max-width: 100%; }
+  .validation-popover { position: static; width: 230px; max-width: 100%; margin-top: 8px; }
+}
 
 @media (hover: hover) and (pointer: fine) {
   .architecture-viewer { --chrome-opacity: 0; --chrome-pointer-events: none; }

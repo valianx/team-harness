@@ -12,6 +12,7 @@ Preserve the proven control composition while allowing graph appearance to follo
 - Place top and bottom control stacks inside the canvas column as absolute overlays. Selected details retain their adjacent region. Diagnostic and source-warning regions remain visible independently. Unlike reserved bands, overlay visibility cannot resize the canvas.
 - On initial complete-view framing, Fit view and focus framing, preserve aspect ratio and fit measured nodes plus relevant route sections and labels into a centered 90% canvas rectangle, subject to supported zoom limits. Manual navigation remains possible. Complete architecture is the initial perspective.
 - On fine-hover devices hide temporary controls outside the viewer; reveal for hover, visible keyboard focus, open selects or validation details. Keep controls visible on coarse pointers. Preserve reduced-motion behavior. Mouse focus alone must not pin controls open.
+- At narrow widths, wrap and compact controls and bound each overlay stack's height with independent scrolling, keeping a central canvas interaction gap and validation content inside its scrollable panel.
 - Reuse existing geometry/viewer/static suites and add acceptance tests that compare graph and camera geometry before/after hover, keyboard/touch interaction and two different graph styles. Contextual geometry changes must use shared measurement/layout tokens and rerun checks; appearance changes cannot conceal relationships or diagnostics.
 
 ## Risks / Trade-offs

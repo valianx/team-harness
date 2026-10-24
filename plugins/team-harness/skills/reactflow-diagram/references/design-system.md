@@ -29,6 +29,8 @@ context at the bottom. Controls float over the canvas and reserve no layout spac
 On fine-hover devices they hide outside the viewer and appear for hover, visible
 keyboard focus or open control popups; on coarse pointers they remain visible.
 Visibility changes never resize the canvas, move the camera or alter graph geometry.
+On narrow screens the control stacks scroll independently, keeping their content
+accessible and leaving room to pan the diagram between them.
 
 The initial perspective is the complete architecture. Automatic framing and Fit
 view preserve aspect ratio inside the centered 90% canvas rectangle, including

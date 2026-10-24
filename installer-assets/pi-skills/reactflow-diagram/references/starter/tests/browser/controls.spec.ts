@@ -282,3 +282,75 @@ test('DPR2 preserves logical full-canvas framing and produces a 4K raster', asyn
   await page.screenshot({ path: testInfo.outputPath('canvas-4k-dpr2.png') });
   await context.close();
 });
+
+for (const width of [820, 390]) {
+  test(`stacked touch details keep overlay controls separate and reachable at ${width}×720`, async ({ browser }, testInfo) => {
+    const context = await browser.newContext({ viewport: { width, height: 720 }, hasTouch: true, isMobile: true, reducedMotion: 'reduce' });
+    const page = await context.newPage();
+    await ready(page);
+    await page.getByRole('combobox', { name: 'Perspective' }).selectOption('request-view');
+    await expect(page.locator('[data-layout-state="ready"]')).toBeVisible();
+    await page.locator('.react-flow__node-service').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('complementary', { name: 'Selection details' })).toBeVisible();
+    await visibility(page, '1');
+    const surfaces = await page.evaluate(() => {
+      const rect = (selector: string) => { const r = document.querySelector(selector)!.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height }; };
+      return { canvas: rect('.diagram-canvas'), top: rect('.viewer-chrome-top'), bottom: rect('.viewer-chrome-bottom') };
+    });
+    await testInfo.attach('stacked-overlay-surfaces.json', { body: JSON.stringify(surfaces, null, 2), contentType: 'application/json' });
+    await page.screenshot({ path: testInfo.outputPath(`stacked-details-${width}.png`) });
+    expect(surfaces.top.bottom + 4, 'Temporary overlay stacks must leave an unobstructed canvas interaction gap.').toBeLessThanOrEqual(surfaces.bottom.top);
+    for (const surface of [surfaces.top, surfaces.bottom]) {
+      expect(surface.left).toBeGreaterThanOrEqual(surfaces.canvas.left);
+      expect(surface.right).toBeLessThanOrEqual(surfaces.canvas.right);
+      expect(surface.top).toBeGreaterThanOrEqual(surfaces.canvas.top);
+      expect(surface.bottom).toBeLessThanOrEqual(surfaces.canvas.bottom);
+    }
+    const beforeScrolling = await geometry(page);
+    const bottom = page.locator('.viewer-chrome-bottom');
+    const overflows = await bottom.evaluate(element => element.scrollHeight > element.clientHeight);
+    if (width === 390) expect(overflows, 'Phone controls retain their full content in a scrollable overlay.').toBe(true);
+    if (overflows) {
+      const zoom = page.getByRole('button', { name: 'Zoom out', exact: true });
+      await zoom.scrollIntoViewIfNeeded();
+      await zoom.focus();
+      const scrollTop = await bottom.evaluate(element => element.scrollTop);
+      await page.keyboard.press('PageDown');
+      await expect.poll(() => bottom.evaluate(element => element.scrollTop)).toBeGreaterThan(scrollTop);
+    }
+    const targets = page.locator('.viewer-toolbar button:not(:disabled), .viewer-toolbar select, .viewer-footer button:not(:disabled), .canvas-navigation button, .validation-status summary, .view-context button, button[aria-label="Close details"]');
+    expect(await targets.count()).toBeGreaterThan(5);
+    for (const target of await targets.all()) {
+      await target.scrollIntoViewIfNeeded();
+      expect(await target.evaluate(element => {
+        const r = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return !!hit && element.contains(hit);
+      }), `Control must remain reachable by scrolling: ${await target.getAttribute('aria-label') ?? await target.innerText()}`).toBe(true);
+    }
+    expect(await geometry(page), 'Scrolling controls must not scroll, resize or recamera the diagram.').toEqual(beforeScrolling);
+    const fit = page.getByRole('button', { name: 'Fit diagram' });
+    await fit.scrollIntoViewIfNeeded();
+    await fit.tap();
+    await expect.poll(async () => Math.abs((await fittedContent(page)).occupancy - 0.9)).toBeLessThan(0.005);
+    const validation = page.getByTestId('validation-status').locator('summary');
+    await validation.scrollIntoViewIfNeeded();
+    await validation.tap();
+    const explanation = page.locator('.validation-popover p');
+    await explanation.scrollIntoViewIfNeeded();
+    await expect(explanation).toBeVisible();
+    expect(await explanation.evaluate(element => {
+      const r = element.getBoundingClientRect(), hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return !!hit && element.contains(hit);
+    })).toBe(true);
+    await validation.scrollIntoViewIfNeeded();
+    await validation.tap();
+    const continuation = page.getByRole('button', { name: /Continue SQL in Persistence and events/ });
+    await continuation.scrollIntoViewIfNeeded();
+    await continuation.tap();
+    await expect(page.getByRole('combobox', { name: 'Perspective' })).toHaveValue('persistence-view');
+    await expect(page.locator('[data-layout-state="ready"]')).toBeVisible();
+    await context.close();
+  });
+}
