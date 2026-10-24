@@ -132,6 +132,10 @@ test('catalog text and highlighted code meet contrast on their rendered surfaces
   test.skip(!paletteSelected, 'The unselected legacy default does not include styles/harness-theme-base.css.');
   const codeText = await root.evaluate(element => getComputedStyle(element).getPropertyValue('--h-code-text').trim());
   expect(codeText, 'A selected palette must load its --h-code-text value before contrast can be assessed').not.toBe('');
+  const highlighted = root.locator('pre');
+  await highlighted.evaluate(element => element.closest('[style*="--slidev-code-font-size"]')?.style.removeProperty('--slidev-code-font-size'));
+  expect(await highlighted.evaluate(element => getComputedStyle(element).fontSize), 'The selected theme must supply 22px without the legacy fixture override').toBe('22px');
+  await healthy(page, testInfo, 'palette-code-native-font');
   const groups = [
     ['pre code', root.locator('pre code')],
     ['body', root.locator('.harness-body > p').first()],
