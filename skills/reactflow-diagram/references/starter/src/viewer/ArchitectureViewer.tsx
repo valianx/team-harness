@@ -49,7 +49,7 @@ function Viewer({ model, evidence }: { model: Architecture; evidence?: Validatio
   const surface = useRef<HTMLDivElement>(null);
   const runner = useMemo(() => createLayoutRunner(), []);
   const revision = useRef(0);
-  const [viewId, setViewId] = useState(model.views[0]?.id ?? '');
+  const [viewId, setViewId] = useState('');
   const [selectedId, setSelectedId] = useState<string>();
   const [stepIndex, setStepIndex] = useState(0);
   const [hostSize, setHostSize] = useState({ width: -1, height: -1 });
@@ -93,14 +93,21 @@ function Viewer({ model, evidence }: { model: Architecture; evidence?: Validatio
     return () => { ++revision.current; runner.invalidate(); };
   }, [visibleModel, usable, runner]);
 
-  const fitTargets = useCallback((targets: PlacedNode[], padding = 0.15) => {
+  const fitTargets = useCallback((targets: PlacedNode[]) => {
     if (!flow || !targets.length || !usable) return;
-    const x = Math.min(...targets.map(node => node.absX)), y = Math.min(...targets.map(node => node.absY));
-    const width = Math.max(...targets.map(node => node.absX + node.width)) - x;
-    const height = Math.max(...targets.map(node => node.absY + node.height)) - y;
-    const viewport = getViewportForBounds({ x, y, width, height }, canvasSize.width, canvasSize.height, 0.8, 1, padding);
-    void flow.setViewport(viewport, { duration: reducedMotion ? 0 : 220 });
-  }, [flow, usable, canvasSize.width, canvasSize.height, reducedMotion]);
+    const ids = new Set(targets.map(node => node.id));
+    const relationships = new Set(visibleModel.edges.filter(edge => ids.has(edge.from) && ids.has(edge.to)).map(edge => edge.id));
+    const routes = state.geometry?.edges.filter(edge => relationships.has(edge.id)) ?? [];
+    const points = [
+      ...targets.flatMap(node => [{ x: node.absX, y: node.absY }, { x: node.absX + node.width, y: node.absY + node.height }]),
+      ...routes.flatMap(edge => [...edge.sections.flatMap(section => section.points), ...(edge.label ? [{ x: edge.label.x, y: edge.label.y }, { x: edge.label.x + edge.label.width, y: edge.label.y + edge.label.height }] : [])]),
+    ];
+    const x = Math.min(...points.map(point => point.x)), y = Math.min(...points.map(point => point.y));
+    const width = Math.max(...points.map(point => point.x)) - x;
+    const height = Math.max(...points.map(point => point.y)) - y;
+    const viewport = getViewportForBounds({ x, y, width, height }, canvasSize.width * 0.9, canvasSize.height * 0.9, 0.15, 1.8, 0);
+    void flow.setViewport({ ...viewport, x: viewport.x + canvasSize.width * 0.05, y: viewport.y + canvasSize.height * 0.05 }, { duration: reducedMotion ? 0 : 220 });
+  }, [flow, usable, canvasSize.width, canvasSize.height, reducedMotion, state.geometry, visibleModel.edges]);
 
   const fit = useCallback(() => fitTargets(state.geometry?.nodes ?? []), [fitTargets, state.geometry]);
 
@@ -126,7 +133,7 @@ function Viewer({ model, evidence }: { model: Architecture; evidence?: Validatio
       }
       const leaves = state.geometry!.nodes.filter(node => node.kind !== 'group' && focus.has(node.id));
       const targets = leaves.length ? leaves : state.geometry!.nodes.filter(node => focus.has(node.id));
-      fitTargets(targets.length ? targets : state.geometry!.nodes, 0.2);
+      fitTargets(targets.length ? targets : state.geometry!.nodes);
     });
     return () => cancelAnimationFrame(frame);
   }, [focusedIds, selectedId, visibleModel, state.geometry, flow, usable, fitTargets]);
@@ -178,24 +185,25 @@ function Viewer({ model, evidence }: { model: Architecture; evidence?: Validatio
   }
 
   return <section ref={root} className={`architecture-viewer${reducedMotion ? ' reduce-motion' : ''}${!usable && hostSize.width >= 0 ? ' is-unusable' : ''}`} aria-label={`${model.title} architecture viewer`} style={theme} onKeyDownCapture={keyboardSelect}>
-    <header className="viewer-toolbar">
-      <div className="diagram-title"><span className="eyebrow">Architecture / interactive view</span><h1>{model.title}</h1></div>
-      <div className="toolbar-controls"><label className="perspective-label"><span className="sr-only">Perspective</span><select aria-label="Perspective" value={viewId} onChange={event => setViewId(event.target.value)}><option value="">Complete architecture</option>{model.views.map(view => <option key={view.id} value={view.id}>{view.label}</option>)}</select></label>
-      <button type="button" className="secondary-button fit-button" onClick={fit} disabled={!state.geometry} aria-label="Fit diagram"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="M7 3H3v4m10-4h4v4M3 13v4h4m10-4v4h-4" /></svg><span>Fit view</span></button>
-      <span className={`fidelity-status ${fidelity.status}`} data-testid="fidelity-status"><span className="status-dot" />{fidelity.status === 'draft' ? 'Draft' : 'Source reviewed'}</span></div>
-    </header>
-
     {fidelity.status === 'draft' && <details className="review-notes" data-testid="review-notes"><summary><span className="review-symbol">!</span>{fidelity.reasons.length} source {fidelity.reasons.length === 1 ? 'question' : 'questions'} to resolve<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg></summary><ul>{fidelity.reasons.map((reason, index) => <li key={index}>{reason}</li>)}</ul></details>}
 
     <div className={`viewer-workarea${selected ? ' has-details' : ''}`}>
       <div ref={canvas} className="diagram-canvas" data-testid="diagram-canvas" data-layout-state={state.phase}>
+        <div className="viewer-chrome-top">
+          <header className="viewer-toolbar">
+            <div className="diagram-title"><span className="eyebrow">Architecture / interactive view</span><h1>{model.title}</h1></div>
+            <div className="toolbar-controls"><label className="perspective-label"><span className="sr-only">Perspective</span><select aria-label="Perspective" value={viewId} onChange={event => setViewId(event.target.value)}><option value="">Complete architecture</option>{model.views.map(view => <option key={view.id} value={view.id}>{view.label}</option>)}</select></label>
+            <button type="button" className="secondary-button fit-button" onClick={fit} disabled={!state.geometry} aria-label="Fit diagram"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="M7 3H3v4m10-4h4v4M3 13v4h4m10-4v4h-4" /></svg><span>Fit view</span></button>
+            <span className={`fidelity-status ${fidelity.status}`} data-testid="fidelity-status"><span className="status-dot" />{fidelity.status === 'draft' ? 'Draft' : 'Source reviewed'}</span></div>
+          </header>
+          {usable && state.phase === 'ready' && !!nodes.length && <div className="canvas-context"><span className="canvas-context-dot" /><span>{selectedView?.label ?? 'Complete architecture'}</span><span className="canvas-count">{visibleModel.nodes.length} components · {visibleModel.edges.length} relationships</span></div>}
+          {extendsCanvas && <p className="canvas-limit" data-testid="canvas-limit" role="status">This view extends beyond the canvas.<br />Pan or choose a perspective.</p>}
+        </div>
         {!usable && hostSize.width >= 0 && <div className="viewer-size-alert" role="alert"><strong>Give the viewer a width and height.</strong><p>Set an explicit height on its host container, for example <code>height: 650px</code>, and allow it to fill the available width.</p></div>}
         {usable && state.phase === 'loading' && <div className="canvas-state" role="status"><div className="loading-mark"><Glyph kind="service" size={28} /></div><h2>Preparing your architecture</h2><p>Loading local fonts, measuring components and routing connections.</p></div>}
         {usable && state.phase === 'error' && <div className="canvas-state error-state" role="alert"><span className="state-symbol">!</span><h2>Layout needs attention</h2><p>{state.message}</p><p className="state-help">Share this diagnostic with your agent to correct the model or its supported layout.</p></div>}
         {usable && state.phase === 'ready' && !nodes.length && <div className="canvas-state"><Glyph kind="group" size={32} /><h2>No components in this perspective</h2><p>Choose another perspective or ask your agent to add the missing architecture.</p></div>}
         {usable && state.phase === 'ready' && !!nodes.length && <>
-          <div className="canvas-context"><span className="canvas-context-dot" /><span>{selectedView?.label ?? 'Complete architecture'}</span><span className="canvas-count">{visibleModel.nodes.length} components · {visibleModel.edges.length} relationships</span></div>
-          {extendsCanvas && <p className="canvas-limit" data-testid="canvas-limit" role="status">This view extends beyond the canvas.<br />Pan or choose a perspective.</p>}
           <ReactFlow<DiagramNode, DiagramEdge> nodes={nodes} edges={edges} nodeTypes={NODE_TYPES} edgeTypes={EDGE_TYPES}
             onInit={setFlow} onNodeClick={(_, node) => setSelectedId(node.id)} onEdgeClick={(_, edge) => setSelectedId(edge.id)} onPaneClick={() => setSelectedId(undefined)}
             nodesDraggable={false} nodesConnectable={false} edgesReconnectable={false} deleteKeyCode={null} minZoom={0.15} maxZoom={1.8} colorMode="dark"
@@ -204,23 +212,27 @@ function Viewer({ model, evidence }: { model: Architecture; evidence?: Validatio
             aria-label="Interactive architecture diagram">
             <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#343d3e" />
           </ReactFlow>
-          <div className="canvas-legend" aria-label="Component legend">{(['service', 'gateway', 'database', 'queue', 'external'] as const).filter(kind => visibleModel.nodes.some(node => node.kind === kind)).map(kind => <span key={kind}><Glyph kind={kind} size={13} />{kind === 'queue' ? 'Queue' : kind.charAt(0).toUpperCase() + kind.slice(1)}</span>)}</div>
-          <div className="canvas-navigation"><button type="button" className="icon-button" onClick={() => void flow?.zoomOut({ duration: reducedMotion ? 0 : 150 })} aria-label="Zoom out">−</button><output aria-label="Zoom level">{Math.round(zoom * 100)}%</output><button type="button" className="icon-button" onClick={() => void flow?.zoomIn({ duration: reducedMotion ? 0 : 150 })} aria-label="Zoom in">+</button></div>
         </>}
+        <div className="viewer-chrome-bottom">
+          {usable && state.phase === 'ready' && !!nodes.length && <div className="viewer-chrome-aux">
+            <div className="canvas-legend" aria-label="Component legend">{(['service', 'gateway', 'database', 'queue', 'external'] as const).filter(kind => visibleModel.nodes.some(node => node.kind === kind)).map(kind => <span key={kind}><Glyph kind={kind} size={13} />{kind === 'queue' ? 'Queue' : kind.charAt(0).toUpperCase() + kind.slice(1)}</span>)}</div>
+            <div className="canvas-navigation"><button type="button" className="icon-button" onClick={() => void flow?.zoomOut({ duration: reducedMotion ? 0 : 150 })} aria-label="Zoom out">−</button><output aria-label="Zoom level">{Math.round(zoom * 100)}%</output><button type="button" className="icon-button" onClick={() => void flow?.zoomIn({ duration: reducedMotion ? 0 : 150 })} aria-label="Zoom in">+</button></div>
+          </div>}
+          <footer className="viewer-footer">
+            <nav className="presentation-steps" aria-label="Presentation steps"><button type="button" className="icon-button step-button" aria-label="Previous step" disabled={stepIndex === 0 || !step} onClick={() => setStepIndex(index => index - 1)}><Arrow back /></button>
+              <div className="step-narrative" data-testid="step-narrative" aria-live="polite">{step ? <><span className="step-index">{String(stepIndex + 1).padStart(2, '0')}<span> / {String(visibleModel.steps.length).padStart(2, '0')}</span></span><div><strong>{step.title}</strong>{step.description && <p>{step.description}</p>}</div></> : <span className="no-steps">Explore the components and their evidence</span>}</div>
+              <button type="button" className="icon-button step-button" aria-label="Next step" disabled={!step || stepIndex >= visibleModel.steps.length - 1} onClick={() => setStepIndex(index => index + 1)}><Arrow /></button>
+            </nav>
+            <ValidationStatus state={state} evidence={evidence} />
+          </footer>
+          {selectedView && <div className="view-context" data-testid="view-context"><span className="eyebrow">Perspective context</span><span>{selectedView.outside?.length ? `${selectedView.outside.length} relationships declared outside this perspective.` : 'All included relationships retain their endpoints.'}</span>{selectedView.outside?.map(outside => <span key={outside.edge}>{model.edges.find(edge => edge.id === outside.edge)?.label ?? outside.edge}: {outside.reason}</span>)}{selectedView.continuations?.map(continuation => <button type="button" key={`${continuation.edge}-${continuation.view}`} onClick={() => setViewId(continuation.view)}>Continue {model.edges.find(edge => edge.id === continuation.edge)?.label ?? continuation.edge} in {model.views.find(view => view.id === continuation.view)?.label ?? continuation.view} <Arrow /></button>)}</div>}
+        </div>
       </div>
       {selected && <Details model={model} selection={selected} onClose={closeDetails} />}
     </div>
 
     {state.diagnostics.length > 0 && <details className="geometry-diagnostics" open><summary>Geometry checks need attention · {state.diagnostics.length}</summary><ul>{state.diagnostics.map((diagnostic, index) => <li key={index}><strong>{diagnostic.check}</strong> · {diagnostic.ids.join(', ')}<p>{diagnostic.message}</p></li>)}</ul></details>}
 
-    <footer className="viewer-footer">
-      <nav className="presentation-steps" aria-label="Presentation steps"><button type="button" className="icon-button step-button" aria-label="Previous step" disabled={stepIndex === 0 || !step} onClick={() => setStepIndex(index => index - 1)}><Arrow back /></button>
-        <div className="step-narrative" data-testid="step-narrative" aria-live="polite">{step ? <><span className="step-index">{String(stepIndex + 1).padStart(2, '0')}<span> / {String(visibleModel.steps.length).padStart(2, '0')}</span></span><div><strong>{step.title}</strong>{step.description && <p>{step.description}</p>}</div></> : <span className="no-steps">Explore the components and their evidence</span>}</div>
-        <button type="button" className="icon-button step-button" aria-label="Next step" disabled={!step || stepIndex >= visibleModel.steps.length - 1} onClick={() => setStepIndex(index => index + 1)}><Arrow /></button>
-      </nav>
-      <ValidationStatus state={state} evidence={evidence} />
-    </footer>
-    {selectedView && <div className="view-context" data-testid="view-context"><span className="eyebrow">Perspective context</span><span>{selectedView.outside?.length ? `${selectedView.outside.length} relationships declared outside this perspective.` : 'All included relationships retain their endpoints.'}</span>{selectedView.outside?.map(outside => <span key={outside.edge}>{model.edges.find(edge => edge.id === outside.edge)?.label ?? outside.edge}: {outside.reason}</span>)}{selectedView.continuations?.map(continuation => <button type="button" key={`${continuation.edge}-${continuation.view}`} onClick={() => setViewId(continuation.view)}>Continue {model.edges.find(edge => edge.id === continuation.edge)?.label ?? continuation.edge} in {model.views.find(view => view.id === continuation.view)?.label ?? continuation.view} <Arrow /></button>)}</div>}
     <MeasurementSurface key={viewId} ref={surface} model={visibleModel} />
   </section>;
 }

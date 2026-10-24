@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.55.0] - 2026-10-23
+
+### Changed
+
+- Keep diagram controls consistent across contextual visuals, with floating controls and stable 90% canvas framing.
+
 ## [3.54.0] - 2026-10-23
 
 ### Added

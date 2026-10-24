@@ -306,3 +306,4 @@ superseded unless a bullet explicitly records the current two-posture contract.
 - [constraint] Every release bootstrap verifies the exact asset checksum before execution; native lifecycle help preserves installation state, and updater shortcuts must respect the selected configuration root.
 - [decision] Consumer test dashboards reuse ui-design and existing runners; batches carry API requests or test references, while trusted project configuration owns execution.
 - [decision] Architecture diagrams accept sources through the native agent; internal models separate source fidelity from measured layout and standalone viewer validation.
+- [decision] Architecture diagrams adapt graph visuals to context while preserving standard floating controls and 90% canvas framing.

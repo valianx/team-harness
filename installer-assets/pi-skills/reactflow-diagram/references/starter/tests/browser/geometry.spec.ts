@@ -6,10 +6,15 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720
       await page.setViewportSize(viewport);
       await page.goto(`/?fixture=${fixture}`);
       await expect(page.locator('[data-layout-state="ready"]')).toBeVisible();
+      const viewer = await page.locator('.architecture-viewer').boundingBox();
+      await page.mouse.move(viewer!.x + 12, viewer!.y + 12);
 
-      if (fixture === 'dense') await expect(page.getByTestId('canvas-limit')).toContainText('Pan or choose a perspective');
       await page.getByRole('combobox', { name: 'Perspective' }).selectOption('');
       await expect(page.locator('[data-layout-state="ready"]')).toBeVisible();
+      if (fixture === 'dense') {
+        for (let zoom = 0; zoom < 8; zoom++) await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+        await expect(page.getByTestId('canvas-limit')).toContainText('Pan or choose a perspective');
+      }
       if (fixture === 'nested') {
         await expect(page.locator('.react-flow__node-group[data-id="reserved"]')).toHaveCount(1);
         await expect(page.locator('.react-flow [data-parent="reserved"]')).toHaveCount(0);
@@ -61,7 +66,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720
         const clipped = [...document.querySelectorAll('.react-flow__node .component-label, .react-flow__node .group-title, .edge-label[data-relationship]')].filter(element => element.scrollHeight > element.clientHeight + 1 || element.scrollWidth > element.clientWidth + 1).map(element => element.textContent);
         return { geometry, diagnostics: checkGeometry(model, geometry), attachmentErrors, clipped,
           actualRoutes: edges.map(edge => ({ id: edge.id, sections: edge.sections })), expectedRoutes: expected.edges.map((edge: { id: string; sections: unknown }) => ({ id: edge.id, sections: edge.sections })),
-          measurementIdentity: { font: getComputedStyle(document.querySelector('.component-label')!).fontFamily, browser: navigator.userAgent, viewport: { width: innerWidth, height: innerHeight }, kit: '1.0.0' } };
+          measurementIdentity: { font: getComputedStyle(document.querySelector('.component-label')!).fontFamily, browser: navigator.userAgent, viewport: { width: innerWidth, height: innerHeight }, kit: '1.1.0' } };
       }, fixture);
 
       await testInfo.attach('rendered-geometry.json', { body: JSON.stringify(result, null, 2), contentType: 'application/json' });
