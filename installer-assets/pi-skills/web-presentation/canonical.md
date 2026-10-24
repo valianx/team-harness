@@ -17,7 +17,9 @@ engine, package manager, identity, dependency pins, assets and manual adjustment
 Use its incumbent workflow for other engines; migration needs its own request.
 For Slidev, edit only the relevant source or named slide. A retry updates the
 same section instead of replacing the deck. Read [authoring](references/authoring.md)
-for templates, supported layouts and incremental editing.
+for templates, supported layouts and incremental editing. For a new deck, choose
+an optional [visual theme](references/themes.md) from its content and audience;
+preserve explicit visual preferences and existing project styling.
 
 For a new deck, resolve this installation's `skill_root` and run its scaffold
 outside installed assets. The copied project owns its pinned engine, theme and

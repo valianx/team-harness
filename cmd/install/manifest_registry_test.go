@@ -435,6 +435,18 @@ func TestBuildOpencodeManifests_WebPresentationPayload(t *testing.T) {
 		"references/templates/feature/slides.md",
 		"references/templates/integration/slides.md",
 		"references/templates/architecture/slides.md",
+		"references/themes/registry.json",
+		"references/themes/shared.css",
+		"references/themes/technical/style.css",
+		"references/themes/natural/style.css",
+		"references/themes/cosmic/style.css",
+		"references/themes/editorial/style.css",
+		"references/themes/workshop/style.css",
+		"references/themes/technical/public/images/harness-theme.svg",
+		"references/themes/natural/public/images/harness-theme.svg",
+		"references/themes/cosmic/public/images/harness-theme.svg",
+		"references/themes/editorial/public/images/harness-theme.svg",
+		"references/themes/workshop/public/images/harness-theme.svg",
 	} {
 		want := "{config_root}/skills/web-presentation/" + file
 		source, ok := emitted[want]
@@ -468,6 +480,18 @@ func TestBuildOpencodeManifests_WebPresentationPayload(t *testing.T) {
 		"references/starter/vendor/slidev-addon-harness-1.0.0.tgz",
 		"references/starter/gitignore.txt",
 		"references/kit/layouts/h-cover.vue",
+		"references/themes/registry.json",
+		"references/themes/shared.css",
+		"references/themes/technical/style.css",
+		"references/themes/natural/style.css",
+		"references/themes/cosmic/style.css",
+		"references/themes/editorial/style.css",
+		"references/themes/workshop/style.css",
+		"references/themes/technical/public/images/harness-theme.svg",
+		"references/themes/natural/public/images/harness-theme.svg",
+		"references/themes/cosmic/public/images/harness-theme.svg",
+		"references/themes/editorial/public/images/harness-theme.svg",
+		"references/themes/workshop/public/images/harness-theme.svg",
 	} {
 		source := emitted["{config_root}/skills/web-presentation/"+file]
 		expected, err := fs.ReadFile(EmbeddedAssets(), source)

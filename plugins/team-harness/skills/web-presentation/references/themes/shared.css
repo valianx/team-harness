@@ -1,0 +1,79 @@
+.harness-slide {
+  --slidev-code-font-size: 22px;
+}
+
+.harness-slide .harness-body code {
+  color: var(--h-code-text);
+  background-color: var(--h-code-background);
+}
+
+.harness-slide .harness-body pre {
+  color: var(--h-code-text);
+  background-color: var(--h-code-background);
+  border-color: var(--h-line);
+}
+
+.harness-slide .harness-body pre code {
+  color: inherit;
+  background-color: transparent;
+}
+
+.harness-slide .harness-body pre.shiki span[style] {
+  color: color-mix(in srgb, var(--shiki-light, var(--h-code-text)) 45%, var(--h-code-text));
+}
+
+html.dark .harness-slide .harness-body pre.shiki span[style] {
+  color: color-mix(in srgb, var(--shiki-dark, var(--h-code-text)) 45%, var(--h-code-text));
+}
+
+.harness-slide :is(button, input, select, textarea),
+.harness-slide .harness-frame button {
+  color: var(--h-text);
+  background-color: var(--h-surface);
+  border-color: var(--h-line);
+  accent-color: var(--h-accent);
+  caret-color: var(--h-accent);
+}
+
+.harness-slide button:hover:not(:disabled),
+.harness-slide .harness-frame button:hover:not(:disabled) {
+  background-color: var(--h-control-hover);
+  border-color: var(--h-accent);
+}
+
+.harness-slide :is(input, textarea)::placeholder {
+  color: var(--h-muted);
+}
+
+.harness-slide :is(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline-color: var(--h-accent);
+}
+
+.harness-slide :is(input, select, textarea)[aria-invalid="true"] {
+  border-color: var(--h-error);
+}
+
+.harness-slide .harness-frame-window,
+.harness-slide .harness-frame-placeholder,
+.harness-slide .harness-frame-fallback {
+  background-color: var(--h-surface);
+  border-color: var(--h-line);
+}
+
+.harness-slide .harness-frame iframe,
+.harness-slide .harness-frame-fallback img {
+  background-color: var(--h-background);
+}
+
+.harness-slide .harness-frame-status,
+.harness-slide .harness-frame-placeholder,
+.harness-slide .harness-frame-fallback p,
+.harness-slide .harness-frame-exit-hint {
+  color: var(--h-muted);
+}
+
+.harness-slide .harness-frame-fallback-error,
+.harness-slide [role="alert"],
+.harness-slide .harness-frame[data-harness-frame-state="error"] .harness-frame-status {
+  color: var(--h-error);
+}

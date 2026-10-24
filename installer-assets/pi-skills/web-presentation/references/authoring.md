@@ -12,8 +12,10 @@ The kit extends the MIT default Slidev theme. Native navigation, presenter mode,
 Markdown imports, Mermaid and `v-click` reveals remain available. Consult the
 [syntax guide](https://sli.dev/guide/syntax) and
 [layouts guide](https://sli.dev/guide/layout) for engine behavior.
-New templates set native `colorSchema: dark` so Mermaid labels match the kit's
-dark visual region. Preserve that alignment and check label contrast in captures.
+New templates default to native `colorSchema: dark`. The optional visual-theme
+selection aligns that setting with its palette. Keep diagram and stage colors
+aligned, and check label contrast in captures; external illustrations retain their
+own colors and still need visual review.
 
 | Layout | Composition |
 | --- | --- |

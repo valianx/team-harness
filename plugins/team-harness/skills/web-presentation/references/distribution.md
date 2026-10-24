@@ -7,13 +7,15 @@ for browser verification. Do not install into the skill tree. Resolve the curren
 skill root and select a fresh absolute output path:
 
 ```bash
-node "$skill_root/references/scripts/create-deck.mjs" --template feature --out /absolute/deck
+node "$skill_root/references/scripts/create-deck.mjs" --template feature --visual-theme natural --out /absolute/deck
 cd /absolute/deck
 npm ci
 npm run dev
 ```
 
-Choose `feature`, `integration` or `architecture`. Creation refuses an existing
+Choose `feature`, `integration` or `architecture` independently from an optional
+[visual theme](themes.md); selected CSS and favicon assets become project-owned.
+Omit `--visual-theme` for the existing default. Creation refuses an existing
 output directory; inspect an existing deck before editing it. The copied project
 contains native Markdown, public assets, scripts, tests and its vendor archive.
 The root package/lockfile pin Slidev 53.0.0, the default theme 0.25.0 and

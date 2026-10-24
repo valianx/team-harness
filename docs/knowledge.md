@@ -3,6 +3,8 @@
 
 ## Current workflow guidance
 
+- [pattern] Presentation visual themes are consumer-owned palettes independent of narrative templates; shared kit geometry and native controls retain their behavior.
+
 - [constraint] Controlled React Flow nodes retain measured dimensions during presentation updates so initialized handles and connections stay visible.
 
 - [decision] Web presentations use a project-owned pinned Slidev addon archive; Team Harness updates never upgrade an existing deck.

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.56.0] - 2026-10-24
+
+### Added
+
+- Reuse five presentation styles across narrative templates while preserving shared controls and existing decks.
+
 ## [3.55.0] - 2026-10-23
 
 ### Changed

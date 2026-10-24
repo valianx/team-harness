@@ -175,6 +175,16 @@ jobs:
           npm ci --prefix "$RUNNER_TEMP/web-presentations/architecture" --no-audit --no-fund
           npm --prefix "$RUNNER_TEMP/web-presentations/architecture" run check
           npm --prefix "$RUNNER_TEMP/web-presentations/architecture" run build -- --base /talks/architecture/
+      - name: Verify every reusable visual theme
+        run: |
+          for visual_theme in technical natural cosmic editorial workshop; do
+            theme_project="$RUNNER_TEMP/web-presentations/$visual_theme"
+            node skills/web-presentation/references/scripts/create-deck.mjs --template feature --visual-theme "$visual_theme" --out "$theme_project"
+            npm ci --prefix "$theme_project" --no-audit --no-fund
+            WEB_PRESENTATION_PROJECT="$theme_project" WEB_PRESENTATION_EVIDENCE_DIR="$RUNNER_TEMP/web-presentations/theme-evidence/$visual_theme/dev" npm --prefix "$theme_project" run test:browser -- tests/browser/catalog.spec.mjs tests/browser/consumer.spec.mjs
+            npm --prefix "$theme_project" run build -- --base "/talks/$visual_theme/"
+            WEB_PRESENTATION_PROJECT="$theme_project" WEB_PRESENTATION_STATIC=1 WEB_PRESENTATION_BASE_URL="http://127.0.0.1:4173/talks/$visual_theme/" WEB_PRESENTATION_SERVER_COMMAND="npm run preview -- --base /talks/$visual_theme/ --port 4173 --host 127.0.0.1" WEB_PRESENTATION_EVIDENCE_DIR="$RUNNER_TEMP/web-presentations/theme-evidence/$visual_theme/static" npm --prefix "$theme_project" run test:browser -- tests/browser/production.spec.mjs
+          done
       - name: Retain browser and static evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -183,6 +193,7 @@ jobs:
           path: |
             ${{ runner.temp }}/web-presentations/dev-evidence/
             ${{ runner.temp }}/web-presentations/static-evidence/
+            ${{ runner.temp }}/web-presentations/theme-evidence/
           if-no-files-found: warn
 
   windows-hooks:
