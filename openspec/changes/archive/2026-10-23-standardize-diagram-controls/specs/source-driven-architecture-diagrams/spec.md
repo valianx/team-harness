@@ -2,7 +2,7 @@
 
 ### Requirement: Reusable visual system
 
-The kit SHALL provide reusable components for services, gateways, databases, queues, external systems and groups. Diagram backgrounds and component appearance SHALL be adaptable to the source context and audience while control appearance, placement and interaction remain standardized across generated diagrams. Styling and layout SHALL consume the same typography, spacing, port and group-header tokens for measured graph elements. Long text SHALL remain accessible without clipping or diagram-specific geometry repairs; longer descriptions SHALL be available in details. A group SHALL represent visual containment without implicitly asserting a software architecture classification.
+Generated diagrams SHALL reuse a shipped component catalog for services, gateways, databases, queues/brokers, external systems and groups. Diagram backgrounds and component appearance SHALL be adaptable to the source context and audience while control appearance, placement and interaction remain standardized across generated diagrams. Styling and layout SHALL consume the same typography, spacing, port and group-header tokens for measured graph elements. Long text SHALL remain accessible without clipping or diagram-specific geometry repairs; longer descriptions SHALL be available in details. A group SHALL represent visual containment without implicitly asserting a software architecture classification.
 
 #### Scenario: Long mixed component labels
 - **WHEN** a diagram contains mixed component types and long names

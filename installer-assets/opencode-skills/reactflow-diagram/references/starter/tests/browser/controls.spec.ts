@@ -9,6 +9,11 @@ async function ready(page: Page, fixture = 'sample') {
 }
 
 async function visibility(page: Page, opacity: '0' | '1') {
+  for (const selector of ['.viewer-toolbar', '.viewer-footer', '.canvas-context', '.canvas-legend', '.canvas-navigation']) {
+    await expect(page.locator(selector)).toHaveCount(1);
+  }
+  const perspective = await page.getByRole('combobox', { name: 'Perspective' }).inputValue();
+  await expect(page.locator('.view-context')).toHaveCount(perspective ? 1 : 0);
   for (const element of await page.locator(controls).all()) await expect(element).toHaveCSS('opacity', opacity);
   await expect(page.locator('.viewer-toolbar')).toHaveCSS('pointer-events', opacity === '0' ? 'none' : 'auto');
   await expect(page.locator('.canvas-navigation')).toHaveCSS('pointer-events', opacity === '0' ? 'none' : 'auto');
