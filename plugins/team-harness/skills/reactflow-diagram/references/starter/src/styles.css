@@ -114,6 +114,7 @@ svg { flex: 0 0 auto; }
 .edge-label { position: absolute; padding: 5px 8px; border: 1px solid #48585a; border-radius: 5px; background: #222c2e; color: #c9d2ce; font: 400 var(--label-font)/1.35 var(--font-family), sans-serif; text-align: center; white-space: normal; max-width: 200px; overflow-wrap: anywhere; pointer-events: all; cursor: pointer; }
 .edge-label.is-focused, .edge-label.is-selected { color: #b9e4cf; border-color: #639e7f; }
 .edge-label.is-dimmed { opacity: .6; }
+.architecture-viewer .react-flow__edgelabel-renderer { z-index: 3; }
 .relationship-label-text { display: block; }
 .architecture-viewer .react-flow__attribution { bottom: 1px; right: 1px; background: transparent; font-size: 7px; opacity: .4; }
 .architecture-viewer .react-flow__attribution a { color: #acc1b0; }

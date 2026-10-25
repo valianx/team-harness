@@ -34,7 +34,7 @@ async function assertCheckReportsEach(rootDir, relativePaths) {
 }
 
 try {
-  for (const directory of [".claude-plugin", "agents", "docs", "hooks/ts/dist", "hooks/ts/entry"]) {
+  for (const directory of [".claude-plugin", "agents", "docs", "hooks/ts/dist", "hooks/ts/entry", "runtime/schema"]) {
     await mkdir(join(rootDir, directory), { recursive: true });
   }
   for (const file of [...shipped, ...scratch]) {
@@ -44,6 +44,9 @@ try {
   await writeFile(join(rootDir, ".claude-plugin", "hooks.json"), "active hooks fixture\n");
   await writeFile(join(rootDir, "agents", "retired-agent.md"), "retired agent fixture\n");
   await writeFile(join(rootDir, "docs", "agent-authoring.md"), "retired doc fixture\n");
+  await writeFile(join(rootDir, "runtime/schema/runtime-docs.json"), JSON.stringify({
+    schema_version: 1, documents: ["agent-authoring.md"],
+  }));
 
   await syncClaudePackageAssets({ rootDir, check: false });
   for (const file of shipped) {

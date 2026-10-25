@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "documents": [
+    "agent-authoring.md",
+    "code-comments.md",
+    "code-hygiene-gate.md",
+    "context7-usage.md",
+    "conventions.md",
+    "gcp-infra.md",
+    "observability.md",
+    "output-contract-patterns.md",
+    "permission-provisioning.md",
+    "pipeline-lanes.md",
+    "plan-shards.md",
+    "testing.md",
+    "verification-packet.md",
+    "voice-guide.md",
+    "worktree-discipline.md"
+  ]
+}

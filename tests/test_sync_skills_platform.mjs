@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { chmod, cp, lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -172,6 +173,35 @@ try {
   await writeFile(resourceSource, Buffer.from([0, 1, 2, 255]));
   await rm(projectedDirectory, { recursive: true, force: true });
   const { opencodeGenerated, codexGenerated, piGenerated, names } = await syncSkills({ rootDir: fixtureRoot });
+  for (const name of opencodeGenerated) {
+    const nativeName = name === "find-bugs" ? "th-find-bugs" : name;
+    const frontmatter = (await readFile(join(fixtureRoot, "installer-assets/opencode-skills", nativeName, "SKILL.md"), "utf8"))
+      .match(/^---\n([\s\S]*?)\n---\n/)?.[1];
+    const configValue = frontmatter?.match(/^  team-harness\/config: (.+)$/m)?.[1];
+    assert.ok(configValue, `${name} must carry machine-readable settings metadata`);
+    assert.equal(JSON.parse(configValue), "__TEAM_HARNESS_OPENCODE_CONFIG__",
+      `native ${name} metadata must carry a settings value for the installer's executable binding`);
+  }
+  const packagedRoot = join(fixtureRoot, "plugins/team-harness");
+  const packagedScanner = join(packagedRoot, "skills/audit-security/scripts/security_scan.py");
+  const resolveScanner = (scanner, args = []) => JSON.parse(execFileSync(
+    process.platform === "win32" ? "python" : "python3",
+    ["-c", [
+      "import contextlib, io, json, runpy, sys",
+      "sys.argv = sys.argv[1:]",
+      "scanner = runpy.run_path(sys.argv[0])",
+      "with contextlib.redirect_stdout(io.StringIO()): failures = scanner['check_0_roster_reachability']()",
+      "print(json.dumps({'root': str(scanner['REPO_ROOT']), 'failures': failures}))",
+    ].join("\n"), scanner, ...args],
+    { encoding: "utf8" },
+  ));
+  assert.deepEqual(resolveScanner(packagedScanner), { root: resolve(packagedRoot), failures: 0 },
+    "the packaged scanner must audit the actual roster above per-skill agents/openai.yaml metadata");
+  const explicitRoot = join(rootDir, "explicit-assets");
+  await mkdir(join(explicitRoot, "agents"), { recursive: true });
+  await cp(join(packagedRoot, "agents"), join(explicitRoot, "agents"), { recursive: true });
+  assert.deepEqual(resolveScanner(packagedScanner, ["--root", explicitRoot]), { root: resolve(explicitRoot), failures: 0 },
+    "an explicit asset root remains authoritative outside the package ancestry");
   assert.ok(Array.isArray(piGenerated), "Pi must have an explicit native projection result");
   assert.deepEqual(piGenerated, names, "every canonical skill receives a Pi projection, including lifecycle overrides");
   const piCrossRepoSkill = await readFile(join(piRoot, "cross-repo/SKILL.md"), "utf8");

@@ -156,10 +156,17 @@ requires it.
 
 **Symptom:** After running `/plugin marketplace update`, changes don't seem to apply.
 
-**Fix:** After the marketplace update, reload the plugin:
+**Fix:** Run `/th:update` to refresh the catalog and download the selected
+snapshot. For the equivalent Claude Code CLI sequence:
 
 ```
-/plugin marketplace update team-harness-marketplace
+claude plugin marketplace update team-harness-marketplace
+claude plugin update th@team-harness-marketplace
+```
+
+Then activate the downloaded snapshot in the current Claude Code conversation:
+
+```
 /reload-plugins
 ```
 

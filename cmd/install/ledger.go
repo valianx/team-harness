@@ -205,6 +205,9 @@ func validateLedgerOwnership(entry LedgerEntry) error {
 	if err := validateOwnershipTags(entry.Owns); err != nil {
 		return err
 	}
+	if strings.HasPrefix(entry.Component, "reference-docs-") && len(entry.Owns.ConfigKeys) != 0 {
+		return fmt.Errorf("runtime document component %q cannot own settings", entry.Component)
+	}
 	if entry.Component == opencodeGuideComponent &&
 		(len(entry.Owns.Files) != 1 || entry.Owns.Files[0] != "{config_root}/"+opencodeGuideRelativePath ||
 			len(entry.Owns.ConfigKeys) != 1 || entry.Owns.ConfigKeys[0] != opencodeGuideOwnershipKey) {
@@ -234,6 +237,8 @@ func validateLedgerOwnership(entry LedgerEntry) error {
 		case strings.HasPrefix(entry.Component, "skill-"):
 			derived := strings.NewReplacer("/", "-", ".", "-", "_", "-").Replace(strings.TrimPrefix(clean, "skills/"))
 			valid = strings.HasPrefix(clean, "skills/") && entry.Component == "skill-"+strings.Trim(derived, "-")
+		case strings.HasPrefix(entry.Component, "reference-docs-"):
+			valid = runtimeDocumentOwnershipMatches(entry.Component, rel)
 		case strings.HasPrefix(entry.Component, "reference-"):
 			derived := strings.NewReplacer("/", "-", ".", "-", "_", "-").Replace(strings.TrimPrefix(clean, "th-references/agents/"))
 			valid = strings.HasPrefix(clean, "th-references/agents/") && entry.Component == "reference-"+strings.Trim(derived, "-")

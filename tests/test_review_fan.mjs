@@ -39,6 +39,22 @@ async function withRepository(callback) {
   }
 }
 
+async function withDivergentRepository(callback) {
+  return withRepository(async (root) => {
+    const common = (await run("git", ["-C", root, "rev-parse", "HEAD"])).stdout.trim();
+    await git(root, ["checkout", "-q", "-b", "base-side"]);
+    await commit(root, {
+      "src/auth.py": "def authorize(user):\n    return True\n",
+      "assets/blob.bin": Buffer.from([0, 1, 2, 0, 255]),
+    }, "base-side controls");
+    const base = (await run("git", ["-C", root, "rev-parse", "HEAD"])).stdout.trim();
+    await git(root, ["checkout", "-q", "-b", "feature-side", common]);
+    await commit(root, { "src/feature.js": "export const value = 1;\n" }, "feature change");
+    const head = (await run("git", ["-C", root, "rev-parse", "HEAD"])).stdout.trim();
+    return callback(root, { common, base, head });
+  });
+}
+
 async function withOpenSpecTransportFixture(expectedChange, callback) {
   const directory = await mkdtemp(path.join(tmpdir(), "th-openspec-transport-"));
   const previousPath = process.env.PATH;
@@ -204,6 +220,103 @@ await check("derives the changed surface from the repository, not from the calle
   assert.equal(result.package.read_only, true);
 }));
 
+await check("binds a divergent three-dot package to the effective merge-base comparison", async () => withDivergentRepository(async (root, { common, base, head }) => {
+  const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: `${base}...${head}`, lens: "qa" });
+  assert.equal(result.verdict, "pass");
+  const packaged = result.package;
+  assert.deepEqual(packaged.scope.range_paths, ["src/feature.js"]);
+  const coordinatePaths = (await run("git", ["-C", root, "diff", "--name-only", packaged.coordinates.base, packaged.coordinates.head])).stdout.trim().split("\n");
+  assert.deepEqual(coordinatePaths, ["src/feature.js"]);
+  assert.deepEqual(packaged.coordinates, { base: common, head, commit_or_range: `${common}..${head}`, source: "derived" });
+  assert.deepEqual(packaged.scope.paths, ["src/feature.js"]);
+  assert.equal(packaged.risk_signals.applies, false);
+  assert.equal(packaged.risk_signals.ambiguous, false);
+  assert.deepEqual(packaged.required_lenses, ["qa"]);
+}));
+
+await check("retains both requested endpoints for a divergent two-dot comparison", async () => withDivergentRepository(async (root, { base, head }) => {
+  const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: `${base}..${head}`, lens: "qa" });
+  assert.equal(result.verdict, "pass");
+  assert.deepEqual(result.package.coordinates, { base, head, commit_or_range: `${base}..${head}`, source: "derived" });
+  assert.deepEqual(result.package.scope.range_paths, ["assets/blob.bin", "src/auth.py", "src/feature.js"]);
+  assert.equal(result.package.risk_signals.applies, true);
+  assert.equal(result.package.risk_signals.ambiguous, true);
+  assert.deepEqual(result.package.required_lenses, ["qa"]);
+}));
+
+await check("returns immutable coordinates for symbolic two-dot endpoints", async () => withRepository(async (root) => {
+  const base = (await run("git", ["-C", root, "rev-parse", "HEAD"])).stdout.trim();
+  await commit(root, { "src/feature.js": "export const value = 1;\n" }, "feature change");
+  const head = (await run("git", ["-C", root, "rev-parse", "HEAD"])).stdout.trim();
+  const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: "main~1..main", lens: "qa" });
+  assert.equal(result.verdict, "pass");
+  assert.deepEqual(result.package.coordinates, { base, head, commit_or_range: `${base}..${head}`, source: "derived" });
+}));
+
+await check("keeps checker proofs and risk reads anchored when symbolic refs advance", async () => withRepository(async (root) => {
+  const boundaryFiles = {};
+  for (const relative of ["skills/pipeline/scripts/review-surface.mjs", "skills/pipeline/scripts/cli-entrypoint.mjs"]) {
+    boundaryFiles[relative] = await readFile(new URL(`../${relative}`, import.meta.url), "utf8");
+  }
+  boundaryFiles["tools/codex-runtime/sync-skills.mjs"] = `
+import { execFileSync } from "node:child_process";
+for (const endpoint of ["base", "head"]) {
+  const target = execFileSync("git", ["rev-parse", "refs/heads/advance-" + endpoint], { encoding: "utf8" }).trim();
+  execFileSync("git", ["update-ref", "refs/heads/review-" + endpoint, target]);
+}
+`;
+  await commit(root, boundaryFiles, "review-surface boundary");
+  const base = (await run("git", ["-C", root, "rev-parse", "HEAD"])).stdout.trim();
+  const mirror = "plugins/team-harness/skills/demo/scripts/check.mjs";
+  await commit(root, {
+    "src/feature.js": "export const value = 1;\n",
+    "skills/demo/scripts/check.mjs": "export const value = 1;\n",
+    [mirror]: "export const value = 1;\n",
+  }, "reviewed change");
+  const head = (await run("git", ["-C", root, "rev-parse", "HEAD"])).stdout.trim();
+  await commit(root, {
+    "src/feature.js": "export const api_key = process.env.API_KEY;\n",
+    [mirror]: "export const value = 2;\n",
+    "assets/later.bin": Buffer.from([0, 2, 0, 255]),
+  }, "later changes outside review");
+  const later = (await run("git", ["-C", root, "rev-parse", "HEAD"])).stdout.trim();
+  for (const [name, target] of [["review-base", base], ["review-head", head], ["advance-base", head], ["advance-head", later]]) {
+    await git(root, ["update-ref", `refs/heads/${name}`, target]);
+  }
+  const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: "review-base..review-head", lens: "qa" });
+  assert.equal(result.verdict, "pass");
+  const advancedHead = (await run("git", ["-C", root, "rev-parse", "review-head"])).stdout.trim();
+  assert.equal(advancedHead, later, "the fixture did not advance the symbolic endpoint");
+  assert.equal(result.package.review_surface.reviewed_head, head);
+  assert.deepEqual(result.package.review_surface.excluded.map((entry) => entry.path), [mirror]);
+  assert.deepEqual(result.package.scope.range_paths, [mirror, "skills/demo/scripts/check.mjs", "src/feature.js"]);
+  assert.deepEqual(result.package.scope.paths, ["skills/demo/scripts/check.mjs", "src/feature.js"]);
+  assert.deepEqual(result.package.coordinates, { base, head, commit_or_range: `${base}..${head}`, source: "derived" });
+  assert.equal(result.package.risk_signals.applies, false);
+  assert.equal(result.package.risk_signals.ambiguous, false);
+  assert.equal(result.package.read_only, true);
+  assert.equal((await run("git", ["-C", root, "status", "--porcelain=v1", "--untracked-files=all"])).stdout, "");
+}));
+
+await check("refuses a three-dot comparison without a shared merge base", async () => withRepository(async (root) => {
+  const base = (await run("git", ["-C", root, "rev-parse", "HEAD"])).stdout.trim();
+  await commit(root, { "src/feature.js": "export const value = 1;\n" }, "feature change");
+  const tree = (await run("git", ["-C", root, "rev-parse", "HEAD^{tree}"])).stdout.trim();
+  const head = (await run("git", ["-C", root, "commit-tree", tree, "-m", "unrelated history"])).stdout.trim();
+  const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: `${base}...${head}`, lens: "qa" });
+  assert.equal(result.error_code, "RANGE_MERGE_BASE_UNSUPPORTED");
+  assert.equal(Object.hasOwn(result, "package"), false);
+}));
+
+await check("refuses a three-dot comparison with multiple merge bases", async () => withDivergentRepository(async (root, { base, head }) => {
+  const tree = (await run("git", ["-C", root, "rev-parse", `${head}^{tree}`])).stdout.trim();
+  const left = (await run("git", ["-C", root, "commit-tree", tree, "-p", base, "-p", head, "-m", "left merge"])).stdout.trim();
+  const right = (await run("git", ["-C", root, "commit-tree", tree, "-p", head, "-p", base, "-m", "right merge"])).stdout.trim();
+  const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: `${left}...${right}`, lens: "qa" });
+  assert.equal(result.error_code, "RANGE_MERGE_BASE_UNSUPPORTED");
+  assert.equal(Object.hasOwn(result, "package"), false);
+}));
+
 await check("keeps risk signals advisory when a changed path looks sensitive", async () => withRepository(async (root) => {
   await commit(root, { "src/auth_service.py": "def authorize(user):\n    return True\n" }, "auth");
   const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: "HEAD~1..HEAD", lens: "qa" });
@@ -275,6 +388,17 @@ await check("emits a delta package bounded to the range since the prior anchor",
   assert.equal(result.verdict, "pass");
   assert.equal(result.package.scope.kind, "delta");
   assert.deepEqual(result.package.scope.paths, ["src/b.js"]);
+}));
+
+await check("retains the prior-anchor endpoint comparison for a three-dot delta request", async () => withDivergentRepository(async (root, { common, base, head }) => {
+  const result = await runReviewFan({ subcommand: "package", repoRoot: root, range: `${common}...${head}`, lens: "qa", priorAnchor: base });
+  assert.equal(result.verdict, "pass");
+  assert.equal(result.package.scope.kind, "delta");
+  assert.equal(result.package.scope.prior_anchor, base);
+  assert.deepEqual(result.package.coordinates, { base, head, commit_or_range: `${base}..${head}`, source: "derived" });
+  assert.deepEqual(result.package.scope.range_paths, ["assets/blob.bin", "src/auth.py", "src/feature.js"]);
+  assert.equal(result.package.risk_signals.applies, true);
+  assert.equal(result.package.risk_signals.ambiguous, true);
 }));
 
 await check("refuses to bind criteria from an active or archived change that is not present", async () => withRepository(async (root) => {

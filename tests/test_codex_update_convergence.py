@@ -589,6 +589,99 @@ class ConvergenceFixture(unittest.TestCase):
                 self.assertEqual(config.read_bytes(), final_bytes)
                 self.assertEqual(config.with_name("config.toml.bak").read_bytes(), original)
 
+    def test_partial_custom_fallbacks_fill_only_the_missing_field(self) -> None:
+        config = self.codex_home / "config.toml"
+        cases = (
+            (
+                'default_subagent_model = "operator-model" # selected model\n',
+                {"default_subagent_model": "operator-model", "default_subagent_reasoning_effort": "max"},
+            ),
+            (
+                "default_subagent_reasoning_effort = 'high' # selected effort\n",
+                {"default_subagent_model": "gpt-6.1-sol", "default_subagent_reasoning_effort": "high"},
+            ),
+            (
+                'default_subagent_model = "operator-model"',
+                {"default_subagent_model": "operator-model", "default_subagent_reasoning_effort": "max"},
+            ),
+            (
+                'default_subagent_model = "gpt-5.6-luna"\n',
+                {"default_subagent_model": "gpt-5.6-luna", "default_subagent_reasoning_effort": "max"},
+            ),
+            (
+                'default_subagent_model = "gpt-6-luna"\n',
+                {"default_subagent_model": "gpt-6-luna", "default_subagent_reasoning_effort": "max"},
+            ),
+        )
+        for configured, expected in cases:
+            with self.subTest(configured=configured):
+                original = (
+                    '# operator preferences\nmodel = "operator-main"\n'
+                    'project_doc_fallback_filenames = ["NOTES.md"]\n'
+                    '[unrelated]\nkeep = { nested = [1, 2] }\n'
+                    '[agents]\nmax_threads = 7\n' + configured
+                ).encode()
+                config.write_bytes(original)
+                receipt = self.converge(FakeCodex())
+                self.assertEqual(receipt["status"], "converged")
+                document = tomllib.loads(config.read_text(encoding="utf-8"))
+                self.assertEqual(document["agents"], {"max_threads": 7, **expected})
+                self.assertTrue(receipt["domains"]["agents"]["customDefaultsPreserved"])
+                self.assertEqual(document["model"], "operator-main")
+                self.assertEqual(document["unrelated"], {"keep": {"nested": [1, 2]}})
+                self.assertEqual(document["project_doc_fallback_filenames"], ["NOTES.md", "CLAUDE.md"])
+                self.assertIn(configured, config.read_text(encoding="utf-8"))
+                self.assertEqual(config.with_name("config.toml.bak").read_bytes(), original)
+                final_bytes = config.read_bytes()
+                for _ in range(2):
+                    repeated = self.converge(FakeCodex())
+                    self.assertEqual(repeated["status"], "current")
+                    self.assertEqual(config.read_bytes(), final_bytes)
+                    self.assertEqual(config.with_name("config.toml.bak").read_bytes(), original)
+
+    def test_current_fallback_pair_is_preserved_when_adding_project_instructions(self) -> None:
+        config = self.codex_home / "config.toml"
+        original = (
+            '# operator formatting\n[agents]\n'
+            'default_subagent_model = "gpt-6.1-sol" # current model\n'
+            "default_subagent_reasoning_effort = 'max' # current effort\n"
+            '[other]\npreserve = true\n'
+        ).encode()
+        config.write_bytes(original)
+        receipt = self.converge(FakeCodex())
+        self.assertIsNone(receipt["failedDomain"])
+        document = tomllib.loads(config.read_text(encoding="utf-8"))
+        self.assertEqual(document["project_doc_fallback_filenames"], ["CLAUDE.md"])
+        self.assertTrue(document["other"]["preserve"])
+        self.assertIn(b'# operator formatting\n', config.read_bytes())
+        self.assertIn(original.split(b'\n', 1)[1], config.read_bytes())
+        final_bytes = config.read_bytes()
+        repeated = self.converge(FakeCodex())
+        self.assertEqual(repeated["status"], "current")
+        self.assertEqual(config.read_bytes(), final_bytes)
+        self.assertEqual(config.with_name("config.toml.bak").read_bytes(), original)
+
+    def test_completed_partial_fallback_stays_operator_owned_after_edits(self) -> None:
+        config = self.codex_home / "config.toml"
+        config.write_text('[agents]\ndefault_subagent_model = "gpt-6-luna"\n', encoding="utf-8")
+        first = self.converge(FakeCodex())
+        self.assertIsNone(first["failedDomain"])
+        edited = config.read_text(encoding="utf-8").replace(
+            'default_subagent_model = "gpt-6-luna"', 'default_subagent_model = "gpt-5.6-terra"'
+        ).replace(
+            'default_subagent_reasoning_effort = "max"', 'default_subagent_reasoning_effort = "medium"'
+        ).encode()
+        config.write_bytes(edited)
+        for _ in range(2):
+            receipt = self.converge(FakeCodex())
+            self.assertEqual(receipt["status"], "current")
+            self.assertTrue(receipt["domains"]["agents"]["customDefaultsPreserved"])
+            self.assertEqual(config.read_bytes(), edited)
+            self.assertEqual(tomllib.loads(edited.decode())["agents"], {
+                "default_subagent_model": "gpt-5.6-terra",
+                "default_subagent_reasoning_effort": "medium",
+            })
+
     def test_other_complete_fallback_pairs_remain_operator_owned(self) -> None:
         config = self.codex_home / "config.toml"
         for model, effort in (("gpt-5.6-luna", "high"), ("gpt-6-sol", "xhigh")):

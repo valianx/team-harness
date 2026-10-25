@@ -3,6 +3,8 @@
 
 ## Current workflow guidance
 
+- [constraint] Review packages resolve refs once; native installers bind settings and method paths before hashing projected assets.
+
 - [constraint] Controlled React Flow nodes retain measured dimensions during presentation updates so initialized handles and connections stay visible.
 
 - [decision] Web presentations use a project-owned pinned Slidev addon archive; Team Harness updates never upgrade an existing deck.

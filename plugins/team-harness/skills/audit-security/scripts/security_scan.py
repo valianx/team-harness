@@ -15,9 +15,8 @@
 # Usage:
 #   python3 skills/audit-security/scripts/security_scan.py [--root <asset-root>]
 #   (or via the repo wrapper: python3 tests/test_security_scan.py)
-# The asset root defaults to the nearest ancestor of this file containing an
-# agents/ directory — the repo checkout, the CC plugin cache, the Codex
-# package, and an opencode config root all satisfy that shape.
+# The asset root defaults to the nearest ancestor with Markdown agent assets.
+# Per-skill agents/openai.yaml discovery metadata does not identify a roster.
 # Exit code:
 #   0 if all FAIL-severity checks pass (WARN findings may still be printed)
 #   1 if any FAIL finding is present
@@ -55,7 +54,10 @@ def _resolve_asset_root() -> Path:
             sys.exit(f"--root {root} has no agents/ directory")
         return root
     for ancestor in Path(__file__).resolve().parents:
-        if (ancestor / "agents").is_dir():
+        if any(
+            agent.is_file() and agent.name != "README.md" and not agent.name.startswith("ref-")
+            for agent in (ancestor / "agents").glob("*.md")
+        ):
             return ancestor
     sys.exit("asset root not found — pass --root <path>")
 

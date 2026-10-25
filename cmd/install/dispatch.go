@@ -237,6 +237,14 @@ func selectTransform(placer Placer) (func([]byte, string, string) ([]byte, error
 		// claude-code: identity (nil is treated as identity by ComputePlan).
 		return nil, nil
 	}
+	transform, err := selectOpencodeModelTransform(placer)
+	if err != nil {
+		return nil, err
+	}
+	return bindOpencodeResources(placer, transform)
+}
+
+func selectOpencodeModelTransform(placer Placer) (func([]byte, string, string) ([]byte, error), error) {
 	settings, err := readWorkerModelSettings(placer)
 	if err != nil {
 		return nil, fmt.Errorf("preflight config: %w", err)

@@ -75,14 +75,24 @@ Running `/th:update` every release keeps both the cache artifacts (via the plugi
 
 ## Self-healing / idempotency
 
-`/th:update` Step 6 re-syncs every fixed-path artifact on every run, regardless of whether the plugin version changed:
+`/th:update` reconciles its managed fixed-path artifacts on every run,
+including an equal-version run. For Claude Code blocks, the current
+[update method](../skills/update/SKILL.md) owns the decision matrix:
 
-- **Managed CLAUDE.md blocks** (`orchestrator-dispatch-rule`, `voice-rule`) — destructive marker-bounded replace (if markers are present) or append (if markers are absent). No content comparison — marker presence is the only check. Step 6 also **deletes** the retired `dev-mode` / `nested-dispatch-takeover` blocks if present.
+- **Managed CLAUDE.md blocks** — insert absent blocks and stamp their provenance;
+  preserve unchanged canonical content; update known harness-owned content;
+  preserve operator-edited content unless `--force-blocks` is explicitly selected.
+  Unstamped legacy blocks follow the method's adoption rules. A malformed marker
+  pair produces a warning and is skipped rather than duplicated.
 - **Retired output style** — inspect and migrate verified TH selections separately; preserve custom files and unrelated settings. No style is copied on fresh or repeated runs.
 
-Because Step 6 is unconditional and destructive, a machine that missed one or more updates self-corrects on the next run: the fixed-path artifacts are overwritten with the current version's canonical content.
+Repeated updates repair missing or eligible managed content while retaining
+operator ownership. Their atomic write and rolling backup apply only when a
+change is required; a current document remains an idempotent no-op.
 
-**Concrete example:** an operator whose `~/.claude/CLAUDE.md` was missing one or more managed blocks — because the version of the plugin they installed did not write them yet — gets those blocks restored on the next `/th:update`. Step 6 appends any block whose start/end markers are absent, so no manual intervention is required. The same behavior applies whether a block was never written or was accidentally deleted: the next update run re-inserts it unconditionally.
+For example, an absent managed block is restored on the next update. A block
+whose live hash differs from its stored provenance is retained as operator-edited;
+restoring canonical content then requires the explicit force option.
 
 ---
 
@@ -99,7 +109,8 @@ This is the same family of failure as issue #272: an artifact was shipped to the
 - [ ] Add the artifact file to the plugin cache layout (the appropriate path under `skills/`, `output-styles/`, etc.).
 - [ ] Add a sync step in `skills/update/SKILL.md` Step 6 (both the bash and PowerShell command blocks).
 - [ ] Add the same idempotent sync in `skills/setup/SKILL.md` (for first-time installs that have not run `/th:update` yet).
-- [ ] Confirm the sync is destructive / force-copy (no content comparison — only presence checks for marker-bounded blocks).
+- [ ] Verify missing/current/managed/operator-edited/malformed states and the
+      explicit force path; preserve unrelated content and repeat-run idempotency.
 
 ---
 
