@@ -17,13 +17,18 @@ changing them. Preserve the standard controls in `src/viewer/controls.css`.
 | Group | Visual containment; no implicit C4 classification |
 
 Names wrap at the kit's controlled width using bundled Inter assets. Keep names
-recognizable; move extended explanations into `description`, which remains
-available in details. Source locators and inference decisions belong with those
-details. Avoid copying private documents or credentials into a public build.
+recognizable and unambiguous; preserve full names and move extended explanations
+into `description`, which remains available in details. Compact wording preserves
+component identity, relationship meaning and source facts. Source locators and
+inference decisions belong with those details. Avoid copying private documents
+or credentials into a public build.
 
 Inspect legibility at the intended logical viewport and fitted zoom. Higher pixel
-density improves sharpness without enlarging text; adapt shared graph tokens or
-explicit perspectives when the overview becomes too dense.
+density improves sharpness without enlarging text. Judge useful graph aspect,
+fitted label readability and meaningful grouping through
+[composition-review.md](composition-review.md); correct the overview before adding
+supplementary perspectives. A compact bounding box alone does not establish a
+readable composition.
 
 ## Interaction
 
@@ -36,7 +41,8 @@ Visibility changes never resize the canvas, move the camera or alter graph geome
 On narrow canvases the control stacks scroll independently, keeping their content
 accessible and leaving room to pan the diagram between them.
 
-The initial perspective is the complete architecture. Automatic framing and Fit
+The initial view is the complete architecture; steps focus only after explicit
+navigation. Fit view resets the guided tour. Automatic framing and Fit
 view preserve aspect ratio inside the centered 90% canvas rectangle, including
 target nodes and their connecting routes and labels, subject to zoom limits.
 This is 90% of the limiting dimension, not 90% of the area. Manual pan/zoom remains
@@ -50,7 +56,9 @@ passing geometry; pending validation stays visible independently.
 ## Embed the copied viewer
 
 Use the public component exported by `src/viewer/ArchitectureViewer.tsx`:
-`ArchitectureViewer({ model: unknown, evidence?: ValidationEvidence })`.
+`ArchitectureViewer({ model, evidence, composition })`. `model` is `unknown`,
+`evidence` is optional `ValidationEvidence`, and optional `composition` selects
+`'auto' | 'layered' | 'compact'`, defaulting to `'auto'`.
 Load React Flow's stylesheet and the copied `src/styles.css`. In an SSR host,
 render this viewer within a client-side boundary; measurement requires the DOM.
 Give the host an explicit usable width and height, including in flex/grid layouts.

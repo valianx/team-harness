@@ -84,11 +84,10 @@ svg { flex: 0 0 auto; }
 .architecture-viewer .react-flow { --xy-background-color: #171e1f; --xy-node-color: #e8e9e3; --xy-edge-stroke-width: 1.5; }
 .architecture-viewer .react-flow__node { font-family: var(--font-family), sans-serif; text-align: left; border: 0; background: transparent; padding: 0; box-shadow: none; }
 .architecture-viewer .react-flow__node:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; border-radius: 8px; }
-.component-card { width: var(--node-width); min-height: var(--node-min-height); height: auto; padding: 17px 19px 18px; border: 1px solid #526164; border-radius: 8px; background: #293234; color: #eeeee5; }
-.component-heading { display: flex; align-items: center; gap: 8px; min-height: 20px; margin-bottom: 9px; }
+.component-card { width: var(--node-width); min-height: var(--node-min-height); height: auto; display: flex; align-items: center; padding: 13px 14px; border: 1px solid #526164; border-radius: 8px; background: #293234; color: #eeeee5; }
+.component-heading { display: flex; align-items: center; gap: 10px; width: 100%; }
 .component-icon { display: flex; align-items: center; color: #a7bfb0; }
-.component-kind { font-size: 10px; line-height: 16px; letter-spacing: .05em; color: #aebcbb; }
-.component-label { font-size: var(--body-font); font-weight: 500; line-height: 1.45; letter-spacing: -.15px; overflow-wrap: anywhere; }
+.component-label { min-width: 0; font-size: var(--body-font); font-weight: 600; line-height: 1.25; letter-spacing: -.3px; overflow-wrap: anywhere; }
 .component-gateway { border-radius: 16px; background: #2b3537; }
 .component-gateway .component-icon { color: #b5c9b3; }
 .component-database { border-radius: 14px 14px 8px 8px; background: #253135; }
@@ -99,10 +98,10 @@ svg { flex: 0 0 auto; }
 .component-external .component-icon { color: #b2bfb7; }
 .architecture-viewer .component-port { position: absolute; width: var(--port-size); height: var(--port-size); min-width: var(--port-size); min-height: var(--port-size); background: #799e8b; border: 1px solid #c0d0bf; border-radius: 50%; transform: translate(-50%, -50%); }
 .architecture-viewer .group-frame { width: 100%; height: 100%; border: 1px solid #435356; border-radius: 12px; background: rgba(105,130,133,.045); pointer-events: none; }
-.group-header { width: var(--node-width); padding: 0; color: #c3cecb; }
+.group-header { width: var(--node-width); display: flex; align-items: flex-start; gap: 10px; padding: 0; color: #c3cecb; }
 .group-frame > .group-header { position: absolute; left: var(--group-inset); top: var(--group-inset); }
-.group-eyebrow { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .09em; font-size: 9px; line-height: 14px; font-weight: 500; color: #9aadaa; }
-.group-title { font-size: 13px; font-weight: 500; line-height: 1.45; letter-spacing: -.1px; overflow-wrap: anywhere; }
+.group-icon { display: flex; align-items: center; margin-top: 2px; color: #9aadaa; }
+.group-title { min-width: 0; font-size: 18px; font-weight: 600; line-height: 1.25; letter-spacing: -.2px; overflow-wrap: anywhere; }
 .react-flow__node-group .group-header::after { content: ''; position: absolute; top: calc(100% + 10px); left: 0; width: 32px; height: 1px; background: #50684e; }
 .architecture-viewer .react-flow__node.selected .component-card { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .architecture-viewer .react-flow__node.selected > .group-frame { border-color: var(--accent); }

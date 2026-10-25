@@ -73,6 +73,7 @@ export function checkGeometry(model: Architecture, geometry: Geometry): Diagnost
   const byEdge = new Map(model.edges.map(edge => [edge.id, edge]));
   const routeIds = new Set(geometry.edges.map(edge => edge.id));
   const seenRoutes = new Set<string>();
+  const sourcePorts = new Map<string, Point>(), targetPorts = new Map<string, Point>();
   for (const edge of model.edges) if (!routeIds.has(edge.id)) fail('route', [edge.id], 'Missing computed route');
   for (const route of geometry.edges) {
     if (seenRoutes.has(route.id)) fail('identity', [route.id], 'Duplicate relationship route');
@@ -89,6 +90,7 @@ export function checkGeometry(model: Architecture, geometry: Geometry): Diagnost
     const segments = route.sections.flatMap(section => section.points.slice(1).map((point, i) => [section.points[i], point]));
     for (const [index, [a, b]] of segments.entries()) {
       if (![a.x, a.y, b.x, b.y].every(Number.isFinite)) { fail('route', [route.id], 'Nonfinite route point'); continue; }
+      if (Math.abs(a.x - b.x) > T.tolerance && Math.abs(a.y - b.y) > T.tolerance) fail('route-orthogonality', [route.id], 'Route segment is not orthogonal');
       if (outside(a.x, a.y) || outside(b.x, b.y)) fail('clipping', [route.id], 'Route is outside diagram bounds');
       for (const node of geometry.nodes) {
         const endpointContact = (node.id === edge.from && index === 0) || (node.id === edge.to && index === segments.length - 1);
@@ -102,6 +104,11 @@ export function checkGeometry(model: Architecture, geometry: Geometry): Diagnost
       if (!node || !Number.isFinite(point.x) || !Number.isFinite(point.y) || point.x < node.absX - T.portSize - T.tolerance || point.x > node.absX + node.width + T.portSize + T.tolerance || point.y < node.absY - T.portSize - T.tolerance || point.y > node.absY + node.height + T.portSize + T.tolerance) fail('port', [route.id, nodeId], 'Route port is detached from endpoint');
       else if (point.x > node.absX + T.tolerance && point.x < node.absX + node.width - T.tolerance && point.y > node.absY + T.tolerance && point.y < node.absY + node.height - T.tolerance) fail('port', [route.id, nodeId], 'Port is inside endpoint body');
     }
+    for (const [nodeId, point, ports] of [[edge.from, route.sourcePort, sourcePorts], [edge.to, route.targetPort, targetPorts]] as const) {
+      const shared = ports.get(nodeId);
+      if (shared && Math.hypot(shared.x - point.x, shared.y - point.y) > T.tolerance) fail('shared-port', [route.id, nodeId], 'Relationships disagree on the component’s single rendered handle');
+      else ports.set(nodeId, point);
+    }
     if (edge.label && !route.label) fail('label', [route.id], 'Missing measured relationship label');
     if (route.label) {
       const label = route.label;
@@ -109,6 +116,7 @@ export function checkGeometry(model: Architecture, geometry: Geometry): Diagnost
       if (label.x < -T.tolerance || label.y < -T.tolerance || label.x + label.width > geometry.bounds.width + T.tolerance || label.y + label.height > geometry.bounds.height + T.tolerance) fail('label', [route.id], 'Label is clipped by diagram bounds');
       for (const node of geometry.nodes) if (overlap(label, node.kind === 'group' && (ancestor(edge.from, node.id) || ancestor(edge.to, node.id)) ? header(node) : rect(node))) fail('label-collision', [route.id, node.id], 'Label obscures a component or header');
       for (const other of geometry.edges) if (other.id !== route.id && other.label && overlap(label, other.label)) fail('label-overlap', [route.id, other.id], 'Relationship labels overlap');
+      for (const other of geometry.edges) if (other.id !== route.id && other.sections.some(section => section.points.slice(1).some((point, i) => segmentIntersects(section.points[i], point, label)))) fail('route-label-collision', [route.id, other.id], 'An unrelated route obscures a relationship label');
     }
   }
   return diagnostics;

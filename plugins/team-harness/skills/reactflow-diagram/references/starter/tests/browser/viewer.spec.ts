@@ -79,7 +79,7 @@ test('presentation steps preserve geometry while changing focus and narrative', 
   await page.getByRole('button', { name: 'Next step' }).click();
   await expect(page.getByTestId('step-narrative')).not.toHaveText(narrative);
   expect(await positions()).toEqual(before);
-  await expect(page.locator('.is-focused').first()).toBeVisible();
+  await expect(page.locator('.react-flow__node.is-focused:not(.react-flow__node-group)').first()).toBeVisible();
 });
 
 for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720 }]) {
@@ -98,6 +98,8 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720
         return !!canvas && cards.length >= ids.length && cards.every(card => card.left >= canvas.x + 4 && card.right <= canvas.x + canvas.width - 4 && card.top >= canvas.y + 4 && card.bottom <= canvas.y + canvas.height - 4);
       }).toBe(true);
     };
+    await expect(focused).toHaveCount(0);
+    await page.getByRole('button', { name: 'Next step' }).click();
     await visible(['gateway', 'orchestrator']);
     await page.screenshot({ path: testInfo.outputPath(`guided-request-${viewport.width}.png`), fullPage: true });
     await page.getByRole('combobox', { name: 'Perspective' }).selectOption('');

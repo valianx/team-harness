@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { Background, BackgroundVariant, getViewportForBounds, MarkerType, ReactFlow, ReactFlowProvider, type ReactFlowInstance } from '@xyflow/react';
 import { createLayoutRunner } from '../controller';
+import { layout } from '../layout';
+import { contentBounds } from '../composition';
 import { fidelityStatus, parseModel, selectView } from '../model';
 import { TOKENS } from '../tokens';
-import type { Architecture, Diagnostic, Geometry, PlacedNode, ValidationEvidence } from '../types';
+import type { Architecture, CompositionMode, Diagnostic, Geometry, PlacedNode, ValidationEvidence } from '../types';
 import { EDGE_TYPES, Glyph, NODE_TYPES, type DiagramEdge, type DiagramNode } from './components';
 import { Details } from './Details';
 import { MeasurementSurface, measureSurface } from './measurement';
@@ -43,15 +45,17 @@ function ValidationStatus({ state, evidence }: { state: LayoutState; evidence?: 
   return <details className="validation-status" data-testid="validation-status"><summary><span className={`status-dot${complete ? ' complete' : ''}`} />{complete ? 'Mechanical checks passed' : 'Validation incomplete'}<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg></summary><div className="validation-popover"><p>Source fidelity is assessed separately.</p><dl>{Object.entries(checks).map(([check, status]) => <div key={check}><dt>{check}</dt><dd className={`check-${status}`}>{status === 'missing' ? 'Not supplied' : status === 'pass' ? 'Passed' : 'Failed'}</dd></div>)}</dl></div></details>;
 }
 
-function Viewer({ model, evidence }: { model: Architecture; evidence?: ValidationEvidence }) {
+function Viewer({ model, inputIdentity, evidence, composition }: { model: Architecture; inputIdentity: string; evidence?: ValidationEvidence; composition: CompositionMode }) {
   const root = useRef<HTMLElement>(null);
   const canvas = useRef<HTMLDivElement>(null);
   const surface = useRef<HTMLDivElement>(null);
-  const runner = useMemo(() => createLayoutRunner(), []);
+  const runner = useMemo(() => createLayoutRunner({ layout: (model, sizes) => layout(model, sizes, { composition }) }), [composition]);
   const revision = useRef(0);
   const [viewId, setViewId] = useState('');
   const [selectedId, setSelectedId] = useState<string>();
-  const [stepIndex, setStepIndex] = useState(0);
+  const [selectionFocused, setSelectionFocused] = useState(false);
+  const selectElement = useCallback((id: string) => { setSelectedId(id); setSelectionFocused(true); }, []);
+  const [stepIndex, setStepIndex] = useState(-1);
   const [hostSize, setHostSize] = useState({ width: -1, height: -1 });
   const [canvasSize, setCanvasSize] = useState({ width: -1, height: -1 });
   const [layoutState, setState] = useState<LayoutState>({ phase: 'loading', diagnostics: [] });
@@ -79,7 +83,7 @@ function Viewer({ model, evidence }: { model: Architecture; evidence?: Validatio
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => { setSelectedId(undefined); setStepIndex(0); }, [visibleModel]);
+  useEffect(() => { setSelectedId(undefined); setStepIndex(-1); setSelectionFocused(false); }, [visibleModel]);
 
   useEffect(() => {
     const request = ++revision.current;
@@ -109,7 +113,11 @@ function Viewer({ model, evidence }: { model: Architecture; evidence?: Validatio
     void flow.setViewport({ ...viewport, x: viewport.x + canvasSize.width * 0.05, y: viewport.y + canvasSize.height * 0.05 }, { duration: reducedMotion ? 0 : 220 });
   }, [flow, usable, canvasSize.width, canvasSize.height, reducedMotion, state.geometry, visibleModel.edges]);
 
-  const fit = useCallback(() => fitTargets(state.geometry?.nodes ?? []), [fitTargets, state.geometry]);
+  const fit = useCallback(() => {
+    setStepIndex(-1);
+    setSelectionFocused(false);
+    fitTargets(state.geometry?.nodes ?? []);
+  }, [fitTargets, state.geometry]);
 
   const focusedIds = useMemo(() => {
     const ids = new Set(step?.focus ?? []);
@@ -127,7 +135,7 @@ function Viewer({ model, evidence }: { model: Architecture; evidence?: Validatio
     if (!flow || !state.geometry || !usable) return;
     const frame = requestAnimationFrame(() => {
       let focus = focusedIds;
-      if (selectedId) {
+      if (selectedId && selectionFocused) {
         const relationship = visibleModel.edges.find(edge => edge.id === selectedId);
         focus = new Set(relationship ? [relationship.from, relationship.to] : [selectedId]);
       }
@@ -136,9 +144,10 @@ function Viewer({ model, evidence }: { model: Architecture; evidence?: Validatio
       fitTargets(targets.length ? targets : state.geometry!.nodes);
     });
     return () => cancelAnimationFrame(frame);
-  }, [focusedIds, selectedId, visibleModel, state.geometry, flow, usable, fitTargets]);
+  }, [focusedIds, selectedId, selectionFocused, visibleModel, state.geometry, flow, usable, fitTargets]);
 
-  const extendsCanvas = !!state.geometry && (state.geometry.bounds.width * zoom > canvasSize.width || state.geometry.bounds.height * zoom > canvasSize.height);
+  const content = state.geometry ? contentBounds(state.geometry) : undefined;
+  const extendsCanvas = !!content && (content.width * zoom > canvasSize.width + TOKENS.tolerance || content.height * zoom > canvasSize.height + TOKENS.tolerance);
 
   const nodes: DiagramNode[] = useMemo(() => state.geometry?.nodes.map(placed => {
     const component = [...visibleModel.nodes, ...visibleModel.groups].find(element => element.id === placed.id)!;
@@ -162,13 +171,13 @@ function Viewer({ model, evidence }: { model: Architecture; evidence?: Validatio
     const relationship = visibleModel.edges.find(edge => edge.id === route.id)!;
     const focused = focusedIds.has(route.id);
     return { id: route.id, type: 'routed', source: relationship.from, target: relationship.to, sourceHandle: 'out', targetHandle: 'in',
-      data: { relationship, route, focused, dimmed: !!step && !focused, onSelect: setSelectedId },
+      data: { relationship, route, focused, dimmed: !!step && !focused, onSelect: selectElement },
       className: `${focused ? 'is-focused' : ''}${step && !focused ? ' is-dimmed' : ''}`,
       selected: route.id === selectedId, selectable: true, focusable: true, ariaRole: 'button',
       ariaLabel: `Relationship: ${relationship.label ?? relationship.id}`,
       markerEnd: { type: MarkerType.ArrowClosed, color: focused || route.id === selectedId ? '#78c9b4' : '#85938f', width: 14, height: 14 },
     };
-  }) ?? [], [state.geometry, visibleModel, focusedIds, step, selectedId]);
+  }) ?? [], [state.geometry, visibleModel, focusedIds, step, selectedId, selectElement]);
 
   const closeDetails = useCallback(() => {
     const id = selectedId;
@@ -181,14 +190,17 @@ function Viewer({ model, evidence }: { model: Architecture; evidence?: Validatio
     if (event.key !== 'Enter' && event.key !== ' ') return;
     const target = event.target as Element;
     const element = target.closest('.react-flow__node, .react-flow__edge');
-    if (element) { event.preventDefault(); setSelectedId(element.getAttribute('data-id')!); }
+    if (element) { event.preventDefault(); selectElement(element.getAttribute('data-id')!); }
   }
 
-  return <section ref={root} className={`architecture-viewer${reducedMotion ? ' reduce-motion' : ''}${!usable && hostSize.width >= 0 ? ' is-unusable' : ''}`} aria-label={`${model.title} architecture viewer`} style={theme} onKeyDownCapture={keyboardSelect}>
+  return <section ref={root} className={`architecture-viewer${reducedMotion ? ' reduce-motion' : ''}${!usable && hostSize.width >= 0 ? ' is-unusable' : ''}`} aria-label={`${model.title} architecture viewer`} style={theme} onKeyDownCapture={keyboardSelect}
+    data-model-content={inputIdentity}>
     {fidelity.status === 'draft' && <details className="review-notes" data-testid="review-notes"><summary><span className="review-symbol">!</span>{fidelity.reasons.length} source {fidelity.reasons.length === 1 ? 'question' : 'questions'} to resolve<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg></summary><ul>{fidelity.reasons.map((reason, index) => <li key={index}>{reason}</li>)}</ul></details>}
 
     <div className={`viewer-workarea${selected ? ' has-details' : ''}`}>
-      <div ref={canvas} className="diagram-canvas" data-testid="diagram-canvas" data-layout-state={state.phase}>
+      <div ref={canvas} className="diagram-canvas" data-testid="diagram-canvas" data-layout-state={state.phase}
+        data-layout-diagnostics={JSON.stringify(state.diagnostics)} data-composition-selected={state.geometry?.composition?.selected}
+        data-composition-report={state.geometry?.composition ? JSON.stringify(state.geometry.composition) : undefined}>
         <div className="viewer-chrome-top">
           <header className="viewer-toolbar">
             <div className="diagram-title"><span className="eyebrow">Architecture / interactive view</span><h1>{model.title}</h1></div>
@@ -205,7 +217,7 @@ function Viewer({ model, evidence }: { model: Architecture; evidence?: Validatio
         {usable && state.phase === 'ready' && !nodes.length && <div className="canvas-state"><Glyph kind="group" size={32} /><h2>No components in this perspective</h2><p>Choose another perspective or ask your agent to add the missing architecture.</p></div>}
         {usable && state.phase === 'ready' && !!nodes.length && <>
           <ReactFlow<DiagramNode, DiagramEdge> nodes={nodes} edges={edges} nodeTypes={NODE_TYPES} edgeTypes={EDGE_TYPES}
-            onInit={setFlow} onNodeClick={(_, node) => setSelectedId(node.id)} onEdgeClick={(_, edge) => setSelectedId(edge.id)} onPaneClick={() => setSelectedId(undefined)}
+            onInit={setFlow} onNodeClick={(_, node) => selectElement(node.id)} onEdgeClick={(_, edge) => selectElement(edge.id)} onPaneClick={() => setSelectedId(undefined)}
             nodesDraggable={false} nodesConnectable={false} edgesReconnectable={false} deleteKeyCode={null} minZoom={0.15} maxZoom={1.8} colorMode="dark"
             autoPanOnNodeFocus onMove={(_, viewport) => setZoom(viewport.zoom)}
             elevateNodesOnSelect={false} elevateEdgesOnSelect={false} proOptions={{ hideAttribution: false }}
@@ -219,9 +231,9 @@ function Viewer({ model, evidence }: { model: Architecture; evidence?: Validatio
             <div className="canvas-navigation"><button type="button" className="icon-button" onClick={() => void flow?.zoomOut({ duration: reducedMotion ? 0 : 150 })} aria-label="Zoom out">−</button><output aria-label="Zoom level">{Math.round(zoom * 100)}%</output><button type="button" className="icon-button" onClick={() => void flow?.zoomIn({ duration: reducedMotion ? 0 : 150 })} aria-label="Zoom in">+</button></div>
           </div>}
           <footer className="viewer-footer">
-            <nav className="presentation-steps" aria-label="Presentation steps"><button type="button" className="icon-button step-button" aria-label="Previous step" disabled={stepIndex === 0 || !step} onClick={() => setStepIndex(index => index - 1)}><Arrow back /></button>
+            <nav className="presentation-steps" aria-label="Presentation steps"><button type="button" className="icon-button step-button" aria-label="Previous step" disabled={stepIndex < 0} onClick={() => { setSelectionFocused(false); setStepIndex(index => index - 1); }}><Arrow back /></button>
               <div className="step-narrative" data-testid="step-narrative" aria-live="polite">{step ? <><span className="step-index">{String(stepIndex + 1).padStart(2, '0')}<span> / {String(visibleModel.steps.length).padStart(2, '0')}</span></span><div><strong>{step.title}</strong>{step.description && <p>{step.description}</p>}</div></> : <span className="no-steps">Explore the components and their evidence</span>}</div>
-              <button type="button" className="icon-button step-button" aria-label="Next step" disabled={!step || stepIndex >= visibleModel.steps.length - 1} onClick={() => setStepIndex(index => index + 1)}><Arrow /></button>
+              <button type="button" className="icon-button step-button" aria-label="Next step" disabled={!visibleModel.steps.length || stepIndex >= visibleModel.steps.length - 1} onClick={() => { setSelectionFocused(false); setStepIndex(index => index + 1); }}><Arrow /></button>
             </nav>
             <ValidationStatus state={state} evidence={evidence} />
           </footer>
@@ -238,14 +250,14 @@ function Viewer({ model, evidence }: { model: Architecture; evidence?: Validatio
 }
 
 /** ArchitectureViewerProps accepts editable architecture input and separately supplied validation evidence. */
-export type ArchitectureViewerProps = { model: unknown; evidence?: ValidationEvidence };
+export type ArchitectureViewerProps = { model: unknown; evidence?: ValidationEvidence; composition?: CompositionMode };
 
 /** ArchitectureViewer validates a versioned model and owns bounded, replaceable layout generations. */
-export function ArchitectureViewer({ model, evidence }: ArchitectureViewerProps) {
+export function ArchitectureViewer({ model, evidence, composition = 'auto' }: ArchitectureViewerProps) {
   const parsed = useMemo(() => {
     try { return { model: parseModel(model) }; }
     catch (error) { return { error: error instanceof Error ? error.message : String(error) }; }
   }, [model]);
   if (!parsed.model) return <section className="architecture-viewer invalid-viewer" style={theme} role="alert"><span className="eyebrow">Architecture / model diagnostic</span><h1>Model could not be read</h1><pre>{parsed.error}</pre><p>Ask your agent to correct the indicated model fields before layout.</p></section>;
-  return <ReactFlowProvider><Viewer model={parsed.model} evidence={evidence} /></ReactFlowProvider>;
+  return <ReactFlowProvider><Viewer model={parsed.model} inputIdentity={JSON.stringify(model)} evidence={evidence} composition={composition} /></ReactFlowProvider>;
 }

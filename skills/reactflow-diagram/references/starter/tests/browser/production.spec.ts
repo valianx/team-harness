@@ -52,6 +52,8 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720
       };
     });
     await page.getByRole('button', { name: 'Next step' }).click();
+    await expect(page.getByTestId('step-narrative')).toContainText('Receive a payment');
+    await page.getByRole('button', { name: 'Next step' }).click();
     await expect(page.getByTestId('step-narrative')).toContainText('Store the payment');
     expect(await paths()).toEqual(before);
     const removed = await edgeRemovals.evaluate(stop => stop());
