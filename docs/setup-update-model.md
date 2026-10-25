@@ -11,7 +11,7 @@ This document describes the working model that governs how Team Harness is insta
 | What | Owner | Frequency |
 |------|-------|-----------|
 | Native preferences — workspace mode (`logs-mode`, `logs-path`, `logs-subfolder`), default `language`, English-learning mode, GitHub identity routes (`github.account_routes`) | `/th:setup` | One-time bootstrap; re-run to reconfigure |
-| FILES — managed `~/.claude/CLAUDE.md` general-agent and voice blocks | `/th:update` | Every release |
+| FILES — reconcile managed `~/.claude/CLAUDE.md` general-agent and voice blocks | `/th:update` | Every update run |
 | FLOWS — marketplace catalog refresh, plugin version download | `/th:update` | Every release |
 | `~/.claude/.team-harness.json` full write (merge-write-whole-document) | `/th:setup` | One-time bootstrap; re-run to reconfigure |
 
@@ -38,14 +38,14 @@ These artifacts live inside the plugin cache directory (`~/.claude/plugins/cache
 
 ### Fixed-path artifacts (explicit sync required)
 
-These artifacts must land at a specific absolute path under `~/.claude/` that the plugin runtime does **not** manage automatically. They require an explicit copy (or write) step in `/th:update` Step 6 every time a release is published.
+These artifacts live at fixed paths under `~/.claude/` outside automatic plugin-cache management. `/th:update` Step 6 reconciles them on each run; ownership and current content determine whether a write is needed.
 
 **Artifacts in this class:**
 
 | Artifact | Target path | Mechanism in `/th:update` Step 6 |
 |----------|-------------|----------------------------------|
-| `orchestrator-dispatch-rule` managed block | `~/.claude/CLAUDE.md` (marker-delimited section) | Destructive marker-bounded replace or append |
-| `voice-rule` managed block | `~/.claude/CLAUDE.md` (marker-delimited section) | Destructive marker-bounded replace or append |
+| `orchestrator-dispatch-rule` managed block | `~/.claude/CLAUDE.md` (marker-delimited section) | Provenance-aware reconciliation; preserve operator edits unless explicitly forced |
+| `voice-rule` managed block | `~/.claude/CLAUDE.md` (marker-delimited section) | Provenance-aware reconciliation; preserve operator edits unless explicitly forced |
 
 > **Retired entry mechanisms:** the `dev-mode`, `nested-dispatch-takeover` and `dev-mode-entry` blocks, activation marker and developer-mode output style are no longer installed. Update removes the retired managed blocks and follows [bounded style migration](dev-mode.md#retire-an-existing-developer-mode-selection) for existing selections. Session startup supplies workflow discovery, language and workspace context. Native host permissions and approvals remain independent of style selection.
 
