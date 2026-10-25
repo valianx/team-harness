@@ -88,7 +88,7 @@ by convergence escalation.
    `.codex-plugin/plugin.json`, require `name: team-harness`, and record its
    semantic `OLD_VERSION`.
 
-2. Resolve one Python 3 interpreter as `PYTHON_BIN`: on Windows use the canonical
+2. Resolve one Python 3.11+ interpreter as `PYTHON_BIN`: on Windows use the canonical
    absolute `sys.executable` from `py -3`, or the active Python 3 if that launcher
    is absent; elsewhere use canonical Python 3. Require a regular executable and
    reuse it throughout. Discover the active native Codex application once
@@ -99,8 +99,13 @@ by convergence escalation.
    PYTHON_BIN -B OLD_PLUGIN/skills/update/scripts/resolve_codex.py --candidate CANDIDATE
    ```
 
-   Require success and one JSON `codexBin`; pin that value as `CODEX_BIN` for
-   every native command in both stages. The resolver follows parent-directory
+   Require success and one JSON object containing `pythonBin` and `codexBin`;
+   pin them as `PYTHON_BIN` and `CODEX_BIN` throughout both stages. The resolver
+   checks Python 3.11 before loading update dependencies or selecting a binary.
+   A `PYTHON_VERSION_UNSUPPORTED` failure stops before any native Codex command,
+   marketplace refresh or plugin installation. Install or select Python 3.11+
+   and rerun update with its canonical executable; do not continue with the
+   unsupported interpreter. The resolver follows parent-directory
    junctions as well as file links. PowerShell's `Source`, `FullName`, or an empty
    leaf `Target` does not prove a canonical path. Do not pass the candidate
    directly to convergence or repeat PATH discovery later. Resolution failure

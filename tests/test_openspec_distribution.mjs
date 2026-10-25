@@ -135,12 +135,16 @@ try {
   }
   const before = new Map();
   for (const relative of contents.keys()) before.set(relative, await readFile(path.join(fixtureRoot, relative), "utf8"));
-  for (const directory of [".claude-plugin", "agents", "hooks", "docs"]) {
+  for (const directory of [".claude-plugin", "agents", "hooks", "docs", "runtime/schema"]) {
     await mkdir(path.join(fixtureRoot, directory), { recursive: true });
   }
   await mkdir(path.join(fixtureRoot, "skills/find-bugs"), { recursive: true });
   await writeFile(path.join(fixtureRoot, "skills/find-bugs/SKILL.md"), "TH-owned find-bugs fixture\n");
   await writeFile(path.join(fixtureRoot, "agents/fixture.md"), "TH owned fixture\n");
+  await writeFile(path.join(fixtureRoot, "docs/agent-authoring.md"), "TH method fixture\n");
+  await writeFile(path.join(fixtureRoot, "runtime/schema/runtime-docs.json"), JSON.stringify({
+    schema_version: 1, documents: ["agent-authoring.md"],
+  }));
   await syncClaudePackageAssets({ rootDir: fixtureRoot, check: false });
   assert.equal(await readFile(path.join(fixtureRoot, "plugins/team-harness/agents/fixture.md"), "utf8"), "TH owned fixture\n");
 

@@ -23,7 +23,7 @@ const MAX_OPENSPEC_TREE_BYTES = 64 * 1024 * 1024;
 const SHA = /^[0-9a-f]{7,40}$/;
 const CHANGE_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ARCHIVED_CHANGE_NAME = /^archive\/\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const RANGE = /^([^\s.]+(?:\.[^\s.]+)*)\.{2,3}([^\s.]+(?:\.[^\s.]+)*)$/;
+const RANGE = /^([^\s.]+(?:\.[^\s.]+)*)(\.{2,3})([^\s.]+(?:\.[^\s.]+)*)$/;
 
 export const LENSES = ["tester", "qa", "security", "adversary"];
 
@@ -32,6 +32,7 @@ export const ERROR_CODES = new Set([
   "REPOSITORY_UNRESOLVED",
   "WORKTREE_NOT_CLEAN",
   "RANGE_NOT_COMMITTED",
+  "RANGE_MERGE_BASE_UNSUPPORTED",
   "CHANGED_SURFACE_EMPTY",
   "CHANGED_SURFACE_TOO_LARGE",
   "CHANGE_NOT_VALIDATED",
@@ -124,7 +125,7 @@ async function assertCleanTree(root) {
 function splitRange(range) {
   const match = RANGE.exec(range ?? "");
   if (!match) fail("ARGUMENT_INVALID");
-  return [match[1], match[2]];
+  return { left: match[1], separator: match[2], right: match[3] };
 }
 
 function validChangeRef(value) {
@@ -132,7 +133,7 @@ function validChangeRef(value) {
 }
 
 async function resolveCommitted(root, range) {
-  const [left, right] = splitRange(range);
+  const { left, separator, right } = splitRange(range);
   const resolved = [];
   for (const endpoint of [left, right]) {
     try {
@@ -141,7 +142,18 @@ async function resolveCommitted(root, range) {
       return fail("RANGE_NOT_COMMITTED");
     }
   }
-  return { base: resolved[0], head: resolved[1] };
+  let [base, head] = resolved;
+  if (separator === "...") {
+    let mergeBases;
+    try {
+      mergeBases = (await git(root, ["merge-base", "--all", base, head])).trim().split(/\r?\n/).filter(Boolean);
+    } catch {
+      return fail("RANGE_MERGE_BASE_UNSUPPORTED");
+    }
+    if (mergeBases.length !== 1) fail("RANGE_MERGE_BASE_UNSUPPORTED");
+    [base] = mergeBases;
+  }
+  return { base, head };
 }
 
 function parseNameStatus(stdout) {
@@ -509,8 +521,9 @@ async function buildPackage(input) {
   const root = await resolveRepositoryRoot(input.repoRoot);
   await assertCleanTree(root);
   const scope = resolveScope(input.priorAnchor, input.scope);
-  const range = scope.kind === "delta" ? `${scope.prior_anchor}..${splitRange(input.range)[1]}` : input.range;
-  const coordinates = await resolveCommitted(root, range);
+  const requestedRange = scope.kind === "delta" ? `${scope.prior_anchor}..${splitRange(input.range).right}` : input.range;
+  const coordinates = await resolveCommitted(root, requestedRange);
+  const range = `${coordinates.base}..${coordinates.head}`;
   const allChanged = await readChangedSurface(root, range);
   const verified = await readVerifiedExclusions(root, range);
   const changedSurface = allChanged.filter((entry) => !verified.paths.has(entry.path));

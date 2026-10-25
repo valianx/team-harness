@@ -1,9 +1,15 @@
-# Sharded plan contract
+# Historical sharded plan compatibility
 
-New Tier 2-4 workspaces use `plan_format: sharded-v1`. The canonical fenced
-schema the architect emits ships with the agents:
-`agents/ref-architect-design.md § "Canonical schema"`. The plan is a set of
-small canonical artifacts, not a monolith copied between roles:
+This document describes retained `sharded-v1` plans from earlier workflows.
+Its packets, preflights and gate nonces are historical compatibility material;
+they are not prerequisites for new work. Use the current
+[Spec flow](../skills/spec/SKILL.md) and
+[native coordination guide](../agents/ref-pipeline.md) for new plans and assignments.
+Preserve existing historical records when reading or continuing their context.
+
+## Historical format
+
+Earlier Tier 2-4 workspaces used the following canonical artifact layout:
 
 | Artifact | Canonical content | Normal readers |
 |---|---|---|

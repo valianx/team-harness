@@ -234,9 +234,9 @@ To auto-register MCP servers at install time, supply them via environment:
 
 **Linux / macOS:**
 ```
-MEMORY_MCP_URL=https://your-mcp.example.com/mcp \
-  CONTEXT7_API_KEY=your-key \
-  curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash
+curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | \
+  MEMORY_MCP_URL=https://your-mcp.example.com/mcp \
+  CONTEXT7_API_KEY=your-key bash
 ```
 
 **Windows:**

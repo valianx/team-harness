@@ -23,7 +23,10 @@ import (
 //   - installer-assets/ holds generated runtime payloads. Changes require
 //     the same shared version update as other installed runtime inputs.
 
-//go:embed all:agents skills hooks installer-assets all:.codex/agents
+// Runtime support documents are selected for installation by the shared
+// runtime/schema/runtime-docs.json registry; other contributor docs are inert.
+//
+//go:embed all:agents skills hooks installer-assets all:.codex/agents runtime/schema/runtime-docs.json docs/*.md
 var embeddedAssets embed.FS
 
 // FS returns the read-only embedded filesystem containing runtime assets.

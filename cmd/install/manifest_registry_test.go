@@ -21,6 +21,7 @@ package main
 import (
 	"bytes"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -107,6 +108,130 @@ func TestBuildOpencodeManifests_NativeWorkflowGuide(t *testing.T) {
 		if validateOwnershipTags(OwnershipTags{ConfigKeys: []string{key}}) == nil {
 			t.Fatalf("operator instructions can be claimed: %s", key)
 		}
+	}
+}
+
+func TestBuildOpencodeManifests_StandaloneMethodDocuments(t *testing.T) {
+	modules, components, err := buildOpencodeManifests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bySource := map[string]ComponentManifest{}
+	for _, component := range components {
+		bySource[component.Source] = component
+	}
+	var selected []string
+	for _, source := range []string{
+		"agents/gcp-infra.md",
+		"installer-assets/opencode-skills/gcp-infra/canonical.md",
+		"docs/gcp-infra.md",
+		"docs/conventions.md",
+		"docs/voice-guide.md",
+		"docs/plan-shards.md",
+		"docs/pipeline-lanes.md",
+		"docs/permission-provisioning.md",
+		"agents/ref-pipeline.md",
+		"installer-assets/opencode-skills/spec/SKILL.md",
+		"installer-assets/opencode-skills/workspace/SKILL.md",
+		"installer-assets/opencode-skills/pipeline/SKILL.md",
+		"installer-assets/opencode-skills/verify/SKILL.md",
+	} {
+		component, present := bySource[source]
+		if !present {
+			t.Errorf("standalone GCP method resource is not emitted: %s", source)
+			continue
+		}
+		selected = append(selected, component.Component)
+		if strings.HasPrefix(source, "docs/") && (len(component.Emits.Files) != 1 || component.Emits.Files[0] != "{config_root}/th-references/"+source) {
+			t.Errorf("method resource must stay inert under th-references: %+v", component)
+		}
+	}
+	if t.Failed() {
+		return
+	}
+	isolatedOpencodeLedger(t)
+	placer := newOpencodePlacerAt(filepath.Join(t.TempDir(), "native config with spaces"))
+	configureLedger(placer)
+	transform := settingsBindingTransformForTest(t, placer)
+	plan, err := ComputePlan(modules, components, selected, placer, EmbeddedAssets(), transform)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ApplyPlan(plan, placer); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	PrintPlan(plan, &output)
+	if !strings.Contains(output.String(), filepath.Join(placer.ConfigRoot(), "th-references", "docs", "gcp-infra.md")) {
+		t.Fatal("native plan output omits the required installed method")
+	}
+	for _, source := range []string{"docs/gcp-infra.md", "docs/conventions.md", "docs/voice-guide.md"} {
+		installed := filepath.Join(placer.ConfigRoot(), "th-references", filepath.FromSlash(source))
+		data, err := os.ReadFile(installed)
+		if err != nil || len(data) == 0 {
+			t.Fatalf("installed method is unavailable without a checkout: %s (%v)", installed, err)
+		}
+	}
+	for _, pair := range [][2]string{
+		{"skills/gcp-infra/canonical.md", "docs/gcp-infra.md"},
+		{"agents/gcp-infra.md", "docs/conventions.md"},
+		{"th-references/docs/conventions.md", "docs/voice-guide.md"},
+	} {
+		data, err := os.ReadFile(filepath.Join(placer.ConfigRoot(), filepath.FromSlash(pair[0])))
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := filepath.ToSlash(filepath.Join(placer.ConfigRoot(), "th-references", filepath.FromSlash(pair[1])))
+		if !strings.Contains(string(data), want) {
+			t.Errorf("installed method reference does not resolve to its distributed resource: %s -> %s", pair[0], want)
+		}
+	}
+	links := regexp.MustCompile(`\]\(<?([^)>]+)>?\)`)
+	for _, name := range []string{"conventions.md", "plan-shards.md", "pipeline-lanes.md", "permission-provisioning.md"} {
+		file := filepath.Join(placer.ConfigRoot(), "th-references", "docs", name)
+		data, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, match := range links.FindAllSubmatch(data, -1) {
+			target := strings.SplitN(string(match[1]), "#", 2)[0]
+			if !strings.HasSuffix(target, ".md") || strings.Contains(target, "://") || strings.HasSuffix(target, "AGENTS.md") {
+				continue
+			}
+			target, err = url.PathUnescape(target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !filepath.IsAbs(target) {
+				target = filepath.Join(filepath.Dir(file), filepath.FromSlash(target))
+			}
+			if _, err := os.Stat(target); err != nil {
+				t.Errorf("transitive method link is unavailable in a standalone installation: %s -> %s: %v", file, target, err)
+			}
+		}
+	}
+}
+
+func TestRuntimeDocumentOwnershipCannotClaimUnregisteredPaths(t *testing.T) {
+	isolatedOpencodeLedger(t)
+	configureLedger(newOpencodePlacerAt(t.TempDir()))
+	for _, tc := range []struct {
+		name, component, file string
+		keys                  []string
+		valid                 bool
+	}{
+		{"registered method", "reference-docs-gcp-infra-md", "{config_root}/th-references/docs/gcp-infra.md", nil, true},
+		{"unregistered document", "reference-docs-private-md", "{config_root}/th-references/docs/private.md", nil, false},
+		{"unrelated file", "reference-docs-gcp-infra-md", "{config_root}/opencode.json", nil, false},
+		{"normalized alias", "reference-docs-gcp-infra-md", "{config_root}/th-references/docs/other/../gcp-infra.md", nil, false},
+		{"runtime setting", "reference-docs-gcp-infra-md", "{config_root}/th-references/docs/gcp-infra.md", []string{"logs-mode"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateLedgerOwnership(LedgerEntry{Component: tc.component, Owns: OwnershipTags{Files: []string{tc.file}, ConfigKeys: tc.keys}})
+			if (err == nil) != tc.valid {
+				t.Fatalf("ownership validation = %v, want valid=%v", err, tc.valid)
+			}
+		})
 	}
 }
 

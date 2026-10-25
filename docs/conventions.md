@@ -16,7 +16,11 @@ the operator uses the workspace as a review surface. Local
 context duplicate. Remote narrative examples below are logical sections in the
 bound effort Page, persisted by Main; file-only outputs use separate local storage.
 
-Beyond the root-tier docs (`00-state.md`, `01-plan.md`, `02-implementation.md`, `03-testing.md`, etc.), a workspace groups related artifacts under subfolders created implicitly on first `Write`: `plan/` for architecture, delivery, conditional invariants, and per-task shards; `sketches/` for plan-stage sketches; `research/` for research-family artifacts; and `reviews/` for review-family reports. Basenames never change merely because of grouping except where `docs/plan-shards.md` defines the plan layout.
+Create only the context the selected flow needs. File workspaces may group
+sketches, research and reviews under their method's existing paths; remote
+workspaces retain the same logical content in the bound Page. OpenSpec owns
+canonical intent and implementation tasks. Its files remain in the repository
+and are linked from the workspace rather than copied into task packets.
 
 ## Document classification
 
@@ -29,22 +33,23 @@ artifacts and deliverables retain their required formats; notes link to them.
 
 | Doc | Tier | Format contract | Writer |
 |-----|------|-----------------|--------|
-| `01-plan.md` | operator-facing | `sharded-v1` operator summary and manifest; no copied architecture or AC prose | architect (content); see `docs/plan-shards.md` |
-| `plan/architecture.md`, `plan/delivery.md`, `plan/invariants.md`, `plan/tasks/*.md` | agentic | Canonical plan shards; one fact in one owning artifact | architect; bounded post-gate writers per consolidation contract |
+| `01-plan.md` or its logical Page section | operator-facing | Objective, phase progress, source references and next action | Main; bounded specialist input |
+| OpenSpec proposal, design, requirements and tasks | product intent | Upstream schema in the owning repository; no workspace copy | Main or explicitly assigned author |
 | `sketches/*` | operator-facing | Required DB model/frontend wireframe before implementation; other previews on demand via `sketch` | Main or explicitly assigned specialist |
-| `01-root-cause.md` | operator-facing | Strict root-cause template (unchanged); the bug-fix equivalent of the plan, read at STAGE-GATE-1 | architect |
-| `overview.md` (initiative) | operator-facing | `agents/ref-dispatch-machinery.md § "overview.md — you are the sole writer"` (unchanged) | orchestrator (sole writer; derives completion-row coordinates after its own Phase-4 mechanics) |
-| `reviews/01-plan-review.md` | agentic | Fixed skeleton of anchored sections; no `## Review Summary`/`## Technical Detail` split; minimal prose, tables and labels | panel (single-writer-per-section) |
-| `reviews/04-*.md`, `reviews/01-ux-review.md` | agentic | Each agent's current fixed structure; no two-tier obligation | qa / security / adversary / reviewer / ux-reviewer |
-| `02-implementation.md`, `03-testing.md`, `02-regression-test.md`, `02-documentation.md`, `02-gcp-infra.md` | agentic | Each agent's current fixed structure; no two-tier obligation | implementer / tester / documenter / gcp-infra |
-| `00-state.md`, `00-execution-events.*`, `00-pipeline-summary.md`, `00-knowledge-context.md`, `failure-brief.md`, verify packets | agentic | Already agentic (unchanged) | orchestrator / verifiers |
-| `research/00-research.md`, `research/00-audit.md`, `01-planning.md` | agentic | Each agent's current fixed structure; no two-tier obligation | architect |
+| Root-cause or implementation evidence | agentic | Relevant method's current contract and observed results | Assigned investigator or implementer; Main consolidates |
+| Review reports and native returns | agentic | Immutable target, findings, coverage and limits from the selected method | Selected reviewers; Main owns dispositions |
+| Test reports and machine evidence | agentic or machine | Actual command, candidate, results and omissions; tool-owned formats | Main or assigned tester |
+| Pipeline state and events | machine | Current pipeline-owned formats; absent from direct/spec work | Current coordinator |
+| `research/00-research.md`, `research/00-audit.md`, `01-planning.md` | agentic | Relevant research method's report contract | Main or assigned specialist |
 | Vault pages produced by `documenter`, `00-teaching-pack-*.md` | operator-deliverable | Own contracts (docs flow / mentor); outside the two-tier mandate | documenter / mentor |
 
 Context notes have no universal `## Review Summary` / `## Technical Detail` split.
 Keep sections useful to the task and any structure required by an existing consumer;
 agentic notes may use compact tables or structured blocks within Markdown. STOP
 blocks, machine records and status-block return protocols keep their own formats.
+
+[Historical sharded plans](plan-shards.md) remain readable compatibility records.
+Their task shards, preflight packets and gate nonces do not govern new work.
 
 All tiers also follow the enforceable workspace write and read budgets in
 `docs/output-contract-patterns.md § 6` and § 7. “Operator-facing” permits clear prose; it does
@@ -55,7 +60,11 @@ pointers, not a second copy of source evidence.
 
 The same operator-facing/agentic split governs body-prose language, not just format:
 
-- **Operator-facing tier** — body prose in `01-plan.md`, `sketches/*`, and `01-root-cause.md` follows the operator's resolved language (session override in `00-state.md` → `language` key in `~/.claude/.team-harness.json` → detection from the operator's first message → `en`). Structural elements (section headers, field names, table keys, AC identifiers, status-block keys) stay English regardless.
+- **Operator-facing tier** — body prose follows the operator's resolved language
+  from the live request, bound context and selected runtime settings. Resolve
+  those settings through the current native adapter. Structural elements
+  (section headers, field names, table keys, AC identifiers, status-block keys)
+  stay English regardless.
 - **Agentic tier** — body prose in every other workspace doc, including `reviews/01-plan-review.md` and every `reviews/04-*.md` report body, is English. Every versioned/committed artefact is English with no exception.
 
 This rule is mirrored in `docs/voice-guide.md § Operator-Supplied Content Boundary` and operationalized per-artifact: each specialist agent declares its own artifact's language in its own `## Return Protocol § Language` clause (`agents/architect.md`, `agents/qa.md`, `agents/tester.md`, `agents/delivery.md`, and ten others — 14 in total), rather than as a single centralized dispatch instruction. `agents/_shared/dispatch-contract.md` deliberately does not mention language on any line — the standard's own convention is that this rule lives in each agent's own output contract, never in the dispatcher's prompt. The only surface outside this rule that still renders in the operator's resolved language is `agents/orchestrator.md` live chat, documented as an exception in `docs/voice-guide.md § Documented exceptions`, never as a hardcoded language.

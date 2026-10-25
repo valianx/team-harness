@@ -47,7 +47,7 @@ WORKSPACE_DIAGNOSTICS = frozenset({
 HELPER_DIGESTS = {
     "skills/update/scripts/bridge_snapshot.py": "52da3ca0233c3d9f145a46a9f0b6648aa65f01bd867cd4d7b0870053b8f2f99d",
     "skills/setup/scripts/manage_config.py": "dd67dfe743da46aa36c7d825759f9bad5efde7c89c2c9be109508d8a47d24f24",
-    "skills/setup/scripts/manage_agents.py": "c1fe6c68b5e8e373036db4ba18de0135a996a9063af3138526c87b034186f240",
+    "skills/setup/scripts/manage_agents.py": "c6e2a9429ad64cd80bc6a9f68dd4e1d9e194f53711778bdba3895a8996c54b42",
 }
 
 

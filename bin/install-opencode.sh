@@ -119,11 +119,11 @@ echo "Checksum verified."
 # path even when a terminal is present (e.g. automated deployments).
 #
 # MEMORY_MCP_URL and CONTEXT7_API_KEY are OPTIONAL. When MEMORY_MCP_URL is
-# set, it is passed via --memory-url argv (not env, to avoid shell history).
+# set, the bootstrap forwards it through --memory-url to the installer.
 # To configure an optional MCP later, re-run with the env vars set:
-#   MEMORY_MCP_URL=https://your-mcp.example.com/mcp \
-#     CONTEXT7_API_KEY=your-key \
-#     curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | bash
+#   curl -fsSL https://valianx.github.io/team-harness/install-opencode.sh | \
+#     MEMORY_MCP_URL=https://your-mcp.example.com/mcp \
+#     CONTEXT7_API_KEY=your-key bash
 #
 # Redirect stdin from /dev/tty when present — same rationale as install.sh:
 # when invoked via 'curl | bash', bash holds the pipe as stdin; the binary
@@ -137,7 +137,7 @@ chmod +x "$TMP/install"
 
 echo "Launching installer..."
 if [ -n "${MEMORY_MCP_URL:-}" ]; then
-    # URL provided — pass it via argv (not via env that shell records in history).
+    # Forward the explicitly selected Memory MCP URL.
     if (exec < /dev/tty) 2>/dev/null; then
         "$TMP/install" apply --runtime opencode --scope global --memory-url "$MEMORY_MCP_URL" "$@" </dev/tty
     else

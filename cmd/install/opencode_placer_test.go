@@ -1,10 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
+	"testing/fstest"
 )
 
 func TestOpencodeRootPrecedencePlacesOnlyInSelectedRoot(t *testing.T) {
@@ -83,6 +86,154 @@ func TestOpencodeRootPrecedencePlacesOnlyInSelectedRoot(t *testing.T) {
 				t.Error("root selection changed files outside the selected root, or wrote after an invalid selection")
 			}
 		})
+	}
+}
+
+func TestOpencodeSettingsBindingUsesSelectedInstallation(t *testing.T) {
+	for _, tc := range []struct {
+		name, scope, override, environment, want string
+	}{
+		{"native global", "global", "", "", "global"},
+		{"project", "project", "", "", "project"},
+		{"environment", "project", "", "environment", "environment"},
+		{"explicit", "project", "explicit", "environment", "explicit"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			base, err := filepath.EvalSymlinks(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			roots := map[string]string{
+				"global":      filepath.Join(base, "native config", "opencode"),
+				"project":     filepath.Join(base, "project", ".opencode"),
+				"environment": filepath.Join(base, "environment root"),
+				"explicit":    filepath.Join(base, "explicit root"),
+			}
+			if err := os.MkdirAll(filepath.Join(base, "project"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			t.Chdir(filepath.Join(base, "project"))
+			t.Setenv("XDG_CONFIG_HOME", filepath.Join(base, "native config"))
+			t.Setenv("APPDATA", filepath.Join(base, "native config"))
+			t.Setenv("OPENCODE_CONFIG_DIR", roots[tc.environment])
+			placer, err := newOpencodePlacer(tc.scope, roots[tc.override])
+			if err != nil {
+				t.Fatal(err)
+			}
+			installSettingsBindingFixture(t, placer, filepath.Join(roots[tc.want], ".team-harness.json"))
+		})
+	}
+}
+
+func TestOpencodeSettingsBindingPreservesPathData(t *testing.T) {
+	for _, root := range []string{
+		filepath.Join(t.TempDir(), "root with spaces"),
+		`C:\Users\Operator Name\AppData\Roaming\opencode`,
+	} {
+		t.Run(root, func(t *testing.T) {
+			// Windows separators are exercised as data on every host; native root
+			// selection and placement run in the platform's own matrix above.
+			placer := newOpencodePlacerAt(root)
+			transform := settingsBindingTransformForTest(t, placer)
+			bound, err := transform(settingsBindingSource, "skill", "installer-assets/opencode-skills/learn-english/SKILL.md")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := settingsBindingValue(t, bound); got != filepath.Join(root, ".team-harness.json") {
+				t.Fatalf("binding = %q, want exact root data %q", got, root)
+			}
+		})
+	}
+	if os.PathSeparator != '\\' {
+		root := filepath.Join(t.TempDir(), "operator's \"config\" \\ literal")
+		installSettingsBindingFixture(t, newOpencodePlacerAt(root), filepath.Join(root, ".team-harness.json"))
+	}
+}
+
+func TestOpencodeSettingsBindingCoversModelTransforms(t *testing.T) {
+	for _, tc := range []struct{ name, settings string }{
+		{"baseline", `{}`},
+		{"legacy cost tier", `{"opencode.cost_tier_provider":"anthropic"}`},
+		{"worker profiles", `{"worker-models":` + string(workerPreferenceForTest(`{"mode":"inherit"}`)) + `}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			if err := os.WriteFile(filepath.Join(root, ".team-harness.json"), []byte(tc.settings), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			installSettingsBindingFixture(t, newOpencodePlacerAt(root), filepath.Join(root, ".team-harness.json"))
+		})
+	}
+}
+
+var settingsBindingSource = []byte("---\nname: learn-english\ndescription: Fixture\nmetadata:\n  team-harness/config: \"__TEAM_HARNESS_OPENCODE_CONFIG__\"\n---\n")
+
+func settingsBindingTransformForTest(t *testing.T, placer Placer) func([]byte, string, string) ([]byte, error) {
+	t.Helper()
+	previousRuntime, previousTier, previousTierSet := runtimeFlag, opencodeTierFlag, opencodeTierFlagSet
+	t.Cleanup(func() {
+		runtimeFlag, opencodeTierFlag, opencodeTierFlagSet = previousRuntime, previousTier, previousTierSet
+	})
+	runtimeFlag, opencodeTierFlag, opencodeTierFlagSet = "opencode", "", false
+	transform, err := selectTransform(placer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return transform
+}
+
+func settingsBindingValue(t *testing.T, data []byte) string {
+	t.Helper()
+	for _, line := range strings.Split(string(data), "\n") {
+		if value, found := strings.CutPrefix(line, "  team-harness/config: "); found {
+			var decoded string
+			if err := json.Unmarshal([]byte(value), &decoded); err != nil {
+				t.Fatalf("settings binding is not a JSON/YAML string: %v", err)
+			}
+			return decoded
+		}
+	}
+	t.Fatal("settings binding missing from installed metadata")
+	return ""
+}
+
+func installSettingsBindingFixture(t *testing.T, placer *opencodePlacer, want string) {
+	t.Helper()
+	isolatedOpencodeLedger(t)
+	configureLedger(placer)
+	component := ComponentManifest{
+		SchemaVersion: 1, Component: "skill-learn-english-SKILL-md", Module: "opencode-harness", Kind: "skill",
+		Source: "installer-assets/opencode-skills/learn-english/SKILL.md",
+		Emits:  OwnershipTags{Files: []string{"{config_root}/skills/learn-english/SKILL.md"}},
+	}
+	transform := settingsBindingTransformForTest(t, placer)
+	assets := fstest.MapFS{component.Source: &fstest.MapFile{Data: settingsBindingSource}}
+	plan, err := ComputePlan(nil, []ComponentManifest{component}, []string{component.Component}, placer, assets, transform)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.ToCreate) != 1 || plan.ToCreate[0].SrcHash != hashBytes(plan.ToCreate[0].SrcData) {
+		t.Fatalf("binding must precede source hashing: %+v", plan)
+	}
+	if got := settingsBindingValue(t, plan.ToCreate[0].SrcData); got != want {
+		t.Fatalf("planned settings binding = %q, want %q", got, want)
+	}
+	if err := ApplyPlan(plan, placer); err != nil {
+		t.Fatal(err)
+	}
+	installed, err := os.ReadFile(filepath.Join(placer.ConfigRoot(), "skills", "learn-english", "SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := settingsBindingValue(t, installed); got != want {
+		t.Fatalf("installed settings binding = %q, want %q", got, want)
+	}
+	second, err := ComputePlan(nil, []ComponentManifest{component}, []string{component.Component}, placer, assets, transform)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(second.ToCreate)+len(second.ToUpdate) != 0 || len(second.ToSkipHashMatch) != 1 {
+		t.Fatalf("settings binding is not idempotent: %+v", second)
 	}
 }
 

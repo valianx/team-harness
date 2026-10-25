@@ -102,7 +102,7 @@ contracts listed below.
 | `test_regression_evidence.mjs` | Real base/head assertion comparisons, preexisting failures, inconclusive execution, deadlines, bounded diagnostics, stale/tampered evidence and unchanged operator checkout; no model calls |
 | `test_hook_registration.mjs` | Retained context/observation hook registration, launcher bundles and OpenCode integration; retired enforcement wiring is absent. |
 | `test_openspec_launcher.mjs` | Executes the Windows npm JavaScript entrypoint transport with literal arguments and paths containing spaces/symbols; checks missing runtime and invalid input. Runs in Linux and native Windows CI. |
-| `test_sync_skills_platform.mjs` | Shared setup asset byte/mode drift and OpenCode cross-repo source propagation, read-only drift detection and stable regeneration. Runs in the full suite and native Windows CI. |
+| `test_sync_skills_platform.mjs` | Shared setup asset byte/mode drift, OpenCode source propagation, packaged scanner-root selection, read-only drift detection and stable regeneration. Runs in the full suite and native Windows CI. |
 | `test_workspace_context.mjs` | Shared selector truth table, bound file/remote context, portable source identity and separate operational-path validation. |
 | `test_space_context.mjs` | Native metadata-only container/effort selection, complete discovery, uncertain/partial write receipts and setup persistence outcomes. No live service. |
 | `test_test_dashboard_batch.mjs` | Offline API/frontend/mixed batch validation, stable IDs, dependency graphs, request/assertion shapes and sanitized CLI errors; no application or model calls. |
@@ -170,7 +170,7 @@ live model authoring and host workflow activation are outside this evidence.
 
 The architecture diagram starter has a separate Chromium lane. It copies the kit
 outside the installation and checks model/geometry invariants, actual rendered
-bounds/routes, interactions and a production static server. Reproduce with a fresh
+bounds/routes, relationship-label pointer targets, interactions and a production static server. Reproduce with a fresh
 external project and evidence directory (Chromium must be provisioned explicitly):
 
 ```bash
@@ -182,7 +182,7 @@ npm run build
 npx playwright install chromium
 DIAGRAM_EVIDENCE_DIR=/absolute/workspace/diagram-evidence npm run test:browser
 npm run inspect -- --out /absolute/workspace/composition-evidence
-DIAGRAM_EVIDENCE_DIR=/absolute/workspace/static-evidence DIAGRAM_SERVER_COMMAND='npm run preview -- --host 127.0.0.1 --port 4178' npm run test:browser -- tests/browser/production.spec.ts
+DIAGRAM_EVIDENCE_DIR=/absolute/workspace/static-evidence DIAGRAM_SERVER_COMMAND='npm run preview -- --host 127.0.0.1 --port 4178' npm run test:browser -- tests/browser/production.spec.ts tests/browser/labels.spec.ts
 ```
 
 Inspection compares complete compositions and every auto perspective of the editable

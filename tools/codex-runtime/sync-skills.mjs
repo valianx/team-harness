@@ -125,21 +125,17 @@ export const sharedPipelineScripts = [
 
 const sharedPipelinePolicies = ["openspec-policy.json"];
 
-// docs/ files the packaged agent bodies instruct reading at runtime; the
-// Codex package must carry them so those reads resolve on an installed tree.
-export const claudePackageDocs = [
-  "agent-authoring.md",
-  "code-comments.md",
-  "code-hygiene-gate.md",
-  "context7-usage.md",
-  "gcp-infra.md",
-  "permission-provisioning.md",
-  "pipeline-lanes.md",
-  "plan-shards.md",
-  "testing.md",
-  "verification-packet.md",
-  "worktree-discipline.md",
-];
+// One explicit document set supplies packaged methods on both native runtimes.
+async function runtimeDocuments(rootDir) {
+  const registry = JSON.parse(await readFile(join(rootDir, "runtime/schema/runtime-docs.json"), "utf8"));
+  if (registry.schema_version !== 1 || !Array.isArray(registry.documents) || registry.documents.length === 0
+    || registry.documents.some(name => typeof name !== "string" || !/^[a-z][a-z0-9-]*\.md$/.test(name))
+    || new Set(registry.documents).size !== registry.documents.length) {
+    throw new Error("invalid runtime document registry");
+  }
+  for (const name of registry.documents) await assertSafeDestinationPath(rootDir, join(rootDir, "docs", name), "file");
+  return registry.documents;
+}
 
 function yamlString(value) {
   return JSON.stringify(value);
@@ -196,10 +192,9 @@ function renderAdapter(name, canonical, runtime) {
     : `Examples written as \`/th:${name}\` name the same capability; interpret them as examples rather than requiring Claude Code.`;
   const configPath = codex
     ? "${CODEX_HOME:-$HOME/.codex}/.team-harness.json"
-    : "${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}/.team-harness.json";
-  const frontmatter = canonical.explicitOnly && !codex
-    ? `---\nname: ${nativeName}\ndescription: ${yamlString(canonical.description)}\nmetadata:\n  opencode/autoinvoke: "false"\n---`
-    : `---\nname: ${nativeName}\ndescription: ${yamlString(canonical.description)}\n---`;
+    : 'metadata["team-harness/config"]';
+  const metadata = codex ? "" : `metadata:\n  team-harness/config: "__TEAM_HARNESS_OPENCODE_CONFIG__"\n${canonical.explicitOnly ? '  opencode/autoinvoke: "false"\n' : ""}`;
+  const frontmatter = `---\nname: ${nativeName}\ndescription: ${yamlString(canonical.description)}\n${metadata}---`;
   return `---
 ${frontmatter.slice(4)}
 
@@ -225,9 +220,9 @@ workflow:
    only bounded work to available native agents when delegation is allowed and
    materially useful. Gate approval and consolidation stay in the primary thread.
 4. Resolve persistent settings from
-   \`${configPath}\`. Never depend on a Claude
+   \`${configPath}\`.${codex ? "" : " This file's metadata is bound to the selected settings path by the native installer."} Never depend on a Claude
    Code installation, \`~/.claude\`, the \`claude\` binary, or Claude plugin
-   cache paths. Use packaged files relative to this skill directory.${codex ? "" : " Canonical agent reference documents (`agents/ref-*.md` and documents in agent subdirectories, except README.md) resolve under `th-references/agents/...` in that config root, including links with relative prefixes. Invocable agent definitions remain under `agents/`."}
+   cache paths. Use packaged files relative to this skill directory.${codex ? "" : " The settings file's parent is the selected config root. Canonical agent reference documents (`agents/ref-*.md` and documents in agent subdirectories, except README.md) resolve under `th-references/agents/...` in that root, including links with relative prefixes. Distributed `docs/...` methods resolve under `th-references/docs/...`; the native installer binds their paths. Invocable agent definitions remain under `agents/`."}
 5. Preserve every canonical safety boundary, read-only default, confirmation
    gate, secret rule, and outward-write approval. Native ${codex ? "Codex" : "opencode"} sandbox and
    permission policy remain authoritative.
@@ -520,11 +515,12 @@ async function assertSafeLinkRemoval(rootDir, target) {
 
 /** Synchronize curated Claude assets; check mode reports drift without writing. */
 export async function syncClaudePackageAssets({ check, rootDir }) {
+  const documents = await runtimeDocuments(rootDir);
   const projections = [
     [join(rootDir, ".claude-plugin"), join(rootDir, "plugins/team-harness/.claude-plugin"), new Set(["plugin.json", "hooks.json"])],
     [join(rootDir, "agents"), join(rootDir, "plugins/team-harness/agents"), null],
     [join(rootDir, "hooks"), join(rootDir, "plugins/team-harness/hooks"), null],
-    [join(rootDir, "docs"), join(rootDir, "plugins/team-harness/docs"), new Set(claudePackageDocs)],
+    [join(rootDir, "docs"), join(rootDir, "plugins/team-harness/docs"), new Set(documents)],
   ];
   let stale = false;
   for (const [sourceRoot, targetRoot, allowlist] of projections) {

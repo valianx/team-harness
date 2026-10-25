@@ -40,6 +40,8 @@ MANAGED_MARKER = "# Code generated from runtime/schema/codex-agents.json; DO NOT
 DEFAULT_SUBAGENT_MODEL = "gpt-6.1-sol"
 DEFAULT_SUBAGENT_REASONING_EFFORT = "max"
 LEGACY_SUBAGENT_PAIRS = frozenset({("gpt-5.6-terra", "medium"), ("gpt-5.6-luna", "max"), ("gpt-6-luna", "max")})
+# Filling a partial operator choice can form a legacy pair; retain its ownership.
+CUSTOM_DEFAULTS_MARKER = "# Team Harness: preserve operator-selected subagent defaults."
 PROJECT_DOC_FALLBACK = "CLAUDE.md"
 RUNTIME_KEYS = (
     "default_subagent_model",
@@ -99,9 +101,13 @@ def classify_runtime_config(path: Path) -> dict[str, object]:
         raise ValueError("agents.default_subagent_model must be a string")
     if effort is not None and not isinstance(effort, str):
         raise ValueError("agents.default_subagent_reasoning_effort must be a string")
+    custom_defaults = any(
+        line.strip() == CUSTOM_DEFAULTS_MARKER.encode("utf-8")
+        for line in (raw or b"").splitlines()
+    )
     if model == DEFAULT_SUBAGENT_MODEL and effort == DEFAULT_SUBAGENT_REASONING_EFFORT:
         status = "current"
-    elif (model, effort) in LEGACY_SUBAGENT_PAIRS:
+    elif (model, effort) in LEGACY_SUBAGENT_PAIRS and not custom_defaults:
         status = "legacy"
     elif model is None or effort is None:
         status = "missing"
@@ -243,9 +249,13 @@ def render_runtime_config(
                         raise ValueError(f"unsupported Codex runtime key layout: {key}")
                     lines[index] = f'{match.group(1)}"{desired[key]}"{match.group(2)}{newline}'
                 break
-    missing = [key for key in RUNTIME_KEYS if key not in found] if replace_existing else []
+    missing = [key for key in RUNTIME_KEYS if key not in found]
     if missing:
+        if not lines[section_end - 1].endswith(("\n", "\r")):
+            lines[section_end - 1] += newline
         insertion = [f'{key} = "{desired[key]}"{newline}' for key in missing]
+        if found and not replace_existing and not any(line.strip() == CUSTOM_DEFAULTS_MARKER for line in lines):
+            insertion.insert(0, CUSTOM_DEFAULTS_MARKER + newline)
         lines[section_end:section_end] = insertion
     return "".join(lines).encode("utf-8")
 
@@ -288,7 +298,7 @@ def sync_runtime_config(path: Path) -> tuple[bool, dict[str, object]]:
     rendered = render_runtime_config(
         raw,
         fallbacks=fallbacks,
-        replace_existing=status in {"legacy", "missing"},
+        replace_existing=status == "legacy",
     )
     if raw == rendered:
         return False, before
@@ -299,8 +309,9 @@ def sync_runtime_config(path: Path) -> tuple[bool, dict[str, object]]:
     rendered_agents = parsed.get("agents")
     if not isinstance(rendered_agents, dict):
         raise ValueError(f"Codex runtime fallback reconciliation incomplete: {path}")
-    if status in {"legacy", "missing"} and any(
-        rendered_agents.get(key) != value
+    previous_agents = parsed_before.get("agents", {})
+    if any(
+        rendered_agents.get(key) != (value if status == "legacy" else previous_agents.get(key, value))
         for key, value in {
             "default_subagent_model": DEFAULT_SUBAGENT_MODEL,
             "default_subagent_reasoning_effort": DEFAULT_SUBAGENT_REASONING_EFFORT,

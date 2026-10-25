@@ -217,13 +217,18 @@ func buildOpencodeManifests() ([]ModuleManifest, []ComponentManifest, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("build reference components: %w", err)
 	}
+	documentComponents, err := buildRuntimeDocumentComponents(embeddedFS)
+	if err != nil {
+		return nil, nil, fmt.Errorf("build runtime document components: %w", err)
+	}
 
 	allComponents := make([]ComponentManifest, 0,
-		len(agentComponents)+len(skillComponents)+len(commandComponents)+len(referenceComponents))
+		len(agentComponents)+len(skillComponents)+len(commandComponents)+len(referenceComponents)+len(documentComponents))
 	allComponents = append(allComponents, agentComponents...)
 	allComponents = append(allComponents, skillComponents...)
 	allComponents = append(allComponents, commandComponents...)
 	allComponents = append(allComponents, referenceComponents...)
+	allComponents = append(allComponents, documentComponents...)
 
 	// Build the module manifest listing all component IDs AFTER assembling the
 	// full component slice (keeps orphan-check safe).

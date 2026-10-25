@@ -8,6 +8,8 @@ Give the guided lane validation that confirms rather than iterates, raises the b
 ### Requirement: The review package is produced by an executable, not assembled from prose
 The verification helper SHALL derive immutable coordinates, changed surface and bound criteria when used. Its security classification is optional risk advice. Main selects requested/relevant lenses and owns the publication decision; no classification or helper summary grants or denies execution authority.
 
+Accepted range syntax SHALL resolve once to immutable effective endpoints used consistently by changed scope, risk signals, coordinates and later consumers. For a three-dot range, the effective base SHALL be the supported merge base rather than the raw left endpoint.
+
 #### Scenario: A review is requested
 - **WHEN** a committed range is packaged
 - **THEN** the helper preserves anchored evidence and requested coverage without adding an automatic security lens.
@@ -23,6 +25,14 @@ The verification helper SHALL derive immutable coordinates, changed surface and 
 #### Scenario: Publication follows verified repairs
 - **WHEN** the coordinator closes findings after the original review
 - **THEN** it records the corrected revision and executable validation evidence without rewriting original returns or historical reports; no helper readiness field vetoes that disposition
+
+#### Scenario: Divergent branches use a three-dot comparison
+- **WHEN** a committed A...B range is packaged and A has changes absent from their supported merge base
+- **THEN** the emitted immutable comparison identifies the same feature changes as the packaged scope, without unrelated changes from A
+
+#### Scenario: A symbolic endpoint moves after resolution
+- **WHEN** a branch name used in a request advances after its endpoints have been resolved
+- **THEN** all later package operations remain bound to the resolved comparison
 
 ### Requirement: Validation runs once and a fix closes by executing its oracle
 

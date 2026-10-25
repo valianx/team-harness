@@ -11,7 +11,7 @@ This document describes the working model that governs how Team Harness is insta
 | What | Owner | Frequency |
 |------|-------|-----------|
 | Native preferences — workspace mode (`logs-mode`, `logs-path`, `logs-subfolder`), default `language`, English-learning mode, GitHub identity routes (`github.account_routes`) | `/th:setup` | One-time bootstrap; re-run to reconfigure |
-| FILES — managed `~/.claude/CLAUDE.md` general-agent and voice blocks | `/th:update` | Every release |
+| FILES — reconcile managed `~/.claude/CLAUDE.md` general-agent and voice blocks | `/th:update` | Every update run |
 | FLOWS — marketplace catalog refresh, plugin version download | `/th:update` | Every release |
 | `~/.claude/.team-harness.json` full write (merge-write-whole-document) | `/th:setup` | One-time bootstrap; re-run to reconfigure |
 
@@ -38,14 +38,14 @@ These artifacts live inside the plugin cache directory (`~/.claude/plugins/cache
 
 ### Fixed-path artifacts (explicit sync required)
 
-These artifacts must land at a specific absolute path under `~/.claude/` that the plugin runtime does **not** manage automatically. They require an explicit copy (or write) step in `/th:update` Step 6 every time a release is published.
+These artifacts live at fixed paths under `~/.claude/` outside automatic plugin-cache management. `/th:update` Step 6 reconciles them on each run; ownership and current content determine whether a write is needed.
 
 **Artifacts in this class:**
 
 | Artifact | Target path | Mechanism in `/th:update` Step 6 |
 |----------|-------------|----------------------------------|
-| `orchestrator-dispatch-rule` managed block | `~/.claude/CLAUDE.md` (marker-delimited section) | Destructive marker-bounded replace or append |
-| `voice-rule` managed block | `~/.claude/CLAUDE.md` (marker-delimited section) | Destructive marker-bounded replace or append |
+| `orchestrator-dispatch-rule` managed block | `~/.claude/CLAUDE.md` (marker-delimited section) | Provenance-aware reconciliation; preserve operator edits unless explicitly forced |
+| `voice-rule` managed block | `~/.claude/CLAUDE.md` (marker-delimited section) | Provenance-aware reconciliation; preserve operator edits unless explicitly forced |
 
 > **Retired entry mechanisms:** the `dev-mode`, `nested-dispatch-takeover` and `dev-mode-entry` blocks, activation marker and developer-mode output style are no longer installed. Update removes the retired managed blocks and follows [bounded style migration](dev-mode.md#retire-an-existing-developer-mode-selection) for existing selections. Session startup supplies workflow discovery, language and workspace context. Native host permissions and approvals remain independent of style selection.
 
@@ -75,14 +75,24 @@ Running `/th:update` every release keeps both the cache artifacts (via the plugi
 
 ## Self-healing / idempotency
 
-`/th:update` Step 6 re-syncs every fixed-path artifact on every run, regardless of whether the plugin version changed:
+`/th:update` reconciles its managed fixed-path artifacts on every run,
+including an equal-version run. For Claude Code blocks, the current
+[update method](../skills/update/SKILL.md) owns the decision matrix:
 
-- **Managed CLAUDE.md blocks** (`orchestrator-dispatch-rule`, `voice-rule`) — destructive marker-bounded replace (if markers are present) or append (if markers are absent). No content comparison — marker presence is the only check. Step 6 also **deletes** the retired `dev-mode` / `nested-dispatch-takeover` blocks if present.
+- **Managed CLAUDE.md blocks** — insert absent blocks and stamp their provenance;
+  preserve unchanged canonical content; update known harness-owned content;
+  preserve operator-edited content unless `--force-blocks` is explicitly selected.
+  Unstamped legacy blocks follow the method's adoption rules. A malformed marker
+  pair produces a warning and is skipped rather than duplicated.
 - **Retired output style** — inspect and migrate verified TH selections separately; preserve custom files and unrelated settings. No style is copied on fresh or repeated runs.
 
-Because Step 6 is unconditional and destructive, a machine that missed one or more updates self-corrects on the next run: the fixed-path artifacts are overwritten with the current version's canonical content.
+Repeated updates repair missing or eligible managed content while retaining
+operator ownership. Their atomic write and rolling backup apply only when a
+change is required; a current document remains an idempotent no-op.
 
-**Concrete example:** an operator whose `~/.claude/CLAUDE.md` was missing one or more managed blocks — because the version of the plugin they installed did not write them yet — gets those blocks restored on the next `/th:update`. Step 6 appends any block whose start/end markers are absent, so no manual intervention is required. The same behavior applies whether a block was never written or was accidentally deleted: the next update run re-inserts it unconditionally.
+For example, an absent managed block is restored on the next update. A block
+whose live hash differs from its stored provenance is retained as operator-edited;
+restoring canonical content then requires the explicit force option.
 
 ---
 
@@ -99,7 +109,8 @@ This is the same family of failure as issue #272: an artifact was shipped to the
 - [ ] Add the artifact file to the plugin cache layout (the appropriate path under `skills/`, `output-styles/`, etc.).
 - [ ] Add a sync step in `skills/update/SKILL.md` Step 6 (both the bash and PowerShell command blocks).
 - [ ] Add the same idempotent sync in `skills/setup/SKILL.md` (for first-time installs that have not run `/th:update` yet).
-- [ ] Confirm the sync is destructive / force-copy (no content comparison — only presence checks for marker-bounded blocks).
+- [ ] Verify missing/current/managed/operator-edited/malformed states and the
+      explicit force path; preserve unrelated content and repeat-run idempotency.
 
 ---
 

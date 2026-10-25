@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.56.1] - 2026-10-25
+
+### Fixed
+
+- Preserve partial Codex preferences and reject unsupported update interpreters before installation changes.
+- Bind OpenCode skills and method documents to the selected installation and correct packaged security scans.
+- Keep review coordinates immutable and align maintenance guidance with current workflows.
+- Keep diagram relationship labels visible and clickable above connection routes.
+
 ## [3.56.0] - 2026-10-25
 
 ### Changed
