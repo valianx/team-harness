@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { chmod, cp, lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { chmod, cp, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -195,12 +195,14 @@ try {
     ].join("\n"), scanner, ...args],
     { encoding: "utf8" },
   ));
-  assert.deepEqual(resolveScanner(packagedScanner), { root: resolve(packagedRoot), failures: 0 },
+  // Python resolves directory aliases, including Windows 8.3 TEMP paths.
+  // Compare physical roots while retaining the exact roster-root assertion.
+  assert.deepEqual(resolveScanner(packagedScanner), { root: await realpath(packagedRoot), failures: 0 },
     "the packaged scanner must audit the actual roster above per-skill agents/openai.yaml metadata");
   const explicitRoot = join(rootDir, "explicit-assets");
   await mkdir(join(explicitRoot, "agents"), { recursive: true });
   await cp(join(packagedRoot, "agents"), join(explicitRoot, "agents"), { recursive: true });
-  assert.deepEqual(resolveScanner(packagedScanner, ["--root", explicitRoot]), { root: resolve(explicitRoot), failures: 0 },
+  assert.deepEqual(resolveScanner(packagedScanner, ["--root", explicitRoot]), { root: await realpath(explicitRoot), failures: 0 },
     "an explicit asset root remains authoritative outside the package ancestry");
   assert.ok(Array.isArray(piGenerated), "Pi must have an explicit native projection result");
   assert.deepEqual(piGenerated, names, "every canonical skill receives a Pi projection, including lifecycle overrides");
