@@ -25,14 +25,13 @@ export function Glyph({ kind, size = 20 }: { kind: Kind; size?: number }) {
 /** ComponentCard is rendered unchanged in measurement and in the interactive graph. */
 export function ComponentCard({ component }: { component: Component }) {
   return <div className={`component-card component-${component.kind}`} data-parent={component.parent}>
-    <div className="component-heading"><span className="component-icon"><Glyph kind={component.kind} /></span><span className="component-kind">{KIND_LABELS[component.kind]}</span></div>
-    <div className="component-label">{component.label}</div>
+    <div className="component-heading"><span className="component-icon" title={KIND_LABELS[component.kind]}><Glyph kind={component.kind} /><span className="sr-only">{KIND_LABELS[component.kind]}</span></span><div className="component-label">{component.label}</div></div>
   </div>;
 }
 
 /** GroupHeader has a fixed text width so content measurement does not change after layout. */
 export function GroupHeader({ group }: { group: Group }) {
-  return <div className="group-header"><div className="group-eyebrow"><Glyph kind="group" size={14} /><span>Group</span></div><div className="group-title">{group.label}</div></div>;
+  return <div className="group-header"><span className="group-icon"><Glyph kind="group" size={18} /><span className="sr-only">Group</span></span><div className="group-title">{group.label}</div></div>;
 }
 
 /** RelationshipLabel shares font, padding and wrapping between measurement and routed labels. */

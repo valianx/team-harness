@@ -405,7 +405,7 @@ func TestBuildOpencodeManifests_DiagramProjectPreparationEmitted(t *testing.T) {
 			emitted[file] = true
 		}
 	}
-	for _, file := range []string{"package.json", "gitignore.txt", "scripts/prepare-project.mjs"} {
+	for _, file := range []string{"package.json", "gitignore.txt", "scripts/prepare-project.mjs", "scripts/inspect-composition.mjs", "src/composition.ts"} {
 		want := "{config_root}/skills/reactflow-diagram/references/starter/" + file
 		if !emitted[want] {
 			t.Errorf("copied-project preparation asset not emitted: %s", want)

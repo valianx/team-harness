@@ -310,3 +310,26 @@ test('an empty group with room for its header and insets is valid', () => {
     box('group', 0, 0, { kind: 'group', width: 320, height: 96, headerHeight: 32 }),
   ])), []);
 });
+
+test('relationships sharing a component must use its single rendered source and target handles', () => {
+  const fixture = horizontal();
+  fixture.model.edges.push({ id: 'second', from: 'a', to: 'b', evidence });
+  fixture.geometry.edges.push({ id: 'second', sourcePort: { x: 100, y: 270 }, targetPort: { x: 600, y: 270 },
+    sections: [{ points: [{ x: 100, y: 270 }, { x: 600, y: 270 }] }] });
+  diagnostic(checkGeometry(fixture.model, fixture.geometry), 'shared-port', ['a', 'second']);
+  diagnostic(checkGeometry(fixture.model, fixture.geometry), 'shared-port', ['b', 'second']);
+});
+
+test('a diagonal segment cannot pass as an orthogonal architecture route', () => {
+  const fixture = horizontal();
+  fixture.geometry.edges[0].sections[0].points.splice(1, 0, { x: 300, y: 150 });
+  diagnostic(checkGeometry(fixture.model, fixture.geometry), 'route-orthogonality', ['request']);
+});
+
+test('a route through an unrelated relationship label is an obstruction even with valid node clearance', () => {
+  const fixture = horizontal(true);
+  fixture.model.edges.push({ id: 'second', from: 'a', to: 'b', evidence });
+  fixture.geometry.edges.push({ id: 'second', sourcePort: { x: 100, y: 250 }, targetPort: { x: 600, y: 250 },
+    sections: [{ points: [{ x: 100, y: 250 }, { x: 250, y: 250 }, { x: 250, y: 112 }, { x: 500, y: 112 }, { x: 500, y: 250 }, { x: 600, y: 250 }] }] });
+  diagnostic(checkGeometry(fixture.model, fixture.geometry), 'route-label-collision', ['request', 'second']);
+});

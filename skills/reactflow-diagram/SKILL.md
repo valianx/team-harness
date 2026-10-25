@@ -38,7 +38,11 @@ Conversational corrections update the same model: retain unaffected IDs and
 evidence, add the correction's source locator and rerun affected validation.
 
 Read [design-system.md](references/design-system.md) and
-[layout-contract.md](references/layout-contract.md). Copy the versioned
+[layout-contract.md](references/layout-contract.md), then follow
+[composition-review.md](references/composition-review.md) to choose and visually
+correct the composition before presenting it. Reuse operator-approved examples
+and preferences from the conversation or bound workspace; resolve routine layout
+choices from that context. Copy the versioned
 `references/starter/` into the output directory and edit its
 `fixtures/sample.json`. Reuse its renderer, tokens, measurement and layout;
 the copied project owns its local source, dependencies and assets. The viewer has
@@ -51,10 +55,10 @@ preserving an existing ignore file. If lifecycle scripts are disabled, run
 
 ## Review and delivery
 
-Run the starter's model, geometry, build and browser checks; inspect the actual
-render at both documented viewports, including details, perspectives and steps.
-Use explicit views when density requires them, retaining every relationship's
-membership or declared exclusion. Repair the reported model or layout cause;
+Run the starter's model, geometry, build and browser checks, then use its `inspect`
+command for the actual consumer. Judge the captured views and exercise details and steps.
+Deliver a useful complete overview; supplementary perspectives explain focused
+flows without replacing it. Repair the reported model or layout cause;
 coordinates, hidden relationships and ad hoc geometry overrides are not repairs.
 
 Compare the actual generated artifact with the source inventory. Retain the source

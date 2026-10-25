@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.56.0] - 2026-10-25
+
+### Changed
+
+- Create compact source-led diagrams with autonomous composition comparison and visual revision before delivery.
+
 ## [3.55.0] - 2026-10-23
 
 ### Changed

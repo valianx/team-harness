@@ -3,19 +3,23 @@
 ## Measured geometry
 
 The starter validates the internal model before measuring real components,
-headers, ports and edge labels after fonts are ready. ELK derives hierarchy and
-routing; React Flow consumes the resulting positions and complete route sections.
+headers, ports and edge labels after fonts are ready. Default `auto` composition
+compares compact packing with layered ELK candidates and exposes its selection.
+React Flow consumes the resulting positions and complete route sections.
 Edit `fixtures/sample.json`; demonstration fixtures use a separate immutable model.
 
 The supported directions are `right` and `down`, with at most two group levels:
-root → group → subgroup → node. Diagram-space defaults are leaf width 256,
-sibling clearance 48, inter-layer clearance 96 and group inset 32 plus measured
-header space. Empty groups retain measured minimum bounds.
+root → group → subgroup → node. Shared tokens own component dimensions, sibling
+and layer clearance, group insets and measured header space. Empty groups retain
+measured minimum bounds.
 
 The adapter reserves port clearance below headers and refines obstructed segments
 against measured obstacles, preserving endpoints, sections and valid bends.
-Chromium fixtures exercise 14 components/20 relationships rightward and 5/4
-downward; large views and ancestor headers may require pan or explicit perspectives.
+Choose and assess actual composition candidates through
+[composition-review.md](composition-review.md); a successful layout calculation
+does not establish that its fitted overview is useful.
+Standalone previews accept `?composition=layered` or `?composition=compact` for
+explicit comparison. Composition changes preserve the semantic model and direction.
 
 Each model generation has at most three measurement/layout passes. A readiness
 timeout, nonconvergence or stale asynchronous result cannot establish a verified
@@ -36,9 +40,8 @@ npx playwright install chromium
 DIAGRAM_EVIDENCE_DIR="/absolute/workspace/diagram-evidence" npm run test:browser
 ```
 
-The install lifecycle prepares a missing `.gitignore` from `gitignore.txt`, which
-survives runtime packaging. With scripts disabled, run `node scripts/prepare-project.mjs`;
-an existing consumer ignore file is preserved.
+`npm ci` prepares package-safe `.gitignore`; with lifecycle scripts disabled run
+`node scripts/prepare-project.mjs`, preserving an existing consumer ignore file.
 
 Browser provisioning is a one-time environment step. A compatible installed
 Chromium can instead be selected with `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
@@ -49,21 +52,33 @@ opens a local development server; it does not verify production independence.
 
 ## Inspect and repair
 
-Inspect actual output at 1440×900 and 1280×720, including reduced motion and an
-explicitly sized embedding. Check long names, nested/empty groups, cross-group
-edges, disconnected elements and dense fan-in/fan-out present in the artifact.
-Open details, change perspectives and advance steps; confirm focused content and
-controls remain usable. Retain artifact revision, kit/dependency identity,
-environment, checked fixture sizes, screenshots and machine diagnostics.
+Inspect the actual editable consumer with the copied project's command:
+
+```sh
+npm run inspect -- --out /absolute/evidence
+```
+
+It starts its own local Vite server/browser and stops its owned processes. It
+compares complete `auto`/`layered`/`compact` views at 1280×720 and 1440×900, then
+every perspective in `auto`, saving `run-*/summary.json` and screenshots. Add
+`--url http://127.0.0.1:port/` for an already served dev or static build; the actual
+model identity guard still applies. Provision Chromium or use the executable
+override above. Keep evidence outside distributed assets.
+
+Read fitted label sizes, candidate metrics and diagnostics, then judge the actual
+captures through [composition-review.md](composition-review.md). `mechanicalStatus`
+does not complete `visualAssessment` or `sourceFidelityAssessment`, which remain
+pending; exit 0 is not a visual review. Also exercise details, steps, reduced motion
+and an explicitly sized embedding; fixture success alone does not verify the consumer.
 
 | Failure | Action |
 | --- | --- |
 | Model identity, evidence or reference | Correct the named ID or field path; preserve unaffected identities. |
 | Unavailable source or unresolved claim | Seek the missing material or scope decision; keep fidelity draft. |
 | Clipped label or changing dimensions | Check local fonts, wrapping and shared measurements; rerun the bounded layout. |
-| Overlap, containment or route collision | Inspect the offending IDs and complete route/header geometry; correct the adapter or split explicit views. |
+| Overlap, containment or route collision | Inspect offending IDs and complete route/header geometry; correct the adapter or supported composition. |
 | Unusable host | Give the viewer a nonzero width and height, then remeasure. |
-| Density beyond readable output | Retain the semantic model, account for edges across perspectives, or report the unresolved constraint. |
+| Density beyond readable output | Recompose within the visual correction budget; retain the complete overview and add useful perspectives, or report the unresolved constraint. |
 
 Do not conceal a failure with manual coordinates, smaller unreadable text,
 diagram-specific CSS or omitted relationships. A kit defect stays a named blocker
@@ -72,8 +87,8 @@ with its diagnostics; arbitrary graphs have no universal readability guarantee.
 ## Independent output and completion
 
 Serve the production `dist/` from a separate static location using an available
-static server. Check local fonts/assets, details and steps without access to the
-installed skill tree. Deliver the editable project, `fixtures/sample.json`,
+static server and repeat inspection with `--url`. Check fonts/assets, details and
+steps without access to the installed skill tree. Deliver the editable project, `fixtures/sample.json`,
 package/lockfile, `dist/`, evidence locations and any remaining gaps.
 
 Assess source fidelity by comparing this actual output with its original sources;

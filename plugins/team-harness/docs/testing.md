@@ -181,11 +181,15 @@ npm test
 npm run build
 npx playwright install chromium
 DIAGRAM_EVIDENCE_DIR=/absolute/workspace/diagram-evidence npm run test:browser
+npm run inspect -- --out /absolute/workspace/composition-evidence
 DIAGRAM_EVIDENCE_DIR=/absolute/workspace/static-evidence DIAGRAM_SERVER_COMMAND='npm run preview -- --host 127.0.0.1 --port 4178' npm run test:browser -- tests/browser/production.spec.ts
 ```
 
-CI also replaces the editable model with a one-node input and checks the rebuild.
-These checks need a separate source-fidelity assessment and invoke no models.
+Inspection compares complete compositions and every auto perspective of the editable
+model at both viewports, retaining identity, fitted text sizes, diagnostics and captures.
+Use `--url http://127.0.0.1:4178/` to inspect an existing static preview. Mechanical
+success keeps source fidelity and visual judgment pending. CI also replaces the
+editable model with a one-node input and checks the rebuild; these checks invoke no models.
 
 The reusable Slidev kit has its own Chromium CI lane. Verify archive freshness,
 then scaffold a copied project outside the installation:

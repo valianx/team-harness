@@ -17,6 +17,22 @@ export type Point = { x: number; y: number };
 export type Measurements = { nodes: Record<string, Size>; headers: Record<string, Size>; labels: Record<string, Size> };
 export type PlacedNode = Point & Size & { id: string; parent?: string; kind: NodeKind | 'group'; absX: number; absY: number; headerHeight: number };
 export type Route = { id: string; sections: { points: Point[] }[]; label?: Point & Size & { text: string }; sourcePort: Point; targetPort: Point };
-export type Geometry = { nodes: PlacedNode[]; edges: Route[]; bounds: Size };
+/** CompositionMode selects a derived arrangement without changing architectural content. */
+export type CompositionMode = 'auto' | 'layered' | 'compact';
+/** LayoutOptions preserves the measured two-argument layout API. */
+export type LayoutOptions = { composition?: CompositionMode };
+/** CompositionCandidate retains bounded comparison evidence at a common reference canvas. */
+export type CompositionCandidate = {
+  id: string; mode: 'layered' | 'compact'; valid: boolean; bounds: Size;
+  fitScale: number; fittedNodeFont: number; fittedLabelFont: number; aspectRatio: number;
+  crossings: number; overlaps: number; labelObstructions: number; bends: number; score: number;
+  diagnostics: Diagnostic[];
+};
+/** CompositionEvidence explains the selected arrangement and any rejected alternatives. */
+export type CompositionEvidence = {
+  requested: CompositionMode; selected: 'layered' | 'compact'; candidate: string;
+  candidates: CompositionCandidate[]; reason: string;
+};
+export type Geometry = { nodes: PlacedNode[]; edges: Route[]; bounds: Size; composition?: CompositionEvidence };
 export type Diagnostic = { check: string; ids: string[]; message: string };
 export type ValidationEvidence = { model: 'pass' | 'fail'; geometry: 'pass' | 'fail' | 'missing'; rendered: 'pass' | 'fail' | 'missing'; build: 'pass' | 'fail' | 'missing' };
