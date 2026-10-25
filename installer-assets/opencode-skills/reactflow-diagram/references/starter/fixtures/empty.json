@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "title": "Empty generated architecture",
+  "theme": "presentation",
+  "direction": "right",
+  "sources": [],
+  "nodes": [],
+  "edges": [],
+  "review": { "unresolved": [], "decisions": ["Empty input intentionally omits optional collections."] }
+}

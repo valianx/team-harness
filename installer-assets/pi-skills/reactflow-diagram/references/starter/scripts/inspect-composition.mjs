@@ -127,7 +127,7 @@ async function inspect(options) {
           await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
           await page.getByRole('combobox', { name: 'Perspective', exact: true }).selectOption(view.id);
           await settle(page);
-          if (model.nodes.length || model.groups.length) await page.getByRole('button', { name: 'Fit diagram', exact: true }).click();
+          if (model.nodes.length || (model.groups ?? []).length) await page.getByRole('button', { name: 'Fit diagram', exact: true }).click();
           await settle(page);
           await page.mouse.move(-10, -10);
           const measurements = await measure(page);

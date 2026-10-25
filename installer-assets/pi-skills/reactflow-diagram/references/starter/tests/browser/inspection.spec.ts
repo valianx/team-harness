@@ -58,7 +58,8 @@ test('the inspection command rejects a responding server that is not the editabl
 
 test('the inspection command rejects stale content even when all identities and relationships match', async ({}, testInfo) => {
   const stale = structuredClone(model);
-  stale.nodes[0].label += ' (stale)';
+  if (stale.nodes.length) stale.nodes[0].label += ' (stale)';
+  else stale.review.decisions.push('Stale source decision');
   const content = JSON.stringify(stale).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
   const server = createServer((_, response) => {
     response.setHeader('Content-Type', 'text/html; charset=utf-8');

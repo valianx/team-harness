@@ -119,6 +119,15 @@ jobs:
           DIAGRAM_SERVER_COMMAND: npm run preview -- --host 127.0.0.1 --port 4178
           DIAGRAM_EVIDENCE_DIR: ${{ runner.temp }}/architecture-diagrams/minimal-evidence
         run: npm --prefix "$DIAGRAM_PROJECT" run test:browser -- tests/browser/production.spec.ts tests/browser/inspection.spec.ts
+      - name: Rebuild an empty input with omitted optional collections
+        run: |
+          cp "$DIAGRAM_PROJECT/fixtures/empty.json" "$DIAGRAM_PROJECT/fixtures/sample.json"
+          npm --prefix "$DIAGRAM_PROJECT" run build
+      - name: Inspect the empty consumer independently
+        env:
+          DIAGRAM_SERVER_COMMAND: npm run preview -- --host 127.0.0.1 --port 4178
+          DIAGRAM_EVIDENCE_DIR: ${{ runner.temp }}/architecture-diagrams/empty-evidence
+        run: npm --prefix "$DIAGRAM_PROJECT" run test:browser -- tests/browser/inspection.spec.ts
       - name: Retain geometry, captures and traces
         if: always()
         uses: actions/upload-artifact@v4
@@ -128,6 +137,7 @@ jobs:
             ${{ runner.temp }}/architecture-diagrams/evidence/
             ${{ runner.temp }}/architecture-diagrams/production-evidence/
             ${{ runner.temp }}/architecture-diagrams/minimal-evidence/
+            ${{ runner.temp }}/architecture-diagrams/empty-evidence/
           if-no-files-found: warn
 
   reusable-web-presentation:
