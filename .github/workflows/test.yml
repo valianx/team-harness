@@ -102,12 +102,14 @@ jobs:
       - name: Build independent local assets
         run: npm --prefix "$DIAGRAM_PROJECT" run build
       - name: Check measured browser geometry and interactions
-        run: npm --prefix "$DIAGRAM_PROJECT" run test:browser -- tests/browser/geometry.spec.ts tests/browser/viewer.spec.ts tests/browser/controls.spec.ts tests/browser/composition.spec.ts tests/browser/inspection.spec.ts tests/browser/labels.spec.ts
+        run: npm --prefix "$DIAGRAM_PROJECT" run test:browser -- tests/browser/geometry.spec.ts tests/browser/viewer.spec.ts tests/browser/controls.spec.ts tests/browser/composition.spec.ts tests/browser/inspection.spec.ts tests/browser/labels.spec.ts tests/browser/presentation.spec.ts tests/browser/embedding.spec.ts tests/browser/flow.spec.ts
       - name: Check the copied production build on a static server
         env:
           DIAGRAM_SERVER_COMMAND: npm run preview -- --host 127.0.0.1 --port 4178
           DIAGRAM_EVIDENCE_DIR: ${{ runner.temp }}/architecture-diagrams/production-evidence
-        run: npm --prefix "$DIAGRAM_PROJECT" run test:browser -- tests/browser/production.spec.ts tests/browser/controls.spec.ts tests/browser/composition.spec.ts tests/browser/inspection.spec.ts tests/browser/labels.spec.ts
+        run: |
+          npm --prefix "$DIAGRAM_PROJECT" run test:browser -- tests/browser/production.spec.ts tests/browser/geometry.spec.ts tests/browser/controls.spec.ts tests/browser/composition.spec.ts tests/browser/inspection.spec.ts tests/browser/labels.spec.ts tests/browser/presentation.spec.ts tests/browser/embedding.spec.ts tests/browser/flow.spec.ts
+          npm --prefix "$DIAGRAM_PROJECT" run test:browser -- tests/browser/viewer.spec.ts -g 'standard details retain contrast'
       - name: Replace the editable model with a minimal generated input
         run: cp "$DIAGRAM_PROJECT/fixtures/minimal.json" "$DIAGRAM_PROJECT/fixtures/sample.json"
       - name: Verify and rebuild the edited consumer project
@@ -138,6 +140,41 @@ jobs:
             ${{ runner.temp }}/architecture-diagrams/production-evidence/
             ${{ runner.temp }}/architecture-diagrams/minimal-evidence/
             ${{ runner.temp }}/architecture-diagrams/empty-evidence/
+          if-no-files-found: warn
+
+  native-excalidraw:
+    name: native Excalidraw editing and export (Chromium)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Configure native tool paths on the runner
+        run: |
+          echo "NATIVE_TOOL_DIR=$RUNNER_TEMP/native-excalidraw/references" >> "$GITHUB_ENV"
+          echo "NATIVE_EVIDENCE_DIR=$RUNNER_TEMP/native-excalidraw/evidence" >> "$GITHUB_ENV"
+      - name: Copy the native tools outside the installation
+        run: node -e "require('node:fs').cpSync('skills/excalidraw-diagram/references', process.env.NATIVE_TOOL_DIR, {recursive:true})"
+      - name: Install locked official editor and browser tooling
+        run: npm ci --prefix "$NATIVE_TOOL_DIR/native" --no-audit --no-fund
+      - name: Provision Chromium explicitly
+        run: npm exec --prefix "$NATIVE_TOOL_DIR/native" -- playwright install --with-deps chromium
+      - name: Verify portable interpreter discovery
+        run: npm --prefix "$NATIVE_TOOL_DIR/native" test
+      - name: Verify actual native editing and faithful exports
+        run: npm --prefix "$NATIVE_TOOL_DIR/native" run test:browser
+      - name: Retain native scene, export and compatibility evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-excalidraw-evidence
+          path: ${{ env.NATIVE_EVIDENCE_DIR }}/
           if-no-files-found: warn
 
   reusable-web-presentation:
@@ -229,6 +266,8 @@ jobs:
       - run: python tests/test_codex_update_convergence.py
       - run: python tests/test_workspace_config.py
       - run: python tests/test_codex_binary_resolution.py
+      - run: python tests/test_excalidraw_native.py
+      - run: node skills/excalidraw-diagram/references/native/tests/python.test.mjs
       - name: Verify portable workflow regressions on Windows
         run: python tests/test_inline_git_hardening.py
       - run: python tests/test_github_identity_routes.py

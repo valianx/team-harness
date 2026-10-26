@@ -40,14 +40,18 @@ evidence, add the correction's source locator and rerun affected validation.
 Read [design-system.md](references/design-system.md) and
 [layout-contract.md](references/layout-contract.md), then follow
 [composition-review.md](references/composition-review.md) to choose and visually
-correct the composition before presenting it. Reuse operator-approved examples
-and preferences from the conversation or bound workspace; resolve routine layout
-choices from that context. Copy the versioned
+correct the composition before presenting it. For source/reference-led flows read
+[the shared composition grammar](../excalidraw-diagram/references/composition.md).
+For a referenced flow, derive internal `flow.primary` and `flow.supportSide` from
+the approved composition, then inspect the candidate's flow-satisfaction evidence.
+Copy the versioned
 `references/starter/` into the output directory and edit its
 `fixtures/sample.json`. Reuse its renderer, tokens, measurement and layout;
 the copied project owns its local source, dependencies and assets. The viewer has
 no source-upload UI or AI backend. Adapt graph backgrounds and component visuals
 to the context; preserve the standard controls described in the design reference.
+When reconstructing an approved Excalidraw scene, carry its composition into the
+web view and verify interactive behavior separately; honor an explicitly requested engine.
 
 `npm ci` prepares `.gitignore` from the package-safe `gitignore.txt` when absent,
 preserving an existing ignore file. If lifecycle scripts are disabled, run

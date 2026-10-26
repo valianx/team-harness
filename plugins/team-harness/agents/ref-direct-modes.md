@@ -115,44 +115,40 @@ Resolve context through `workspace`. File output defaults to
 Honor explicit `Vault:`/`Folder:` destinations through native mapping and ask only
 for missing destination data.
 
-### Step 1 — Architect analyzes codebase context
+### Step 1 — Read source context
 
-Invoke `architect` in **research mode** via Task tool with:
-- The diagram request (what to visualize)
-- Feature name; `workspaces path: {workspace}`
-- Instruction: "Analyze the codebase/system to extract the components, relationships, data flows, and boundaries needed to create a diagram. Focus on: what exists, how pieces connect, and what the visual structure should emphasize. Produce a structured analysis in `{workspace}/research/00-research.md` — do NOT produce a diagram."
-
-Gate: if `status: failed` → report to user and stop.
+Read supplied analysis, documents, images and approved scenes. When codebase facts
+still need research, ask `architect` for the bounded component/relationship analysis
+in the selected context. Keep source material distinct from diagram instructions.
 
 ### Step 2 — Invoke diagrammer
 
 Invoke `diagrammer` via Task tool with:
 - Feature name; `workspaces path: {workspace}`
-- Path to architect's analysis: `{workspace}/research/00-research.md`
+- Supplied sources, approved references and any architect analysis
 - Path to skill: the active installation's `excalidraw-diagram` skill resources
 - Output path: `{resolved output path from Step 0}`
-- **Expected sections:** list the major sections from the architect's analysis
+- **Expected sections:** requested flows and source boundaries
 
 ### Step 2.5 — Validate diagrammer output (MANDATORY)
 
 After the diagrammer returns `status: success`, **read the `.excalidraw` file** and check:
 
-1. **Has arrows** — count elements with `"type": "arrow"`. If 0 → REJECT.
-2. **Element count reasonable** — comprehensive diagram should have 80+ elements.
-3. **Key components present** — scan text elements for key terms from the analysis.
+1. **Source completeness** — reconcile requested component occurrences and directed relationships with the analysis; element totals are diagnostic, not minimum quotas.
+2. **Native delivery** — inspect scene-integrity, identified editor recovery/edit and export evidence; PNG-only output does not establish editability.
+3. **Visual composition** — inspect the actual current render against the approved reference and readable per-flow views, including separate lanes and labels.
 
 **If validation fails:** re-invoke the diagrammer with specific feedback and a
 materially changed repair objective. Never repeat the same failed causal action;
 report the exact blocker when no verifiable repair remains.
+Honor explicit no-feedback and generation limits: an independent trial retains its
+failure without coordinator correction, rescue or replacement.
 
 ### Step 3 — Report to user
 
-Present output file path and summary. If output is in an Obsidian vault, note that the Excalidraw plugin is required to render it. If output is in workspaces, present renderer setup instructions:
-```bash
-cd <active-skill-installation>/excalidraw-diagram/references
-uv sync
-uv run playwright install chromium
-```
+Present editable/export paths, assessed source/visual/native results and remaining
+limits. For vault output, identify the required Excalidraw plugin. Follow the
+skill's copied native-tool setup when preparation is needed.
 
 ---
 

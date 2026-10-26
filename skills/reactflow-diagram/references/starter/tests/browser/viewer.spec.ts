@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { revealControls } from './control-helpers';
 
 async function ready(page: Page, fixture = 'sample') {
   await page.goto(`/?fixture=${fixture}`);
@@ -76,6 +77,7 @@ test('presentation steps preserve geometry while changing focus and narrative', 
   })));
   const before = await positions();
   const narrative = await page.getByTestId('step-narrative').innerText();
+  await revealControls(page, 'bottom');
   await page.getByRole('button', { name: 'Next step' }).click();
   await expect(page.getByTestId('step-narrative')).not.toHaveText(narrative);
   expect(await positions()).toEqual(before);
@@ -83,6 +85,29 @@ test('presentation steps preserve geometry while changing focus and narrative', 
 });
 
 for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720 }]) {
+  test(`standard details retain contrast under contextual graph colors at ${viewport.width}×${viewport.height}`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await ready(page);
+    await page.addStyleTag({ content: '.architecture-viewer { color: #263442; } .diagram-canvas { background: #fff; }' });
+    await page.locator('.react-flow__node-service').first().focus();
+    await page.keyboard.press('Enter');
+    const panel = page.getByRole('complementary', { name: 'Selection details' });
+    await expect(panel).toBeVisible();
+    const contrast = await panel.locator('h2').evaluate(title => {
+      const luminance = (color: string) => {
+        const channels = color.match(/[\d.]+/g)!.slice(0, 3).map(Number).map(value => {
+          const normalized = value / 255;
+          return normalized <= .04045 ? normalized / 12.92 : ((normalized + .055) / 1.055) ** 2.4;
+        });
+        return channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722;
+      };
+      const foreground = luminance(getComputedStyle(title).color);
+      const background = luminance(getComputedStyle(title.closest('.selection-details')!).backgroundColor);
+      return (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05);
+    });
+    expect(contrast).toBeGreaterThanOrEqual(4.5);
+  });
+
   test(`guided payment focus fits at ${viewport.width}×${viewport.height}`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     await ready(page);
@@ -99,6 +124,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720
       }).toBe(true);
     };
     await expect(focused).toHaveCount(0);
+    await revealControls(page, 'bottom');
     await page.getByRole('button', { name: 'Next step' }).click();
     await visible(['gateway', 'orchestrator']);
     await page.screenshot({ path: testInfo.outputPath(`guided-request-${viewport.width}.png`), fullPage: true });
@@ -151,6 +177,7 @@ test('keeps unresolved sources and missing validation visible', async ({ page })
   await expect(page.getByTestId('fidelity-status')).toContainText('Draft');
   await expect(page.getByTestId('review-notes')).toBeVisible();
   await expect(page.getByTestId('validation-status')).toContainText('Validation incomplete');
+  await revealControls(page, 'bottom');
   await page.getByTestId('validation-status').locator('summary').click();
   await expect(page.getByTestId('validation-status').getByText('Rendered', { exact: true })).toBeVisible();
   await expect(page.getByTestId('validation-status').getByText('Not supplied')).toHaveCount(2);
@@ -180,6 +207,7 @@ test('reduced motion and presentation viewport keep controls and selected conten
   await ready(page);
   await page.getByRole('combobox', { name: 'Perspective' }).selectOption('');
   await expect(page.getByRole('button', { name: 'Next step' })).toBeEnabled();
+  await revealControls(page, 'bottom');
   await page.getByRole('button', { name: 'Next step' }).click();
   await page.locator('.react-flow__node-service').first().click();
   const canvas = await page.getByTestId('diagram-canvas').boundingBox();
@@ -189,5 +217,5 @@ test('reduced motion and presentation viewport keep controls and selected conten
   expect(canvas!.x + canvas!.width).toBeLessThanOrEqual(panel!.x + 1);
   await selectedComponentIsVisible(page);
   await expect(page.getByRole('button', { name: 'Fit diagram' })).toBeInViewport();
-  expect(await page.locator('.architecture-viewer').evaluate(element => getComputedStyle(element).getPropertyValue('--motion-duration').trim())).toBe('0ms');
+  await expect(page.locator('.viewer-toolbar')).toHaveCSS('transition-duration', '0s');
 });

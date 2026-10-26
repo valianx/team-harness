@@ -5,6 +5,7 @@ import { layout } from '../src/layout';
 import { checkGeometry } from '../src/geometry';
 import { FIXTURES } from '../src/fixtures';
 import type { Architecture, Measurements } from '../src/types';
+import { withoutTiming } from './fixtures/timing';
 
 export function measurements(model: Architecture): Measurements {
   return {
@@ -26,7 +27,7 @@ for (const name of ['sample', 'cycle', 'disconnected', 'dense']) for (const dire
       assert.ok(Number.isFinite(edge.sourcePort.x));
     }
     assert.deepEqual(checkGeometry(model, geometry), []);
-    assert.deepEqual(await layout(model, measurements(model)), geometry);
+    assert.deepEqual(withoutTiming(await layout(model, measurements(model))), withoutTiming(geometry));
   });
 }
 
@@ -52,5 +53,5 @@ test('removing and restoring descendants recalculates the same nested group boun
   assert.equal(group(empty).id, group(before).id);
   assert.ok(group(empty).height < group(before).height);
   assert.deepEqual(checkGeometry(withoutChild, empty), []);
-  assert.deepEqual(await layout(model, measurements(model)), before);
+  assert.deepEqual(withoutTiming(await layout(model, measurements(model))), withoutTiming(before));
 });

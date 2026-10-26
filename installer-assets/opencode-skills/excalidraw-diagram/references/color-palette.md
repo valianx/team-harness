@@ -1,6 +1,6 @@
 # Color Palette & Brand Style
 
-**This is the single source of truth for all colors and brand-specific styles.** To customize diagrams for your own brand, edit this file — everything else in the skill is universal.
+These are defaults for sources without an approved visual palette. Supplied brand guidance and accepted references take precedence within their context.
 
 ---
 
@@ -54,7 +54,7 @@ Used for code snippets, data examples, and other concrete evidence inside techni
 
 | Element | Color |
 |---------|-------|
-| Arrows | Use the stroke color of the source element's semantic purpose |
+| Arrows | Use the relationship's interaction class independently of component-role colors |
 | Structural lines (dividers, trees, timelines) | Primary stroke (`#1e3a5f`) or Slate (`#64748b`) |
 | Marker dots (fill + stroke) | Primary fill (`#3b82f6`) |
 

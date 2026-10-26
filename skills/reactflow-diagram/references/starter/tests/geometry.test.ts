@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { checkGeometry, segmentIntersects } from '../src/geometry';
-import type { Architecture, Diagnostic, Geometry, PlacedNode, Relationship, Route } from '../src/types';
+import { TOKENS as T } from '../src/tokens';
+import type { Architecture, Diagnostic, Endpoint, Geometry, PlacedNode, Relationship, Route } from '../src/types';
 
 const evidence = [{ source: 'source', locator: 'Synthetic architecture' }];
 
@@ -24,11 +25,15 @@ function geometry(nodes: PlacedNode[], edges: Route[] = []): Geometry {
   return { nodes, edges, bounds: { width: 1400, height: 1000 } };
 }
 
+function endpoint(id: string, role: 'source' | 'target', x: number, y: number, slot = 0): Endpoint {
+  return { id: `${id}:${role}`, nodeId: role === 'source' ? 'a' : 'b', side: role === 'source' ? 'right' : 'left', slot, x, y };
+}
+
 function horizontal(label = false): { model: Architecture; geometry: Geometry } {
   return {
     model: architecture([{ id: 'a' }, { id: 'b' }], [{ id: 'request', from: 'a', to: 'b', ...(label ? { label: 'Calls' } : {}) }]),
     geometry: geometry([box('a', 0, 200), box('b', 600, 200)], [{
-      id: 'request', sourcePort: { x: 100, y: 250 }, targetPort: { x: 600, y: 250 },
+      id: 'request', sourcePort: endpoint('request', 'source', 100, 250), targetPort: endpoint('request', 'target', 600, 250),
       sections: [{ points: [{ x: 100, y: 250 }, { x: 600, y: 250 }] }],
       ...(label ? { label: { x: 300, y: 100, width: 100, height: 24, text: 'Calls' } } : {}),
     }]),
@@ -161,10 +166,10 @@ for (const direction of ['right', 'down'] as const) for (const endpoint of ['sou
     const route = fixture.geometry.edges[0];
     const point = { x: endpoint === 'source' ? 0 : 700, y: 250 };
     if (endpoint === 'source') {
-      route.sourcePort = point;
+      route.sourcePort = { ...route.sourcePort, ...point };
       route.sections[0].points[0] = point;
     } else {
-      route.targetPort = point;
+      route.targetPort = { ...route.targetPort, ...point };
       route.sections[0].points[1] = point;
     }
     if (direction === 'down') {
@@ -173,9 +178,9 @@ for (const direction of ['right', 'down'] as const) for (const endpoint of ['sou
         [node.x, node.y] = [node.y, node.x];
         [node.absX, node.absY] = [node.absY, node.absX];
       }
-      const rotate = ({ x, y }: { x: number; y: number }) => ({ x: y, y: x });
-      route.sourcePort = rotate(route.sourcePort);
-      route.targetPort = rotate(route.targetPort);
+      const rotate = <P extends { x: number; y: number }>(point: P): P => ({ ...point, x: point.y, y: point.x });
+      route.sourcePort = { ...rotate(route.sourcePort), side: 'bottom' };
+      route.targetPort = { ...rotate(route.targetPort), side: 'top' };
       route.sections[0].points = route.sections[0].points.map(rotate);
     }
     diagnostic(checkGeometry(fixture.model, fixture.geometry), 'route-collision', ['request', endpoint === 'source' ? 'a' : 'b']);
@@ -189,7 +194,7 @@ function crossBoundary(): { model: Architecture; geometry: Geometry } {
       box('group', 100, 100, { kind: 'group', width: 400, height: 400, headerHeight: 32 }),
       box('a', 32, 150, { parent: 'group', absX: 132, absY: 250 }),
       box('b', 800, 250),
-    ], [{ id: 'request', sourcePort: { x: 232, y: 300 }, targetPort: { x: 800, y: 300 }, sections: [{ points: [{ x: 232, y: 300 }, { x: 800, y: 300 }] }] }]),
+    ], [{ id: 'request', sourcePort: endpoint('request', 'source', 232, 300), targetPort: endpoint('request', 'target', 800, 300), sections: [{ points: [{ x: 232, y: 300 }, { x: 800, y: 300 }] }] }]),
   };
 }
 
@@ -225,13 +230,13 @@ test('a route that reenters its source after the initial contact is rejected', (
 
 test('a port detached outside the endpoint bounds is rejected', () => {
   const fixture = horizontal();
-  fixture.geometry.edges[0].sourcePort = { x: 300, y: 250 };
+  fixture.geometry.edges[0].sourcePort = { ...fixture.geometry.edges[0].sourcePort, x: 300, y: 250 };
   diagnostic(checkGeometry(fixture.model, fixture.geometry), 'port', ['request', 'a']);
 });
 
 test('a port in the middle of its endpoint body is not an attached boundary port', () => {
   const fixture = horizontal();
-  fixture.geometry.edges[0].sourcePort = { x: 50, y: 250 };
+  fixture.geometry.edges[0].sourcePort = { ...fixture.geometry.edges[0].sourcePort, x: 50, y: 250 };
   fixture.geometry.edges[0].sections[0].points[0] = { x: 50, y: 250 };
   diagnostic(checkGeometry(fixture.model, fixture.geometry), 'port', ['request', 'a']);
 });
@@ -307,17 +312,18 @@ for (const [name, width, height] of [['horizontal insets', 40, 150], ['header an
 test('an empty group with room for its header and insets is valid', () => {
   const model = architecture([], [], [{ id: 'group' }]);
   assert.deepEqual(checkGeometry(model, geometry([
-    box('group', 0, 0, { kind: 'group', width: 320, height: 96, headerHeight: 32 }),
+    box('group', 0, 0, { kind: 'group', width: Math.max(320, T.nodeWidth + 2 * T.groupInset), height: 96, headerHeight: 32 }),
   ])), []);
 });
 
-test('relationships sharing a component must use its single rendered source and target handles', () => {
+test('relationships sharing a component retain distinct attached endpoint slots', () => {
   const fixture = horizontal();
   fixture.model.edges.push({ id: 'second', from: 'a', to: 'b', evidence });
-  fixture.geometry.edges.push({ id: 'second', sourcePort: { x: 100, y: 270 }, targetPort: { x: 600, y: 270 },
+  fixture.geometry.edges.push({ id: 'second', sourcePort: endpoint('second', 'source', 100, 270, 1), targetPort: endpoint('second', 'target', 600, 270, 1),
     sections: [{ points: [{ x: 100, y: 270 }, { x: 600, y: 270 }] }] });
-  diagnostic(checkGeometry(fixture.model, fixture.geometry), 'shared-port', ['a', 'second']);
-  diagnostic(checkGeometry(fixture.model, fixture.geometry), 'shared-port', ['b', 'second']);
+  assert.deepEqual(checkGeometry(fixture.model, fixture.geometry), []);
+  fixture.geometry.edges[1].sourcePort.slot = 0;
+  diagnostic(checkGeometry(fixture.model, fixture.geometry), 'endpoint-slot', ['a', 'second']);
 });
 
 test('a diagonal segment cannot pass as an orthogonal architecture route', () => {
@@ -329,7 +335,7 @@ test('a diagonal segment cannot pass as an orthogonal architecture route', () =>
 test('a route through an unrelated relationship label is an obstruction even with valid node clearance', () => {
   const fixture = horizontal(true);
   fixture.model.edges.push({ id: 'second', from: 'a', to: 'b', evidence });
-  fixture.geometry.edges.push({ id: 'second', sourcePort: { x: 100, y: 250 }, targetPort: { x: 600, y: 250 },
+  fixture.geometry.edges.push({ id: 'second', sourcePort: endpoint('second', 'source', 100, 250, 1), targetPort: endpoint('second', 'target', 600, 250, 1),
     sections: [{ points: [{ x: 100, y: 250 }, { x: 250, y: 250 }, { x: 250, y: 112 }, { x: 500, y: 112 }, { x: 500, y: 250 }, { x: 600, y: 250 }] }] });
   diagnostic(checkGeometry(fixture.model, fixture.geometry), 'route-label-collision', ['request', 'second']);
 });

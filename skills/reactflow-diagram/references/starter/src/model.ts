@@ -13,8 +13,10 @@ const schema = z.strictObject({
   sources: z.array(z.strictObject({ id, title: text, locator: text, status: z.enum(['read', 'unavailable']), material: z.boolean().optional() })),
   nodes: z.array(z.strictObject({ ...element, kind: z.enum(['service', 'gateway', 'database', 'queue', 'external']) })),
   groups: z.array(z.strictObject(element)).default([]),
-  edges: z.array(z.strictObject({ id, from: id, to: id, label: text.optional(), description: z.string().optional(), evidence })),
+  edges: z.array(z.strictObject({ id, from: id, to: id, label: text.optional(), description: z.string().optional(),
+    interaction: z.enum(['request', 'call', 'response', 'event', 'persistence']).optional(), evidence })),
   review: z.strictObject({ unresolved: z.array(text), decisions: z.array(text), assessor: text.optional() }),
+  flow: z.strictObject({ primary: z.array(id).min(1), supportSide: z.enum(['above', 'below']) }).optional(),
   views: z.array(z.strictObject({ id, label: text, nodeIds: z.array(id), edgeIds: z.array(id),
     outside: z.array(z.strictObject({ edge: id, reason: text })).optional(),
     continuations: z.array(z.strictObject({ edge: id, view: id })).optional() })).default([]),
@@ -65,6 +67,22 @@ export function parseModel(input: unknown): Architecture {
   for (const edge of model.edges) {
     requireId(nodes, edge.from, `${edge.id}.from endpoint`); requireId(nodes, edge.to, `${edge.id}.to endpoint`);
   }
+  if (model.flow) {
+    if (model.direction !== 'right') throw new Error(`flow: direction ${model.direction} is unsupported; direction must be right`);
+    const seenEdges = new Set<string>(), seenNodes = new Set<string>();
+    let previous: string | undefined;
+    for (const edgeId of model.flow.primary) {
+      requireId(edges, edgeId, 'flow.primary');
+      if (seenEdges.has(edgeId)) throw new Error(`flow.primary: repeated relationship ${edgeId}`);
+      seenEdges.add(edgeId);
+      const edge = edges.get(edgeId)!;
+      if (edge.interaction !== 'request') throw new Error(`flow.primary: ${edgeId} must be a request relationship`);
+      if (previous !== undefined && previous !== edge.from) throw new Error(`flow.primary: ${edgeId} does not continue a contiguous path from ${previous}`);
+      if (previous === undefined) seenNodes.add(edge.from);
+      if (seenNodes.has(edge.to)) throw new Error(`flow.primary: path must be simple; repeated node ${edge.to}`);
+      seenNodes.add(edge.to); previous = edge.to;
+    }
+  }
   for (const step of model.steps) for (const focus of step.focus) requireId(identities, focus, `${step.id}.focus`);
   const accounted = new Set<string>();
   const views = new Map(model.views.map(view => [view.id, view]));
@@ -110,7 +128,8 @@ export function selectView(model: Architecture, viewId?: string): Architecture {
   }
   const edges = model.edges.filter(edge => view.edgeIds.includes(edge.id));
   edges.forEach(edge => keep.add(edge.id));
-  return { ...model, nodes, groups: model.groups.filter(group => keep.has(group.id)), edges, views: [],
+  const { flow, ...rest } = model;
+  return { ...rest, ...(flow && flow.primary.every(id => keep.has(id)) ? { flow } : {}), nodes, groups: model.groups.filter(group => keep.has(group.id)), edges, views: [],
     steps: model.steps.filter(step => step.focus.every(id => keep.has(id))) };
 }
 
@@ -119,5 +138,6 @@ export function completionStatus(model: Architecture, evidence: ValidationEviden
   const fidelity = fidelityStatus(model);
   if (fidelity.status === 'draft') return { status: 'draft' as const, reasons: fidelity.reasons };
   const reasons = Object.entries(evidence).filter(([, status]) => status !== 'pass').map(([check, status]) => `${check}: ${status}`);
+  if (model.flow && evidence.flow === undefined) reasons.push('flow: missing');
   return { status: reasons.length ? 'unverified' as const : 'verified' as const, reasons };
 }

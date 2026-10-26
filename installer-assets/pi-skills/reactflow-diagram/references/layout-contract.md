@@ -1,5 +1,10 @@
 # Layout, validation and delivery
 
+- [Measured geometry](#measured-geometry)
+- [Run the copied project](#run-the-copied-project)
+- [Inspect and repair](#inspect-and-repair)
+- [Independent output and completion](#independent-output-and-completion)
+
 ## Measured geometry
 
 The starter validates the internal model before measuring real components,
@@ -15,9 +20,15 @@ measured minimum bounds.
 
 The adapter reserves port clearance below headers and refines obstructed segments
 against measured obstacles, preserving endpoints, sections and valid bends.
+Each relationship retains its own stable source/target endpoint identity, side
+and slot through both engines and rendered handles. Opposite directions and
+separate specialist calls use distinguishable attachments and lanes. Automatic
+composition retains bounded work/time and crossing, shared-segment, bend and
+length/detour observations; explicit modes compute only the requested engine.
 Choose and assess actual composition candidates through
 [composition-review.md](composition-review.md); a successful layout calculation
 does not establish that its fitted overview is useful.
+Declared flow intent enables a measured compact-flow candidate in place of the wide alternative, preserving the three-candidate limit and shared routing. Explicit compact uses that flow candidate; explicit layered remains layered. Inspect both mechanical geometry and declared-intent satisfaction before accepting a view.
 Standalone previews accept `?composition=layered` or `?composition=compact` for
 explicit comparison. Composition changes preserve the semantic model and direction.
 
@@ -45,6 +56,7 @@ DIAGRAM_EVIDENCE_DIR="/absolute/workspace/diagram-evidence" npm run test:browser
 
 Browser provisioning is a one-time environment step. A compatible installed
 Chromium can instead be selected with `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
+Default browser runs own their server and use consumer-local `test-results/`.
 Keep `DIAGRAM_EVIDENCE_DIR` outside distributed assets; retain diagnostics,
 screenshots and traces there. Report unavailable browser/system dependencies as
 missing coverage rather than marking the browser check passed. `npm run dev`
@@ -70,6 +82,7 @@ captures through [composition-review.md](composition-review.md). `mechanicalStat
 does not complete `visualAssessment` or `sourceFidelityAssessment`, which remain
 pending; exit 0 is not a visual review. Also exercise details, steps, reduced motion
 and an explicitly sized embedding; fixture success alone does not verify the consumer.
+For declared flows, inspect `intentStatus`/`intentFailures` and `readabilityStatus`/`readabilityFailures` separately: unsatisfied or missing AUTO intent, incomplete text measurements or fitted names/labels below the 14/11 defaults fail the command. Rejected explicit comparisons retain their errors without certifying them or invalidating successful AUTO geometry; source and visual judgment remain pending.
 
 | Failure | Action |
 | --- | --- |

@@ -137,6 +137,18 @@ fi
 
 echo
 echo "############################################################"
+echo "# Native Excalidraw scene integrity and safe revision"
+echo "############################################################"
+if [ -n "$PY" ] && $PY "$TESTS_DIR/test_excalidraw_native.py"; then
+    echo "excalidraw-native: PASS"
+else
+    echo "excalidraw-native: FAIL (see scene integrity results; Python required)"
+    FAILED=$((FAILED + 1))
+fi
+run_node_suite "excalidraw-python-discovery" "../skills/excalidraw-diagram/references/native/tests/python.test.mjs" "node not found"
+
+echo
+echo "############################################################"
 echo "# Suite 3f: every document pointer resolves"
 echo "############################################################"
 if [ -n "$PY" ] && $PY "$TESTS_DIR/test_reference_resolution.py"; then

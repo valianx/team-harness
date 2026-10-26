@@ -13,6 +13,9 @@ these preferences in the bound context rather than adding global configuration.
 Resolve layout choices from this evidence; ask only for a missing material source
 or audience decision.
 
+Apply [reference-led flow composition](../../excalidraw-diagram/references/composition.md)
+for functional zones, repeated components, relationship lanes and label placement.
+
 Retain the full component, group and relationship inventory, identities and source
 facts in the model and complete overview. Use concise, recognizable names and
 relationship labels; keep full wording, explanations and evidence accessible in
@@ -26,10 +29,14 @@ the standard temporary controls and stable 90% canvas framing.
 
 ## Compare actual compositions
 
-Compare a few genuinely different arrangements using `layered`/`compact` results
+For automatic composition, compare a bounded set of arrangements using `layered`/`compact` results
 and `auto` selection evidence, then supported model or shared token revisions.
 Changing only color or the camera is not a new composition. Candidates retain the
 same complete source inventory and boundaries.
+An explicit mode computes that mode only. Retain candidate work/time and route
+length/detour evidence alongside quality; unnecessary search is not improvement.
+For declared flow intent, compare its satisfaction separately from geometry and text size; reject a folded spine or reversed support side even if the candidate is otherwise readable. The measured compact-flow alternative preserves this intent without operator coordinates; incompatible hierarchy remains a named limit.
+After typography changes, renew routing and inspect distinct supporting-call corridors as well as fitted text. Merged call segments remain unresolved even with readable labels; isolated perpendicular crossings require visual judgment rather than a universal crossing-free promise.
 
 Use [consumer inspection](layout-contract.md#inspect-and-repair) to capture the
 actual artifact at 1440×900 and 1280×720. Confirm its model identity/revision and

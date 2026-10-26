@@ -310,3 +310,4 @@ superseded unless a bullet explicitly records the current two-posture contract.
 - [decision] Architecture diagrams accept sources through the native agent; internal models separate source fidelity from measured layout and standalone viewer validation.
 - [decision] Architecture diagrams adapt graph visuals to context while preserving standard floating controls and 90% canvas framing.
 - [pattern] Diagram authoring compares measured compact and layered compositions and reviews fitted consumer output before delivery.
+- [constraint] Approved diagram references guide scoped composition; native editing/export, source fidelity, visual quality and unassisted generation require separate evidence.

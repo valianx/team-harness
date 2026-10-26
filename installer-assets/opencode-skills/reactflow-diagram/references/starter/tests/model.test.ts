@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseModel, fidelityStatus, selectView, completionStatus } from '../src/model';
+import { flowFixture } from './fixtures/flow';
 
 export function example(): any {
   const evidence = [{ source: 'note', locator: 'Architecture' }];
@@ -15,6 +16,70 @@ test('validates a minimal architecture and preserves relationship cycles', () =>
   const input = example();
   input.edges.push({ ...input.edges[0], id: 'reply', from: 'b', to: 'a' });
   assert.equal(parseModel(input).edges.length, 2);
+});
+
+test('schema one preserves neutral relationships and every supported interaction class', () => {
+  const neutral = parseModel(example());
+  assert.equal(neutral.edges[0].interaction, undefined);
+  for (const interaction of ['request', 'call', 'response', 'event', 'persistence'] as const) {
+    const input = example(); input.edges[0].interaction = interaction;
+    const parsed = parseModel(input);
+    assert.equal(parsed.edges[0].interaction, interaction);
+    assert.deepEqual(parsed.edges[0].evidence, neutral.edges[0].evidence);
+  }
+});
+
+test('interaction classes do not admit arbitrary style, coordinates or unknown values', () => {
+  for (const field of [{ interaction: 'rpc' }, { interaction: 'call', color: 'red' }, { interaction: 'event', x: 10 }]) {
+    const input = example(); Object.assign(input.edges[0], field);
+    assert.throws(() => parseModel(input), /edges\.0/);
+  }
+});
+
+test('schema one accepts an ordered request path without requiring flow on legacy inputs', () => {
+  const input = flowFixture();
+  assert.deepEqual(parseModel(input).flow, { primary: ['enter', 'commit'], supportSide: 'above' });
+  input.edges.push({ ...input.edges[0], id: 'feedback', from: 'journal', to: 'intake', interaction: 'response' });
+  assert.equal(parseModel(input).edges.length, 5);
+  input.flow!.primary = ['enter'];
+  assert.deepEqual(parseModel(input).flow!.primary, ['enter']);
+  assert.equal(parseModel(example()).flow, undefined);
+});
+
+for (const [name, mutate, match] of [
+  ['missing relationship', (m: any) => m.flow.primary[1] = 'absent', /flow.*absent/],
+  ['unclassified relationship', (m: any) => delete m.edges[0].interaction, /flow.*enter.*request/],
+  ['non-request relationship', (m: any) => m.flow.primary = ['consult'], /flow.*consult.*request/],
+  ['repeated relationship', (m: any) => m.flow.primary = ['enter', 'enter'], /flow.*repeat.*enter/],
+  ['disconnected order', (m: any) => m.flow.primary = ['commit', 'enter'], /flow.*contiguous/],
+  ['cyclic request path', (m: any) => m.edges[1].to = 'intake', /flow.*simple.*intake/],
+  ['empty request path', (m: any) => m.flow.primary = [], /flow\.primary/],
+  ['unsupported side', (m: any) => m.flow.supportSide = 'left', /flow\.supportSide/],
+  ['unsupported vertical direction', (m: any) => m.direction = 'down', /flow.*direction.*right/],
+  ['coordinates', (m: any) => m.flow.x = 70, /flow.*x/],
+  ['unknown flow field', (m: any) => m.flow.orientation = 'right', /flow.*orientation/],
+] as const) {
+  test(`flow intent rejects ${name}`, () => { const model = flowFixture(); mutate(model); assert.throws(() => parseModel(model), match); });
+}
+
+test('legacy vertical models remain valid without horizontal flow intent', () => {
+  const input = example(); input.direction = 'down';
+  assert.equal(parseModel(input).direction, 'down');
+  assert.equal(parseModel(input).flow, undefined);
+});
+
+test('perspectives keep flow only when every primary relationship remains present', () => {
+  const input = flowFixture();
+  input.views = [
+    { id: 'whole', label: 'Whole', nodeIds: input.nodes.map(node => node.id), edgeIds: input.edges.map(edge => edge.id) },
+    { id: 'fragment', label: 'Fragment', nodeIds: input.nodes.map(node => node.id), edgeIds: ['enter'] },
+  ];
+  const model = parseModel(input), original = structuredClone(model);
+  assert.deepEqual(selectView(model, 'whole').flow, model.flow);
+  const fragment = selectView(model, 'fragment');
+  assert.equal(fragment.flow, undefined);
+  assert.deepEqual(fragment.nodes.map(node => node.id), model.nodes.map(node => node.id));
+  assert.deepEqual(model, original);
 });
 
 test('rejects unsupported fields and reports their paths', () => {
@@ -75,4 +140,11 @@ test('a build or geometry pass cannot hide missing checks or unresolved fidelity
   assert.equal(completionStatus(m, { model: 'pass', geometry: 'pass', build: 'pass', rendered: 'pass' }).status, 'verified');
   m.review.unresolved.push('Source conflict');
   assert.equal(completionStatus(m, { model: 'pass', geometry: 'pass', build: 'pass', rendered: 'pass' }).status, 'draft');
+});
+
+test('completion of a declared flow requires its own passing intent assessment', () => {
+  const model = parseModel(flowFixture()), mechanical = { model: 'pass', geometry: 'pass', build: 'pass', rendered: 'pass' } as const;
+  assert.equal(completionStatus(model, mechanical).status, 'unverified');
+  assert.equal(completionStatus(model, { ...mechanical, flow: 'fail' }).status, 'unverified');
+  assert.equal(completionStatus(model, { ...mechanical, flow: 'pass' }).status, 'verified');
 });
