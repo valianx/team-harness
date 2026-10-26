@@ -7,7 +7,7 @@
 
 ## Global constraints and review focus
 
-Preserve schema-version-1 inputs, source topology, human scene edits and explicit engine choices. Retain the complete requested flow, stable 90% framing and independent 24 CSS-pixel border controls. Run exactly two fresh generations, both formats per agent, without feedback or replacement. Publication and merge require demonstrated success.
+Preserve schema-version-1 inputs, source topology, human scene edits and explicit engine choices. Retain the complete requested flow, stable 90% framing and independent 24 CSS-pixel border controls. Each declared validation pair has two fresh generations, both formats per agent, without feedback or replacement; keep the failed initial pair and one further pair on the corrected revision distinct. Publication and merge require demonstrated success.
 
 Review bound-label changes after editor recovery, backup/read failures, reciprocal and nested endpoint collisions, popup/focus retention at narrow hosts, and stale consumer captures. Native tests, both routing engines, browser tests and actual-consumer inspection own these cases respectively.
 
@@ -29,6 +29,8 @@ Files: starter `src/{types,model,layout,compact-routing,composition,geometry}.ts
 - [x] 2.4 Retain bounded candidate/work/time and route-quality evidence; explicit modes avoid unrelated candidates and tests cover bounded exploration without flaky timing thresholds.
 - [x] 2.5 Render the full endpoint set with matching edge handle IDs, readable open arrowheads and visually hidden measurable handles; retain controlled-node dimensions and relationship details.
 - [x] 2.6 Fill the standalone window and implement independent 24px upper/lower border reveal with central-hover, keyboard, native-popup, coarse-pointer, embedded, hit-target and stable-camera browser cases.
+- [x] 2.7 Validate optional source-derived flow intent and retain it coherently in perspectives; derive a measured unwrapped request spine and contextual support side, guide the shared endpoint router within three candidates, and assess actual request/return/call lanes separately from collision validity. Add synthetic hierarchy, order, route, permutation, fallback and selection regressions before implementation; retain explicit intent failures.
+- [x] 2.8 Preserve standardized details contrast under contextual graph colors and add a failing actual-DOM regression at both required viewports before the correction.
 
 ## 3. Maintained validation and distribution
 
@@ -44,6 +46,7 @@ Files: maintained synthetic cases and CI, generated `runtime/` projections, rele
 Files: external trial bundles and consumer outputs only. Freeze source/candidate hashes and the literal prompt using `./output` in separate working directories. Retain both original outcomes and native time/usage observations; assess actual editor/static outputs at both viewports before OpenSpec implementation verification.
 
 - [x] 4.1 Freeze the reviewed source/reference bundle, minimal identical prompt, candidate commit/tree, skill snapshot and two separate consumer directories; retain runtime/model/effort identities and the selected case.
-- [ ] 4.2 Run exactly two fresh agents once each against those identical inputs, without inherited conversation, coordinator feedback, hidden rescue/restart or access to the other output; preserve actual usage/time and any failure or clarification request.
-- [ ] 4.3 Assess both completed outputs against the same source facts and approved visual reference, inspect native editor and actual static browser output, and report fidelity, editability, readability, routing, controls and autonomous self-correction separately.
-- [ ] 4.4 Verify the implementation against the ten changed/added requirements, acceptance scenarios and design using the current evidence; retain original trial outcomes and unresolved limits before PR preparation.
+- [x] 4.2 Run exactly two fresh agents once each against those identical inputs, without inherited conversation, coordinator feedback, hidden rescue/restart or access to the other output; preserve actual usage/time and any failure or clarification request.
+- [x] 4.3 Assess both completed outputs against the same source facts and approved visual reference, inspect native editor and actual static browser output, and report fidelity, editability, readability, routing, controls and autonomous self-correction separately.
+- [ ] 4.4 Freeze the corrected reviewed candidate and run one additional pair of two fresh agents, one generation and at most 30 minutes per agent, against identical sources and minimal task inputs; assess both formats independently without feedback, retain the initial failures and report all four original outcomes across the two revisions.
+- [ ] 4.5 Verify the implementation against the ten changed/added requirements, acceptance scenarios and design using the current evidence; retain both validation rounds and unresolved limits before PR preparation.

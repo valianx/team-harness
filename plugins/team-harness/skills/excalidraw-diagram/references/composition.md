@@ -6,7 +6,7 @@ Read supplied documents, images and the current editable scene. Record component
 
 ## Arrange a readable flow
 
-- Put the primary progression along a clear reading axis, usually left to right. Supporting services can sit above it and responses below when that matches the reference.
+- Preserve the approved primary reading axis, supporting-service side and lower response lanes. Folding the primary path or flipping the support side remains an unresolved composition change even when fonts and geometry pass.
 - Use consistent, spacious component cards when they communicate equal roles. Keep functional zones visually subordinate; use subtle hatching if the reference calls for it.
 - Reserve separate lanes and endpoint slots for requests, returns and different calls to the same service. Plan these together before drawing individual arrows.
 - Keep labels close to their own route, on clear segments away from elbows and arrowheads. Route around unrelated cards and labels; show an unmistakable direction at the fitted scale.

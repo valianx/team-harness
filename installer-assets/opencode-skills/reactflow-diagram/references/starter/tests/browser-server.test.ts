@@ -43,21 +43,25 @@ async function configuration(root: string, overrides: NodeJS.ProcessEnv = {}, cw
   return JSON.parse(stdout);
 }
 
-test('two default consumers choose distinct free loopback ports and own their servers', async () => {
+test('an active default consumer keeps the next consumer on a distinct loopback port', async () => {
   await consumers(async roots => {
-    const configs = await Promise.all(roots.map(root => configuration(root)));
-    const urls = configs.map(config => new URL(config.baseURL));
-    assert.notEqual(urls[0].port, urls[1].port, 'Default consumers must not share a browser destination');
-    for (const [index, config] of configs.entries()) {
-      assert.equal(urls[index].hostname, '127.0.0.1');
-      assert.ok(Number(urls[index].port) > 0);
-      assert.equal(config.reuseExistingServer, false);
-      assert.match(config.command, new RegExp(`--port ${urls[index].port}(?: |$)`));
-      assert.match(config.command, /--host 127\.0\.0\.1(?: |$)/);
-      assert.match(config.command, /--strictPort(?: |$)/);
-      const probe = createServer();
-      await new Promise<void>((resolve, reject) => { probe.once('error', reject); probe.listen(Number(urls[index].port), '127.0.0.1', resolve); });
-      await new Promise<void>((resolve, reject) => probe.close(error => error ? reject(error) : resolve()));
+    const first = await configuration(roots[0]);
+    const active = createServer();
+    await new Promise<void>((resolve, reject) => { active.once('error', reject); active.listen(Number(new URL(first.baseURL).port), '127.0.0.1', resolve); });
+    try {
+      const configs = [first, await configuration(roots[1])];
+      const urls = configs.map(config => new URL(config.baseURL));
+      assert.notEqual(urls[0].port, urls[1].port, 'An occupied destination must not be selected for another consumer');
+      for (const [index, config] of configs.entries()) {
+        assert.equal(urls[index].hostname, '127.0.0.1');
+        assert.ok(Number(urls[index].port) > 0);
+        assert.equal(config.reuseExistingServer, false);
+        assert.match(config.command, new RegExp(`--port ${urls[index].port}(?: |$)`));
+        assert.match(config.command, /--host 127\.0\.0\.1(?: |$)/);
+        assert.match(config.command, /--strictPort(?: |$)/);
+      }
+    } finally {
+      await new Promise<void>((resolve, reject) => active.close(error => error ? reject(error) : resolve()));
     }
   });
 });

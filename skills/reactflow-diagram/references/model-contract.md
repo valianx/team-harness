@@ -9,7 +9,8 @@ the starter's runtime validator rejects unsupported fields before layout.
 
 | Record | Fields |
 | --- | --- |
-| Model | `schemaVersion: 1`, `title`, `theme: "presentation"`, `direction: "right"` or `"down"`, `sources`, `nodes`, `groups`, `edges`, `review`, `views`, `steps` |
+| Model | `schemaVersion: 1`, `title`, `theme: "presentation"`, `direction: "right"` or `"down"`, `sources`, `nodes`, `groups`, `edges`, `review`, `views`, `steps`, optional `flow` |
+| Flow | `primary: string[]` of ordered request-edge IDs, `supportSide: "above"` or `"below"` |
 | Source | `id`, `title`, `locator`, `status: "read"` or `"unavailable"`, optional `material` |
 | Node | `id`, `kind`, `label`, optional `description` and `parent`, `evidence` |
 | Group | Node fields without `kind`; optional `parent` names another group |
@@ -29,6 +30,8 @@ Optional `interaction` uses `request` for the primary ingress/navigation/provide
 `call` for supporting specialists, `response` for synchronous returns, `event` for
 asynchronous notifications and `persistence` for storage operations. Omission stays
 neutral; classify from source meaning independently of component colors.
+
+For an approved horizontal flow, use `direction: "right"`, derive `flow.primary` as a simple contiguous request path and `flow.supportSide` from its composition. This internal intent has no coordinates; generic architectures, including vertical layouts, can omit it. A perspective retains it only when the complete primary path remains present. Incompatible group spans or unsatisfied intent remain explicit composition limits.
 
 Every node, group and edge has evidence. The supported forms are:
 
@@ -72,7 +75,7 @@ resolutions and declared omissions. An absent assessor means fidelity review is
 pending; an assessor name alone is not the assessment evidence. Keep the actual
 source-to-artifact comparison and its revision in the workspace.
 
-Positions, dimensions, ports, routes, arbitrary CSS and layout overrides are not
+Positions, dimensions, ports, routes, arbitrary CSS and unsupported layout overrides are not
 model fields. Keep generated geometry and diagnostics separate. Model integrity,
 source-fidelity assessment and rendered/geometry/build evidence answer different
 questions; do not infer one from another.

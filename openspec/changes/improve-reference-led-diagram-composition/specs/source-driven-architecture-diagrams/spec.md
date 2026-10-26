@@ -4,6 +4,14 @@
 
 The kit SHALL validate its versioned internal model before layout, including unique identities, supported types, evidence references, parent and relationship endpoints, acyclic group hierarchy, and valid view/presentation references. Relationship cycles SHALL be supported independently of hierarchy validation. Geometry SHALL be derived data, and unsupported geometry or arbitrary style fields SHALL be rejected with offending identities or field paths. Optional supported interaction classes SHALL distinguish requests, calls, synchronous responses, events and persistence without requiring them on existing models or treating visual color as source evidence.
 
+When supplied, semantic flow intent SHALL reference an ordered simple request-edge path and a supported relative side for supporting content. Its supported horizontal scope SHALL be validated without silently overriding an explicit vertical direction. Perspectives SHALL retain this intent only when they contain its complete path.
+
+#### Scenario: Semantic flow intent is validated
+
+- **GIVEN** an optional internal flow intent declares an ordered request-edge path and supporting-service side without coordinates
+- **WHEN** that intent is validated
+- **THEN** references, supported direction and a simple contiguous path are checked, unsupported fields are rejected, and perspectives retain the intent only when its complete path remains present
+
 #### Scenario: Invalid model is rejected
 - **WHEN** a model contains duplicate identities, a missing endpoint, invalid evidence, a hierarchy cycle or unsupported geometry fields
 - **THEN** validation stops layout and reports the relevant identities or field paths
@@ -33,6 +41,10 @@ Approved visual references SHALL guide functional-zone hierarchy, card proportio
 #### Scenario: Thin relationships in presentation
 - **WHEN** the actual consumer is fitted at its presentation viewport
 - **THEN** arrow directions remain visually clear and hidden handle dots do not change the measured endpoints or route attachment
+
+#### Scenario: Contextual graph foreground with standardized details
+- **WHEN** a diagram uses a dark graph foreground over a light canvas and opens its standard dark details surface
+- **THEN** the selected title and evidence remain legible at both required viewports independently of the graph palette
 
 ### Requirement: Routed connections and labels
 
@@ -114,6 +126,10 @@ Approved references SHALL guide reading direction, functional zones, request/ret
 - **WHEN** the selected task requests a web version of an approved editable reference
 - **THEN** the agent reconstructs interactive components and relationships from the available sources, checks the reference's visual properties and identifies facts the image cannot establish
 
+#### Scenario: Approved flow grammar guides a measured web candidate
+- **WHEN** source-supported flow intent declares an ordered request spine and the reference's support side
+- **THEN** bounded composition preserves card order, actual primary routed progression, distinct return lanes and the support side using measured geometry and existing group ancestry, or retains an explicit unsatisfied-intent limit; geometric validity alone does not establish completion
+
 ### Requirement: Source-preserving visual revision
 
 Before delivery, the agent SHALL inspect the actual generated overview and relevant perspectives at 1280×720 and 1440×900, verify the rendered model identity, and assess source fidelity separately from mechanical checks. The inspection capability SHALL expose composition alternatives, geometry diagnostics, fitted label sizes and captures for the actual consumer model. The agent SHALL correct identified composition problems through at most an initial cycle and two corrective cycles, distinguish those cycles from measurement convergence, and retain unresolved limitations and rejected alternatives without claiming visual completion.
@@ -127,6 +143,10 @@ Visual assessment SHALL compare the actual visible revision with the accepted re
 #### Scenario: Automatic revision cannot meet the requested composition
 - **WHEN** the bounded corrective cycles do not produce a suitable complete overview
 - **THEN** the skill delivers useful editable output and explicit supplementary perspectives with the remaining limitation, without inventing operator approval or hiding the failed overview
+
+#### Scenario: A declared flow passes geometry but misses fitted text targets
+- **WHEN** an applicable AUTO flow view has incomplete text measurements or fitted component names below 14 CSS px or relationship labels below 11 CSS px
+- **THEN** inspection retains a separate failing readability assessment and exits unsuccessfully while preserving mechanical, intent, source and visual outcomes independently; unlabeled relationships do not require invented text
 
 #### Scenario: A generated revision is delivered in an existing browser tab
 - **WHEN** the artifact is updated and the target tab is refreshed

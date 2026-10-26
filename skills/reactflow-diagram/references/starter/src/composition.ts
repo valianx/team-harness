@@ -1,6 +1,7 @@
 import { checkGeometry, segmentIntersects } from './geometry';
 import { TOKENS as T } from './tokens';
 import { routingWork } from './route-budget';
+import { assessFlow } from './flow-composition';
 import type { Architecture, CompositionCandidate, Geometry, Point, Route, RouteMetric } from './types';
 
 type Rect = Point & { width: number; height: number };
@@ -75,13 +76,13 @@ export function routeReadability(geometry: Geometry): { crossings: number; overl
 export function assessComposition(model: Architecture, geometry: Geometry, id: string, mode: 'layered' | 'compact'): CompositionCandidate {
   const diagnostics = checkGeometry(model, geometry);
   const metrics = routeReadability(geometry), bounds = contentBounds(geometry);
-  const fitScale = bounds.width && bounds.height ? Math.min(1152 / bounds.width, 540 / bounds.height, 1) : 1;
+  const fitScale = bounds.width && bounds.height ? Math.min(1152 / bounds.width, 648 / bounds.height, 1) : 1;
   const aspectRatio = bounds.height ? bounds.width / bounds.height : 1;
-  const shapePenalty = Math.abs(Math.log(aspectRatio / (1152 / 540)));
+  const shapePenalty = Math.abs(Math.log(aspectRatio / (1152 / 648)));
   const detourPenalty = metrics.routeLength ? metrics.routeDetour / metrics.routeLength * .08 : 0;
   const clutter = metrics.crossings * .018 + metrics.overlaps * .025 + metrics.labelObstructions * .12 + metrics.bends * .0008 + detourPenalty;
   const score = fitScale / (1 + shapePenalty * .08 + clutter);
   return { id, mode, valid: diagnostics.length === 0, bounds: { width: bounds.width, height: bounds.height },
     fitScale, fittedNodeFont: T.bodyFont * fitScale, fittedLabelFont: T.labelFont * fitScale, aspectRatio,
-    ...metrics, score, diagnostics, elapsedMs: 0, work: geometry.routing?.work ?? routingWork() };
+    ...metrics, score, diagnostics, elapsedMs: 0, work: geometry.routing?.work ?? routingWork(), ...(model.flow ? { flow: assessFlow(model, geometry) } : {}) };
 }

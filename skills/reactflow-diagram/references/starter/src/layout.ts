@@ -5,6 +5,7 @@ import { TOKENS as T } from './tokens';
 import { compactNodes } from './compact';
 import { routeCompact } from './compact-routing';
 import { assessComposition } from './composition';
+import { assessFlow, flowNodes } from './flow-composition';
 import { ROUTING_LIMITS, routingWork, sumWork } from './route-budget';
 
 function measuredSize(values: Record<string, Size>, id: string): Size {
@@ -13,11 +14,12 @@ function measuredSize(values: Record<string, Size>, id: string): Size {
   return value;
 }
 
-function failedCandidate(id: string, mode: 'layered' | 'compact', error: unknown): CompositionCandidate {
+function failedCandidate(model: Architecture, id: string, mode: 'layered' | 'compact', error: unknown): CompositionCandidate {
   return { id, mode, valid: false, bounds: { width: 0, height: 0 },
     fitScale: 0, fittedNodeFont: 0, fittedLabelFont: 0, aspectRatio: 0, crossings: 0, overlaps: 0, labelObstructions: 0, bends: 0, score: 0,
     routeLength: 0, routeDetour: 0, maxDetourRatio: 1, routes: [], elapsedMs: 0, work: routingWork(),
-    diagnostics: [{ check: 'composition', ids: [], message: error instanceof Error ? error.message : String(error) }] };
+    diagnostics: [{ check: 'composition', ids: [], message: error instanceof Error ? error.message : String(error) }],
+    ...(model.flow ? { flow: assessFlow(model) } : {}) };
 }
 
 async function layeredLayout(model: Architecture, measurements: Measurements, work: RoutingWork): Promise<Geometry> {
@@ -88,6 +90,7 @@ async function layeredLayout(model: Architecture, measurements: Measurements, wo
 export async function layout(model: Architecture, measurements: Measurements, options: LayoutOptions = {}): Promise<Geometry> {
   const started = performance.now();
   const requested = options.composition ?? 'auto';
+  if (model.flow && model.direction !== 'right') throw new Error(assessFlow(model)!.diagnostics[0].message);
   for (const node of model.nodes) measuredSize(measurements.nodes, node.id);
   for (const group of model.groups) measuredSize(measurements.headers, group.id);
   for (const edge of model.edges) if (edge.label) measuredSize(measurements.labels, edge.id);
@@ -98,19 +101,21 @@ export async function layout(model: Architecture, measurements: Measurements, op
     try {
       const geometry = await run(work);
       candidate = { geometry, evidence: assessComposition(model, geometry, id, mode) };
-    } catch (error) { candidate = { evidence: failedCandidate(id, mode, error) }; }
+    } catch (error) { candidate = { evidence: failedCandidate(model, id, mode, error) }; }
     candidate.evidence.work = work; candidate.evidence.elapsedMs = performance.now() - begin;
     candidates.push(candidate);
     return candidate;
   }
   if (requested !== 'compact') await compute('layered', 'layered', work => layeredLayout(model, measurements, work));
-  const compactPlans = requested === 'layered' ? [] : requested === 'compact' ? [['compact-balanced', 1.65] as const] : [['compact-balanced', 1.65] as const, ['compact-wide', 2.5] as const];
+  const compactPlans = requested === 'layered' ? [] : requested === 'compact'
+    ? [[model.flow ? 'compact-flow' : 'compact-balanced', 1.65] as const]
+    : [['compact-balanced', 1.65] as const, [model.flow ? 'compact-flow' : 'compact-wide', 2.5] as const];
   const placements = new Map<string, { id: string; geometry: Geometry }>();
   for (const [id, aspect] of compactPlans) {
     let duplicateOf: string | undefined;
     const candidate = await compute(id, 'compact', work => {
       work.compactPlacements++;
-      const nodes = compactNodes(model, measurements, aspect);
+      const nodes = id === 'compact-flow' ? flowNodes(model, measurements) : compactNodes(model, measurements, aspect);
       const signature = JSON.stringify(nodes), previous = placements.get(signature);
       if (previous) { duplicateOf = previous.id; return previous.geometry; }
       const geometry = routeCompact(model, nodes, measurements, work);
@@ -144,9 +149,19 @@ export async function layout(model: Architecture, measurements: Measurements, op
       selected = best[0]; reason = 'The layered arrangement failed geometry checks; selected a validated complete alternative.';
     }
     if (selected.evidence.valid && !readable(selected.evidence)) reason += ' Fitted text remains below the default presentation targets.';
+    if (model.flow) {
+      const satisfying = best.filter(candidate => candidate.evidence.flow?.status === 'satisfied');
+      const preferred = satisfying.find(candidate => readable(candidate.evidence)) ?? satisfying[0];
+      if (preferred) {
+        selected = preferred;
+        reason = 'The selected arrangement satisfies the declared unwrapped request spine and supporting-content side.';
+        if (!readable(selected.evidence)) reason += ' Fitted text remains below the default presentation targets.';
+      }
+    }
   }
   if (!selected.evidence.valid) reason = best.length ? 'The requested arrangement has unresolved geometry checks; valid alternatives are recorded.' : 'No candidate passed every geometry check; retain these diagnostics for visual repair.';
+  if (model.flow && selected.evidence.flow?.status !== 'satisfied') reason = `Declared flow intent remains unsatisfied. The selected complete arrangement ${selected.evidence.valid ? 'passed geometry checks' : 'has unresolved geometry diagnostics'}. Geometry validity alone does not establish the requested composition.`;
   return { ...selected.geometry!, composition: { requested, selected: selected.evidence.mode, candidate: selected.evidence.id,
-    candidates: candidates.map(candidate => candidate.evidence), reason,
+    candidates: candidates.map(candidate => candidate.evidence), reason, ...(model.flow ? { flow: selected.evidence.flow } : {}),
     execution: { elapsedMs: performance.now() - started, limits: ROUTING_LIMITS, work: sumWork(candidates.map(candidate => candidate.evidence.work)) } } };
 }

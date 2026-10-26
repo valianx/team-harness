@@ -35,14 +35,16 @@ function useReducedMotion() {
   return reduced;
 }
 
-function ValidationStatus({ state, evidence }: { state: LayoutState; evidence?: ValidationEvidence }) {
+function ValidationStatus({ state, evidence, flowRequired }: { state: LayoutState; evidence?: ValidationEvidence; flowRequired: boolean }) {
+  const flowAssessment = state.phase === 'ready' ? state.geometry?.composition?.flow : undefined;
   const checks = {
     Model: evidence?.model ?? 'pass',
     Geometry: evidence?.geometry === 'fail' || state.diagnostics.length ? 'fail' : state.phase === 'ready' ? 'pass' : 'missing',
     Rendered: evidence?.rendered ?? 'missing', Build: evidence?.build ?? 'missing',
+    ...(flowRequired ? { 'Flow composition': flowAssessment?.status === 'satisfied' ? 'pass' : flowAssessment ? 'fail' : 'missing' } : {}),
   };
   const complete = Object.values(checks).every(status => status === 'pass');
-  return <details className="validation-status" data-testid="validation-status"><summary><span className={`status-dot${complete ? ' complete' : ''}`} />{complete ? 'Mechanical checks passed' : 'Validation incomplete'}<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg></summary><div className="validation-popover"><p>Source fidelity is assessed separately.</p><dl>{Object.entries(checks).map(([check, status]) => <div key={check}><dt>{check}</dt><dd className={`check-${status}`}>{status === 'missing' ? 'Not supplied' : status === 'pass' ? 'Passed' : 'Failed'}</dd></div>)}</dl></div></details>;
+  return <details className="validation-status" data-testid="validation-status"><summary><span className={`status-dot${complete ? ' complete' : ''}`} />{complete ? flowRequired ? 'Mechanical and flow checks passed' : 'Mechanical checks passed' : 'Validation incomplete'}<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg></summary><div className="validation-popover"><p>Source fidelity and visual judgment are assessed separately.</p><dl>{Object.entries(checks).map(([check, status]) => <div key={check}><dt>{check}</dt><dd className={`check-${status}`}>{status === 'missing' ? 'Not supplied' : status === 'pass' ? 'Passed' : 'Failed'}</dd></div>)}</dl></div></details>;
 }
 
 function Viewer({ model, inputIdentity, evidence, composition }: { model: Architecture; inputIdentity: string; evidence?: ValidationEvidence; composition: CompositionMode }) {
@@ -68,6 +70,11 @@ function Viewer({ model, inputIdentity, evidence, composition }: { model: Archit
   const reducedMotion = useReducedMotion();
   const visibleModel = useMemo(() => selectView(model, model.views.some(view => view.id === viewId) ? viewId : undefined), [model, viewId]);
   const state: LayoutState = layoutState.model === visibleModel ? layoutState : { phase: 'loading', diagnostics: [] };
+  const flowAssessment = state.geometry?.composition?.flow;
+  const flowDiagnostics: Diagnostic[] = visibleModel.flow && state.phase === 'ready' && flowAssessment?.status !== 'satisfied'
+    ? flowAssessment?.diagnostics.length ? flowAssessment.diagnostics : [{ check: flowAssessment ? 'flow-unsatisfied' : 'flow-unavailable', ids: visibleModel.flow.primary,
+      message: flowAssessment ? 'The selected composition does not satisfy the declared flow.' : 'Declared flow intent has no current selected composition assessment.' }]
+    : [];
   const fidelity = useMemo(() => fidelityStatus(model), [model]);
   const selectedView = model.views.find(view => view.id === viewId);
   const selected = [...model.nodes, ...model.groups, ...model.edges].find(element => element.id === selectedId);
@@ -272,7 +279,7 @@ function Viewer({ model, inputIdentity, evidence, composition }: { model: Archit
               <div className="step-narrative" data-testid="step-narrative" aria-live="polite">{step ? <><span className="step-index">{String(stepIndex + 1).padStart(2, '0')}<span> / {String(visibleModel.steps.length).padStart(2, '0')}</span></span><div><strong>{step.title}</strong>{step.description && <p>{step.description}</p>}</div></> : <span className="no-steps">Explore the components and their evidence</span>}</div>
               <button type="button" className="icon-button step-button" aria-label="Next step" disabled={!visibleModel.steps.length || stepIndex >= visibleModel.steps.length - 1} onClick={() => { setSelectionFocused(false); setStepIndex(index => index + 1); }}><Arrow /></button>
             </nav>
-            <ValidationStatus state={state} evidence={evidence} />
+            <ValidationStatus state={state} evidence={evidence} flowRequired={!!visibleModel.flow} />
           </footer>
           {selectedView && <div className="view-context" data-testid="view-context"><span className="eyebrow">Perspective context</span><span>{selectedView.outside?.length ? `${selectedView.outside.length} relationships declared outside this perspective.` : 'All included relationships retain their endpoints.'}</span>{selectedView.outside?.map(outside => <span key={outside.edge}>{model.edges.find(edge => edge.id === outside.edge)?.label ?? outside.edge}: {outside.reason}</span>)}{selectedView.continuations?.map(continuation => <button type="button" key={`${continuation.edge}-${continuation.view}`} onClick={() => setViewId(continuation.view)}>Continue {model.edges.find(edge => edge.id === continuation.edge)?.label ?? continuation.edge} in {model.views.find(view => view.id === continuation.view)?.label ?? continuation.view} <Arrow /></button>)}</div>}
         </div>
@@ -281,6 +288,7 @@ function Viewer({ model, inputIdentity, evidence, composition }: { model: Archit
     </div>
 
     {state.diagnostics.length > 0 && <details className="geometry-diagnostics" open><summary>Geometry checks need attention · {state.diagnostics.length}</summary><ul>{state.diagnostics.map((diagnostic, index) => <li key={index}><strong>{diagnostic.check}</strong> · {diagnostic.ids.join(', ')}<p>{diagnostic.message}</p></li>)}</ul></details>}
+    {flowDiagnostics.length > 0 && <details className="geometry-diagnostics" data-testid="flow-diagnostics" open><summary>Flow composition needs attention · {flowDiagnostics.length}</summary><ul>{flowDiagnostics.map((diagnostic, index) => <li key={index}><strong>{diagnostic.check}</strong> · {diagnostic.ids.join(', ')}<p>{diagnostic.message}</p></li>)}</ul></details>}
 
     <MeasurementSurface key={viewId} ref={surface} model={visibleModel} />
   </section>;

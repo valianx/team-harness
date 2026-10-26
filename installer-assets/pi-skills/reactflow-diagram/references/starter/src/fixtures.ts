@@ -1,4 +1,5 @@
 import sample from '../fixtures/payment-demo.json';
+import { flowFixture } from '../tests/fixtures/flow';
 import type { Architecture } from './types';
 
 const clone = (): Architecture => ({ ...structuredClone(sample), views: [] }) as Architecture;
@@ -43,4 +44,17 @@ interactions.edges = [
 ].map(([id, from, to, label]) => ({ ...interactions.edges[0], id, from, to, label, ...(id === 'neutral' ? {} : { interaction: id }) })) as Architecture['edges'];
 interactions.steps = [];
 
-export const FIXTURES: Record<string, unknown> = { sample, 'long-label': longLabel, 'self-loop': selfLoop, empty, invalid, nested, cycle, disconnected, dense, unresolved, unavailable, down, interactions };
+const flowAbove = flowFixture('above', true, true);
+flowAbove.views = [
+  { id: 'primary-view', label: 'Primary path', nodeIds: ['intake', 'router', 'journal'], edgeIds: ['enter', 'commit'],
+    outside: flowAbove.edges.filter(edge => !['enter', 'commit'].includes(edge.id)).map(edge => ({ edge: edge.id, reason: 'Supporting relationship is outside this perspective.' })) },
+  { id: 'helpers-view', label: 'Supporting lookup', nodeIds: ['router', 'lookup', 'memo'], edgeIds: ['consult', 'retain'],
+    outside: flowAbove.edges.filter(edge => !['consult', 'retain'].includes(edge.id)).map(edge => ({ edge: edge.id, reason: 'Primary and return relationships are outside this perspective.' })) },
+];
+const flowBelow = flowFixture('below');
+const incompatibleFlow = flowFixture();
+incompatibleFlow.title = 'Invented incompatible grouping';
+incompatibleFlow.groups.push({ ...incompatibleFlow.groups[0], id: 'split-zone', label: 'Split span' });
+for (const node of incompatibleFlow.nodes) if (['intake', 'journal'].includes(node.id)) node.parent = 'split-zone';
+
+export const FIXTURES: Record<string, unknown> = { sample, 'long-label': longLabel, 'self-loop': selfLoop, 'flow-above': flowAbove, 'flow-below': flowBelow, 'flow-incompatible': incompatibleFlow, empty, invalid, nested, cycle, disconnected, dense, unresolved, unavailable, down, interactions };

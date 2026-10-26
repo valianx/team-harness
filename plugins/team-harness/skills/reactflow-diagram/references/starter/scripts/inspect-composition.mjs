@@ -8,6 +8,23 @@ import { chromium } from '@playwright/test';
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const activeCanvas = '.diagram-canvas';
 const viewports = [{ width: 1280, height: 720 }, { width: 1440, height: 900 }];
+const readabilityTargets = Object.freeze({ componentTextPx: 14, relationshipTextPx: 11 });
+
+function readabilityFailuresFor(measurements, expectedComponents, expectedLabels, context) {
+  const failures = [];
+  for (const [metric, expected, name] of [['componentTextPx', expectedComponents, 'component names'], ['relationshipTextPx', expectedLabels, 'relationship labels']]) {
+    if (!expected) continue;
+    const observed = measurements[metric], target = readabilityTargets[metric];
+    if (!observed || observed.count !== expected || !Number.isFinite(observed.minimum) || observed.minimum <= 0 || !Number.isFinite(observed.maximum) || observed.maximum < observed.minimum) {
+      failures.push({ ...context, check: 'readability-observations', metric, target, expectedCount: expected, observedCount: observed?.count ?? 0,
+        actual: observed?.minimum ?? null, reason: `${context.label}: ${name} do not have complete finite font observations.` });
+    } else if (observed.minimum < target) {
+      failures.push({ ...context, check: 'readability-target', metric, target, actual: observed.minimum,
+        reason: `${context.label}: fitted ${name} are below the default ${target} CSS-pixel target.` });
+    }
+  }
+  return failures;
+}
 
 function argumentsFor(argv) {
   const values = {};
@@ -43,7 +60,9 @@ async function prepareOutput(destination) {
 }
 
 async function settle(page) {
-  await page.locator(`${activeCanvas}[data-layout-state="ready"]`).waitFor({ timeout: 60000 });
+  const canvas = page.locator(`${activeCanvas}:is([data-layout-state="ready"], [data-layout-state="error"])`);
+  await canvas.waitFor({ timeout: 60000 });
+  if (await canvas.getAttribute('data-layout-state') === 'error') throw new Error(await page.locator('.error-state').innerText());
   await page.evaluate(async () => {
     await document.fonts.ready;
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -91,10 +110,13 @@ async function inspect(options) {
   const output = await prepareOutput(options['--out']);
   const bytes = await readFile(path.join(project, 'fixtures/sample.json'));
   const model = JSON.parse(bytes);
+  const requiredFlowViews = model.flow ? [{ id: '', label: 'Complete architecture', edgeIds: model.edges.map(edge => edge.id) }, ...(model.views ?? [])]
+    .filter(view => model.flow.primary.every(id => view.edgeIds.includes(id))) : [];
   const report = {
     schemaVersion: 1, startedAt: new Date().toISOString(), project,
     model: { title: model.title, sha256: createHash('sha256').update(bytes).digest('hex'), nodes: model.nodes?.length, edges: model.edges?.length },
-    output, cases: [], failures: [], mechanicalStatus: 'pending', visualAssessment: 'pending', sourceFidelityAssessment: 'pending',
+    output, cases: [], failures: [], mechanicalStatus: 'pending', intentStatus: 'pending', intentFailures: [],
+    readabilityTargets, readabilityStatus: 'pending', readabilityFailures: [], visualAssessment: 'pending', sourceFidelityAssessment: 'pending',
     limits: 'Effective font sizes and candidate scores inform author judgment; they do not certify explanatory clarity or source fidelity.',
   };
   let server, browser;
@@ -119,8 +141,17 @@ async function inspect(options) {
         const url = new URL(base.endsWith('/') ? base : `${base}/`);
         url.searchParams.set('composition', mode);
         await page.goto(url.href, { waitUntil: 'networkidle' });
-        await settle(page);
         await verifyIdentity(page, model);
+        try {
+          await settle(page);
+        } catch (error) {
+          if (mode === 'auto') throw error;
+          const screenshot = `${viewport.width}x${viewport.height}-${mode}-error.png`;
+          await page.screenshot({ path: path.join(output, screenshot), fullPage: false });
+          report.cases.push({ viewport, mode, view: '', label: 'Complete architecture', screenshot, error: error.message,
+            intentStatus: model.flow ? 'fail' : 'not-applicable', readabilityStatus: 'not-applicable', readabilityFailures: [] });
+          continue;
+        }
         const views = mode === 'auto' ? [{ id: '', label: 'Complete architecture' }, ...(model.views ?? []).map(view => ({ id: view.id, label: view.label }))] : [{ id: '', label: 'Complete architecture' }];
         for (const view of views) {
           const box = await page.locator(activeCanvas).boundingBox();
@@ -134,14 +165,26 @@ async function inspect(options) {
           const selected = view.id ? model.views.find(item => item.id === view.id) : null;
           const expectedNodes = selected ? [...selected.nodeIds].sort() : model.nodes.map(node => node.id).sort();
           const expectedEdges = selected ? [...selected.edgeIds].sort() : model.edges.map(edge => edge.id).sort();
+          const flowApplicable = !!model.flow && model.flow.primary.every(id => expectedEdges.includes(id));
+          const flowAssessment = measurements.composition?.flow;
+          const flowStatus = flowAssessment?.status === 'satisfied' ? 'satisfied' : flowAssessment?.status === 'unsatisfied' ? 'unsatisfied' : 'missing';
+          const intentStatus = !flowApplicable ? 'not-applicable' : flowStatus === 'satisfied' ? 'pass' : 'fail';
+          const labeledEdges = model.edges.filter(edge => expectedEdges.includes(edge.id) && edge.label).length;
+          const readabilityApplicable = mode === 'auto' && flowApplicable;
+          const readabilityFailures = readabilityApplicable ? readabilityFailuresFor(measurements, expectedNodes.length, labeledEdges,
+            { viewport, mode, view: view.id, label: view.label }) : [];
+          const readabilityStatus = !readabilityApplicable ? 'not-applicable' : readabilityFailures.length ? 'fail' : 'pass';
           if (JSON.stringify(measurements.nodes) !== JSON.stringify(expectedNodes) || JSON.stringify(measurements.edges) !== JSON.stringify(expectedEdges)) throw new Error(`Rendered membership differs from consumer model in ${view.label}`);
           const screenshot = `${viewport.width}x${viewport.height}-${mode}-${view.id || 'complete'}.png`;
           await page.screenshot({ path: path.join(output, screenshot), fullPage: false });
-          const result = { viewport, mode, view: view.id, label: view.label, screenshot, ...measurements };
+          const result = { viewport, mode, view: view.id, label: view.label, screenshot, intentStatus, readabilityStatus, readabilityFailures, ...measurements };
           report.cases.push(result);
+          report.readabilityFailures.push(...readabilityFailures);
+          if (mode === 'auto' && intentStatus === 'fail') report.intentFailures.push({ viewport, mode, view: view.id, status: flowStatus,
+            reason: flowStatus === 'missing' ? 'Declared flow intent has no current selected composition assessment' : 'Selected composition does not satisfy the declared flow intent',
+            diagnostics: flowAssessment?.diagnostics ?? [] });
           if (mode === 'auto' && measurements.diagnostics.length) report.failures.push({ viewport, view: view.id, reason: 'Selected composition has geometry diagnostics', diagnostics: measurements.diagnostics });
           if (mode === 'auto' && expectedNodes.length && (measurements.componentTextPx?.count !== expectedNodes.length || measurements.componentTextPx.minimum <= 0)) report.failures.push({ viewport, view: view.id, reason: 'Consumer component text was not fully measured' });
-          const labeledEdges = model.edges.filter(edge => expectedEdges.includes(edge.id) && edge.label).length;
           if (mode === 'auto' && labeledEdges && (measurements.relationshipTextPx?.count !== labeledEdges || measurements.relationshipTextPx.minimum <= 0)) report.failures.push({ viewport, view: view.id, reason: 'Consumer relationship text was not fully measured' });
         }
       }
@@ -155,11 +198,23 @@ async function inspect(options) {
   } finally {
     await browser?.close();
     await server?.close();
+    const applicable = report.cases.filter(item => item.mode === 'auto' && item.intentStatus !== 'not-applicable');
+    if (model.flow && !applicable.length) report.intentFailures.push({ mode: 'auto', view: '', status: 'missing', reason: 'Declared flow intent was not assessed in an automatic view', diagnostics: [] });
+    report.intentStatus = report.intentFailures.length ? 'fail' : applicable.length ? 'pass' : 'not-applicable';
+    for (const viewport of viewports) for (const view of requiredFlowViews) {
+      if (!report.cases.some(item => item.mode === 'auto' && item.view === view.id && item.viewport.width === viewport.width && item.viewport.height === viewport.height)) {
+        report.readabilityFailures.push({ viewport, mode: 'auto', view: view.id, label: view.label, check: 'readability-unperformed',
+          reason: `${view.label}: required automatic flow readability was not assessed.` });
+      }
+    }
+    report.readabilityStatus = report.readabilityFailures.length ? 'fail' : requiredFlowViews.length ? 'pass' : 'not-applicable';
     report.finishedAt = new Date().toISOString();
     await writeFile(path.join(output, 'summary.json'), JSON.stringify(report, null, 2) + '\n');
   }
-  console.log(JSON.stringify({ output, summary: path.join(output, 'summary.json'), mechanicalStatus: report.mechanicalStatus, visualAssessment: report.visualAssessment, sourceFidelityAssessment: report.sourceFidelityAssessment, cases: report.cases.length, failures: report.failures }, null, 2));
-  process.exitCode = report.mechanicalStatus === 'pass' ? 0 : 1;
+  console.log(JSON.stringify({ output, summary: path.join(output, 'summary.json'), mechanicalStatus: report.mechanicalStatus, intentStatus: report.intentStatus, intentFailures: report.intentFailures,
+    readabilityTargets, readabilityStatus: report.readabilityStatus, readabilityFailures: report.readabilityFailures,
+    visualAssessment: report.visualAssessment, sourceFidelityAssessment: report.sourceFidelityAssessment, cases: report.cases.length, failures: report.failures }, null, 2));
+  process.exitCode = report.mechanicalStatus === 'pass' && report.intentStatus !== 'fail' && report.readabilityStatus !== 'fail' ? 0 : 1;
 }
 
 try { await inspect(argumentsFor(process.argv.slice(2))); }

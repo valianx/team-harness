@@ -102,12 +102,14 @@ jobs:
       - name: Build independent local assets
         run: npm --prefix "$DIAGRAM_PROJECT" run build
       - name: Check measured browser geometry and interactions
-        run: npm --prefix "$DIAGRAM_PROJECT" run test:browser -- tests/browser/geometry.spec.ts tests/browser/viewer.spec.ts tests/browser/controls.spec.ts tests/browser/composition.spec.ts tests/browser/inspection.spec.ts tests/browser/labels.spec.ts tests/browser/presentation.spec.ts tests/browser/embedding.spec.ts
+        run: npm --prefix "$DIAGRAM_PROJECT" run test:browser -- tests/browser/geometry.spec.ts tests/browser/viewer.spec.ts tests/browser/controls.spec.ts tests/browser/composition.spec.ts tests/browser/inspection.spec.ts tests/browser/labels.spec.ts tests/browser/presentation.spec.ts tests/browser/embedding.spec.ts tests/browser/flow.spec.ts
       - name: Check the copied production build on a static server
         env:
           DIAGRAM_SERVER_COMMAND: npm run preview -- --host 127.0.0.1 --port 4178
           DIAGRAM_EVIDENCE_DIR: ${{ runner.temp }}/architecture-diagrams/production-evidence
-        run: npm --prefix "$DIAGRAM_PROJECT" run test:browser -- tests/browser/production.spec.ts tests/browser/geometry.spec.ts tests/browser/controls.spec.ts tests/browser/composition.spec.ts tests/browser/inspection.spec.ts tests/browser/labels.spec.ts tests/browser/presentation.spec.ts tests/browser/embedding.spec.ts
+        run: |
+          npm --prefix "$DIAGRAM_PROJECT" run test:browser -- tests/browser/production.spec.ts tests/browser/geometry.spec.ts tests/browser/controls.spec.ts tests/browser/composition.spec.ts tests/browser/inspection.spec.ts tests/browser/labels.spec.ts tests/browser/presentation.spec.ts tests/browser/embedding.spec.ts tests/browser/flow.spec.ts
+          npm --prefix "$DIAGRAM_PROJECT" run test:browser -- tests/browser/viewer.spec.ts -g 'standard details retain contrast'
       - name: Replace the editable model with a minimal generated input
         run: cp "$DIAGRAM_PROJECT/fixtures/minimal.json" "$DIAGRAM_PROJECT/fixtures/sample.json"
       - name: Verify and rebuild the edited consumer project

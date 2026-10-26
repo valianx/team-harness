@@ -23,6 +23,7 @@ length/detour observations; explicit modes compute only the requested engine.
 Choose and assess actual composition candidates through
 [composition-review.md](composition-review.md); a successful layout calculation
 does not establish that its fitted overview is useful.
+Declared flow intent enables a measured compact-flow candidate in place of the wide alternative, preserving the three-candidate limit and shared routing. Explicit compact uses that flow candidate; explicit layered remains layered. Inspect both mechanical geometry and declared-intent satisfaction before accepting a view.
 Standalone previews accept `?composition=layered` or `?composition=compact` for
 explicit comparison. Composition changes preserve the semantic model and direction.
 
@@ -76,6 +77,7 @@ captures through [composition-review.md](composition-review.md). `mechanicalStat
 does not complete `visualAssessment` or `sourceFidelityAssessment`, which remain
 pending; exit 0 is not a visual review. Also exercise details, steps, reduced motion
 and an explicitly sized embedding; fixture success alone does not verify the consumer.
+For declared flows, inspect `intentStatus`/`intentFailures` and `readabilityStatus`/`readabilityFailures` separately: unsatisfied or missing AUTO intent, incomplete text measurements or fitted names/labels below the 14/11 defaults fail the command. Rejected explicit comparisons retain their errors without certifying them or invalidating successful AUTO geometry; source and visual judgment remain pending.
 
 | Failure | Action |
 | --- | --- |
