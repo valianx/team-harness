@@ -9,7 +9,7 @@ Issue #719 records a real diagramming session that required about an hour of ope
 - Give React Flow relationships optional semantic interaction classes, stable side-specific ports and separate slots; evaluate routes together and retain bounded exploration evidence.
 - Make the standalone canvas fill its host window and reveal upper/lower controls from their respective borders, preserving keyboard, popup and touch access.
 - Validate the operator's actual source case and reference visually, separately from mechanical and source-fidelity checks.
-- Validate the same case in bounded paired rounds before PR creation: retain the failed initial pair and run one further pair against the corrected candidate, with identical inputs within each pair and no coordinator feedback during generation.
+- Validate the same case in bounded paired rounds before PR creation: retain the failed C1 and C3 pairs, correct their demonstrated native-visibility and supporting-corridor causes, then run one final pair against the corrected candidate with identical inputs and no coordinator feedback.
 
 ## Capabilities
 

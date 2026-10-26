@@ -458,10 +458,12 @@ node "{copied_references}/native/verify.mjs" "{source_file}" --output-dir "{evid
 ```
 
 This retains native/editor/export evidence and the requested PNG. View the actual PNG and editor capture with the host's image-reading capability.
+For a desktop per-flow presentation, append `--presentation` and inspect its fitted typography and connection-visibility observations; generic collection overviews do not establish per-flow readability.
 
 ### The Loop
 
 Keep structural, native-editability, visual and source-fidelity results separate throughout verification.
+Allow at most three prerequisite-repair attempts per prospective composition. A rejected preflight without a native render does not consume a visual correction; the first actual native capture starts the initial composition assessment, including any visible defects.
 
 After generating the initial JSON, run this cycle:
 
@@ -480,6 +482,7 @@ After generating the initial JSON, run this cycle:
 - Arrows crossing through elements instead of routing around them
 - Arrows landing on the wrong element or pointing into empty space
 - Labels floating ambiguously (not clearly anchored to what they describe)
+- Bound-label masks hiding a connection or its arrowhead despite correct label placement
 - Uneven spacing between elements that should be evenly spaced
 - Sections with too much whitespace next to sections that are too cramped
 - Text too small to read at the rendered size
@@ -490,6 +493,7 @@ After generating the initial JSON, run this cycle:
 - Adjust `x`/`y` coordinates to fix spacing and alignment
 - Add intermediate waypoints to arrow `points` arrays to route around elements
 - Reposition labels closer to the element they describe
+- Lengthen or reroute a short connector to clear its measured label mask and arrowhead; preserve readable text and native bindings
 - Resize elements to rebalance visual weight across sections
 
 **5. Re-render & re-view** — Run the render script again and Read the new PNG.

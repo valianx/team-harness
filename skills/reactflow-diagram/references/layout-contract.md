@@ -1,5 +1,10 @@
 # Layout, validation and delivery
 
+- [Measured geometry](#measured-geometry)
+- [Run the copied project](#run-the-copied-project)
+- [Inspect and repair](#inspect-and-repair)
+- [Independent output and completion](#independent-output-and-completion)
+
 ## Measured geometry
 
 The starter validates the internal model before measuring real components,

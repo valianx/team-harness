@@ -9,10 +9,28 @@ const point = (endpoint: Endpoint): Point => ({ x: endpoint.x, y: endpoint.y });
 /** ENDPOINT_STUB_LENGTH is shared with group-header clearance for policy-constrained approaches. */
 export const ENDPOINT_STUB_LENGTH = 16;
 
-/** endpointStub reserves an outward approach before the shared orthogonal router takes over. */
-export function endpointStub(endpoint: Endpoint): Point {
+/** FLOW_SUPPORT_LANE_GAP separates parallel support corridors while allowing perpendicular crossings. */
+export const FLOW_SUPPORT_LANE_GAP = 2 * T.edgeClearance;
+
+/** flowStubLength reserves distinct measured departure and arrival levels for supporting calls. */
+export function flowStubLength(policy?: FlowLanePolicy): number {
+  return ENDPOINT_STUB_LENGTH + (policy?.kind === 'support' ? policy.order * FLOW_SUPPORT_LANE_GAP : 0);
+}
+
+/** parallelFlowCorridor detects merged or visually inseparable parallel runs, not isolated crossings. */
+export function parallelFlowCorridor(a: Point, b: Point, c: Point, d: Point): boolean {
+  const horizontal = Math.abs(a.y - b.y) <= T.tolerance;
+  if (horizontal !== (Math.abs(c.y - d.y) <= T.tolerance)) return false;
+  const axis = horizontal ? 'x' : 'y', normal = horizontal ? 'y' : 'x';
+  if (Math.abs(a[axis] - b[axis]) <= T.tolerance || Math.abs(c[axis] - d[axis]) <= T.tolerance) return false;
+  const shared = Math.min(Math.max(a[axis], b[axis]), Math.max(c[axis], d[axis])) - Math.max(Math.min(a[axis], b[axis]), Math.min(c[axis], d[axis]));
+  return shared > T.tolerance && Math.abs(a[normal] - c[normal]) < FLOW_SUPPORT_LANE_GAP - T.tolerance;
+}
+
+/** endpointStub reserves a measured outward approach before the shared orthogonal router takes over. */
+export function endpointStub(endpoint: Endpoint, length = ENDPOINT_STUB_LENGTH): Point {
   const { x, y, side } = endpoint;
-  return { x: x + (side === 'right' ? ENDPOINT_STUB_LENGTH : side === 'left' ? -ENDPOINT_STUB_LENGTH : 0), y: y + (side === 'bottom' ? ENDPOINT_STUB_LENGTH : side === 'top' ? -ENDPOINT_STUB_LENGTH : 0) };
+  return { x: x + (side === 'right' ? length : side === 'left' ? -length : 0), y: y + (side === 'bottom' ? length : side === 'top' ? -length : 0) };
 }
 
 /** flowLanePolicies keeps primary progression, synchronous returns and supporting calls on declared sides. */
@@ -25,9 +43,8 @@ export function flowLanePolicies(model: Architecture): Map<string, FlowLanePolic
   path.forEach((edge, order) => policies.set(edge.id, { kind: 'primary', sourceSide: 'right', targetSide: 'left', order }));
   const returns = model.edges.filter(edge => edge.interaction === 'response' && primary.has(edge.from) && primary.has(edge.to) && primary.get(edge.from)! > primary.get(edge.to)!).sort((a, b) => a.id.localeCompare(b.id));
   returns.forEach((edge, order) => policies.set(edge.id, { kind: 'return', sourceSide: 'bottom', targetSide: 'bottom', order }));
-  for (const edge of [...model.edges].sort((a, b) => a.id.localeCompare(b.id))) if (edge.interaction === 'call' && primary.has(edge.from) && !primary.has(edge.to)) {
-    policies.set(edge.id, { kind: 'support', sourceSide: model.flow.supportSide === 'above' ? 'top' : 'bottom', targetSide: model.flow.supportSide === 'above' ? 'bottom' : 'top', order: 0 });
-  }
+  const support = model.edges.filter(edge => edge.interaction === 'call' && primary.has(edge.from) && !primary.has(edge.to)).sort((a, b) => a.id.localeCompare(b.id));
+  support.forEach((edge, order) => policies.set(edge.id, { kind: 'support', sourceSide: model.flow!.supportSide === 'above' ? 'top' : 'bottom', targetSide: model.flow!.supportSide === 'above' ? 'bottom' : 'top', order }));
   return policies;
 }
 

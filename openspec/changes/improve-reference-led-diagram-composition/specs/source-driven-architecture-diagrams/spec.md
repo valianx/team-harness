@@ -52,6 +52,8 @@ The viewer SHALL preserve computed ports, route sections, bends and label positi
 
 Rendered relationship labels SHALL paint above their routes and remain available as pointer targets while respecting the standard temporary-control layers. Relationships SHALL retain their own stable endpoint identities and supported side/slot positions. Side and lane selection SHALL consider the complete flow, obstacles and other routes rather than imposing one shared input/output point or selecting solely from component centers. Request/return paths and separate calls to one specialist SHALL remain distinguishable. Crossing, shared-segment, bend and detour diagnostics SHALL identify affected relationships without hiding topology to improve a score.
 
+Declared supporting-call constraints SHALL apply during bounded route and label search. Measured typography changes SHALL NOT silently route a call through the wrong side or merge separate calls into ambiguous shared corridors; infeasible constraints SHALL remain explicit. Isolated perpendicular crossings SHALL remain supported independently of corridor separation.
+
 #### Scenario: Connection crosses nested group boundaries
 - **WHEN** a labeled relationship connects nodes in different nested groups
 - **THEN** its rendered endpoints, route and label use consistent coordinates, avoid unrelated bodies and headers, and retain the relationship's identity
@@ -71,6 +73,10 @@ Rendered relationship labels SHALL paint above their routes and remain available
 #### Scenario: A direct side avoids an unnecessary detour
 - **WHEN** a relationship can use a feasible facing side while another attachment would route around unrelated content
 - **THEN** bounded route selection evaluates that alternative and retains the chosen attachment and any remaining detour diagnostics
+
+#### Scenario: Enlarged labels and repeated supporting calls
+- **WHEN** supported typography changes measured labels and several primary components call supporting services on a declared side
+- **THEN** bounded search preserves that side and distinguishable departure, corridor and arrival lanes when feasible, permits isolated crossings and retains an explicit unsatisfied limit otherwise
 
 ### Requirement: Reusable interactive viewer
 

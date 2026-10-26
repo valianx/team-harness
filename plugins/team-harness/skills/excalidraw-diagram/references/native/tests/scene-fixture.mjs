@@ -28,7 +28,38 @@ export function fixture() {
       arrow('request', 285, 255, [[0, 0], [155, 0], [155, 80], [330, 80]], 'card-a', 'card-b', 0.25, 0.25, 'request-label'),
       arrow('response', 615, 405, [[0, 0], [-155, 0], [-155, -80], [-330, -80]], 'card-b', 'card-a', 0.75, 0.75, 'response-label'),
       label('request-label', 'Submit', 'request', 0.2),
-      label('response-label', 'Return', 'response', 0.8),
+      label('response-label', 'Return', 'response', 0.75),
       { ...label('human-note', 'Human note', null, null), x: 100, y: 500, customData: { human: true } },
     ] };
+}
+
+/** A measured two-line label needs room for native masks and complete arrowheads. */
+export function labelClearanceFixture(length) {
+  const scene = fixture();
+  const byId = new Map(scene.elements.map(element => [element.id, element]));
+  scene.elements = ['card-a', 'card-b', 'request', 'request-label', 'human-note'].map(id => byId.get(id));
+  for (const id of ['card-a', 'card-b']) byId.get(id).boundElements = [{ id: 'request', type: 'arrow' }];
+  Object.assign(byId.get('card-b'), { x: 290 + length, y: 220 });
+  Object.assign(byId.get('request'), { x: 285, y: 290, width: length, height: 0, points: [[0, 0], [length, 0]],
+    startBinding: { elementId: 'card-a', fixedPoint: [1, 0.5001], mode: 'orbit' },
+    endBinding: { elementId: 'card-b', fixedPoint: [0, 0.5001], mode: 'orbit' } });
+  Object.assign(byId.get('request-label'), { x: 0, y: 0, text: 'Write\nrecord', originalText: 'Write\nrecord', width: 80, height: 55,
+    fontSize: 22, lineHeight: 1.25, labelPosition: 0.5 });
+  return scene;
+}
+
+/** A wide annotation is legitimate in an overview but makes per-flow text too small. */
+export function presentationFixture(wide = true) {
+  const scene = fixture();
+  for (const id of ['card-a', 'card-b']) {
+    const card = scene.elements.find(element => element.id === id);
+    const text = id === 'card-a' ? 'Writer' : 'Archive';
+    const labelId = `${id}-label`;
+    card.boundElements.push({ id: labelId, type: 'text' });
+    scene.elements.push({ ...base(labelId, 'text', card.x + 10, card.y + 10, 100, 28), text, originalText: text, fontSize: 22,
+      fontFamily: 3, textAlign: 'center', verticalAlign: 'middle', containerId: id, autoResize: true, lineHeight: 1.25 });
+  }
+  for (const element of scene.elements) if (element.type === 'text' && element.containerId?.match(/request|response/)) element.labelPosition = 0.5;
+  if (wide) scene.elements.find(element => element.id === 'human-note').x = 2200;
+  return scene;
 }

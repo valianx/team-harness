@@ -6,8 +6,8 @@ import { routeCompact } from '../src/compact-routing';
 import { checkGeometry, segmentIntersects } from '../src/geometry';
 import { contentBounds, routeReadability } from '../src/composition';
 import { relationships, relationshipMeasurements, placed } from './fixtures/relationships';
-import type { Architecture, Geometry } from '../src/types';
-import { flowFixture, flowMeasurements, laneFixture, laneMeasurements } from './fixtures/flow';
+import type { Architecture, Geometry, Route } from '../src/types';
+import { flowFixture, flowMeasurements, laneFixture, laneMeasurements, supportLaneFixture, supportLaneMeasurements } from './fixtures/flow';
 import { flowNodes, assessFlow } from '../src/flow-composition';
 import { endpointAllocator, endpointStub } from '../src/endpoints';
 import { TOKENS as T } from '../src/tokens';
@@ -38,6 +38,87 @@ function positions(geometry: Geometry) {
   return { nodes: geometry.nodes, edges: geometry.edges, bounds: geometry.bounds };
 }
 
+function separateSupport(model: Architecture, geometry: Geometry) {
+  const calls = geometry.edges.filter(route => model.edges.some(edge => edge.id === route.id && edge.interaction === 'call'));
+  const segments = (route: Route) => route.sections.flatMap(section => section.points.slice(1).map((b, index) => ({ a: section.points[index], b })));
+  for (const [index, first] of calls.entries()) for (const second of calls.slice(index + 1)) {
+    for (const a of segments(first)) for (const b of segments(second)) {
+      const horizontal = a.a.y === a.b.y;
+      if (horizontal !== (b.a.y === b.b.y)) continue;
+      const axis = horizontal ? 'x' : 'y', normal = horizontal ? 'y' : 'x';
+      const shared = Math.min(Math.max(a.a[axis], a.b[axis]), Math.max(b.a[axis], b.b[axis])) - Math.max(Math.min(a.a[axis], a.b[axis]), Math.min(b.a[axis], b.b[axis]));
+      if (shared > T.tolerance) assert.ok(Math.abs(a.a[normal] - b.a[normal]) >= 2 * T.edgeClearance - T.tolerance,
+        `${first.id}/${second.id} merge for ${shared} units`);
+    }
+  }
+}
+
+for (const supportSide of ['above', 'below'] as const) for (const enlarged of [false, true]) {
+  test(`repeated support calls retain distinct ${supportSide} lanes with ${enlarged ? 'enlarged nested' : 'small'} measured content`, async () => {
+    const model = supportLaneFixture(supportSide, enlarged), original = structuredClone(model), sizes = supportLaneMeasurements(model, enlarged);
+    const geometry = await layout(model, sizes, { composition: 'compact' });
+    endpoints(model, geometry); separateSupport(model, geometry);
+    assert.equal(assessFlow(model, geometry)?.status, 'satisfied');
+    for (const route of geometry.edges.filter(edge => edge.id.startsWith('check-'))) {
+      const source = geometry.nodes.find(node => node.id === route.sourcePort.nodeId)!;
+      const boundary = supportSide === 'above' ? source.absY : source.absY + source.height;
+      assert.ok(route.sections.flatMap(section => section.points).every(point => supportSide === 'above' ? point.y <= boundary + T.tolerance : point.y >= boundary - T.tolerance));
+      assert.ok(supportSide === 'above' ? route.label!.y + route.label!.height <= boundary + T.tolerance : route.label!.y >= boundary - T.tolerance);
+      assert.equal(route.label!.width, sizes.labels[route.id].width); assert.equal(route.label!.height, sizes.labels[route.id].height);
+    }
+    assert.equal(geometry.nodes.find(node => node.id === 'worker')!.parent, enlarged ? 'inner-area' : 'worker-area');
+    assert.deepEqual(model, original);
+    const reordered = { ...model, nodes: [...model.nodes].reverse(), groups: [...model.groups].reverse(), edges: [...model.edges].reverse() };
+    assert.deepEqual(withoutTiming(await layout(reordered, sizes, { composition: 'compact' })), withoutTiming(geometry));
+    const work = geometry.composition!.execution.work;
+    assert.equal(geometry.composition!.candidates.length, 1);
+    assert.ok(work.endpointCandidates <= model.edges.length * 8);
+    assert.ok(work.searches <= work.endpointCandidates * 25);
+    assert.ok(work.corridorCandidates <= work.searches * 48);
+    assert.ok(work.maxGridStates <= 120000);
+  });
+}
+
+function crossingSupportGeometry() {
+  const model = supportLaneFixture(); model.groups = []; model.nodes.forEach(node => { delete node.parent; });
+  model.edges = model.edges.filter(edge => edge.id !== 'check-three');
+  const endpoint = (id: string, nodeId: string, side: 'top' | 'bottom' | 'left' | 'right', slot: number, x: number, y: number) => ({ id, nodeId, side, slot, x, y });
+  const geometry: Geometry = { nodes: [placed('sender', 80, 400), placed('worker', 500, 400), placed('helper', 290, 100)], bounds: { width: 800, height: 550 }, edges: [
+    { id: 'execute', sourcePort: endpoint('execute:source', 'sender', 'right', 0, 312, 450), targetPort: endpoint('execute:target', 'worker', 'left', 0, 492, 450), sections: [{ points: [{ x: 312, y: 450 }, { x: 492, y: 450 }] }], label: { x: 360, y: 438, width: 72, height: 24, text: 'Execute' } },
+    { id: 'check-one', sourcePort: endpoint('check-one:source', 'worker', 'top', 0, 550, 392), targetPort: endpoint('check-one:target', 'helper', 'bottom', 0, 450, 208), sections: [{ points: [{ x: 550, y: 392 }, { x: 550, y: 368 }, { x: 250, y: 368 }, { x: 250, y: 240 }, { x: 450, y: 240 }, { x: 450, y: 208 }] }], label: { x: 214, y: 288, width: 72, height: 24, text: 'Check one' } },
+    { id: 'check-two', sourcePort: endpoint('check-two:source', 'worker', 'top', 1, 660, 392), targetPort: endpoint('check-two:target', 'helper', 'bottom', 1, 350, 208), sections: [{ points: [{ x: 660, y: 392 }, { x: 660, y: 336 }, { x: 600, y: 336 }, { x: 600, y: 224 }, { x: 350, y: 224 }, { x: 350, y: 208 }] }], label: { x: 564, y: 278, width: 72, height: 24, text: 'Check two' } },
+  ] };
+  return { model, geometry };
+}
+
+test('declared support lanes permit isolated perpendicular crossings', () => {
+  const { model, geometry } = crossingSupportGeometry();
+  endpoints(model, geometry); separateSupport(model, geometry);
+  assert.ok(routeReadability(geometry).crossings > 0);
+  assert.equal(assessFlow(model, geometry)?.status, 'satisfied');
+});
+
+for (const separation of [0, T.edgeClearance]) test(`mechanically valid support corridors ${separation} units apart remain explicit unsatisfied intent`, () => {
+  const { model, geometry } = crossingSupportGeometry(), route = geometry.edges.find(edge => edge.id === 'check-two')!;
+  route.sections[0].points.forEach(point => { if (point.y === 224) point.y = 240 + separation; });
+  endpoints(model, geometry);
+  assert.ok(assessFlow(model, geometry)?.diagnostics.some(value => value.check === 'flow-support-lanes' && value.ids.includes('check-one') && value.ids.includes('check-two')));
+  model.edges.find(edge => edge.id === 'check-two')!.interaction = 'persistence';
+  assert.equal(assessFlow(model, geometry)?.status, 'satisfied', 'unrelated shared relationships are not support-lane policy');
+});
+
+test('infeasible support approach room retains complete geometry with explicit unsatisfied intent', () => {
+  const model = supportLaneFixture(), sizes = supportLaneMeasurements(model), nodes = flowNodes(model, sizes);
+  for (const node of nodes.filter(node => node.parent === 'worker-area')) { node.absY -= 4 * T.edgeClearance; node.y -= 4 * T.edgeClearance; }
+  nodes.find(node => node.id === 'worker-area')!.height -= 4 * T.edgeClearance;
+  const geometry = routeCompact(model, nodes, sizes);
+  endpoints(model, geometry);
+  const flow = assessFlow(model, geometry)!;
+  assert.equal(flow.status, 'unsatisfied');
+  assert.ok(flow.diagnostics.some(value => value.check === 'flow-support-route' || value.check === 'flow-support-lanes'));
+  assert.ok(geometry.routing!.work.endpointCandidates <= model.edges.length * 8);
+});
+
 test('a measured primary label fits its own lateral corridor without hypothetical endpoint blockers', async () => {
   const model = laneFixture(); model.nodes = model.nodes.slice(0, 2); model.edges = model.edges.filter(edge => edge.id === 'start'); model.flow!.primary = ['start'];
   const sizes = laneMeasurements(model), geometry = await layout(model, sizes, { composition: 'compact' });
@@ -54,7 +135,7 @@ test('a measured primary label fits its own lateral corridor without hypothetica
 for (const supportSide of ['above', 'below'] as const) {
   test(`declared ${supportSide} flow routes the primary corridor first with lower returns and support-facing calls`, async () => {
     const model = laneFixture(supportSide), sizes = laneMeasurements(model), geometry = await layout(model, sizes, { composition: 'compact' });
-    endpoints(model, geometry);
+    endpoints(model, geometry); separateSupport(model, geometry);
     assert.deepEqual(geometry.routing!.alternatives.slice(0, 2).map(value => value.id), ['start', 'finish']);
     for (const id of model.flow!.primary) {
       const route = geometry.edges.find(edge => edge.id === id)!, points = route.sections.flatMap(section => section.points);

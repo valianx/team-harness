@@ -1,6 +1,6 @@
 import { TOKENS as T } from './tokens';
-import { ENDPOINT_STUB_LENGTH, flowLanePolicies } from './endpoints';
-import type { Architecture, Diagnostic, FlowAssessment, Geometry, Measurements, PlacedNode, Size } from './types';
+import { flowLanePolicies, flowStubLength, parallelFlowCorridor } from './endpoints';
+import type { Architecture, Diagnostic, FlowAssessment, Geometry, Measurements, PlacedNode, Point, Size } from './types';
 
 type Tile = Size & { id: string; x: number; y: number; headerHeight: number; children: Tile[]; anchor?: number; first?: number };
 
@@ -64,12 +64,19 @@ export function flowNodes(model: Architecture, measurements: Measurements): Plac
   const groupIds = new Set(model.groups.map(group => group.id));
   const bandHalfHeight = Math.max(...context.primary.map(id => measurements.nodes[id].height / 2));
   const inset = T.groupInset + T.edgeClearance;
-  const policies = flowLanePolicies(model), topApproaches = new Set<string>();
+  const policies = flowLanePolicies(model), topApproaches = new Map<string, number>();
+  let supportApproach = 0, supportLabelHeight = 0;
   for (const edge of model.edges) {
     const policy = policies.get(edge.id);
-    if (policy?.sourceSide === 'top') topApproaches.add(edge.from);
-    if (policy?.targetSide === 'top') topApproaches.add(edge.to);
+    const depth = T.portSize + flowStubLength(policy);
+    if (policy?.sourceSide === 'top') topApproaches.set(edge.from, Math.max(topApproaches.get(edge.from) ?? 0, depth));
+    if (policy?.targetSide === 'top') topApproaches.set(edge.to, Math.max(topApproaches.get(edge.to) ?? 0, depth));
+    if (policy?.kind === 'support') {
+      supportApproach = Math.max(supportApproach, depth);
+      supportLabelHeight = Math.max(supportLabelHeight, measurements.labels[edge.id]?.height ?? 0);
+    }
   }
+  const supportGap = Math.max(gapY, supportApproach * 2 + supportLabelHeight + 2 * T.edgeClearance);
   const primaryGapAfter = (id: string): number => {
     const edgeId = model.flow!.primary[context.spans.get(id)!.at(-1)!];
     return Math.max(T.layerGap, (measurements.labels[edgeId]?.width ?? 0) + 2 * T.edgeClearance + T.portSize * 2);
@@ -105,12 +112,13 @@ export function flowNodes(model: Architecture, measurements: Measurements): Plac
     const above = support.filter(tile => model.flow!.supportSide === 'above' && !context.returnOnly(tile.id));
     const below = support.filter(tile => !above.includes(tile));
     const top = shelf(above, primaryWidth, gapX, gapY), bottom = shelf(below, primaryWidth, gapX, gapY);
-    const offset = above.length ? top.height + gapY : 0;
+    const offset = above.length ? top.height + supportGap : 0;
+    const bottomGap = model.flow!.supportSide === 'below' ? supportGap : gapY;
     const width = Math.max(primaryWidth, top.width, bottom.width);
     for (const child of primary) { child.x += (width - primaryWidth) / 2; child.y += offset; }
     for (const child of above) child.x += (width - top.width) / 2;
-    for (const child of below) { child.x += (width - bottom.width) / 2; child.y += offset + primaryHeight + gapY; }
-    return { width, height: offset + primaryHeight + (below.length ? gapY + bottom.height : 0), anchor: offset + anchor };
+    for (const child of below) { child.x += (width - bottom.width) / 2; child.y += offset + primaryHeight + bottomGap; }
+    return { width, height: offset + primaryHeight + (below.length ? bottomGap + bottom.height : 0), anchor: offset + anchor };
   }
 
   function tile(id: string, availableWidth: number): Tile {
@@ -122,7 +130,7 @@ export function flowNodes(model: Architecture, measurements: Measurements): Plac
     const contentWidth = Math.max(0, (context.spans.get(id)!.length ? skeletonWidth(id) : availableWidth) - 2 * inset);
     const ids = childIds(id);
     // A policy top approach must fit below the reserved header before it can turn outward.
-    const topInset = inset + (ids.some(child => topApproaches.has(child)) ? T.portSize + ENDPOINT_STUB_LENGTH : 0);
+    const topInset = inset + Math.max(0, ...ids.map(child => topApproaches.get(child) ?? 0));
     const children = ids.map(child => tile(child, contentWidth));
     const content = arrange(children, contentWidth);
     for (const child of children) { child.x += inset; child.y += topInset + headerHeight; }
@@ -175,6 +183,7 @@ export function assessFlow(model: Architecture, geometry?: Geometry): FlowAssess
       }
       const edges = new Map(model.edges.map(edge => [edge.id, edge])), routes = new Map(geometry.edges.map(route => [route.id, route]));
       const returnLanes: { id: string; y: number }[] = [];
+      const supportRoutes: { id: string; segments: { a: Point; b: Point }[] }[] = [];
       for (const [id, policy] of flowLanePolicies(model)) {
         const edge = edges.get(id)!, route = routes.get(id), source = placed.get(edge.from)!, target = placed.get(edge.to)!;
         const check = policy.kind === 'primary' ? 'flow-primary-route' : policy.kind === 'return' ? 'flow-return-route' : 'flow-support-route';
@@ -188,7 +197,13 @@ export function assessFlow(model: Architecture, geometry?: Geometry): FlowAssess
             && points.slice(1).every((point, index) => point.x >= points[index].x - T.tolerance)
             && (!route.label || route.label.x >= source.absX + source.width + T.edgeClearance - T.tolerance && route.label.x + route.label.width <= target.absX - T.edgeClearance + T.tolerance);
         } else if (policy.kind === 'support') {
-          satisfied &&= points.every(point => model.flow!.supportSide === 'above' ? point.y <= source.absY + T.tolerance : point.y >= source.absY + source.height - T.tolerance);
+          satisfied &&= points.every(point => model.flow!.supportSide === 'above' ? point.y <= source.absY + T.tolerance : point.y >= source.absY + source.height - T.tolerance)
+            && (!route.label || (model.flow!.supportSide === 'above' ? route.label.y + route.label.height <= source.absY + T.tolerance : route.label.y >= source.absY + source.height - T.tolerance));
+          const segments = route.sections.flatMap(section => section.points.slice(1).map((b, index) => ({ a: section.points[index], b })));
+          for (const other of supportRoutes) if (segments.some(segment => other.segments.some(value => parallelFlowCorridor(segment.a, segment.b, value.a, value.b)))) {
+            diagnostics.push({ check: 'flow-support-lanes', ids: [other.id, id], message: 'Supporting calls require distinct visible parallel corridors; isolated perpendicular crossings remain permitted.' });
+          }
+          supportRoutes.push({ id, segments });
         } else {
           const horizontal = route.sections.flatMap(section => section.points.slice(1).map((b, index) => ({ a: section.points[index], b }))).filter(segment => segment.a.y === segment.b.y && segment.a.x > segment.b.x).sort((a, b) => (b.a.x - b.b.x) - (a.a.x - a.b.x));
           satisfied &&= horizontal.length > 0 && horizontal.every(segment => segment.a.y > bottom + T.edgeClearance)

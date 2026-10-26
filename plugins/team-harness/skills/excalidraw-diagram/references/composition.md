@@ -10,6 +10,7 @@ Read supplied documents, images and the current editable scene. Record component
 - Use consistent, spacious component cards when they communicate equal roles. Keep functional zones visually subordinate; use subtle hatching if the reference calls for it.
 - Reserve separate lanes and endpoint slots for requests, returns and different calls to the same service. Plan these together before drawing individual arrows.
 - Keep labels close to their own route, on clear segments away from elbows and arrowheads. Route around unrelated cards and labels; show an unmistakable direction at the fitted scale.
+- Reserve measured label-mask and arrowhead clearance before drawing a short native connection. Correct label coordinates can still hide the entire arrow; lengthen its clear segment rather than shrink its text.
 - Component colors express roles or ownership; relationship colors express interaction classes. Preserve their separate meanings, stroke patterns and contrast.
 - Use internal whitespace for lanes and legibility. Fitting the drawing to 90% of the viewport does not mean filling 90% with cards.
 

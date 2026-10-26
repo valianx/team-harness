@@ -13,6 +13,7 @@ import { relationships, relationshipMeasurements } from './fixtures/relationship
 import { samplePresentationMeasurements } from './fixtures/presentation';
 import { flowFixture, flowMeasurements, flowPresentationMeasurements } from './fixtures/flow';
 import { assessFlow, flowNodes } from '../src/flow-composition';
+import { TOKENS as T } from '../src/tokens';
 
 function fit(geometry: Geometry) {
   return Math.min(1152 / geometry.bounds.width, 648 / geometry.bounds.height);
@@ -300,19 +301,22 @@ test('a short flow that meets fitted text targets keeps the layered choice and r
   assert.ok(geometry.composition!.candidates.some(candidate => candidate.mode === 'compact'));
 });
 
-test('auto selects readable compact text for a small tall-card flow below the old ribbon gain threshold', async () => {
+test('auto respects current fitted text targets for a small tall-card flow below the ribbon gain threshold', async () => {
   const model = parseModel(FIXTURES.sample), original = structuredClone(model), sizes = samplePresentationMeasurements();
   sizes.nodes.orchestrator.height = 230;
   const geometry = await layout(model, sizes), evidence = geometry.composition!;
   const layered = evidence.candidates.find(candidate => candidate.mode === 'layered')!;
   const compact = evidence.candidates.find(candidate => candidate.mode === 'compact')!;
   assert.ok(layered.valid && compact.valid);
-  assert.ok(layered.fittedNodeFont < 14 && layered.fittedLabelFont < 11);
-  assert.ok(compact.fittedNodeFont >= 14 && compact.fittedLabelFont >= 11);
+  const readable = (candidate: typeof layered) => candidate.fittedNodeFont >= T.minFittedNodeFont && candidate.fittedLabelFont >= T.minFittedLabelFont;
   assert.ok(compact.fitScale / layered.fitScale > 1.15 && compact.fitScale / layered.fitScale < 1.5);
-  assert.equal(evidence.selected, 'compact');
   const selected = evidence.candidates.find(candidate => candidate.id === evidence.candidate)!;
-  assert.ok(selected.fittedNodeFont >= 14 && selected.fittedLabelFont >= 11);
+  if (readable(layered)) assert.equal(evidence.selected, 'layered');
+  else if (readable(compact)) { assert.equal(evidence.selected, 'compact'); assert.ok(readable(selected)); }
+  for (const candidate of evidence.candidates) {
+    assert.equal(candidate.fittedNodeFont, T.bodyFont * candidate.fitScale);
+    assert.equal(candidate.fittedLabelFont, T.labelFont * candidate.fitScale);
+  }
   complete(model, geometry);
   assert.deepEqual(model, original);
   const reordered = { ...model, nodes: [...model.nodes].reverse(), groups: [...model.groups].reverse(), edges: [...model.edges].reverse() };

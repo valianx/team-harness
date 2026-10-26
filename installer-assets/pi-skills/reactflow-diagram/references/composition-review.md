@@ -36,6 +36,7 @@ same complete source inventory and boundaries.
 An explicit mode computes that mode only. Retain candidate work/time and route
 length/detour evidence alongside quality; unnecessary search is not improvement.
 For declared flow intent, compare its satisfaction separately from geometry and text size; reject a folded spine or reversed support side even if the candidate is otherwise readable. The measured compact-flow alternative preserves this intent without operator coordinates; incompatible hierarchy remains a named limit.
+After typography changes, renew routing and inspect distinct supporting-call corridors as well as fitted text. Merged call segments remain unresolved even with readable labels; isolated perpendicular crossings require visual judgment rather than a universal crossing-free promise.
 
 Use [consumer inspection](layout-contract.md#inspect-and-repair) to capture the
 actual artifact at 1440×900 and 1280×720. Confirm its model identity/revision and

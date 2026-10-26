@@ -167,14 +167,16 @@ test('interaction styles distinguish asynchronous lanes without recoloring compo
     return { id: edge.getAttribute('data-id'), stroke: style.stroke, dash: style.strokeDasharray };
   }));
   const initial = await observed();
-  expect(new Set(initial.map(edge => edge.stroke)).size).toBe(6);
+  expect(initial.map(edge => edge.id).sort()).toEqual(['call', 'event', 'neutral', 'persistence', 'request', 'response']);
   for (const edge of initial) expect(edge.dash === 'none', `${edge.id} uses its interaction pattern`).toBe(!['response', 'event'].includes(edge.id!));
   const cards = () => page.locator('.react-flow__node .component-card').evaluateAll(elements => elements.map(element => getComputedStyle(element).backgroundColor));
   const before = await cards();
-  await page.addStyleTag({ content: '.architecture-viewer { --interaction-request: #e879f9; --interaction-response-dash: 10 3; }' });
+  await page.addStyleTag({ content: '.architecture-viewer { --interaction-request: #e879f9; --interaction-response-dash: 10 3; --interaction-persistence: #64748b; --edge: #64748b; }' });
   const customized = await observed();
   expect(customized.find(edge => edge.id === 'request')!.stroke).toBe('rgb(232, 121, 249)');
   expect(customized.find(edge => edge.id === 'response')!.dash).toBe('10px, 3px');
+  expect(customized.find(edge => edge.id === 'persistence')!.stroke).toBe('rgb(100, 116, 139)');
+  expect(customized.find(edge => edge.id === 'neutral')!.stroke).toBe('rgb(100, 116, 139)');
   expect(await cards()).toEqual(before);
   await testInfo.attach('interaction-styles.json', { body: JSON.stringify({ initial, customized }, null, 2), contentType: 'application/json' });
 });

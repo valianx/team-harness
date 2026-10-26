@@ -75,3 +75,35 @@ export function laneMeasurements(model: Architecture): Measurements {
   sizes.labels.start.width = 168;
   return sizes;
 }
+
+/** Repeated calls between three invented components require separate departure and arrival lanes. */
+export function supportLaneFixture(supportSide: 'above' | 'below' = 'above', nested = false): Architecture {
+  return {
+    schemaVersion: 1, title: 'Invented worker checks', theme: 'presentation', direction: 'right',
+    sources: [{ id: 'invented', title: 'Invented worker checks', locator: 'invented.md', status: 'read' }],
+    nodes: [
+      { id: 'sender', label: 'Sender', kind: 'external', parent: 'worker-area', evidence },
+      { id: 'worker', label: 'Worker', kind: 'service', parent: nested ? 'inner-area' : 'worker-area', evidence },
+      { id: 'helper', label: 'Helper', kind: 'service', parent: 'support-area', evidence },
+    ],
+    groups: [
+      { id: 'worker-area', label: 'Workers', evidence }, { id: 'support-area', label: 'Support', evidence },
+      ...(nested ? [{ id: 'inner-area', label: 'Inner worker', parent: 'worker-area', evidence }] : []),
+    ],
+    edges: [
+      { id: 'execute', from: 'sender', to: 'worker', label: 'Execute', interaction: 'request', evidence },
+      ...['one', 'two', 'three'].map(id => ({ id: `check-${id}`, from: 'worker', to: 'helper', label: `Check ${id}`, interaction: 'call' as const, evidence })),
+    ],
+    flow: { primary: ['execute'], supportSide },
+    review: { unresolved: [], decisions: [], assessor: 'Synthetic fixture' }, views: [], steps: [],
+  };
+}
+
+/** Enlarged card, header and label measurements model supported shared typography changes. */
+export function supportLaneMeasurements(model: Architecture, enlarged = false): Measurements {
+  return {
+    nodes: Object.fromEntries(model.nodes.map(node => [node.id, { width: 224, height: enlarged ? 112 : 76 }])),
+    headers: Object.fromEntries(model.groups.map(group => [group.id, { width: 224, height: enlarged ? 65 : 22.5 }])),
+    labels: Object.fromEntries(model.edges.map(edge => [edge.id, { width: enlarged ? 184 : 72, height: enlarged ? 76 : 24 }])),
+  };
+}

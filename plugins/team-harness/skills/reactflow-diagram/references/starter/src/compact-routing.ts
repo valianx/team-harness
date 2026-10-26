@@ -1,6 +1,6 @@
 import { segmentIntersects } from './geometry';
 import { TOKENS as T } from './tokens';
-import { endpointAllocator, endpointStub } from './endpoints';
+import { endpointAllocator, endpointStub, flowStubLength, FLOW_SUPPORT_LANE_GAP, parallelFlowCorridor } from './endpoints';
 import { ROUTING_LIMITS, routingWork } from './route-budget';
 import type { Architecture, Endpoint, FlowLanePolicy, Geometry, Measurements, PlacedNode, Point, Relationship, Route, RoutingEvidence, RoutingWork, Size } from './types';
 
@@ -8,14 +8,17 @@ type Rect = Point & Size;
 type Obstacle = Rect & { clearance: number };
 type Segment = { a: Point; b: Point };
 type Pending = { state: number; cost: number; estimate: number };
+type PathConstraint = { side: 'above' | 'below'; boundary: number; parallel: Segment[] };
 const equal = (a: Point, b: Point) => Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6;
 const length = (a: Point, b: Point) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 const overlap = (a: Rect, b: Rect, gap = 0) => a.x < b.x + b.width + gap - T.tolerance && a.x + a.width > b.x - gap + T.tolerance && a.y < b.y + b.height + gap - T.tolerance && a.y + a.height > b.y - gap + T.tolerance;
 const segments = (points: Point[]): Segment[] => points.slice(1).map((b, i) => ({ a: points[i], b }));
-const portZone = (endpoint: Endpoint): Rect => {
-  const stub = endpointStub(endpoint);
+const portZone = (endpoint: Endpoint, policy?: FlowLanePolicy): Rect => {
+  const stub = endpointStub(endpoint, flowStubLength(policy));
   return { x: Math.min(endpoint.x, stub.x) - 8, y: Math.min(endpoint.y, stub.y) - 8, width: Math.abs(stub.x - endpoint.x) + 16, height: Math.abs(stub.y - endpoint.y) + 16 };
 };
+const inside = (point: Point, constraint?: PathConstraint) => !constraint || (constraint.side === 'above' ? point.y <= constraint.boundary + T.tolerance : point.y >= constraint.boundary - T.tolerance);
+const parallelBlocked = (a: Point, b: Point, constraint?: PathConstraint) => constraint?.parallel.some(segment => parallelFlowCorridor(a, b, segment.a, segment.b)) ?? false;
 
 function simplify(points: Point[]): Point[] {
   const distinct = points.filter((point, i) => !i || !equal(point, points[i - 1]));
@@ -71,21 +74,27 @@ function pathScore(points: Point[], occupied: Segment[]): number {
   return segments(points).reduce((sum, segment) => sum + length(segment.a, segment.b) + occupancy(segment.a, segment.b, occupied), 0) + Math.max(0, points.length - 2) * 28;
 }
 
-function path(start: Point, end: Point, obstacles: Obstacle[], occupied: Segment[], bounds: Size, work: RoutingWork, preferred?: Point[]): Point[] {
+function path(start: Point, end: Point, obstacles: Obstacle[], occupied: Segment[], bounds: Size, work: RoutingWork, preferred?: Point[], constraint?: PathConstraint): Point[] {
   work.searches++;
+  if (!inside(start, constraint) || !inside(end, constraint)) throw new Error('Support approach leaves its declared half-plane');
   if (equal(start, end)) return [start];
-  if (preferred && !segments(preferred).some(segment => obstacles.some(box => segmentIntersects(segment.a, segment.b, box, box.clearance)))) return simplify(preferred);
+  const blocked = (a: Point, b: Point) => !inside(a, constraint) || !inside(b, constraint) || parallelBlocked(a, b, constraint) || obstacles.some(box => segmentIntersects(a, b, box, box.clearance));
+  if (preferred && !segments(preferred).some(segment => blocked(segment.a, segment.b))) return simplify(preferred);
   const mx = (start.x + end.x) / 2, my = (start.y + end.y) / 2;
   const simple = [
     [start, { x: end.x, y: start.y }, end], [start, { x: start.x, y: end.y }, end],
     [start, { x: mx, y: start.y }, { x: mx, y: end.y }, end],
     [start, { x: start.x, y: my }, { x: end.x, y: my }, end],
-  ].map(simplify).filter(points => !segments(points).some(segment => obstacles.some(box => segmentIntersects(segment.a, segment.b, box, box.clearance))));
+  ].map(simplify).filter(points => !segments(points).some(segment => blocked(segment.a, segment.b)));
   if (simple.length) return simple.sort((a, b) => pathScore(a, occupied) - pathScore(b, occupied))[0];
   const xsAround = new Set<number>(), ysAround = new Set<number>();
   for (const box of obstacles) {
     xsAround.add(box.x - box.clearance - 2); xsAround.add(box.x + box.width + box.clearance + 2);
     ysAround.add(box.y - box.clearance - 2); ysAround.add(box.y + box.height + box.clearance + 2);
+  }
+  for (const segment of constraint?.parallel ?? []) {
+    if (segment.a.x === segment.b.x) for (const sign of [-1, 1]) xsAround.add(segment.a.x + sign * FLOW_SUPPORT_LANE_GAP);
+    if (segment.a.y === segment.b.y) for (const sign of [-1, 1]) ysAround.add(segment.a.y + sign * FLOW_SUPPORT_LANE_GAP);
   }
   const corridors = [
     ...[...xsAround].map(x => simplify([start, { x, y: start.y }, { x, y: end.y }, end])),
@@ -94,7 +103,7 @@ function path(start: Point, end: Point, obstacles: Obstacle[], occupied: Segment
   const feasible: Point[][] = [];
   for (const points of corridors.slice(0, ROUTING_LIMITS.corridorCandidatesPerSearch)) {
     work.corridorCandidates++;
-    if (!segments(points).some(segment => obstacles.some(box => segmentIntersects(segment.a, segment.b, box, box.clearance)))) feasible.push(points);
+    if (!segments(points).some(segment => blocked(segment.a, segment.b))) feasible.push(points);
   }
   if (feasible.length) return feasible.sort((a, b) => pathScore(a, occupied) - pathScore(b, occupied))[0];
   const margin = 12;
@@ -103,7 +112,8 @@ function path(start: Point, end: Point, obstacles: Obstacle[], occupied: Segment
     const values = [0, bounds[size], start[axis], end[axis]];
     for (const box of obstacles) values.push(Math.max(0, box[axis] - box.clearance - 2), box[axis] + box[size] + box.clearance + 2);
     for (const segment of occupied) if (segment.a[axis] === segment.b[axis]) values.push(Math.max(0, segment.a[axis] - margin), segment.a[axis], segment.a[axis] + margin);
-    return [...new Set(values)].sort((a, b) => a - b);
+    for (const segment of constraint?.parallel ?? []) if (segment.a[axis] === segment.b[axis]) values.push(Math.max(0, segment.a[axis] - FLOW_SUPPORT_LANE_GAP), segment.a[axis] + FLOW_SUPPORT_LANE_GAP);
+    return [...new Set(values)].filter(value => axis !== 'y' || inside({ x: 0, y: value }, constraint)).sort((a, b) => a - b);
   };
   const xs = axes('x'), ys = axes('y'), rows = ys.length;
   const point = (id: number): Point => ({ x: xs[Math.floor(id / rows)], y: ys[id % rows] });
@@ -112,7 +122,7 @@ function path(start: Point, end: Point, obstacles: Obstacle[], occupied: Segment
   if (count > ROUTING_LIMITS.gridStatesPerSearch) { work.cappedSearches++; throw new Error('Orthogonal route grid reached its deterministic state limit'); }
   work.maxGridStates = Math.max(work.maxGridStates, count);
   const distances = new Float64Array(count).fill(Infinity), previous = new Int32Array(count).fill(-1);
-  const queue = new MinHeap(), blocked = new Map<number, boolean>();
+  const queue = new MinHeap(), blockedGrid = new Map<number, boolean>();
   for (let heading = 0; heading < 2; heading++) {
     const state = first * 2 + heading;
     distances[state] = 0; queue.push({ state, cost: 0, estimate: length(start, end) });
@@ -135,9 +145,9 @@ function path(start: Point, end: Point, obstacles: Obstacle[], occupied: Segment
       const neighbor = next[i];
       if (neighbor < 0) continue;
       const b = point(neighbor), key = Math.min(id, neighbor) * count + Math.max(id, neighbor);
-      let collision = blocked.get(key);
+      let collision = blockedGrid.get(key);
       if (collision === undefined) {
-        collision = obstacles.some(box => segmentIntersects(a, b, box, box.clearance)); blocked.set(key, collision);
+        collision = blocked(a, b); blockedGrid.set(key, collision);
       }
       if (collision) continue;
       const nextHeading = i < 2 ? 0 : 1, state = neighbor * 2 + nextHeading;
@@ -168,8 +178,8 @@ export function routeCompact(model: Architecture, nodes: PlacedNode[], measureme
     return false;
   };
   const allocator = endpointAllocator(model, nodes);
-  const portZones: Rect[] = model.flow ? [] : model.edges.flatMap(edge => allocator.alternatives(edge).flatMap(({ source, target }) => [source, target].map(portZone)));
-  const plannedPorts = model.edges.filter(edge => allocator.policies.has(edge.id)).map(edge => ({ id: edge.id, pair: allocator.alternatives(edge)[0] }));
+  const portZones: Rect[] = model.flow ? [] : model.edges.flatMap(edge => allocator.alternatives(edge).flatMap(({ source, target }) => [source, target].map(endpoint => portZone(endpoint))));
+  const plannedPorts = model.edges.filter(edge => allocator.policies.has(edge.id)).map(edge => ({ id: edge.id, pair: allocator.alternatives(edge)[0], policy: allocator.policies.get(edge.id) }));
   const primaryIds = new Set(model.edges.filter(edge => allocator.policies.get(edge.id)?.kind === 'primary').flatMap(edge => [edge.from, edge.to]));
   const primaryBottom = Math.max(0, ...nodes.filter(node => primaryIds.has(node.id)).map(node => node.absY + node.height));
   const returnLabelHeight = Math.max(0, ...model.edges.filter(edge => allocator.policies.get(edge.id)?.kind === 'return').map(edge => measurements.labels[edge.id]?.height ?? 0));
@@ -186,7 +196,9 @@ export function routeCompact(model: Architecture, nodes: PlacedNode[], measureme
     if (policy.kind === 'primary') return points.every(point => point.y >= Math.min(route.sourcePort.y, route.targetPort.y) - T.tolerance && point.y <= Math.max(route.sourcePort.y, route.targetPort.y) + T.tolerance)
       && points.slice(1).every((point, index) => point.x >= points[index].x - T.tolerance)
       && (!route.label || route.label.x >= source.absX + source.width + T.edgeClearance - T.tolerance && route.label.x + route.label.width <= target.absX - T.edgeClearance + T.tolerance);
-    if (policy.kind === 'support') return points.every(point => model.flow!.supportSide === 'above' ? point.y <= source.absY + T.tolerance : point.y >= source.absY + source.height - T.tolerance);
+    if (policy.kind === 'support') return points.every(point => model.flow!.supportSide === 'above' ? point.y <= source.absY + T.tolerance : point.y >= source.absY + source.height - T.tolerance)
+      && (!route.label || (model.flow!.supportSide === 'above' ? route.label.y + route.label.height <= source.absY + T.tolerance : route.label.y >= source.absY + source.height - T.tolerance))
+      && !routed.filter(value => allocator.policies.get(value.id)?.kind === 'support').some(value => value.sections.some(section => segments(section.points).some(other => segments(points).some(segment => parallelFlowCorridor(segment.a, segment.b, other.a, other.b)))));
     const axis = returnAxis(route);
     return axis !== undefined && axis > primaryBottom + T.edgeClearance && points.every(point => point.y >= Math.min(route.sourcePort.y, route.targetPort.y) - T.tolerance)
       && route.sections.flatMap(section => segments(section.points)).filter(segment => segment.a.y === segment.b.y && segment.a.x > segment.b.x).every(segment => segment.a.y > primaryBottom + T.edgeClearance)
@@ -207,8 +219,10 @@ export function routeCompact(model: Architecture, nodes: PlacedNode[], measureme
   for (const edge of order) {
     const obstacles = obstaclesFor(edge), occupied = routed.flatMap(route => route.sections.flatMap(section => segments(section.points)));
     // Labels may cover their own path; other committed or policy approaches remain reserved.
-    const labelPortZones = model.flow ? [...routed.flatMap(route => [route.sourcePort, route.targetPort].map(portZone)),
-      ...plannedPorts.filter(value => value.id !== edge.id && !routed.some(route => route.id === value.id)).flatMap(value => [value.pair.source, value.pair.target].map(portZone))] : portZones;
+    const labelPortZones = model.flow ? [...routed.flatMap(route => {
+      const policy = allocator.policies.get(route.id), preferred = policy && route.sourcePort.side === policy.sourceSide && route.targetPort.side === policy.targetSide;
+      return [route.sourcePort, route.targetPort].map(endpoint => portZone(endpoint, preferred ? policy : undefined));
+    }), ...plannedPorts.filter(value => value.id !== edge.id && !routed.some(route => route.id === value.id)).flatMap(value => [value.pair.source, value.pair.target].map(endpoint => portZone(endpoint, value.policy)))] : portZones;
     const policy = allocator.policies.get(edge.id);
     let chosen: { route: Route; score: number; lane: boolean } | undefined, rejected = 0;
     const failures: string[] = [];
@@ -216,17 +230,22 @@ export function routeCompact(model: Architecture, nodes: PlacedNode[], measureme
     for (const { source: sourcePort, target: targetPort } of pairs) {
       work.endpointCandidates++;
       try {
-        const start = endpointStub(sourcePort), end = endpointStub(targetPort);
+        const supporting = policy?.kind === 'support' && sourcePort.side === policy.sourceSide && targetPort.side === policy.targetSide;
+        const constraint: PathConstraint | undefined = supporting ? { side: model.flow!.supportSide, boundary: byId.get(edge.from)!.absY + (model.flow!.supportSide === 'below' ? byId.get(edge.from)!.height : 0),
+          parallel: routed.filter(route => allocator.policies.get(route.id)?.kind === 'support').flatMap(route => route.sections.flatMap(section => segments(section.points))) } : undefined;
+        const stubLength = supporting ? flowStubLength(policy) : undefined;
+        const start = endpointStub(sourcePort, stubLength), end = endpointStub(targetPort, stubLength);
         const lowerBound = length(sourcePort, targetPort);
         if (chosen && lowerBound >= chosen.score && (!policy || chosen.lane)) continue;
         if (obstacles.some(box => segmentIntersects(sourcePort, start, box, box.clearance) || segmentIntersects(end, targetPort, box, box.clearance))) throw new Error('Endpoint approach is obstructed');
+        if (parallelBlocked(sourcePort, start, constraint) || parallelBlocked(end, targetPort, constraint)) throw new Error('Support endpoint approach merges with an earlier call');
         const preferred = policy?.kind === 'return' && sourcePort.side === policy.sourceSide && targetPort.side === policy.targetSide
           ? [start, { x: start.x, y: returnLane(policy) }, { x: end.x, y: returnLane(policy) }, end] : undefined;
-        let middle = path(start, end, obstacles, occupied, bounds, work, preferred);
+        let middle = path(start, end, obstacles, occupied, bounds, work, preferred, constraint);
         let label: Route['label'];
         if (edge.label) {
           const size = measurements.labels[edge.id];
-          const free = (box: Rect) => box.x >= 0 && box.y >= 0 && !obstacles.some(obstacle => overlap(box, obstacle, obstacle.clearance)) && !labelPortZones.some(zone => overlap(box, zone, 4)) && !occupied.some(segment => segmentIntersects(segment.a, segment.b, box, 4));
+          const free = (box: Rect) => box.x >= 0 && box.y >= 0 && inside(box, constraint) && inside({ x: box.x, y: box.y + box.height }, constraint) && !obstacles.some(obstacle => overlap(box, obstacle, obstacle.clearance)) && !labelPortZones.some(zone => overlap(box, zone, 4)) && !occupied.some(segment => segmentIntersects(segment.a, segment.b, box, 4));
           let placement = labelPositions(middle, size).find(free);
           if (!placement) {
             const center = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
@@ -243,12 +262,12 @@ export function routeCompact(model: Architecture, nodes: PlacedNode[], measureme
             for (const candidate of alternatives.slice(0, ROUTING_LIMITS.labelAlternativesPerPair)) {
               work.labelAlternatives++;
               const left = { x: candidate.x - 10, y: candidate.y + size.height / 2 }, right = { x: candidate.x + size.width + 10, y: left.y };
-              if (obstacles.some(box => segmentIntersects(left, right, box, box.clearance))) continue;
+              if (parallelBlocked(left, right, constraint) || obstacles.some(box => segmentIntersects(left, right, box, box.clearance))) continue;
               const [before, after] = start.x <= end.x ? [left, right] : [right, left];
               try {
                 const reserved = [...obstacles, { ...candidate, clearance: 6 }];
-                const first = path(start, before, reserved, occupied, bounds, work);
-                const last = path(after, end, reserved, [...occupied, ...segments(first)], bounds, work);
+                const first = path(start, before, reserved, occupied, bounds, work, undefined, constraint);
+                const last = path(after, end, reserved, [...occupied, ...segments(first)], bounds, work, undefined, constraint);
                 middle = [...first, after, ...last.slice(1)]; placement = candidate; break;
               } catch { /* Another bounded label position may have a reachable approach. */ }
             }

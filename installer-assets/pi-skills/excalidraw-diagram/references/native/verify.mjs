@@ -12,9 +12,10 @@ const root = dirname(fileURLToPath(import.meta.url));
 const { values, positionals } = parseArgs({ allowPositionals: true, options: {
   'output-dir': { type: 'string' }, output: { type: 'string' }, 'edit-id': { type: 'string' },
   sdk: { type: 'string', default: 'pinned' }, scale: { type: 'string', default: '2' }, width: { type: 'string', default: '1440' },
+  presentation: { type: 'boolean', default: false },
 } });
 if (positionals.length !== 1 || !values['output-dir'] || !['pinned', 'stable'].includes(values.sdk)) {
-  throw new Error('Usage: node verify.mjs INPUT --output-dir DIR [--edit-id ID] [--sdk pinned|stable]');
+  throw new Error('Usage: node verify.mjs INPUT --output-dir DIR [--edit-id ID] [--sdk pinned|stable] [--presentation]');
 }
 const input = resolve(positionals[0]);
 const output = resolve(values['output-dir']);
@@ -39,7 +40,10 @@ const report = { input, inputSha256: createHash('sha256').update(raw).digest('he
   editor: { package: metadata.name, version: metadata.version, sourceRevision: values.sdk === 'pinned' ? '17d8904f734464847bcef638b636647b85ac1a1d' : null },
   runtime: { node: process.version, platform: process.platform, lockSha256: createHash('sha256').update(lockBytes).digest('hex'),
     sdkIntegrity: lock.packages[`node_modules/${sdkPackage}`].integrity },
-  structural: 'pending', nativeEditability: 'fail', sourceFidelity: 'unassessed', visual: 'unassessed', errors: [], browserErrors: [] };
+  structural: 'pending', nativeEditability: 'fail', verification: 'fail', labelVisibility: 'pending', visibilityErrors: [],
+  presentationRequested: values.presentation, presentationTargets: { componentTextPx: 14, relationshipTextPx: 11 },
+  presentationReadability: values.presentation ? 'missing' : 'not-applicable', presentationFailures: [],
+  sourceFidelity: 'unassessed', visual: 'unassessed', errors: [], browserErrors: [] };
 const byId = data => new Map(data.elements.map(element => [element.id, element]));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 function checkPreserved(before, after, stage) {
@@ -56,6 +60,34 @@ function checkPreserved(before, after, stage) {
       }
     }
   }
+}
+
+function observeExport(exported, stage) {
+  for (const check of exported.labelVisibilityChecks) if (check.status !== 'pass') {
+    const measured = Number.isFinite(check.clearance) ? check.clearance.toFixed(2) : 'unavailable';
+    report.visibilityErrors.push(`${stage}: arrow ${check.arrowId}, label ${check.labelId}: native head/shaft clearance ${measured} scene units${check.error ? ` (${check.error})` : ''}; reserve a clear labelled segment`);
+  }
+  return [{ width: 1280, height: 720 }, { width: 1440, height: 900 }].map(viewport => {
+    const scale = Math.min(viewport.width * .9 / exported.viewBox.width, viewport.height * .9 / exported.viewBox.height);
+    const result = { viewport, scale, viewBox: exported.viewBox };
+    for (const [role, metric] of [['component', 'componentTextPx'], ['relationship', 'relationshipTextPx'], ['unbound', 'unboundTextPx']]) {
+      const expected = exported.typography.filter(text => text.role === role);
+      const measured = expected.filter(text => Number.isFinite(text.fontSize) && text.fontSize > 0 && Number.isFinite(scale) && scale > 0);
+      const sizes = measured.map(text => text.fontSize * scale);
+      result[metric] = { expected: expected.length, count: measured.length, minimum: sizes.length ? Math.min(...sizes) : null,
+        maximum: sizes.length ? Math.max(...sizes) : null, missingIds: expected.filter(text => !measured.includes(text)).map(text => text.id) };
+      const target = report.presentationTargets[metric];
+      if (values.presentation && role === 'component' && !expected.length) {
+        report.presentationFailures.push({ stage, viewport, metric, target, ids: [], count: 0,
+          unclassifiedTextIds: exported.typography.filter(text => text.role === 'unbound').map(text => text.id),
+          reason: 'Requested per-flow presentation has no classifiable bound component-text observations' });
+      } else if (values.presentation && target && expected.length) {
+        const ids = expected.filter(text => !measured.includes(text) || text.fontSize * scale < target).map(text => text.id);
+        if (ids.length) report.presentationFailures.push({ stage, viewport, metric, target, ids, ...result[metric] });
+      }
+    }
+    return result;
+  });
 }
 let python;
 const guard = data => {
@@ -101,6 +133,10 @@ try {
   if (values.output) await writeFile(resolve(values.output), Buffer.from(exported.png, 'base64'));
   report.exportLabels = exported.labels;
   report.labelChecks = exported.labelChecks;
+  report.renderCompleted = true;
+  report.labelVisibilityChecks = exported.labelVisibilityChecks;
+  report.typography = exported.typography;
+  report.fittedTypography = observeExport(exported, 'export');
   for (const check of exported.labelChecks) if (check.error || check.errorDistance > 1.5) report.errors.push(`export: ${check.id}.labelPosition differs from native path (${check.error || check.errorDistance})`);
   await page.screenshot({ path: resolve(output, 'editor.png') });
   const editId = values['edit-id'] || imported.elements.find(element => element.type !== 'arrow' && element.type !== 'text'
@@ -131,11 +167,16 @@ try {
     await page.screenshot({ path: resolve(output, 'edited-editor.png') });
     report.editedExportLabels = changedExport.labels;
     report.editedLabelChecks = changedExport.labelChecks;
+    report.editedLabelVisibilityChecks = changedExport.labelVisibilityChecks;
+    report.editedTypography = changedExport.typography;
+    report.editedFittedTypography = observeExport(changedExport, 'edited export');
     for (const check of changedExport.labelChecks) if (check.error || check.errorDistance > 1.5) report.errors.push(`edited export: ${check.id}.labelPosition differs from native path (${check.error || check.errorDistance})`);
   }
   if (report.browserErrors.length) report.errors.push('Native editor raised browser errors');
   report.nativeEditability = report.errors.length ? 'fail' : hasArrows ? 'pass' : 'not-applicable';
-  report.verification = report.errors.length ? 'fail' : 'pass';
+  report.labelVisibility = report.visibilityErrors.length ? 'fail' : report.labelVisibilityChecks.length ? 'pass' : 'not-applicable';
+  report.presentationReadability = !values.presentation ? 'not-applicable' : report.presentationFailures.length ? 'fail' : 'pass';
+  report.verification = report.errors.length || report.visibilityErrors.length || report.presentationFailures.length ? 'fail' : 'pass';
 } catch (error) {
   report.errors.push(error.message);
 } finally {
@@ -143,5 +184,7 @@ try {
   await server?.close();
   await writeFile(resolve(output, 'verification.json'), JSON.stringify(report, null, 2) + '\n');
 }
-console.log(JSON.stringify({ report: resolve(output, 'verification.json'), nativeEditability: report.nativeEditability, errors: report.errors }));
+console.log(JSON.stringify({ report: resolve(output, 'verification.json'), nativeEditability: report.nativeEditability,
+  labelVisibility: report.labelVisibility, visibilityErrors: report.visibilityErrors, presentationReadability: report.presentationReadability,
+  presentationFailures: report.presentationFailures, errors: report.errors }));
 process.exitCode = report.verification === 'pass' ? 0 : 1;

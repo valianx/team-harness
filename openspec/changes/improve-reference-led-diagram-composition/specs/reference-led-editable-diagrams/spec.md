@@ -36,6 +36,8 @@ Connections SHALL use native editable arrow elements, including native elbows wh
 
 Delivery SHALL include the native editable scene and faithful exports assessed against the scene recovered from an actual identified editor. Editor/renderer dependencies SHALL have an explicit reproducible identity and demonstrate support for scene fields affecting bindings, elbows and label placement. Structural, native-editability, visual and source-fidelity assessments SHALL remain separate. An exporter that ignores relevant fields SHALL NOT certify the editable scene from its PNG alone; unavailable or failing required verification SHALL remain explicit and prevent a successful-completion claim.
 
+Verification SHALL retain connection-visibility observations independently of label-position fidelity: a correctly positioned bound label SHALL NOT conceal its connection and direction. Per-flow presentation review SHALL use actual fitted text observations rather than source font sizes alone. Prerequisite validation repairs SHALL be bounded separately; a rejected preflight without a native render SHALL NOT consume a visual corrective cycle.
+
 #### Scenario: Exporter and editor differ on a supported label field
 - **WHEN** a scene's bound-label position changes during import or export
 - **THEN** the mismatch is retained as a failing compatibility observation until a compatible verified editor/export path preserves the approved result
@@ -43,3 +45,11 @@ Delivery SHALL include the native editable scene and faithful exports assessed a
 #### Scenario: Native editing and export succeed
 - **WHEN** the scene is imported, recovered and exercised through the selected editor with fonts ready
 - **THEN** the delivered editable file and SVG/PNG retain the assessed components, connections and label placement with editor/renderer identities and evidence recorded
+
+#### Scenario: A bound label masks a short connection
+- **WHEN** the recovered editor/export places a bound label correctly but its native mask conceals a connection or its arrowhead
+- **THEN** verification retains a failing visibility observation for the affected connection and the workflow reserves enough measured clearance without shrinking text or flattening the editable arrow
+
+#### Scenario: Prerequisite failure produces no native render
+- **WHEN** bounded preflight rejects a scene before a native render is available
+- **THEN** the workflow repairs prerequisites within its separate bound or reports the failure, and starts visual composition assessment from the first actual rendered revision

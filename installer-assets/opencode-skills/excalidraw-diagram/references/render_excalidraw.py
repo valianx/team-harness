@@ -164,7 +164,7 @@ def revise_scene(path: Path, patch: dict, expected_sha256: str, backup_dir: Path
 
 
 def render(excalidraw_path: Path, output_path: Path | None = None, scale: int = 2,
-           max_width: int = 1920, edit_id: str | None = None) -> Path:
+           max_width: int = 1920, edit_id: str | None = None, presentation: bool = False) -> Path:
     """Verify through the identified native editor before returning its requested PNG."""
     data = json.loads(excalidraw_path.read_text(encoding="utf-8"))
     errors = validate_excalidraw(data)
@@ -177,6 +177,8 @@ def render(excalidraw_path: Path, output_path: Path | None = None, scale: int = 
                "--output", str(output_path.resolve()), "--scale", str(scale), "--width", str(max_width)]
     if edit_id:
         command.extend(["--edit-id", edit_id])
+    if presentation:
+        command.append("--presentation")
     subprocess.run(command, cwd=native, check=True)
     return output_path
 
@@ -188,6 +190,7 @@ def main() -> None:
     parser.add_argument("--scale", "-s", type=int, default=2)
     parser.add_argument("--width", "-w", type=int, default=1920)
     parser.add_argument("--edit-id")
+    parser.add_argument("--presentation", action="store_true")
     parser.add_argument("--validate-only", action="store_true")
     parser.add_argument("--patch", type=Path)
     parser.add_argument("--expected-sha256")
@@ -204,7 +207,7 @@ def main() -> None:
             print(json.dumps(result))
             raise SystemExit(bool(errors))
         else:
-            result = {"png": str(render(args.input, args.output, args.scale, args.width, args.edit_id))}
+            result = {"png": str(render(args.input, args.output, args.scale, args.width, args.edit_id, args.presentation))}
         print(json.dumps(result))
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"ERROR: {error}\n")

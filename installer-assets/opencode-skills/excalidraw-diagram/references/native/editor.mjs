@@ -53,6 +53,93 @@ window.getDragPoint = id => {
   return sdk.sceneCoordsToViewportCoords({ sceneX: element.x + element.width / 2, sceneY: element.y + element.height / 2 }, api.getAppState());
 };
 
+// Native SVG head footprints include stroke clearance; the intended shaft cutout is allowed.
+function footprint(svg, element) {
+  const box = element.getBBox(), style = getComputedStyle(element);
+  const inset = style.stroke === 'none' ? 0 : parseFloat(style.strokeWidth) / 2;
+  const matrix = svg.getCTM().inverse().multiply(element.getCTM());
+  return [[box.x - inset, box.y - inset], [box.x + box.width + inset, box.y - inset],
+    [box.x + box.width + inset, box.y + box.height + inset], [box.x - inset, box.y + box.height + inset]]
+    .map(([x, y]) => { const point = new DOMPoint(x, y).matrixTransform(matrix); return { x: point.x, y: point.y }; });
+}
+
+function clearance(a, b) {
+  let gap = -Infinity, overlap = Infinity;
+  for (const polygon of [a, b]) for (let index = 0; index < polygon.length; index++) {
+    const p = polygon[index], q = polygon[(index + 1) % polygon.length], length = Math.hypot(q.x - p.x, q.y - p.y);
+    if (!length) continue;
+    const project = points => points.map(point => ((q.y - p.y) * point.x - (q.x - p.x) * point.y) / length);
+    const pa = project(a), pb = project(b);
+    gap = Math.max(gap, Math.min(...pb) - Math.max(...pa), Math.min(...pa) - Math.max(...pb));
+    overlap = Math.min(overlap, Math.min(Math.max(...pa), Math.max(...pb)) - Math.max(Math.min(...pa), Math.min(...pb)));
+  }
+  return gap > 0 ? gap : -overlap;
+}
+
+function contains(polygon, point) {
+  const crosses = polygon.map((p, index) => { const q = polygon[(index + 1) % polygon.length]; return (q.x - p.x) * (point.y - p.y) - (q.y - p.y) * (point.x - p.x); });
+  return crosses.every(value => value >= 0) || crosses.every(value => value <= 0);
+}
+
+function observeLabelVisibility(svg, elements) {
+  const selector = 'path, polygon, polyline, line, circle, ellipse, rect';
+  const primitives = element => element.matches(selector) ? [element] : [...element.querySelectorAll(selector)];
+  return elements.filter(element => element.type === 'arrow').flatMap(arrow => {
+    const label = elements.find(element => element.type === 'text' && element.containerId === arrow.id);
+    if (!label) return [];
+    const base = { arrowId: arrow.id, labelId: label.id };
+    try {
+      const mask = document.getElementById(`mask-${arrow.id}`);
+      const paint = [...svg.querySelectorAll('[mask]')].find(element => element.getAttribute('mask') === `url(#mask-${arrow.id})`);
+      const rectangles = [...(mask?.querySelectorAll('rect') || [])].filter(rect => getComputedStyle(rect).fill === 'rgb(0, 0, 0)' && Number(getComputedStyle(rect).opacity) > 0);
+      if (!paint?.firstElementChild || mask?.getAttribute('maskUnits') !== 'userSpaceOnUse' || !rectangles.length) {
+        return [{ ...base, status: 'fail', clearance: null, error: 'Native label-mask geometry is unavailable' }];
+      }
+      const masks = rectangles.map(rect => footprint(svg, rect));
+      // The pinned native exporter paints the shaft first, followed by its head primitives.
+      const body = primitives(paint.firstElementChild).map(element => footprint(svg, element));
+      const heads = [...paint.children].slice(1).flatMap(primitives).map(element => footprint(svg, element));
+      const headClearances = heads.map(head => Math.min(...masks.map(mask => clearance(head, mask))));
+      const shaftFullyMasked = body.length > 0 && body.every(path => masks.some(mask => path.every(point => contains(mask, point))));
+      const missingHead = (arrow.startArrowhead || arrow.endArrowhead) && !heads.length;
+      const minimum = headClearances.length ? Math.min(...headClearances) : null;
+      const failed = missingHead || shaftFullyMasked || headClearances.some(value => !Number.isFinite(value) || value <= 0);
+      return [{ ...base, status: failed ? 'fail' : 'pass', clearance: minimum, headClearances, headFootprints: heads,
+        labelMaskFootprints: masks, shaftFullyMasked, ...(missingHead ? { error: 'Native arrowhead geometry is unavailable' } : {}) }];
+    } catch (error) {
+      return [{ ...base, status: 'fail', clearance: null, error: `Native label-mask measurement failed: ${error.message}` }];
+    }
+  });
+}
+
+function observeTypography(svg, elements) {
+  const directText = group => [...group.children].filter(child => child.localName === 'text');
+  const groups = [...svg.querySelectorAll('g')].filter(group => directText(group).length);
+  const fontSizes = group => directText(group).map(text => {
+    const matrix = svg.getCTM().inverse().multiply(text.getCTM());
+    return parseFloat(text.getAttribute('font-size')) * Math.hypot(matrix.a, matrix.b);
+  });
+  return elements.filter(element => element.type === 'text').map(element => {
+    const container = elements.find(value => value.id === element.containerId);
+    const role = container?.type === 'arrow' ? 'relationship' : container ? 'component' : 'unbound';
+    try {
+      let group;
+      if (role === 'relationship') group = document.getElementById(`mask-${container.id}`)?.nextElementSibling;
+      else {
+        const matching = groups.filter(group => directText(group).map(text => text.textContent).join('\n') === element.text);
+        // Size only disambiguates duplicate text; missing SVG measurements never use the scene value.
+        group = matching.length === 1 ? matching[0] : matching.find(group => fontSizes(group).every(size => Math.abs(size - element.fontSize) < .001));
+      }
+      const sizes = group ? fontSizes(group) : [];
+      const measured = sizes.length > 0 && sizes.every(size => Number.isFinite(size) && size > 0);
+      return { id: element.id, role, text: element.text, fontSize: measured ? Math.min(...sizes) : null,
+        ...(measured ? {} : { error: 'Actual native SVG font geometry is unavailable' }) };
+    } catch (error) {
+      return { id: element.id, role, text: element.text, fontSize: null, error: `Native font measurement failed: ${error.message}` };
+    }
+  });
+}
+
 window.exportScene = async scale => {
   const elements = api.getSceneElements();
   if (sdk.Fonts) await sdk.Fonts.loadElementsFonts(elements);
@@ -99,7 +186,8 @@ window.exportScene = async scale => {
     const actual = center.matrixTransform(group.getCTM());
     return { id: label.id, expected, actual: { x: actual.x, y: actual.y }, errorDistance: Math.hypot(actual.x - expected.x, actual.y - expected.y) };
   }).filter(Boolean);
-  return { svg: svg.outerHTML, png, labels, labelChecks };
+  return { svg: svg.outerHTML, png, labels, labelChecks, labelVisibilityChecks: observeLabelVisibility(svg, elements),
+    typography: observeTypography(svg, elements), viewBox: { width: svg.viewBox.baseVal.width, height: svg.viewBox.baseVal.height } };
 };
 
 window.__nativeReady = true;
