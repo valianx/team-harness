@@ -43,7 +43,7 @@ Files: maintained synthetic cases and CI, generated `runtime/` projections, rele
 
 Files: external trial bundles and consumer outputs only. Freeze source/candidate hashes and the literal prompt using `./output` in separate working directories. Retain both original outcomes and native time/usage observations; assess actual editor/static outputs at both viewports before OpenSpec implementation verification.
 
-- [ ] 4.1 Freeze the reviewed source/reference bundle, minimal identical prompt, candidate commit/tree, skill snapshot and two separate consumer directories; retain runtime/model/effort identities and the selected case.
+- [x] 4.1 Freeze the reviewed source/reference bundle, minimal identical prompt, candidate commit/tree, skill snapshot and two separate consumer directories; retain runtime/model/effort identities and the selected case.
 - [ ] 4.2 Run exactly two fresh agents once each against those identical inputs, without inherited conversation, coordinator feedback, hidden rescue/restart or access to the other output; preserve actual usage/time and any failure or clarification request.
 - [ ] 4.3 Assess both completed outputs against the same source facts and approved visual reference, inspect native editor and actual static browser output, and report fidelity, editability, readability, routing, controls and autonomous self-correction separately.
 - [ ] 4.4 Verify the implementation against the ten changed/added requirements, acceptance scenarios and design using the current evidence; retain original trial outcomes and unresolved limits before PR preparation.

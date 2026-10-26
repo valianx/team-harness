@@ -139,9 +139,9 @@ def revise_scene(path: Path, patch: dict, expected_sha256: str, backup_dir: Path
     if errors:
         raise ValueError("; ".join(errors))
     payload = (json.dumps(revised, indent=2, ensure_ascii=False, allow_nan=False) + "\n").encode()
-    backup_dir.mkdir(parents=True, exist_ok=True)
+    backup_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     backup = backup_dir / f"{path.name}.{digest}.{secrets.token_hex(4)}.bak"
-    with backup.open("xb") as handle:
+    with os.fdopen(os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as handle:
         handle.write(original)
         handle.flush()
         os.fsync(handle.fileno())

@@ -175,7 +175,8 @@ prepare and run its locked official editor in that copy:
 ```bash
 npm ci --prefix /absolute/workspace/excalidraw/native
 npm exec --prefix /absolute/workspace/excalidraw/native -- playwright install chromium
-NATIVE_EVIDENCE_DIR=/absolute/workspace/native-evidence npm --prefix /absolute/workspace/excalidraw/native test
+npm --prefix /absolute/workspace/excalidraw/native test
+NATIVE_EVIDENCE_DIR=/absolute/workspace/native-evidence npm --prefix /absolute/workspace/excalidraw/native run test:browser
 ```
 
 This checks actual import, recovery, bound editing and exports against the pinned

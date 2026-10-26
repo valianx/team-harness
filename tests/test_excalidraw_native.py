@@ -89,6 +89,25 @@ class SceneIntegrityTests(unittest.TestCase):
 
 
 class SafeRevisionTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "posix", "POSIX permission bits are required")
+    def test_backup_keeps_private_scene_inaccessible_to_other_users(self):
+        with tempfile.TemporaryDirectory() as directory:
+            approved = Path(directory) / "approved.excalidraw"
+            original = json.dumps(scene()).encode()
+            approved.write_bytes(original)
+            approved.chmod(0o600)
+            backups = Path(directory) / "backups"
+            previous_umask = os.umask(0o022)
+            try:
+                receipt = renderer.revise_scene(approved, {"updates": []},
+                                                hashlib.sha256(original).hexdigest(), backups)
+            finally:
+                os.umask(previous_umask)
+            self.assertEqual(Path(receipt["backup"]).read_bytes(), original)
+            self.assertEqual(Path(receipt["backup"]).stat().st_mode & 0o777, 0o600)
+            self.assertEqual(backups.stat().st_mode & 0o777, 0o700)
+            self.assertEqual(approved.stat().st_mode & 0o777, 0o600)
+
     def test_cli_reads_utf8_patch_independently_of_host_locale(self):
         with tempfile.TemporaryDirectory() as directory:
             approved = Path(directory) / "approved.excalidraw"

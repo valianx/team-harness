@@ -162,8 +162,10 @@ jobs:
         run: npm ci --prefix "$NATIVE_TOOL_DIR/native" --no-audit --no-fund
       - name: Provision Chromium explicitly
         run: npm exec --prefix "$NATIVE_TOOL_DIR/native" -- playwright install --with-deps chromium
-      - name: Verify actual native editing and faithful exports
+      - name: Verify portable interpreter discovery
         run: npm --prefix "$NATIVE_TOOL_DIR/native" test
+      - name: Verify actual native editing and faithful exports
+        run: npm --prefix "$NATIVE_TOOL_DIR/native" run test:browser
       - name: Retain native scene, export and compatibility evidence
         if: always()
         uses: actions/upload-artifact@v4
