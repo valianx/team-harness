@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "runtime": "pi",
-  "version": "3.56.1",
+  "version": "3.57.0",
   "agents": [
     {
       "name": "adversary",
@@ -122,7 +122,7 @@
     },
     {
       "name": "diagrammer",
-      "description": "Generates Excalidraw diagrams from architect analysis. Invoked by the orchestrator after the architect produces a codebase analysis in research/00-research.md. Reads the analysis, follows the excalidraw-diagram skill methodology, generates the .excalidraw JSON section-by-section, runs a render-validate loop until the diagram passes quality checks, and reports back. Does NOT analyze codebases, write code, tests, or documentation.",
+      "description": "Creates and revises native Excalidraw diagrams from supplied analysis, documents, images and approved scenes, preserving source meaning and human edits while verifying native editing and visual quality.",
       "source": "agents/diagrammer.md",
       "prompt": "installer-assets/pi-agents/diagrammer.md",
       "model": "sonnet",

@@ -17,6 +17,24 @@ test('validates a minimal architecture and preserves relationship cycles', () =>
   assert.equal(parseModel(input).edges.length, 2);
 });
 
+test('schema one preserves neutral relationships and every supported interaction class', () => {
+  const neutral = parseModel(example());
+  assert.equal(neutral.edges[0].interaction, undefined);
+  for (const interaction of ['request', 'call', 'response', 'event', 'persistence'] as const) {
+    const input = example(); input.edges[0].interaction = interaction;
+    const parsed = parseModel(input);
+    assert.equal(parsed.edges[0].interaction, interaction);
+    assert.deepEqual(parsed.edges[0].evidence, neutral.edges[0].evidence);
+  }
+});
+
+test('interaction classes do not admit arbitrary style, coordinates or unknown values', () => {
+  for (const field of [{ interaction: 'rpc' }, { interaction: 'call', color: 'red' }, { interaction: 'event', x: 10 }]) {
+    const input = example(); Object.assign(input.edges[0], field);
+    assert.throws(() => parseModel(input), /edges\.0/);
+  }
+});
+
 test('rejects unsupported fields and reports their paths', () => {
   const input = example(); input.nodes[0].x = 123;
   assert.throws(() => parseModel(input), /nodes.*x/);

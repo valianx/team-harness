@@ -1,6 +1,9 @@
 
 Create an Excalidraw diagram that visually argues a concept, workflow, or architecture. Routes through the orchestrator which delegates to the excalidraw-diagram skill.
 
+Use supplied sources and scenes with [reference-led composition](../excalidraw-diagram/references/composition.md).
+Web reconstruction is optional; explicit engine choices retain their own workflow.
+
 ## Input
 
 $ARGUMENTS — describe what to diagram. Examples:

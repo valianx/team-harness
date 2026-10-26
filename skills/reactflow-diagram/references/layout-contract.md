@@ -15,6 +15,11 @@ measured minimum bounds.
 
 The adapter reserves port clearance below headers and refines obstructed segments
 against measured obstacles, preserving endpoints, sections and valid bends.
+Each relationship retains its own stable source/target endpoint identity, side
+and slot through both engines and rendered handles. Opposite directions and
+separate specialist calls use distinguishable attachments and lanes. Automatic
+composition retains bounded work/time and crossing, shared-segment, bend and
+length/detour observations; explicit modes compute only the requested engine.
 Choose and assess actual composition candidates through
 [composition-review.md](composition-review.md); a successful layout calculation
 does not establish that its fitted overview is useful.
@@ -45,6 +50,7 @@ DIAGRAM_EVIDENCE_DIR="/absolute/workspace/diagram-evidence" npm run test:browser
 
 Browser provisioning is a one-time environment step. A compatible installed
 Chromium can instead be selected with `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`.
+Default browser runs own their server and use consumer-local `test-results/`.
 Keep `DIAGRAM_EVIDENCE_DIR` outside distributed assets; retain diagnostics,
 screenshots and traces there. Report unavailable browser/system dependencies as
 missing coverage rather than marking the browser check passed. `npm run dev`

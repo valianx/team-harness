@@ -32,23 +32,15 @@ button:focus-visible, select:focus-visible, a:focus-visible, summary:focus-visib
 button, select { border-radius: 6px; }
 svg { flex: 0 0 auto; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
-.diagram-page { max-width: 1920px; padding: 28px 40px 18px; margin: 0 auto; }
-.page-heading { height: 38px; display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; }
-.kit-wordmark { display: flex; align-items: center; gap: 12px; text-decoration: none; color: #e8e9e3; font-size: 13px; font-weight: 500; letter-spacing: -.15px; }
-.wordmark-divider { color: #60746b; margin: 0 5px; }
-.wordmark-symbol { width: 19px; height: 21px; position: relative; display: block; }
-.wordmark-symbol i { width: 7px; height: 7px; position: absolute; border: 1px solid #78c9b4; border-radius: 1px; }
-.wordmark-symbol i:nth-child(1) { left: 0; top: 0; }
-.wordmark-symbol i:nth-child(2) { left: 12px; top: 7px; }
-.wordmark-symbol i:nth-child(3) { left: 0; top: 14px; }
-.wordmark-symbol::after { content: ''; position: absolute; top: 7px; left: 6px; width: 7px; height: 8px; border-top: 1px solid #78c9b4; border-bottom: 1px solid #78c9b4; }
-.page-caption { color: #8a9992; font-size: 11px; letter-spacing: .08em; padding-top: 3px; }
-.page-viewer { height: calc(100dvh - 148px); min-height: 490px; }
-.page-footnote { display: flex; justify-content: space-between; gap: 24px; padding-top: 18px; font-size: 11px; color: #8a9992; }
+.diagram-page { width: 100%; height: 100dvh; }
+.diagram-page > .architecture-viewer { border: 0; border-radius: 0; }
 .embedded-page { padding: 24px; min-height: 100dvh; }
 
 .architecture-viewer {
   --motion-duration: 180ms;
+  --interaction-request: #76b8ff; --interaction-call: #b4a1ed; --interaction-response: #9fc2c1;
+  --interaction-event: #e4bb6b; --interaction-persistence: #8fc4a7;
+  --interaction-response-dash: 7 4; --interaction-event-dash: 2 4;
   width: 100%; height: 100%; min-width: 0; min-height: 0; position: relative;
   display: flex; flex-direction: column; isolation: isolate;
   background: #191f20; border: 1px solid #39443f; border-radius: 12px;
@@ -96,7 +88,7 @@ svg { flex: 0 0 auto; }
 .component-queue .component-icon { color: #bfca9d; }
 .component-external { border-style: dashed; background: #232d30; border-color: #728184; }
 .component-external .component-icon { color: #b2bfb7; }
-.architecture-viewer .component-port { position: absolute; width: var(--port-size); height: var(--port-size); min-width: var(--port-size); min-height: var(--port-size); background: #799e8b; border: 1px solid #c0d0bf; border-radius: 50%; transform: translate(-50%, -50%); }
+.architecture-viewer .component-port { position: absolute; width: var(--port-size); height: var(--port-size); min-width: var(--port-size); min-height: var(--port-size); opacity: 0; pointer-events: none; transform: translate(-50%, -50%); }
 .architecture-viewer .group-frame { width: 100%; height: 100%; border: 1px solid #435356; border-radius: 12px; background: rgba(105,130,133,.045); pointer-events: none; }
 .group-header { width: var(--node-width); display: flex; align-items: flex-start; gap: 10px; padding: 0; color: #c3cecb; }
 .group-frame > .group-header { position: absolute; left: var(--group-inset); top: var(--group-inset); }
@@ -152,6 +144,8 @@ svg { flex: 0 0 auto; }
 .invalid-viewer h1 { font-size: 22px; font-weight: 500; margin: 12px 0 18px; }
 .invalid-viewer pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.65; color: #d2b694; max-height: 50%; overflow: auto; background: #2d2c23; border: 1px solid #62543d; padding: 18px; border-radius: 8px; }
 .invalid-viewer > p { font-size: 12px; color: #a6b396; }
+.fullscreen-error { position: absolute; z-index: 7; top: 24px; left: 24px; padding: 8px 12px; background: #342f26; color: #e1c69b; border: 1px solid #72634b; border-radius: 6px; font-size: 12px; }
+.architecture-viewer:fullscreen { width: 100%; height: 100%; border: 0; border-radius: 0; }
 
 .measurement-surface { position: fixed; top: 0; left: -100000px; width: 1200px; height: auto; visibility: hidden; pointer-events: none; z-index: -1; }
 .measurement-surface > [data-measure-node], .measurement-surface > [data-measure-header] { width: max-content; }
@@ -159,19 +153,12 @@ svg { flex: 0 0 auto; }
 .measurement-surface .measured-port { position: relative; display: block; left: 0; top: 0; transform: none; }
 
 @media (max-width: 1150px) {
-  .diagram-page { padding-left: 24px; padding-right: 24px; }
   .viewer-workarea.has-details { grid-template-columns: minmax(0,1fr) 280px; }
   .selection-details { padding: 18px 20px; }
 }
 @media (max-width: 820px) {
-  .diagram-page { padding: 18px 16px; }
-  .page-heading { margin-bottom: 10px; }
-  .page-viewer { height: calc(100dvh - 128px); min-height: 620px; }
-  .page-caption { display: none; }
   .viewer-workarea.has-details { grid-template-columns: minmax(0,1fr); grid-template-rows: minmax(260px,1fr) 240px; }
   .selection-details { border-left: 0; border-top: 1px solid #3a4c3f; }
-  .page-footnote { font-size: 10px; }
-  .page-footnote span:last-child { display: none; }
   .review-notes summary { padding-left: 18px; padding-right: 18px; }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -13,7 +13,7 @@ the starter's runtime validator rejects unsupported fields before layout.
 | Source | `id`, `title`, `locator`, `status: "read"` or `"unavailable"`, optional `material` |
 | Node | `id`, `kind`, `label`, optional `description` and `parent`, `evidence` |
 | Group | Node fields without `kind`; optional `parent` names another group |
-| Edge | `id`, `from`, `to`, optional `label` and `description`, `evidence` |
+| Edge | `id`, `from`, `to`, optional `label`, `description` and `interaction`, `evidence` |
 | Review | `unresolved: string[]`, `decisions: string[]`, optional `assessor` |
 | View | `id`, `label`, `nodeIds`, `edgeIds`, optional `outside` and `continuations` |
 | Step | `id`, `title`, optional `description`, `focus: string[]` |
@@ -24,6 +24,11 @@ source, view and step IDs are unique within their own collections. Use stable
 meaningful IDs so a correction changes a label or relationship without replacing
 unaffected entities. IDs start with a letter or digit and contain only letters,
 digits, periods, underscores and hyphens.
+
+Optional `interaction` uses `request` for the primary ingress/navigation/provider chain,
+`call` for supporting specialists, `response` for synchronous returns, `event` for
+asynchronous notifications and `persistence` for storage operations. Omission stays
+neutral; classify from source meaning independently of component colors.
 
 Every node, group and edge has evidence. The supported forms are:
 

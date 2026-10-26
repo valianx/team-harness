@@ -168,6 +168,21 @@ from `run-all.sh`. Reports, captures and meaningful content bounds remain in the
 external workspace; visual judgment complements these checks. Other browsers,
 live model authoring and host workflow activation are outside this evidence.
 
+Native Excalidraw verification has its own Chromium lane. Copy the entire
+`skills/excalidraw-diagram/references/` directory outside the installation, then
+prepare and run its locked official editor in that copy:
+
+```bash
+npm ci --prefix /absolute/workspace/excalidraw/native
+npm exec --prefix /absolute/workspace/excalidraw/native -- playwright install chromium
+NATIVE_EVIDENCE_DIR=/absolute/workspace/native-evidence npm --prefix /absolute/workspace/excalidraw/native test
+```
+
+This checks actual import, recovery, bound editing and exports against the pinned
+SDK and retains a stable-version incompatibility control. The default repository
+suite checks scene integrity, safe revision and interpreter discovery without a browser.
+Source fidelity and reference-based visual quality require their separate assessment.
+
 The architecture diagram starter has a separate Chromium lane. It copies the kit
 outside the installation and checks model/geometry invariants, actual rendered
 bounds/routes, relationship-label pointer targets, interactions and a production static server. Reproduce with a fresh

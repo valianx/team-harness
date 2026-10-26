@@ -1,27 +1,28 @@
 import { test, expect, type Page } from '@playwright/test';
+import { hideControls, revealBothControls, revealControls } from './control-helpers';
 
 const controls = '.viewer-toolbar, .viewer-footer, .canvas-context, .canvas-legend, .canvas-navigation, .view-context';
 
 async function ready(page: Page, fixture = 'sample') {
   await page.goto(`/?fixture=${fixture}`);
   await expect(page.locator('[data-layout-state="ready"]')).toBeVisible();
-  await page.mouse.move(0, 0);
+  await hideControls(page);
 }
 
-async function visibility(page: Page, opacity: '0' | '1') {
+async function visibility(page: Page, opacity: '0' | '1', bottom: '0' | '1' = opacity) {
   for (const selector of ['.viewer-toolbar', '.viewer-footer', '.canvas-context', '.canvas-legend', '.canvas-navigation']) {
     await expect(page.locator(selector)).toHaveCount(1);
   }
   const perspective = await page.getByRole('combobox', { name: 'Perspective' }).inputValue();
   await expect(page.locator('.view-context')).toHaveCount(perspective ? 1 : 0);
-  for (const element of await page.locator(controls).all()) await expect(element).toHaveCSS('opacity', opacity);
+  for (const element of await page.locator('.viewer-chrome-top').locator(controls).all()) await expect(element).toHaveCSS('opacity', opacity);
+  for (const element of await page.locator('.viewer-chrome-bottom').locator(controls).all()) await expect(element).toHaveCSS('opacity', bottom);
   await expect(page.locator('.viewer-toolbar')).toHaveCSS('pointer-events', opacity === '0' ? 'none' : 'auto');
-  await expect(page.locator('.canvas-navigation')).toHaveCSS('pointer-events', opacity === '0' ? 'none' : 'auto');
+  await expect(page.locator('.canvas-navigation')).toHaveCSS('pointer-events', bottom === '0' ? 'none' : 'auto');
 }
 
 async function reveal(page: Page) {
-  const box = await page.locator('.architecture-viewer').boundingBox();
-  await page.mouse.move(box!.x + 12, box!.y + 12);
+  await revealBothControls(page);
   await visibility(page, '1');
 }
 
@@ -62,19 +63,11 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720
     await expect.poll(async () => Math.abs((await fittedContent(page)).occupancy - 0.9)).toBeLessThan(0.005);
     const content = await fittedContent(page);
     expect(Math.min(...content.margins)).toBeGreaterThan(0.045);
-    if (fixture === 'cycle') {
-      const routesExtendNodes = await page.evaluate(() => {
-        const nodes = [...document.querySelectorAll('.react-flow__node')].map(node => node.getBoundingClientRect());
-        const routes = [...document.querySelectorAll('.react-flow__edge-path')].map(path => path.getBoundingClientRect());
-        return routes.some(route => route.left < Math.min(...nodes.map(node => node.left)) - 1 || route.right > Math.max(...nodes.map(node => node.right)) + 1 || route.bottom > Math.max(...nodes.map(node => node.bottom)) + 1);
-      });
-      expect(routesExtendNodes, 'The cycle must exercise route bounds beyond the node union.').toBe(true);
-    }
     const before = await geometry(page);
-    expect(before.canvas.width).toBeCloseTo(before.viewer.width - 2, 0);
+    expect(before.canvas.width).toBeCloseTo(before.viewer.width, 0);
     expect(before.canvas.height).toBeCloseTo(before.workarea.height, 0);
-    expect(before.canvas.height + before.noticeHeight).toBeCloseTo(before.viewer.height - 2, 0);
-    await page.mouse.move(0, 0);
+    expect(before.canvas.height + before.noticeHeight).toBeCloseTo(before.viewer.height, 0);
+    await hideControls(page);
     await visibility(page, '0');
     expect(await geometry(page)).toEqual(before);
     await page.screenshot({ path: testInfo.outputPath(`canvas-clean-${viewport.width}.png`) });
@@ -90,11 +83,10 @@ test('keyboard discovers hidden controls and operates perspective and fit', asyn
   await ready(page);
   await visibility(page, '0');
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('link', { name: 'Architecture viewer home' })).toBeFocused();
   const select = page.getByRole('combobox', { name: 'Perspective' });
   for (let index = 0; index < 5 && !await select.evaluate(element => element === document.activeElement); index++) await page.keyboard.press('Tab');
   await expect(select).toBeFocused();
-  await visibility(page, '1');
+  await visibility(page, '1', '0');
   await page.keyboard.press('End');
   await expect(select).toHaveValue('notification-view');
   await expect(page.locator('[data-layout-state="ready"]')).toBeVisible();
@@ -104,39 +96,85 @@ test('keyboard discovers hidden controls and operates perspective and fit', asyn
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Fit diagram' })).toBeFocused();
   await page.keyboard.press('Enter');
-  await visibility(page, '1');
+  await visibility(page, '1', '0');
   await expect(page.locator('.viewer-toolbar')).toHaveCSS('transition-duration', '0s');
+});
+
+test('fit centers a self-loop route outside its component bounds within the zoom limit', async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await ready(page, 'self-loop');
+  await revealControls(page, 'top');
+  await page.getByRole('button', { name: 'Fit diagram' }).click();
+  await expect(page.getByLabel('Zoom level')).toHaveText('180%');
+  const witness = await page.evaluate(() => {
+    const node = document.querySelector('.react-flow__node')!.getBoundingClientRect();
+    const route = document.querySelector('.react-flow__edge-path')!.getBoundingClientRect();
+    return route.left < node.left - 1 || route.right > node.right + 1 || route.top < node.top - 1 || route.bottom > node.bottom + 1;
+  });
+  expect(witness, 'A self-loop must exercise route geometry outside its own component.').toBe(true);
+  const content = await fittedContent(page);
+  expect(content.margins[0]).toBeCloseTo(content.margins[1], 3);
+  expect(content.margins[2]).toBeCloseTo(content.margins[3], 3);
+  expect(Math.min(...content.margins)).toBeGreaterThan(0.045);
+  await testInfo.attach('self-loop-framing.json', { body: JSON.stringify({ witness, content }, null, 2), contentType: 'application/json' });
 });
 
 test('open native select and validation stay visible while mouse focus alone does not', async ({ page }) => {
   await ready(page);
   await reveal(page);
   await page.getByRole('button', { name: 'Fit diagram' }).click();
-  await page.mouse.move(0, 0);
+  await hideControls(page);
   await visibility(page, '0');
-  await reveal(page);
+  await revealControls(page, 'bottom');
   const validation = page.getByTestId('validation-status');
   await validation.locator('summary').click();
-  await page.mouse.move(0, 0);
-  await visibility(page, '1');
+  await hideControls(page);
+  await visibility(page, '0', '1');
   await expect(page.locator('.validation-popover')).toBeVisible();
   await validation.locator('summary').click();
-  await reveal(page);
+  await revealControls(page, 'top');
   const select = page.getByRole('combobox', { name: 'Perspective' });
   await select.click();
   await expect.poll(() => select.evaluate(element => element.matches(':open'))).toBe(true);
-  await page.mouse.move(0, 0);
-  await visibility(page, '1');
+  const canvas = await page.getByTestId('diagram-canvas').boundingBox();
+  await page.mouse.move(canvas!.x + 2, canvas!.y + canvas!.height / 2);
+  await visibility(page, '1', '0');
   await expect.poll(() => select.evaluate(element => element.matches(':open'))).toBe(true);
   await page.keyboard.press('Escape');
+});
+
+test('bottom keyboard focus retains only its own region after pointer leaves', async ({ page }) => {
+  await ready(page);
+  await page.keyboard.press('Tab');
+  await page.getByRole('button', { name: 'Next step' }).focus();
+  await page.keyboard.press('Tab');
+  await expect(page.getByTestId('validation-status').locator('summary')).toBeFocused();
+  const canvas = await page.getByTestId('diagram-canvas').boundingBox();
+  await page.mouse.move(canvas!.x + 2, canvas!.y + canvas!.height / 2);
+  await visibility(page, '0', '1');
+});
+
+test('a native select closes with Escape while selected relationship details remain available', async ({ page }) => {
+  await ready(page);
+  await page.getByTestId('rf__edge-request').focus();
+  await page.keyboard.press('Enter');
+  const details = page.getByRole('complementary', { name: 'Selection details' });
+  await expect(details).toContainText('HTTPS');
+  await revealControls(page, 'top');
+  const select = page.getByRole('combobox', { name: 'Perspective' });
+  await select.click();
+  await expect.poll(() => select.evaluate(element => element.matches(':open'))).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect.poll(() => select.evaluate(element => element.matches(':open'))).toBe(false);
+  await expect(details).toContainText('HTTPS');
 });
 
 test('desktop validation popover receives hits above overlapping canvas navigation', async ({ page }, testInfo) => {
   await ready(page);
   await reveal(page);
   await page.getByTestId('validation-status').locator('summary').click();
-  await page.mouse.move(0, 0);
-  await visibility(page, '1');
+  await hideControls(page);
+  await visibility(page, '0', '1');
   const result = await page.evaluate(() => {
     const popup = document.querySelector('.validation-popover')!, navigation = document.querySelector('.canvas-navigation')!;
     const a = popup.getBoundingClientRect(), b = navigation.getBoundingClientRect();
@@ -173,7 +211,7 @@ test('source notices, model errors and selected details stay visible independent
   await expect(page.locator('.viewer-toolbar')).toHaveCSS('transition-duration', '0.18s');
   const notices = page.getByTestId('review-notes');
   await notices.locator('summary').click();
-  await page.mouse.move(0, 0);
+  await hideControls(page);
   await visibility(page, '0');
   await expect(notices.locator('li').first()).toBeVisible();
   await expect(notices).toHaveCSS('opacity', '1');
@@ -187,7 +225,7 @@ test('source notices, model errors and selected details stay visible independent
   await details.getByRole('button', { name: 'Close details' }).click();
   await expect(details).toHaveCount(0);
   await page.goto('/?fixture=invalid');
-  await page.mouse.move(0, 0);
+  await page.mouse.move(-10, -10);
   await expect(page.getByRole('alert')).toContainText('Model could not be read');
   await expect(page.getByRole('alert')).toHaveCSS('opacity', '1');
 });
@@ -208,7 +246,7 @@ test('contextual graph appearances retain standard control styling and placement
   expect(await graph()).not.toEqual(original);
   expect(await snapshot()).toEqual(standard);
   await page.screenshot({ path: testInfo.outputPath('contextual-light-standard-controls.png') });
-  await page.mouse.move(0, 0);
+  await hideControls(page);
   await visibility(page, '0');
   await reveal(page);
   await page.getByRole('button', { name: 'Fit diagram' }).click();
@@ -253,14 +291,14 @@ test('layout failures stay visible with temporary controls hidden', async ({ pag
   await page.route(/\.woff2?(?:\?|$)/, route => route.abort('failed'));
   await page.goto('/?fixture=sample');
   await expect(page.getByRole('alert')).toContainText('Layout needs attention');
-  await page.mouse.move(0, 0);
+  await hideControls(page);
   await expect(page.locator('.viewer-toolbar')).toHaveCSS('opacity', '0');
   await expect(page.getByRole('alert')).toHaveCSS('opacity', '1');
 });
 
 test('geometry diagnostics remain readable while temporary controls hide', async ({ page }) => {
   test.skip(!!process.env.DIAGRAM_SERVER_COMMAND, 'Development module boundary injects a diagnostic into real layout output.');
-  await page.route(/\/src\/controller\.ts$/, route => route.fulfill({ contentType: 'text/javascript', body: `
+  await page.route(/\/src\/controller\.ts(?:\?t=\d+)?$/, route => route.fulfill({ contentType: 'text/javascript', body: `
     import { createLayoutRunner as actualRunner } from '/src/controller.ts?actual';
     export function createLayoutRunner() {
       const runner = actualRunner();
@@ -296,16 +334,16 @@ test('DPR2 preserves logical full-canvas framing and produces a 4K raster', asyn
   await reveal(page);
   await page.getByRole('button', { name: 'Fit diagram' }).click();
   await expect.poll(async () => Math.abs((await fittedContent(page)).occupancy - 0.9)).toBeLessThan(0.005);
-  await page.mouse.move(0, 0);
+  await hideControls(page);
   await visibility(page, '0');
   expect(await page.evaluate(() => ({ width: innerWidth, height: innerHeight, dpr: devicePixelRatio }))).toEqual({ width: 1920, height: 1080, dpr: 2 });
   await page.screenshot({ path: testInfo.outputPath('canvas-4k-dpr2.png') });
   await context.close();
 });
 
-for (const width of [820, 390]) {
-  test(`stacked touch details keep overlay controls separate and reachable at ${width}×720`, async ({ browser }, testInfo) => {
-    const context = await browser.newContext({ viewport: { width, height: 720 }, hasTouch: true, isMobile: true, reducedMotion: 'reduce' });
+for (const { width, height } of [{ width: 820, height: 720 }, { width: 390, height: 600 }]) {
+  test(`stacked touch details keep overlay controls separate and reachable at ${width}×${height}`, async ({ browser }, testInfo) => {
+    const context = await browser.newContext({ viewport: { width, height }, hasTouch: true, isMobile: true, reducedMotion: 'reduce' });
     const page = await context.newPage();
     await ready(page);
     await page.getByRole('combobox', { name: 'Perspective' }).selectOption('request-view');
@@ -417,7 +455,7 @@ test('embedded viewer adapts controls to its canvas width with a desktop sidebar
   await fit.scrollIntoViewIfNeeded();
   await fit.click();
   await expect.poll(async () => Math.abs((await fittedContent(page)).occupancy - 0.9)).toBeLessThan(0.005);
-  await page.mouse.move(0, 0);
+  await hideControls(page);
   await page.locator('button:focus, select:focus').evaluateAll(elements => elements.forEach(element => (element as HTMLElement).blur()));
   await visibility(page, '0');
   const clean = await geometry(page);

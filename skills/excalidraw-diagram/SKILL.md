@@ -13,13 +13,11 @@ Reuse the bound [context](../workspace/SKILL.md), or resolve it for direct work.
 
 Set `output_dir` to the explicit `deliverable_target` or declared real local operational directory; file modes may use their bound home. URLs/opaque IDs are not paths. For a file target, keep its exact `source_file` and parent directory; otherwise use `{output_dir}/diagram.excalidraw`. Put the PNG preview alongside unless explicitly directed elsewhere. Resolve references/render helpers from this installation's `skill_root`, never an inferred working directory or another runtime's configuration. Main links portable artifacts from the context; unsupported upload stays pending, without presenting a local path as an attachment.
 
-**Setup:** If the user asks you to set up this skill (renderer, dependencies, etc.), see `README.md` for instructions.
+**Setup:** Use [native verification](references/native/README.md) in a copied local tool environment.
 
 ## Customization
 
-**All colors and brand-specific styles live in one file:** `{skill_root}/references/color-palette.md`. Read it before generating any diagram and use it as the single source of truth for all color choices — shape fills, strokes, text colors, evidence artifact backgrounds, everything.
-
-To make this skill produce diagrams in your own brand style, edit `color-palette.md`. Everything else in this file is universal design methodology and Excalidraw best practices.
+Read [composition.md](references/composition.md) for source/reference-led flows and safe revisions. Read supplied documents, images and editable scenes yourself; the operator supplies material, not JSON. An approved reference guides cards, typography, palette, functional zones and lanes. Use [color-palette.md](references/color-palette.md) as a fallback when that context supplies no style.
 
 ---
 
@@ -52,13 +50,13 @@ Use concrete examples when:
 - The audience needs to understand what things actually look like
 - You're showing how multiple technologies integrate
 
-**For technical diagrams, you MUST include evidence artifacts** (see below).
+For technical diagrams, use source-supported names, endpoints and interactions. Include evidence artifacts where they help explain the requested view.
 
 ---
 
 ## Research Mandate (For Technical Diagrams)
 
-**Before drawing anything technical, research the actual specifications.**
+Read the supplied technical sources before drawing; research authoritative specifications when a material detail remains unverified.
 
 If you're diagramming a protocol, API, or framework:
 1. Look up the actual JSON/data formats
@@ -75,7 +73,7 @@ Good: "AG-UI streams events (RUN_STARTED, STATE_DELTA, A2UI_UPDATE)" → "Copilo
 
 ## Evidence Artifacts
 
-Evidence artifacts are concrete examples that prove your diagram is accurate and help viewers learn. Include them in technical diagrams.
+Evidence artifacts are concrete source-supported examples that help explain a technical diagram. Choose only those relevant to its audience and requested detail.
 
 **Types of evidence artifacts** (choose what's relevant to your diagram):
 
@@ -173,7 +171,7 @@ Before anything else, determine if this needs to be:
 - **Simple/Conceptual**: Abstract shapes, labels, relationships (mental models, philosophies)
 - **Comprehensive/Technical**: Concrete examples, code snippets, real data (systems, architectures, tutorials)
 
-**If comprehensive**: Do research first. Look up actual specs, formats, event names, APIs.
+**If comprehensive**: reconcile the supplied facts first; verify missing public specifications when needed.
 
 ### Step 1: Understand Deeply
 Read the content. For each concept, ask:
@@ -197,8 +195,8 @@ For each concept, find the visual pattern that mirrors its behavior:
 | Compares two things | **Side-by-side** (parallel with contrast) |
 | Separates into phases | **Gap/Break** (visual separation between sections) |
 
-### Step 3: Ensure Variety
-For multi-concept diagrams: **each major concept must use a different visual pattern**. No uniform cards or grids.
+### Step 3: Choose a coherent visual grammar
+Reuse an approved reference's patterns. Consistent cards suit component flows; use varied patterns when they clarify different concepts.
 
 ### Step 4: Sketch the Flow
 Before JSON, mentally trace how the eye moves through the diagram. There should be a clear visual story.
@@ -207,13 +205,13 @@ Before JSON, mentally trace how the eye moves through the diagram. There should 
 Only now create the Excalidraw elements. **See below for how to handle large diagrams.**
 
 ### Step 6: Render & Validate (MANDATORY)
-After generating the JSON, you MUST run the render-view-fix loop until the diagram looks right. This is not optional — see the **Render & Validate** section below for the full process.
+After generating the scene, run native verification and the bounded render-view-fix loop. Follow **Render & Validate** below; inspect the actual current output.
 
 ---
 
 ## Large / Comprehensive Diagram Strategy
 
-**For comprehensive or technical diagrams, you MUST build the JSON one section at a time.** Do NOT attempt to generate the entire file in a single pass. This is a hard constraint — Claude Code has a ~32,000 token output limit per response, and a comprehensive diagram easily exceeds that in one shot. Even if it didn't, generating everything at once leads to worse quality. Section-by-section is better in every way.
+Build large diagrams in coherent sections when needed to keep generation and inspection reliable. Each requested flow remains independently understandable; retain the full source inventory.
 
 ### The Section-by-Section Workflow
 
@@ -251,9 +249,8 @@ Each section should be independently understandable: its elements, internal arro
 
 ### What NOT to Do
 
-- **Don't generate the entire diagram in one response.** You will hit the output token limit and produce truncated, broken JSON. Even if the diagram is small enough to fit, splitting into sections produces better results.
-- **Don't use a coding agent** to generate the JSON. The agent won't have sufficient context about the skill's rules, and the coordination overhead negates any benefit.
-- **Don't write a Python generator script.** The templating and coordinate math seem helpful but introduce a layer of indirection that makes debugging harder. Hand-crafted JSON with descriptive IDs is more maintainable.
+- Keep drafts and historical generators separate from the approved editable scene. A later revision starts from the current scene and preserves human changes.
+- Choose direct JSON or a deterministic draft helper according to complexity; inspect its native output and bindings in either case.
 
 ---
 
@@ -348,13 +345,13 @@ Choose shape based on what it represents—or use no shape at all:
 | Abstract state, context | overlapping `ellipse` | Fuzzy, cloud-like |
 | Hierarchy node | lines + text (no boxes) | Structure through lines |
 
-**Rule**: Default to no container. Add shapes only when they carry meaning. Aim for <30% of text elements to be inside containers.
+Use containers where they carry meaning, including consistent cards for source components. Container ratios and element counts do not establish completeness or quality.
 
 ---
 
 ## Color as Meaning
 
-Colors encode information, not decoration. Every color choice should come from `{skill_root}/references/color-palette.md` — the semantic shape colors, text hierarchy colors, and evidence artifact colors are all defined there.
+Colors encode information. Follow the accepted source/reference palette, using `color-palette.md` for unspecified defaults. Keep component-role and relationship-class colors distinct.
 
 **Key principles:**
 - Each semantic purpose (start, end, decision, AI, error, etc.) has a specific fill/stroke pair
@@ -362,7 +359,7 @@ Colors encode information, not decoration. Every color choice should come from `
 - Evidence artifacts (code snippets, JSON examples) use their own dark background + colored text scheme
 - Always pair a darker stroke with a lighter fill for contrast
 
-**Do not invent new colors.** If a concept doesn't fit an existing semantic category, use Primary/Neutral or Secondary.
+For an unspecified concept, choose a compatible neutral style and preserve contrast.
 
 ---
 
@@ -382,7 +379,7 @@ For clean, professional diagrams:
 - `strokeWidth: 3` — Bold. Use sparingly for emphasis (main flow line, key connections).
 
 ### Opacity
-**Always use `opacity: 100` for all elements.** Use color, size, and stroke width to create hierarchy instead of transparency.
+Default to `opacity: 100`; retain approved scene styling and readable contrast.
 
 ### Small Markers Instead of Shapes
 Instead of full shapes, use small dots (10-20px ellipses) as:
@@ -424,7 +421,7 @@ Position alone doesn't show relationships. If A relates to B, there must be an a
 }
 ```
 
-Settings: `fontSize: 16`, `fontFamily: 3`, `textAlign: "center"`, `verticalAlign: "middle"`
+Example defaults: `fontSize: 16`, `fontFamily: 3`, `textAlign: "center"`, `verticalAlign: "middle"`. Use supported reference typography when supplied.
 
 ---
 
@@ -446,23 +443,25 @@ Settings: `fontSize: 16`, `fontFamily: 3`, `textAlign: "center"`, `verticalAlign
 
 ## Element Templates
 
-See `{skill_root}/references/element-templates.md` for copy-paste JSON templates for each element type (text, line, dot, rectangle, arrow). Pull colors from `{skill_root}/references/color-palette.md` based on each element's semantic purpose.
+See [element-templates.md](references/element-templates.md) for native element examples. Apply accepted colors and interaction semantics, with `color-palette.md` as the fallback.
 
 ---
 
 ## Render & Validate (MANDATORY)
 
-You cannot judge a diagram from JSON alone. After generating or editing the Excalidraw JSON, you MUST render it to PNG, view the image, and fix what you see — in a loop until it's right. This is a core part of the workflow, not a final check.
+Inspect the current native scene and rendered output after generation or revision; JSON alone cannot establish visual quality. Use the bounded correction loop below.
 
 ### How to Render
 
 ```bash
-cd "{skill_root}/references" && uv run python render_excalidraw.py "{source_file}"
+node "{copied_references}/native/verify.mjs" "{source_file}" --output-dir "{evidence_dir}" --output "{output_png}"
 ```
 
-This outputs a PNG next to the `.excalidraw` file. Then use the **Read tool** on the PNG to actually view it.
+This retains native/editor/export evidence and the requested PNG. View the actual PNG and editor capture with the host's image-reading capability.
 
 ### The Loop
+
+Keep structural, native-editability, visual and source-fidelity results separate throughout verification.
 
 After generating the initial JSON, run this cycle:
 
@@ -486,7 +485,7 @@ After generating the initial JSON, run this cycle:
 - Text too small to read at the rendered size
 - Overall composition feels lopsided or unbalanced
 
-**4. Fix** — Edit the JSON to address everything you found. Common fixes:
+**4. Fix** — Read and back up the current editable scene before a scoped revision; preserve unaffected IDs and human edits. Common fixes:
 - Widen containers when text is clipped
 - Adjust `x`/`y` coordinates to fix spacing and alignment
 - Add intermediate waypoints to arrow `points` arrays to route around elements
@@ -495,7 +494,7 @@ After generating the initial JSON, run this cycle:
 
 **5. Re-render & re-view** — Run the render script again and Read the new PNG.
 
-**6. Repeat** — Keep cycling until the diagram passes both the vision check (Step 2) and the defect check (Step 3). Typically takes 2-4 iterations. Don't stop after one pass just because there are no critical bugs — if the composition could be better, improve it.
+**6. Reassess** — Use at most two corrective cycles after the initial composition. Retain observations and remaining limits; failed required checks keep the result a draft.
 
 ### When to Stop
 
@@ -507,29 +506,26 @@ The loop is done when:
 - You'd be comfortable showing it to someone without caveats
 
 ### First-Time Setup
-If the render script hasn't been set up yet:
-```bash
-cd "{skill_root}/references"
-uv sync
-uv run playwright install chromium
-```
+Copy the reference tools outside installed assets and follow `native/README.md`
+to prepare the locked editor/browser dependencies. Keep verification output outside
+the copied tools and preserve the current approved editable file.
 
 ---
 
 ## Quality Checklist
 
 ### Depth & Evidence (Check First for Technical Diagrams)
-1. **Research done**: Did you look up actual specs, formats, event names?
-2. **Evidence artifacts**: Are there code snippets, JSON examples, or real data?
-3. **Multi-zoom**: Does it have summary flow + section boundaries + detail?
+1. **Sources read**: Are facts, names, endpoints and uncertainties reconciled?
+2. **Evidence artifacts**: Do relevant source-supported examples explain the requested view?
+3. **View scale**: Are the overview and requested per-flow details independently useful?
 4. **Concrete over abstract**: Real content shown, not just labeled boxes?
 5. **Educational value**: Could someone learn something concrete from this?
 
 ### Conceptual
 6. **Isomorphism**: Does each visual structure mirror its concept's behavior?
 7. **Argument**: Does the diagram SHOW something text alone couldn't?
-8. **Variety**: Does each major concept use a different visual pattern?
-9. **No uniform containers**: Avoided card grids and equal boxes?
+8. **Reference fidelity**: Does the composition preserve the approved visual grammar?
+9. **Component consistency**: Are repeated cards and flow sections coherent where appropriate?
 
 ### Container Discipline
 10. **Minimal containers**: Could any boxed element work as free-floating text instead?
@@ -543,10 +539,10 @@ uv run playwright install chromium
 
 ### Technical
 16. **Text clean**: `text` contains only readable words
-17. **Font**: `fontFamily: 3`
+17. **Font**: Supported reference/context typography is loaded before measuring and exporting
 18. **Roughness**: `roughness: 0` for clean/modern (unless hand-drawn style requested)
-19. **Opacity**: `opacity: 100` for all elements (no transparency)
-20. **Container ratio**: <30% of text elements should be inside containers
+19. **Contrast**: Contextual styling retains readable cards, labels and connections
+20. **Completeness**: All requested component occurrences and directed relationships are represented
 
 ### Visual Validation (Render Required)
 21. **Rendered to PNG**: Diagram has been rendered and visually inspected

@@ -1,6 +1,7 @@
 # Element Templates
 
-Copy-paste JSON templates for each Excalidraw element type. The `strokeColor` and `backgroundColor` values are placeholders — always pull actual colors from `color-palette.md` based on the element's semantic purpose.
+Adapt these native templates to the approved reference. Colors are placeholders;
+use the contextual palette. Measure text after the selected fonts load.
 
 ## Free-Floating Text (no container)
 ```json
@@ -154,8 +155,8 @@ Copy-paste JSON templates for each Excalidraw element type. The `strokeColor` an
 {
   "type": "arrow",
   "id": "arrow1",
-  "x": 282, "y": 145, "width": 118, "height": 0,
-  "strokeColor": "<arrow color — typically matches source element's stroke from palette>",
+  "x": 285, "y": 145, "width": 310, "height": 100,
+  "strokeColor": "<relationship color from the approved reference>",
   "backgroundColor": "transparent",
   "fillStyle": "solid",
   "strokeWidth": 2,
@@ -168,15 +169,21 @@ Copy-paste JSON templates for each Excalidraw element type. The `strokeColor` an
   "versionNonce": 44444,
   "isDeleted": false,
   "groupIds": [],
-  "boundElements": null,
+  "boundElements": [{"id": "arrow-label", "type": "text"}],
   "link": null,
   "locked": false,
-  "points": [[0, 0], [118, 0]],
-  "startBinding": {"elementId": "elem1", "focus": 0, "gap": 2},
-  "endBinding": {"elementId": "elem2", "focus": 0, "gap": 2},
+  "points": [[0, 0], [150, 0], [150, 100], [310, 100]],
+  "elbowed": true,
+  "fixedSegments": null,
+  "startBinding": {"elementId": "elem1", "fixedPoint": [1, 0.5], "mode": "orbit"},
+  "endBinding": {"elementId": "elem2", "fixedPoint": [0, 0.5], "mode": "orbit"},
   "startArrowhead": null,
   "endArrowhead": "arrow"
 }
 ```
 
-For curves: use 3+ points in `points` array.
+Add `{"id": "arrow1", "type": "arrow"}` to both target shapes' `boundElements`.
+Copy the text template with `id: "arrow-label"`, `containerId: "arrow1"`,
+`autoResize: true` and `labelPosition: 0.25`; keep its measured dimensions.
+Request/return arrows need distinct IDs, attachment slots and reciprocal labels.
+For a curved arrow use `elbowed: false` with the appropriate native points.

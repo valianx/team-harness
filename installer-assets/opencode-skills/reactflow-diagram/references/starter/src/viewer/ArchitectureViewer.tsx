@@ -1,13 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import { Background, BackgroundVariant, getViewportForBounds, MarkerType, ReactFlow, ReactFlowProvider, type ReactFlowInstance } from '@xyflow/react';
 import { createLayoutRunner } from '../controller';
 import { layout } from '../layout';
 import { contentBounds } from '../composition';
 import { fidelityStatus, parseModel, selectView } from '../model';
 import { TOKENS } from '../tokens';
-import type { Architecture, CompositionMode, Diagnostic, Geometry, PlacedNode, ValidationEvidence } from '../types';
+import type { Architecture, CompositionMode, Diagnostic, Endpoint, Geometry, PlacedNode, ValidationEvidence } from '../types';
 import { EDGE_TYPES, Glyph, NODE_TYPES, type DiagramEdge, type DiagramNode } from './components';
 import { Details } from './Details';
 import { MeasurementSurface, measureSurface } from './measurement';
@@ -61,6 +61,10 @@ function Viewer({ model, inputIdentity, evidence, composition }: { model: Archit
   const [layoutState, setState] = useState<LayoutState>({ phase: 'loading', diagnostics: [] });
   const [flow, setFlow] = useState<ReactFlowInstance<DiagramNode, DiagramEdge>>();
   const [zoom, setZoom] = useState(1);
+  const [pointerRegion, setPointerRegion] = useState<'top' | 'bottom'>();
+  const [fullscreen, setFullscreen] = useState(false);
+  const [fullscreenAvailable, setFullscreenAvailable] = useState(false);
+  const [fullscreenError, setFullscreenError] = useState('');
   const reducedMotion = useReducedMotion();
   const visibleModel = useMemo(() => selectView(model, model.views.some(view => view.id === viewId) ? viewId : undefined), [model, viewId]);
   const state: LayoutState = layoutState.model === visibleModel ? layoutState : { phase: 'loading', diagnostics: [] };
@@ -69,6 +73,36 @@ function Viewer({ model, inputIdentity, evidence, composition }: { model: Archit
   const selected = [...model.nodes, ...model.groups, ...model.edges].find(element => element.id === selectedId);
   const step = visibleModel.steps[stepIndex];
   const usable = hostSize.width > 0 && hostSize.height > 0 && canvasSize.width > 0 && canvasSize.height > 0;
+
+  useEffect(() => {
+    setFullscreenAvailable(document.fullscreenEnabled === true);
+    const update = () => setFullscreen(document.fullscreenElement === root.current);
+    document.addEventListener('fullscreenchange', update);
+    return () => document.removeEventListener('fullscreenchange', update);
+  }, []);
+
+  function trackControlRegion(event: PointerEvent<HTMLDivElement>) {
+    const box = event.currentTarget.getBoundingClientRect();
+    const y = event.clientY - box.top;
+    const owner = (event.target as Element).closest('.viewer-chrome-top, .viewer-chrome-bottom');
+    const x = event.clientX, pointerY = event.clientY;
+    const retained = [...event.currentTarget.querySelectorAll('.viewer-chrome-top, .viewer-chrome-bottom')].filter(region => {
+      const bounds = region.getBoundingClientRect();
+      return x >= bounds.left && x <= bounds.right && pointerY >= bounds.top && pointerY <= bounds.bottom;
+    }).map(region => region.classList.contains('viewer-chrome-top') ? 'top' : 'bottom');
+    const activated = y < 24 ? 'top' : y >= box.height - 24 ? 'bottom' : owner ? owner.classList.contains('viewer-chrome-top') ? 'top' : 'bottom' : undefined;
+    setPointerRegion(current => activated ?? (current && retained.includes(current) ? current : undefined));
+  }
+
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement === root.current) await document.exitFullscreen();
+      else await root.current?.requestFullscreen();
+      setFullscreenError('');
+    } catch {
+      setFullscreenError('Fullscreen is unavailable in this browser.');
+    }
+  }
 
   useEffect(() => {
     const observer = new ResizeObserver(entries => {
@@ -151,9 +185,9 @@ function Viewer({ model, inputIdentity, evidence, composition }: { model: Archit
 
   const nodes: DiagramNode[] = useMemo(() => state.geometry?.nodes.map(placed => {
     const component = [...visibleModel.nodes, ...visibleModel.groups].find(element => element.id === placed.id)!;
-    const source = state.geometry!.edges.find(edge => visibleModel.edges.find(item => item.id === edge.id)?.from === placed.id)?.sourcePort;
-    const target = state.geometry!.edges.find(edge => visibleModel.edges.find(item => item.id === edge.id)?.to === placed.id)?.targetPort;
-    const local = (point?: { x: number; y: number }) => point ? { x: point.x - placed.absX, y: point.y - placed.absY } : undefined;
+    const local = (point: Endpoint) => ({ ...point, x: point.x - placed.absX, y: point.y - placed.absY });
+    const sourcePorts = state.geometry!.edges.filter(edge => edge.sourcePort.nodeId === placed.id).map(edge => local(edge.sourcePort));
+    const targetPorts = state.geometry!.edges.filter(edge => edge.targetPort.nodeId === placed.id).map(edge => local(edge.targetPort));
     const focused = focusedIds.has(placed.id);
     return {
       id: placed.id, type: placed.kind, parentId: placed.parent, position: { x: placed.x, y: placed.y },
@@ -161,7 +195,7 @@ function Viewer({ model, inputIdentity, evidence, composition }: { model: Archit
       // Retain initialized handle bounds when focus or selection rebuilds controlled nodes.
       measured: { width: placed.width, height: placed.height },
       className: `${focused ? 'is-focused' : ''}${step && !focused ? ' is-dimmed' : ''}`,
-      data: { component, kind: placed.kind, direction: visibleModel.direction, sourcePort: local(source), targetPort: local(target), focused, dimmed: !!step && !focused },
+      data: { component, kind: placed.kind, sourcePorts, targetPorts, focused, dimmed: !!step && !focused },
       selected: placed.id === selectedId, selectable: true, draggable: false, connectable: false,
       ariaLabel: `${placed.kind === 'group' ? 'Group' : 'Component'}: ${component.label}`, ariaRole: 'button',
     };
@@ -170,14 +204,14 @@ function Viewer({ model, inputIdentity, evidence, composition }: { model: Archit
   const edges: DiagramEdge[] = useMemo(() => state.geometry?.edges.map(route => {
     const relationship = visibleModel.edges.find(edge => edge.id === route.id)!;
     const focused = focusedIds.has(route.id);
-    return { id: route.id, type: 'routed', source: relationship.from, target: relationship.to, sourceHandle: 'out', targetHandle: 'in',
+    return { id: route.id, type: 'routed', source: relationship.from, target: relationship.to, sourceHandle: route.sourcePort.id, targetHandle: route.targetPort.id,
       data: { relationship, route, focused, dimmed: !!step && !focused, onSelect: selectElement },
       className: `${focused ? 'is-focused' : ''}${step && !focused ? ' is-dimmed' : ''}`,
       selected: route.id === selectedId, selectable: true, focusable: true, ariaRole: 'button',
       ariaLabel: `Relationship: ${relationship.label ?? relationship.id}`,
-      markerEnd: { type: MarkerType.ArrowClosed, color: focused || route.id === selectedId ? '#78c9b4' : '#85938f', width: 14, height: 14 },
+      markerEnd: { type: MarkerType.Arrow, color: focused || route.id === selectedId ? 'var(--accent)' : relationship.interaction ? `var(--interaction-${relationship.interaction})` : 'var(--edge)', markerUnits: 'userSpaceOnUse', width: 36 / zoom, height: 36 / zoom },
     };
-  }) ?? [], [state.geometry, visibleModel, focusedIds, step, selectedId, selectElement]);
+  }) ?? [], [state.geometry, visibleModel, focusedIds, step, selectedId, selectElement, zoom]);
 
   const closeDetails = useCallback(() => {
     const id = selectedId;
@@ -194,11 +228,12 @@ function Viewer({ model, inputIdentity, evidence, composition }: { model: Archit
   }
 
   return <section ref={root} className={`architecture-viewer${reducedMotion ? ' reduce-motion' : ''}${!usable && hostSize.width >= 0 ? ' is-unusable' : ''}`} aria-label={`${model.title} architecture viewer`} style={theme} onKeyDownCapture={keyboardSelect}
-    data-model-content={inputIdentity}>
+    data-model-content={inputIdentity} data-pointer-region={pointerRegion}>
     {fidelity.status === 'draft' && <details className="review-notes" data-testid="review-notes"><summary><span className="review-symbol">!</span>{fidelity.reasons.length} source {fidelity.reasons.length === 1 ? 'question' : 'questions'} to resolve<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg></summary><ul>{fidelity.reasons.map((reason, index) => <li key={index}>{reason}</li>)}</ul></details>}
 
     <div className={`viewer-workarea${selected ? ' has-details' : ''}`}>
       <div ref={canvas} className="diagram-canvas" data-testid="diagram-canvas" data-layout-state={state.phase}
+        onPointerMoveCapture={trackControlRegion} onPointerLeave={() => setPointerRegion(undefined)}
         data-layout-diagnostics={JSON.stringify(state.diagnostics)} data-composition-selected={state.geometry?.composition?.selected}
         data-composition-report={state.geometry?.composition ? JSON.stringify(state.geometry.composition) : undefined}>
         <div className="viewer-chrome-top">
@@ -206,11 +241,13 @@ function Viewer({ model, inputIdentity, evidence, composition }: { model: Archit
             <div className="diagram-title"><span className="eyebrow">Architecture / interactive view</span><h1>{model.title}</h1></div>
             <div className="toolbar-controls"><label className="perspective-label"><span className="sr-only">Perspective</span><select aria-label="Perspective" value={viewId} onChange={event => setViewId(event.target.value)}><option value="">Complete architecture</option>{model.views.map(view => <option key={view.id} value={view.id}>{view.label}</option>)}</select></label>
             <button type="button" className="secondary-button fit-button" onClick={fit} disabled={!state.geometry} aria-label="Fit diagram"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="M7 3H3v4m10-4h4v4M3 13v4h4m10-4v4h-4" /></svg><span>Fit view</span></button>
+            <button type="button" className="secondary-button fullscreen-button" onClick={() => void toggleFullscreen()} disabled={!fullscreenAvailable} aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d={fullscreen ? 'M3 7h4V3m6 0v4h4M3 13h4v4m6 0v-4h4' : 'M7 3H3v4m10-4h4v4M3 13v4h4m10-4v4h-4'} /></svg></button>
             <span className={`fidelity-status ${fidelity.status}`} data-testid="fidelity-status"><span className="status-dot" />{fidelity.status === 'draft' ? 'Draft' : 'Source reviewed'}</span></div>
           </header>
           {usable && state.phase === 'ready' && !!nodes.length && <div className="canvas-context"><span className="canvas-context-dot" /><span>{selectedView?.label ?? 'Complete architecture'}</span><span className="canvas-count">{visibleModel.nodes.length} components · {visibleModel.edges.length} relationships</span></div>}
           {extendsCanvas && <p className="canvas-limit" data-testid="canvas-limit" role="status">This view extends beyond the canvas.<br />Pan or choose a perspective.</p>}
         </div>
+        {fullscreenError && <p className="fullscreen-error" role="status">{fullscreenError}</p>}
         {!usable && hostSize.width >= 0 && <div className="viewer-size-alert" role="alert"><strong>Give the viewer a width and height.</strong><p>Set an explicit height on its host container, for example <code>height: 650px</code>, and allow it to fill the available width.</p></div>}
         {usable && state.phase === 'loading' && <div className="canvas-state" role="status"><div className="loading-mark"><Glyph kind="service" size={28} /></div><h2>Preparing your architecture</h2><p>Loading local fonts, measuring components and routing connections.</p></div>}
         {usable && state.phase === 'error' && <div className="canvas-state error-state" role="alert"><span className="state-symbol">!</span><h2>Layout needs attention</h2><p>{state.message}</p><p className="state-help">Share this diagnostic with your agent to correct the model or its supported layout.</p></div>}

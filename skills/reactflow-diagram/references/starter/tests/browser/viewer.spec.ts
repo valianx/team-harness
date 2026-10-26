@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { revealControls } from './control-helpers';
 
 async function ready(page: Page, fixture = 'sample') {
   await page.goto(`/?fixture=${fixture}`);
@@ -76,6 +77,7 @@ test('presentation steps preserve geometry while changing focus and narrative', 
   })));
   const before = await positions();
   const narrative = await page.getByTestId('step-narrative').innerText();
+  await revealControls(page, 'bottom');
   await page.getByRole('button', { name: 'Next step' }).click();
   await expect(page.getByTestId('step-narrative')).not.toHaveText(narrative);
   expect(await positions()).toEqual(before);
@@ -99,6 +101,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720
       }).toBe(true);
     };
     await expect(focused).toHaveCount(0);
+    await revealControls(page, 'bottom');
     await page.getByRole('button', { name: 'Next step' }).click();
     await visible(['gateway', 'orchestrator']);
     await page.screenshot({ path: testInfo.outputPath(`guided-request-${viewport.width}.png`), fullPage: true });
@@ -151,6 +154,7 @@ test('keeps unresolved sources and missing validation visible', async ({ page })
   await expect(page.getByTestId('fidelity-status')).toContainText('Draft');
   await expect(page.getByTestId('review-notes')).toBeVisible();
   await expect(page.getByTestId('validation-status')).toContainText('Validation incomplete');
+  await revealControls(page, 'bottom');
   await page.getByTestId('validation-status').locator('summary').click();
   await expect(page.getByTestId('validation-status').getByText('Rendered', { exact: true })).toBeVisible();
   await expect(page.getByTestId('validation-status').getByText('Not supplied')).toHaveCount(2);
@@ -180,6 +184,7 @@ test('reduced motion and presentation viewport keep controls and selected conten
   await ready(page);
   await page.getByRole('combobox', { name: 'Perspective' }).selectOption('');
   await expect(page.getByRole('button', { name: 'Next step' })).toBeEnabled();
+  await revealControls(page, 'bottom');
   await page.getByRole('button', { name: 'Next step' }).click();
   await page.locator('.react-flow__node-service').first().click();
   const canvas = await page.getByTestId('diagram-canvas').boundingBox();
@@ -189,5 +194,5 @@ test('reduced motion and presentation viewport keep controls and selected conten
   expect(canvas!.x + canvas!.width).toBeLessThanOrEqual(panel!.x + 1);
   await selectedComponentIsVisible(page);
   await expect(page.getByRole('button', { name: 'Fit diagram' })).toBeInViewport();
-  expect(await page.locator('.architecture-viewer').evaluate(element => getComputedStyle(element).getPropertyValue('--motion-duration').trim())).toBe('0ms');
+  await expect(page.locator('.viewer-toolbar')).toHaveCSS('transition-duration', '0s');
 });

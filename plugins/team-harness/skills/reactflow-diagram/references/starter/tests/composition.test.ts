@@ -8,6 +8,9 @@ import { FIXTURES } from '../src/fixtures';
 import { contentBounds, routeReadability } from '../src/composition';
 import type { Architecture, Geometry } from '../src/types';
 import { compound, measured } from './fixtures/compound';
+import { withoutTiming } from './fixtures/timing';
+import { relationships, relationshipMeasurements } from './fixtures/relationships';
+import { samplePresentationMeasurements } from './fixtures/presentation';
 
 function fit(geometry: Geometry) {
   return Math.min(1152 / geometry.bounds.width, 540 / geometry.bounds.height);
@@ -41,7 +44,7 @@ test('auto replaces a compound ribbon with a complete measured composition at a 
 });
 
 for (const direction of ['right', 'down'] as const) {
-  test(`compact ${direction} retains measured bounds and shared endpoint ports for every relationship`, async () => {
+  test(`compact ${direction} retains measured bounds and separate endpoint reservations for every relationship`, async () => {
     const model = compound(direction), measurements = measured(model);
     const geometry = await layout(model, measurements, { composition: 'compact' });
     assert.equal(geometry.composition?.selected, 'compact');
@@ -52,8 +55,9 @@ for (const direction of ['right', 'down'] as const) {
       assert.equal(placed.height, measurements.nodes[node.id].height);
       const sources = model.edges.filter(edge => edge.from === node.id).map(edge => geometry.edges.find(route => route.id === edge.id)!.sourcePort);
       const targets = model.edges.filter(edge => edge.to === node.id).map(edge => geometry.edges.find(route => route.id === edge.id)!.targetPort);
-      for (const point of sources) assert.deepEqual(point, sources[0]);
-      for (const point of targets) assert.deepEqual(point, targets[0]);
+      const ports = [...sources, ...targets];
+      assert.equal(new Set(ports.map(point => point.id)).size, ports.length);
+      assert.equal(new Set(ports.map(point => `${point.side}:${point.slot}`)).size, ports.length);
     }
     const candidate = geometry.composition!.candidates.find(value => value.id === geometry.composition!.candidate)!;
     assert.equal(candidate.labelObstructions, 0);
@@ -65,8 +69,8 @@ test('composition is deterministic under input ordering and repeated layout', as
   const model = compound(), measurements = measured(model);
   const geometry = await layout(model, measurements, { composition: 'compact' });
   const reordered = { ...model, nodes: [...model.nodes].reverse(), groups: [...model.groups].reverse(), edges: [...model.edges].reverse() };
-  assert.deepEqual(await layout(model, measurements, { composition: 'compact' }), geometry);
-  assert.deepEqual(await layout(reordered, measurements, { composition: 'compact' }), geometry);
+  assert.deepEqual(withoutTiming(await layout(model, measurements, { composition: 'compact' })), withoutTiming(geometry));
+  assert.deepEqual(withoutTiming(await layout(reordered, measurements, { composition: 'compact' })), withoutTiming(geometry));
 });
 
 test('compact packing respects nested and empty boundaries with variable measured cards', async () => {
@@ -80,12 +84,32 @@ test('compact packing respects nested and empty boundaries with variable measure
   assert.equal(geometry.nodes.find(node => node.id === 'orchestrator')!.height, 214);
 });
 
-test('an ordinary short flow keeps the validated layered choice and reports both alternatives', async () => {
-  const model = parseModel(FIXTURES.sample);
-  const geometry = await layout(model, measured(model));
+test('a short flow that meets fitted text targets keeps the layered choice and reports alternatives', async () => {
+  const model = relationships(), sizes = relationshipMeasurements(model);
+  const geometry = await layout(model, sizes);
   assert.deepEqual(checkGeometry(model, geometry), []);
+  const layered = geometry.composition!.candidates.find(candidate => candidate.mode === 'layered')!;
+  assert.ok(layered.fittedNodeFont >= 14 && layered.fittedLabelFont >= 11);
   assert.equal(geometry.composition?.selected, 'layered');
   assert.ok(geometry.composition!.candidates.some(candidate => candidate.mode === 'compact'));
+});
+
+test('auto selects readable compact text for a small measured flow below the old ribbon gain threshold', async () => {
+  const model = parseModel(FIXTURES.sample), original = structuredClone(model), sizes = samplePresentationMeasurements();
+  const geometry = await layout(model, sizes), evidence = geometry.composition!;
+  const layered = evidence.candidates.find(candidate => candidate.mode === 'layered')!;
+  const compact = evidence.candidates.find(candidate => candidate.mode === 'compact')!;
+  assert.ok(layered.valid && compact.valid);
+  assert.ok(layered.fittedNodeFont < 14 && layered.fittedLabelFont < 11);
+  assert.ok(compact.fittedNodeFont >= 14 && compact.fittedLabelFont >= 11);
+  assert.ok(compact.fitScale / layered.fitScale > 1.15 && compact.fitScale / layered.fitScale < 1.5);
+  assert.equal(evidence.selected, 'compact');
+  const selected = evidence.candidates.find(candidate => candidate.id === evidence.candidate)!;
+  assert.ok(selected.fittedNodeFont >= 14 && selected.fittedLabelFont >= 11);
+  complete(model, geometry);
+  assert.deepEqual(model, original);
+  const reordered = { ...model, nodes: [...model.nodes].reverse(), groups: [...model.groups].reverse(), edges: [...model.edges].reverse() };
+  assert.deepEqual(withoutTiming(await layout(reordered, sizes)), withoutTiming(geometry));
 });
 
 test('auto compacts a few-node ribbon instead of assuming small graphs are readable', async () => {
@@ -100,15 +124,14 @@ test('auto compacts a few-node ribbon instead of assuming small graphs are reada
   complete(model, geometry);
 });
 
-test('a failed layered engine cannot prevent a valid requested compact composition', async context => {
+test('requested compact succeeds without evaluating an unavailable layered engine', async context => {
   const model = compound();
   context.mock.method(ELK.prototype, 'layout', async () => { throw new Error('Layered engine failed'); });
   const geometry = await layout(model, measured(model), { composition: 'compact' });
   assert.equal(geometry.composition?.selected, 'compact');
   complete(model, geometry);
-  const layered = geometry.composition!.candidates.find(candidate => candidate.id === 'layered')!;
-  assert.equal(layered.valid, false);
-  assert.ok(layered.diagnostics.some(diagnostic => diagnostic.message.includes('Layered engine failed')));
+  assert.equal(geometry.composition!.candidates.some(candidate => candidate.mode === 'layered'), false);
+  assert.equal(geometry.composition!.execution.work.layeredCalls, 0);
 });
 
 test('compact recovery never turns missing measured labels into engine failure evidence', async () => {
@@ -120,7 +143,7 @@ test('compact recovery never turns missing measured labels into engine failure e
 test('content bounds include route detours and labels while excluding unused engine padding', () => {
   const geometry: Geometry = {
     nodes: [{ id: 'a', kind: 'service', x: 100, y: 100, absX: 100, absY: 100, width: 100, height: 100, headerHeight: 0 }],
-    edges: [{ id: 'route', sourcePort: { x: 200, y: 150 }, targetPort: { x: 500, y: 150 },
+    edges: [{ id: 'route', sourcePort: { id: 'route:source', nodeId: 'a', side: 'right', slot: 0, x: 200, y: 150 }, targetPort: { id: 'route:target', nodeId: 'b', side: 'left', slot: 0, x: 500, y: 150 },
       sections: [{ points: [{ x: 200, y: 150 }, { x: 500, y: 150 }] }], label: { x: 700, y: 80, width: 80, height: 24, text: 'Outside the node frame' } }],
     bounds: { width: 2000, height: 1000 },
   };
@@ -129,8 +152,13 @@ test('content bounds include route detours and labels while excluding unused eng
 
 test('route metrics distinguish a proper crossing from a route obscuring an unrelated label', () => {
   const geometry: Geometry = { nodes: [], bounds: { width: 100, height: 100 }, edges: [
-    { id: 'horizontal', sourcePort: { x: 0, y: 50 }, targetPort: { x: 100, y: 50 }, sections: [{ points: [{ x: 0, y: 50 }, { x: 100, y: 50 }] }], label: { x: 40, y: 20, width: 20, height: 10, text: 'Label' } },
-    { id: 'vertical', sourcePort: { x: 50, y: 0 }, targetPort: { x: 50, y: 100 }, sections: [{ points: [{ x: 50, y: 0 }, { x: 50, y: 100 }] }] },
+    { id: 'horizontal', sourcePort: { id: 'horizontal:source', nodeId: 'a', side: 'right', slot: 0, x: 0, y: 50 }, targetPort: { id: 'horizontal:target', nodeId: 'b', side: 'left', slot: 0, x: 100, y: 50 }, sections: [{ points: [{ x: 0, y: 50 }, { x: 100, y: 50 }] }], label: { x: 40, y: 20, width: 20, height: 10, text: 'Label' } },
+    { id: 'vertical', sourcePort: { id: 'vertical:source', nodeId: 'c', side: 'bottom', slot: 0, x: 50, y: 0 }, targetPort: { id: 'vertical:target', nodeId: 'd', side: 'top', slot: 0, x: 50, y: 100 }, sections: [{ points: [{ x: 50, y: 0 }, { x: 50, y: 100 }] }] },
   ] };
-  assert.deepEqual(routeReadability(geometry), { crossings: 1, overlaps: 0, labelObstructions: 1, bends: 0 });
+  assert.deepEqual(routeReadability(geometry), { crossings: 1, overlaps: 0, labelObstructions: 1, bends: 0,
+    routeLength: 200, routeDetour: 0, maxDetourRatio: 1,
+    routes: [
+      { id: 'horizontal', length: 100, directLength: 100, detour: 0, detourRatio: 1, bends: 0, crossingIds: ['vertical'], sharedSegmentIds: [], obstructedLabelIds: [] },
+      { id: 'vertical', length: 100, directLength: 100, detour: 0, detourRatio: 1, bends: 0, crossingIds: ['horizontal'], sharedSegmentIds: [], obstructedLabelIds: ['horizontal'] },
+    ] });
 });

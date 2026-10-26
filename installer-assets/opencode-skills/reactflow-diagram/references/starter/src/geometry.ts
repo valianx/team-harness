@@ -1,4 +1,4 @@
-import type { Architecture, Diagnostic, Geometry, PlacedNode, Point } from './types';
+import type { Architecture, Diagnostic, Endpoint, Geometry, PlacedNode, Point } from './types';
 import { TOKENS as T } from './tokens';
 
 type Rect = { x: number; y: number; width: number; height: number };
@@ -73,13 +73,15 @@ export function checkGeometry(model: Architecture, geometry: Geometry): Diagnost
   const byEdge = new Map(model.edges.map(edge => [edge.id, edge]));
   const routeIds = new Set(geometry.edges.map(edge => edge.id));
   const seenRoutes = new Set<string>();
-  const sourcePorts = new Map<string, Point>(), targetPorts = new Map<string, Point>();
+  const endpointIds = new Set<string>(), endpointSlots = new Map<string, string>();
+  const endpointPositions = new Map<string, Endpoint[]>();
   for (const edge of model.edges) if (!routeIds.has(edge.id)) fail('route', [edge.id], 'Missing computed route');
   for (const route of geometry.edges) {
     if (seenRoutes.has(route.id)) fail('identity', [route.id], 'Duplicate relationship route');
     seenRoutes.add(route.id);
     const edge = byEdge.get(route.id);
     if (!edge) { fail('route', [route.id], 'Unknown relationship route'); continue; }
+    if (!route.sourcePort || !route.targetPort) { fail('endpoint-identity', [route.id], 'Missing relationship endpoint'); continue; }
     if (!route.sections.length || route.sections.some(section => section.points.length < 2)) fail('route', [route.id], 'Empty or incomplete route sections');
     for (let i = 1; i < route.sections.length; i++) {
       const previous = route.sections[i - 1].points.at(-1), next = route.sections[i].points[0];
@@ -99,15 +101,23 @@ export function checkGeometry(model: Architecture, geometry: Geometry): Diagnost
         if (segmentIntersects(a, b, obstacle, intendedAncestor || endpointContact ? 0 : T.edgeClearance)) fail('route-collision', [route.id, node.id], 'Route crosses a body or reserved header');
       }
     }
-    for (const [nodeId, point] of [[edge.from, route.sourcePort], [edge.to, route.targetPort]] as const) {
+    for (const [role, nodeId, point] of [['source', edge.from, route.sourcePort], ['target', edge.to, route.targetPort]] as const) {
       const node = nodes.get(nodeId);
+      if (point.id !== `${route.id}:${role}` || point.nodeId !== nodeId || endpointIds.has(point.id)) fail('endpoint-identity', [route.id, nodeId], 'Endpoint identity is missing, duplicated or belongs to another relationship/component');
+      endpointIds.add(point.id);
+      const slot = `${nodeId}:${point.side}:${point.slot}`, positions = endpointPositions.get(nodeId) ?? [];
+      if (!Number.isInteger(point.slot) || point.slot < 0 || endpointSlots.has(slot) || positions.some(other => Math.hypot(other.x - point.x, other.y - point.y) <= T.tolerance)) fail('endpoint-slot', [route.id, nodeId, ...(endpointSlots.has(slot) ? [endpointSlots.get(slot)!] : [])], 'Endpoint slot or attachment is missing or aliases another relationship');
+      endpointSlots.set(slot, route.id); positions.push(point); endpointPositions.set(nodeId, positions);
       if (!node || !Number.isFinite(point.x) || !Number.isFinite(point.y) || point.x < node.absX - T.portSize - T.tolerance || point.x > node.absX + node.width + T.portSize + T.tolerance || point.y < node.absY - T.portSize - T.tolerance || point.y > node.absY + node.height + T.portSize + T.tolerance) fail('port', [route.id, nodeId], 'Route port is detached from endpoint');
       else if (point.x > node.absX + T.tolerance && point.x < node.absX + node.width - T.tolerance && point.y > node.absY + T.tolerance && point.y < node.absY + node.height - T.tolerance) fail('port', [route.id, nodeId], 'Port is inside endpoint body');
-    }
-    for (const [nodeId, point, ports] of [[edge.from, route.sourcePort, sourcePorts], [edge.to, route.targetPort, targetPorts]] as const) {
-      const shared = ports.get(nodeId);
-      if (shared && Math.hypot(shared.x - point.x, shared.y - point.y) > T.tolerance) fail('shared-port', [route.id, nodeId], 'Relationships disagree on the component’s single rendered handle');
-      else ports.set(nodeId, point);
+      else {
+        const within = (value: number, from: number, to: number) => value >= from - T.tolerance && value <= to + T.tolerance;
+        const attached = point.side === 'left' ? within(point.x, node.absX - T.portSize, node.absX) && within(point.y, node.absY, node.absY + node.height)
+          : point.side === 'right' ? within(point.x, node.absX + node.width, node.absX + node.width + T.portSize) && within(point.y, node.absY, node.absY + node.height)
+          : point.side === 'top' ? within(point.y, node.absY - T.portSize, node.absY) && within(point.x, node.absX, node.absX + node.width)
+          : point.side === 'bottom' ? within(point.y, node.absY + node.height, node.absY + node.height + T.portSize) && within(point.x, node.absX, node.absX + node.width) : false;
+        if (!attached) fail('port', [route.id, nodeId], 'Endpoint side disagrees with its attached boundary');
+      }
     }
     if (edge.label && !route.label) fail('label', [route.id], 'Missing measured relationship label');
     if (route.label) {

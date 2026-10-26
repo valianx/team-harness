@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { BaseEdge, EdgeLabelRenderer, Handle, Position, type Edge, type EdgeProps, type Node, type NodeProps } from '@xyflow/react';
-import type { Component, Group, NodeKind, Point, Relationship, Route } from '../types';
+import type { Component, Endpoint, Group, NodeKind, Relationship, Route } from '../types';
 
 type Kind = NodeKind | 'group';
 
@@ -41,8 +41,8 @@ export function RelationshipLabel({ label }: { label: string }) {
 
 /** DiagramNodeData carries derived ports and presentation state without changing the source model. */
 export type DiagramNodeData = {
-  component: Component | Group; kind: Kind; direction: 'right' | 'down';
-  sourcePort?: Point; targetPort?: Point; focused: boolean; dimmed: boolean;
+  component: Component | Group; kind: Kind;
+  sourcePorts: Endpoint[]; targetPorts: Endpoint[]; focused: boolean; dimmed: boolean;
 };
 
 /** DiagramNode is the React Flow adapter for one measured component or group. */
@@ -54,18 +54,23 @@ export type DiagramEdgeData = { relationship: Relationship; route: Route; focuse
 /** DiagramEdge is the React Flow adapter for a derived route. */
 export type DiagramEdge = Edge<DiagramEdgeData>;
 
+function NodeHandles({ data }: { data: DiagramNodeData }) {
+  const positions = { left: Position.Left, right: Position.Right, top: Position.Top, bottom: Position.Bottom };
+  return <>{(['target', 'source'] as const).flatMap(type => data[`${type}Ports`].map(port => <Handle
+    key={port.id} type={type} id={port.id} position={positions[port.side]} data-slot={port.slot}
+    className="component-port" style={{ left: port.x, top: port.y, right: 'auto', bottom: 'auto' }} isConnectable={false}
+  />))}</>;
+}
+
 const ComponentNode = memo(function ComponentNode({ data }: NodeProps<DiagramNode>) {
-  const vertical = data.direction === 'down';
-  const portStyle = (point?: Point) => point ? { left: point.x, top: point.y, right: 'auto', bottom: 'auto' } : undefined;
   return <>
     <ComponentCard component={data.component as Component} />
-    <Handle type="target" id="in" position={vertical ? Position.Top : Position.Left} className="component-port" style={portStyle(data.targetPort)} isConnectable={false} />
-    <Handle type="source" id="out" position={vertical ? Position.Bottom : Position.Right} className="component-port" style={portStyle(data.sourcePort)} isConnectable={false} />
+    <NodeHandles data={data} />
   </>;
 });
 
 const GroupNode = memo(function GroupNode({ data }: NodeProps<DiagramNode>) {
-  return <div className="group-frame" data-parent={data.component.parent}><GroupHeader group={data.component} /></div>;
+  return <><div className="group-frame" data-parent={data.component.parent}><GroupHeader group={data.component} /></div><NodeHandles data={data} /></>;
 });
 
 const RoutedEdge = memo(function RoutedEdge({ id, data, markerEnd, selected }: EdgeProps<DiagramEdge>) {
@@ -77,7 +82,11 @@ const RoutedEdge = memo(function RoutedEdge({ id, data, markerEnd, selected }: E
       path={section.points.map((point, pointIndex) => `${pointIndex ? 'L' : 'M'} ${point.x} ${point.y}`).join(' ')}
       markerEnd={index === route.sections.length - 1 ? markerEnd : undefined}
       interactionWidth={20}
-      style={{ stroke: selected || data.focused ? 'var(--accent)' : 'var(--edge)', strokeWidth: selected || data.focused ? 2 : 1.5 }}
+      style={{
+        stroke: selected || data.focused ? 'var(--accent)' : relationship.interaction ? `var(--interaction-${relationship.interaction})` : 'var(--edge)',
+        strokeWidth: selected || data.focused ? 2 : 1.5,
+        strokeDasharray: relationship.interaction === 'response' || relationship.interaction === 'event' ? `var(--interaction-${relationship.interaction}-dash)` : undefined,
+      }}
     />)}
     {route.label && <EdgeLabelRenderer><button
       type="button" className={`edge-label nodrag nopan${data.focused ? ' is-focused' : ''}${selected ? ' is-selected' : ''}${data.dimmed ? ' is-dimmed' : ''}`}

@@ -38,10 +38,11 @@ All elements share these:
 | `text` | The display text |
 | `originalText` | Same as text |
 | `fontSize` | Size in pixels (16-20 recommended) |
-| `fontFamily` | 3 for monospace (use this) |
+| `fontFamily` | Selected native family; load it before measuring text |
 | `textAlign` | "left", "center", "right" |
 | `verticalAlign` | "top", "middle", "bottom" |
 | `containerId` | ID of parent shape |
+| `labelPosition` | Arrow labels: normalized arc length, 0–1, on the whole path |
 
 ## Arrow-Specific Properties
 
@@ -50,6 +51,8 @@ All elements share these:
 | `points` | Array of [x, y] coordinates |
 | `startBinding` | Connection to start shape |
 | `endBinding` | Connection to end shape |
+| `elbowed` | `true` for a native orthogonal arrow; keep its editable points |
+| `fixedSegments` | Native fixed elbow segments, or null |
 | `startArrowhead` | null, "arrow", "bar", "dot", "triangle" |
 | `endArrowhead` | null, "arrow", "bar", "dot", "triangle" |
 
@@ -58,10 +61,17 @@ All elements share these:
 ```json
 {
   "elementId": "shapeId",
-  "focus": 0,
-  "gap": 2
+  "fixedPoint": [1, 0.5],
+  "mode": "orbit"
 }
 ```
+
+This is the pinned editor's binding format; `[1, 0.5]` is the right-side midpoint.
+Use `inside`, `orbit` or `skip` only with the semantics supported by that editor.
+The target lists each attached arrow in `boundElements`. A label's `containerId`
+names its arrow, and the arrow lists that label as `{ "id": "labelId", "type": "text" }`.
+Validate both directions with `render_excalidraw.py --validate-only`; then use
+[native verification](native/README.md) to detect unsupported rendering semantics.
 
 ## Rectangle Roundness
 

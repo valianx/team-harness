@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.57.0] - 2026-10-26
+
+### Changed
+
+- Generate reference-led diagrams with editable native connections, separate routes and border controls. Fixes #719
+
 ## [3.56.1] - 2026-10-25
 
 ### Fixed

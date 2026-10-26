@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { parseModel } from '../../src/model';
+import { revealControls } from './control-helpers';
 
 const editableModel = parseModel(JSON.parse(readFileSync(new URL('../../fixtures/sample.json', import.meta.url), 'utf8')));
 
@@ -51,6 +52,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720
         return removed;
       };
     });
+    await revealControls(page, 'bottom');
     await page.getByRole('button', { name: 'Next step' }).click();
     await expect(page.getByTestId('step-narrative')).toContainText('Receive a payment');
     await page.getByRole('button', { name: 'Next step' }).click();

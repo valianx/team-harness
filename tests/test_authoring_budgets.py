@@ -36,7 +36,6 @@ EXEMPT = {
     "agents/init-project.md": {"words", "lines"},
     "agents/translator.md": {"words", "lines"},
     "agents/agent-builder.md": {"words"},
-    "agents/diagrammer.md": {"words"},
     "agents/gcp-infra.md": {"words"},
     "agents/mentor.md": {"words"},
     "agents/_shared/apply-review-disposition.md": {"words"},

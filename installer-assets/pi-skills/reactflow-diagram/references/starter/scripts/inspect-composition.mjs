@@ -124,7 +124,7 @@ async function inspect(options) {
         const views = mode === 'auto' ? [{ id: '', label: 'Complete architecture' }, ...(model.views ?? []).map(view => ({ id: view.id, label: view.label }))] : [{ id: '', label: 'Complete architecture' }];
         for (const view of views) {
           const box = await page.locator(activeCanvas).boundingBox();
-          await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+          await page.mouse.move(box.x + box.width / 2, box.y + 2);
           await page.getByRole('combobox', { name: 'Perspective', exact: true }).selectOption(view.id);
           await settle(page);
           if (model.nodes.length || (model.groups ?? []).length) await page.getByRole('button', { name: 'Fit diagram', exact: true }).click();

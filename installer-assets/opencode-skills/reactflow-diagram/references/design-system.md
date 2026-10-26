@@ -35,11 +35,14 @@ readable composition.
 Reuse the standard control appearance and placement: title, perspective and Fit
 view at the top; legend, zoom, presentation steps, validation and perspective
 context at the bottom. Controls float over the canvas and reserve no layout space.
-On fine-hover devices they hide outside the viewer and appear for hover, visible
-keyboard focus or open control popups; on coarse pointers they remain visible.
+On fine-hover devices the top or bottom 24 CSS-pixel border reveals only its own
+region; central hover hides both. A region's controls, visible keyboard focus or
+open popup keep it operable. On coarse pointers both regions remain visible.
 Visibility changes never resize the canvas, move the camera or alter graph geometry.
 On narrow canvases the control stacks scroll independently, keeping their content
 accessible and leaving room to pan the diagram between them.
+The standalone canvas fills the browser window; fixed exterior prose does not
+reserve space. Embedded viewers fill their explicitly sized host.
 
 The initial view is the complete architecture; steps focus only after explicit
 navigation. Fit view resets the guided tour. Automatic framing and Fit

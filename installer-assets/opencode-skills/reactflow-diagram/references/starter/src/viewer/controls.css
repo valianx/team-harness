@@ -105,14 +105,18 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .architecture-viewer { --chrome-opacity: 0; --chrome-pointer-events: none; }
-  .architecture-viewer:where(:hover, :has(:focus-visible), :has(.validation-status[open]), :has(select:open)) { --chrome-opacity: 1; --chrome-pointer-events: auto; }
-  .architecture-viewer :is(.viewer-toolbar, .viewer-footer, .canvas-context, .canvas-legend, .canvas-navigation, .view-context) {
+  .viewer-chrome-top, .viewer-chrome-bottom { --chrome-opacity: 0; --chrome-pointer-events: none; }
+  .architecture-viewer[data-pointer-region="top"] .viewer-chrome-top,
+  .architecture-viewer[data-pointer-region="bottom"] .viewer-chrome-bottom,
+  :is(.viewer-chrome-top, .viewer-chrome-bottom):where(:has(:focus-visible), :has(details[open]), :has(select:open)) {
+    --chrome-opacity: 1; --chrome-pointer-events: auto;
+  }
+  :is(.viewer-chrome-top, .viewer-chrome-bottom) :is(.viewer-toolbar, .viewer-footer, .canvas-context, .canvas-limit, .canvas-legend, .canvas-navigation, .view-context) {
     opacity: var(--chrome-opacity); pointer-events: var(--chrome-pointer-events);
     transition: opacity var(--motion-duration) ease;
   }
-  .architecture-viewer :is(.canvas-context, .canvas-legend) { pointer-events: none; }
+  .architecture-viewer :is(.canvas-context, .canvas-limit, .canvas-legend) { pointer-events: none; }
 }
 @media (any-pointer: coarse) {
-  .architecture-viewer { --chrome-opacity: 1; --chrome-pointer-events: auto; }
+  .viewer-chrome-top, .viewer-chrome-bottom { --chrome-opacity: 1; --chrome-pointer-events: auto; }
 }
