@@ -68,7 +68,7 @@ export function compactNodes(model: Architecture, measurements: Measurements, lo
     const insetX = T.groupInset + T.edgeClearance, insetY = T.groupInset + T.edgeClearance + (vertical ? T.portSize + 16 + T.edgeClearance : 0);
     for (const child of children) { child.x += insetX; child.y += insetY + headerHeight; }
     return { id, children, headerHeight, x: 0, y: 0,
-      width: Math.max(header.width + 2 * T.groupInset, packed.width + 2 * insetX),
+      width: Math.max(T.nodeWidth + 2 * T.groupInset, header.width + 2 * T.groupInset, packed.width + 2 * insetX),
       height: Math.max(headerHeight + 2 * T.groupInset, packed.height + 2 * insetY + headerHeight) };
   }
   const roots = flowOrder(entries.filter(node => !node.parent).map(node => node.id), model).map(tile);

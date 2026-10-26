@@ -40,16 +40,19 @@ async function layeredLayout(model: Architecture, measurements: Measurements, wo
   const root: ElkNode = { id: '__root__', children: [], edges: [], layoutOptions: options };
   const entries = new Map<string, ElkNode>();
   const headers = new Map<string, number>();
+  const populated = new Set([...model.groups, ...model.nodes].flatMap(entry => entry.parent ? [entry.parent] : []));
   for (const group of [...model.groups].sort((a, b) => a.id.localeCompare(b.id))) {
     const header = measuredSize(measurements.headers, group.id);
     const headerHeight = header.height + T.headerGap;
     headers.set(group.id, headerHeight);
-    const width = header.width + 2 * T.groupInset;
+    const width = Math.max(T.nodeWidth, header.width) + 2 * T.groupInset;
     const height = headerHeight + 2 * T.groupInset;
+    // ELK 0.12.0 transforms populated DOWN compound minima; empty leaves keep physical axes.
+    const minimum = vertical && populated.has(group.id) ? `(${height},${width})` : `(${width},${height})`;
     entries.set(group.id, { id: group.id, width, height, children: [], layoutOptions: {
       ...options,
       'elk.padding': `[top=${T.groupInset + headerHeight + T.edgeClearance},left=${T.groupInset},bottom=${T.groupInset},right=${T.groupInset}]`,
-      'elk.nodeSize.constraints': 'MINIMUM_SIZE', 'elk.nodeSize.minimum': `(${width},${height})`,
+      'elk.nodeSize.constraints': 'MINIMUM_SIZE', 'elk.nodeSize.minimum': minimum,
     } });
   }
   for (const node of [...model.nodes].sort((a, b) => a.id.localeCompare(b.id))) {

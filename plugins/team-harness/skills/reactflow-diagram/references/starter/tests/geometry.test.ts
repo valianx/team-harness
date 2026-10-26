@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { checkGeometry, segmentIntersects } from '../src/geometry';
+import { TOKENS as T } from '../src/tokens';
 import type { Architecture, Diagnostic, Endpoint, Geometry, PlacedNode, Relationship, Route } from '../src/types';
 
 const evidence = [{ source: 'source', locator: 'Synthetic architecture' }];
@@ -311,7 +312,7 @@ for (const [name, width, height] of [['horizontal insets', 40, 150], ['header an
 test('an empty group with room for its header and insets is valid', () => {
   const model = architecture([], [], [{ id: 'group' }]);
   assert.deepEqual(checkGeometry(model, geometry([
-    box('group', 0, 0, { kind: 'group', width: 320, height: 96, headerHeight: 32 }),
+    box('group', 0, 0, { kind: 'group', width: Math.max(320, T.nodeWidth + 2 * T.groupInset), height: 96, headerHeight: 32 }),
   ])), []);
 });
 
