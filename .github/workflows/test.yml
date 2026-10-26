@@ -145,9 +145,6 @@ jobs:
   native-excalidraw:
     name: native Excalidraw editing and export (Chromium)
     runs-on: ubuntu-latest
-    env:
-      NATIVE_TOOL_DIR: ${{ runner.temp }}/native-excalidraw/references
-      NATIVE_EVIDENCE_DIR: ${{ runner.temp }}/native-excalidraw/evidence
     steps:
       - uses: actions/checkout@v4
         with:
@@ -158,6 +155,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+      - name: Configure native tool paths on the runner
+        run: |
+          echo "NATIVE_TOOL_DIR=$RUNNER_TEMP/native-excalidraw/references" >> "$GITHUB_ENV"
+          echo "NATIVE_EVIDENCE_DIR=$RUNNER_TEMP/native-excalidraw/evidence" >> "$GITHUB_ENV"
       - name: Copy the native tools outside the installation
         run: node -e "require('node:fs').cpSync('skills/excalidraw-diagram/references', process.env.NATIVE_TOOL_DIR, {recursive:true})"
       - name: Install locked official editor and browser tooling
