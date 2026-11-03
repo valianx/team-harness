@@ -1,46 +1,34 @@
 ---
 name: diagram
-description: Create an Excalidraw diagram for a concept or workflow.
+description: Use when an Excalidraw diagram is requested for a concept, workflow or architecture.
 ---
 
-Create an Excalidraw diagram that visually argues a concept, workflow, or architecture. Routes through the orchestrator which delegates to the excalidraw-diagram skill.
+# Create an editable diagram
 
-Use supplied sources and scenes with [reference-led composition](../excalidraw-diagram/references/composition.md).
-Web reconstruction is optional; explicit engine choices retain their own workflow.
+Main applies [excalidraw-diagram](../excalidraw-diagram/SKILL.md) directly with the
+host's native tools. Supplied sources, approved references and current editable
+scenes guide the result. Honor an explicit request for another engine through
+its selected skill.
 
-## Input
+## Input and destination
 
-$ARGUMENTS — describe what to diagram. Examples:
-- "the dev-team pipeline flow"
-- "authentication flow for the login system"
-- "how the orchestrator delegates to agents"
-- A topic without description → the orchestrator infers what to visualize
+`$ARGUMENTS` describes the diagram, such as "authentication flow for the login
+system". For a topic alone, infer a useful view from the bound context.
 
-## Flags
+- `--vault [name]` writes the `.excalidraw` file to the named Obsidian vault
+  instead of the declared artifact directory. Resolve the vault mapping through
+  the active runtime; report an unresolved mapping instead of inventing a path.
+- `--folder <name>` selects a subfolder within that vault. It requires
+  `--vault` and defaults to the vault root.
 
-- `--vault [name]` — write the `.excalidraw` file to the named Obsidian vault
-  instead of the declared artifact directory. The active runtime resolves the vault
-  mapping; the skill does not assume a host-specific config path.
-- `--folder <name>` — subfolder within the vault (only with `--vault`). Default: vault root.
+Parse and remove these flags from the diagram description. Use the resolved
+vault and folder as the real local artifact directory, or retain the existing
+declared directory when no vault is requested. Preserve an explicit file target;
+otherwise create `diagram.excalidraw` in the selected directory.
 
-## What happens
+## Complete the request
 
-1. Parse `--vault` and `--folder` flags from `$ARGUMENTS` (strip them from the description).
-2. Pass to the `orchestrator` agent:
-
-```
-Direct Mode Task: diagram
-Description: {$ARGUMENTS without flags}
-Context: {bound file or Page locator; Main retains narrative returns}
-Output: {explicit real local artifact directory; diagram.excalidraw by default}
-Vault: {vault name or null}
-Vault path: {resolved path from the active runtime or null}
-Folder: {folder name or null}
-```
-
-## Rules
-
-- Always invoke the `orchestrator` agent — do NOT invoke the excalidraw-diagram skill directly
-- The orchestrator will load the excalidraw-diagram skill context and generate the diagram
-- The skill handles render validation (Playwright render loop) internally
-- Output is a `.excalidraw` file (and optionally a PNG preview)
+Read the selected skill, compose the native scene, then perform its bounded
+visual review and native editor validation. Retain the editable file, previews
+and evidence in the selected location; Main links the artifacts and reports
+assessment results or draft limits in the bound context.

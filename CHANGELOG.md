@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.57.1] - 2026-11-03
+
+### Changed
+
+- Simplify Excalidraw authoring with focused guidance and optional connected tools while preserving native verification.
+
 ## [3.57.0] - 2026-10-26
 
 ### Changed

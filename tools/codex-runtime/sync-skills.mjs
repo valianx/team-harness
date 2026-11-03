@@ -63,7 +63,7 @@ const codexSpecialMappings = new Map([
   ["cross-repo", "Use only repository paths and external reads authorized by the operator. Delegate useful independent repository work with explicit ownership under native permissions."],
   ["diagram", "Create the diagram directly in Main using the packaged Excalidraw workflow; do not dispatch a Claude orchestrator."],
   ["d2-diagram", "Author the `.d2` source directly. Treat D2 CLI rendering as optional and report when the executable is unavailable."],
-  ["excalidraw-diagram", "Use the packaged schema, templates, and renderer directly; preserve its render-validation loop when dependencies are available."],
+  ["excalidraw-diagram", "Create or revise the scene directly in Main. Use local tools by default and load format, composition and tool references only as needed; preserve native editor verification and the bounded visual correction loop."],
   ["gcp-costs", "Default to read-only GCP inspection. Require native permission and explicit operator scope before any external command."],
   ["gcp-infra", "Keep read-and-plan as the default and use native `security` and `qa` reviewers for a prepared change. Follow canonical scoped authorization: reuse clear approval for the unchanged plan, ask only for a missing decision, and preserve native permissions."],
   ["inline", "Treat inline as a Team Harness working preference only. It cannot change Codex's system collaboration mode, sandbox, or approval policy."],

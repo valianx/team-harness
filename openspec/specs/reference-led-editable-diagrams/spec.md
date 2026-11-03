@@ -5,6 +5,18 @@ Turn source material and approved visual references into readable native diagram
 
 ## Requirements
 
+### Requirement: Proportionate native authoring
+
+The workflow SHALL run in the current native coordinator, use local artifact tools by default, and load format, composition and tool-selection references only when relevant. MCP SHALL be optional for an authorized connected canvas or workspace. A simplified element API or automatic layout MAY reduce authoring work, but SHALL NOT replace native connection, revision or delivery verification. The workflow SHALL preserve the operator's requested engine, destination and existing authorization.
+
+#### Scenario: A local diagram needs no connected service
+- **WHEN** the operator requests an editable local Excalidraw artifact
+- **THEN** Main creates and verifies it with local tools without requiring MCP, a persistent orchestrator, account access or publication
+
+#### Scenario: A draft exporter is available
+- **WHEN** a CLI or connected tool produces a PNG preview
+- **THEN** the workflow inspects it as visual evidence and retains separate required native-editability verification before claiming final editable delivery
+
 ### Requirement: Contextual editable flow composition
 
 The diagram workflow SHALL honor the requested engine and reuse approved scene, typography, palette and composition preferences from the supplied material or bound context. Component cards, repeated logical components and independent flow sections SHALL be supported when they clarify the requested story. Defaults SHALL NOT impose visual variety, contained-text ratios or element counts that contradict approved references or source completeness. Component-role colors and relationship-class colors SHALL remain distinct choices.

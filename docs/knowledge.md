@@ -311,3 +311,4 @@ superseded unless a bullet explicitly records the current two-posture contract.
 - [decision] Architecture diagrams adapt graph visuals to context while preserving standard floating controls and 90% canvas framing.
 - [pattern] Diagram authoring compares measured compact and layered compositions and reviews fitted consumer output before delivery.
 - [constraint] Approved diagram references guide scoped composition; native editing/export, source fidelity, visual quality and unassisted generation require separate evidence.
+- [decision] Excalidraw uses local tools and conditional references by default; connected tools remain optional and PNG previews do not certify native editing.
