@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { nativeArrowPaint, nativeLabelGroup, observeComposition } from './observations.mjs';
 import 'official-sdk/index.css';
 
 window.EXCALIDRAW_ASSET_PATH = `/node_modules/${new URLSearchParams(location.search).get('sdk') === 'stable' ? 'excalidraw-stable' : '@excalidraw/excalidraw'}/dist/prod/`;
@@ -124,7 +125,7 @@ function observeTypography(svg, elements) {
     const role = container?.type === 'arrow' ? 'relationship' : container ? 'component' : 'unbound';
     try {
       let group;
-      if (role === 'relationship') group = document.getElementById(`mask-${container.id}`)?.nextElementSibling;
+      if (role === 'relationship') group = nativeLabelGroup(svg, container.id);
       else {
         const matching = groups.filter(group => directText(group).map(text => text.textContent).join('\n') === element.text);
         // Size only disambiguates duplicate text; missing SVG measurements never use the scene value.
@@ -140,7 +141,7 @@ function observeTypography(svg, elements) {
   });
 }
 
-window.exportScene = async scale => {
+window.exportScene = async (scale, review = false) => {
   const elements = api.getSceneElements();
   if (sdk.Fonts) await sdk.Fonts.loadElementsFonts(elements);
   await document.fonts.ready;
@@ -161,24 +162,28 @@ window.exportScene = async scale => {
     const center = point.matrixTransform(text.getCTM());
     return { text: text.textContent, center: { x: center.x, y: center.y }, fontFamily: text.getAttribute('font-family') };
   });
-  const [minX, minY] = sdk.getCommonBounds(elements);
+  const commonBounds = sdk.getCommonBounds(elements);
   const labelChecks = elements.filter(element => element.type === 'text' && element.containerId && element.labelPosition != null).map(label => {
     const arrow = elements.find(element => element.id === label.containerId && element.type === 'arrow');
     if (!arrow) return null;
+    const shaft = nativeArrowPaint(svg, arrow.id)?.firstElementChild;
+    if (!shaft) return { id: label.id, error: 'No identifiable native shaft export group' };
+    // Frame titles extend export bounds; use the actual shaft transform as the origin.
+    const nativeMatrix = svg.getCTM().inverse().multiply(shaft.getCTM());
     const lengths = arrow.points.slice(1).map((point, index) => Math.hypot(point[0] - arrow.points[index][0], point[1] - arrow.points[index][1]));
     let distance = lengths.reduce((sum, length) => sum + length, 0) * label.labelPosition;
     let expected;
     for (let index = 0; index < lengths.length; index++) {
       if (distance <= lengths[index] || index === lengths.length - 1) {
         const ratio = lengths[index] ? distance / lengths[index] : 0;
-        expected = { x: arrow.x + arrow.points[index][0] + (arrow.points[index + 1][0] - arrow.points[index][0]) * ratio - minX + 40,
-          y: arrow.y + arrow.points[index][1] + (arrow.points[index + 1][1] - arrow.points[index][1]) * ratio - minY + 40 };
+        const local = new DOMPoint(arrow.points[index][0] + (arrow.points[index + 1][0] - arrow.points[index][0]) * ratio,
+          arrow.points[index][1] + (arrow.points[index + 1][1] - arrow.points[index][1]) * ratio).matrixTransform(nativeMatrix);
+        expected = { x: local.x, y: local.y };
         break;
       }
       distance -= lengths[index];
     }
-    const mask = [...svg.querySelectorAll('mask')].find(element => element.id === `mask-${arrow.id}`);
-    const group = mask?.nextElementSibling;
+    const group = nativeLabelGroup(svg, arrow.id);
     if (!group?.querySelector('text')) return { id: label.id, error: 'No identifiable native label export group' };
     const center = svg.createSVGPoint();
     center.x = label.width / 2;
@@ -187,7 +192,8 @@ window.exportScene = async scale => {
     return { id: label.id, expected, actual: { x: actual.x, y: actual.y }, errorDistance: Math.hypot(actual.x - expected.x, actual.y - expected.y) };
   }).filter(Boolean);
   return { svg: svg.outerHTML, png, labels, labelChecks, labelVisibilityChecks: observeLabelVisibility(svg, elements),
-    typography: observeTypography(svg, elements), viewBox: { width: svg.viewBox.baseVal.width, height: svg.viewBox.baseVal.height } };
+    typography: observeTypography(svg, elements), viewBox: { width: svg.viewBox.baseVal.width, height: svg.viewBox.baseVal.height },
+    ...(review ? { observations: observeComposition(svg, elements, commonBounds) } : {}) };
 };
 
 window.__nativeReady = true;

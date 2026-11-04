@@ -25,6 +25,21 @@ fidelity or visual readability; those remain explicitly unassessed in the report
 Inspect actual arrow/label visibility before and after the edit as well as label positions. A native mask concealing a connection or its arrowhead fails verification; keep the observed editability facts and source/visual assessments separate.
 Connection-free scenes export with native binding verification `not-applicable`.
 
+Append `--review` for measured composition diagnostics and up to eight annotated
+native-export crops before and after the edit. `verification.json` separates
+`composition` findings from editability and leaves `visual` unassessed. Overflow,
+overlap and unrelated route crossings use recovered geometry and font-ready SVG
+text; approximate geometry produces warnings and missing measurements stay unavailable.
+Inspect warnings and the faithful overview, including intentional containment.
+Use `--focus card-id,label-id` for other crops; `--before /absolute/backup.excalidraw`
+adds a before/current comparison with the same world-coordinate framing and scale.
+Both source files remain unchanged. Keep originals outside generated `review-*` directories.
+For intended alignment, pass `--layout /absolute/layout.json`, for example
+`{"alignmentGroups":[{"ids":["a","b","c"],"axis":"y","anchor":"center","spacing":"equal","tolerance":2}]}`.
+The named axis aligns anchors; equal spacing compares gaps on the other axis.
+These checks use scene units, convex footprints and route centerlines; they do
+not certify aesthetics, stroke-envelope clearance or arbitrary intentional offsets.
+
 Before revising approved work, read the current file and compute its SHA-256.
 Use `python3 ../render_excalidraw.py APPROVED --patch PATCH.json --expected-sha256 HASH --backup-dir DIR`.
 A patch contains `updates: [{id, changes: {...}}]`, optional `additions`, and optional

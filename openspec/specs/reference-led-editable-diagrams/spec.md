@@ -51,6 +51,20 @@ Delivery SHALL include the native editable scene and faithful exports assessed a
 
 Verification SHALL retain connection-visibility observations independently of label-position fidelity: a correctly positioned bound label SHALL NOT conceal its connection and direction. Per-flow presentation review SHALL use actual fitted text observations rather than source font sizes alone. Prerequisite validation repairs SHALL be bounded separately; a rejected preflight without a native render SHALL NOT consume a visual corrective cycle.
 
+Composition review SHALL expose measured findings with element identities and focused native-export captures. Alignment and equal-spacing checks SHALL use declared layout groups. Approximate geometry SHALL remain advisory, and missing observations SHALL NOT certify success. Corrections SHALL preserve a pre-change scene and compare revisions at a common framing and scale while retaining separate visual and source-fidelity judgment.
+
+#### Scenario: A composition has a local visual defect
+- **WHEN** native composition review observes text overflow, overlaps or a route crossing an unrelated element
+- **THEN** it retains the affected IDs, measurements and focused evidence before and after the edit, and unresolved measured errors keep delivery a draft
+
+#### Scenario: A correction changes neighboring geometry
+- **WHEN** the agent reviews a revised scene against its saved predecessor
+- **THEN** the workflow provides a common-framing comparison without changing either input and inspects the intended correction and surrounding routes
+
+#### Scenario: A frame wraps native label exports
+- **WHEN** the editor exports bound labels through frame clipping groups
+- **THEN** verification observes their actual glyphs and native transforms rather than assuming an unframed export origin
+
 #### Scenario: Exporter and editor differ on a supported label field
 - **WHEN** a scene's bound-label position changes during import or export
 - **THEN** the mismatch is retained as a failing compatibility observation until a compatible verified editor/export path preserves the approved result

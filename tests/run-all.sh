@@ -146,6 +146,7 @@ else
     FAILED=$((FAILED + 1))
 fi
 run_node_suite "excalidraw-python-discovery" "../skills/excalidraw-diagram/references/native/tests/python.test.mjs" "node not found"
+run_node_suite "excalidraw-composition" "../skills/excalidraw-diagram/references/native/tests/composition.test.mjs" "node not found"
 
 echo
 echo "############################################################"

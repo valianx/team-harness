@@ -182,6 +182,8 @@ NATIVE_EVIDENCE_DIR=/absolute/workspace/native-evidence npm --prefix /absolute/w
 This checks actual import, recovery, bound editing and exports against the pinned
 SDK and retains a stable-version incompatibility control. The default repository
 suite checks scene integrity, safe revision and interpreter discovery without a browser.
+Review tests also cover frame labels, measured composition findings, focused crops,
+common-framing comparisons and preservation of both input scenes through output aliases.
 Source fidelity and reference-based visual quality require their separate assessment.
 
 The architecture diagram starter has a separate Chromium lane. It copies the kit

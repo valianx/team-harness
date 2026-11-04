@@ -59,8 +59,14 @@ drag and pass its ID. Follow the native guide for setup and safe patch commands.
 ```bash
 node "{copied_references}/native/verify.mjs" "{source_file}" \
   --output-dir "{evidence_dir}" --output "{output_png}" \
-  --edit-id "{bound_component_id}"
+  --edit-id "{bound_component_id}" --review
 ```
+
+Read the composition findings and inspect the overview plus flagged crops. Use
+`--focus ID,ID` to examine another region and `--before BACKUP` to compare revisions
+at the same framing. Declare intended rows/columns through `--layout JSON` when
+alignment or equal spacing matters. Geometry warnings need visual judgment;
+missing observations and unresolved errors keep the scene a draft.
 
 Connection-free scenes record native binding verification as not applicable.
 For desktop per-flow presentation, append `--presentation` and inspect actual
@@ -91,6 +97,9 @@ Retain each observation and scoped causal change, re-verify and view the current
 outputs after every correction. Preserve the current scene and backup on each
 revision. Correct short connections by reserving measured label and arrowhead
 clearance while retaining readable text and native bindings.
+Keep the verifier and thresholds fixed while correcting composition; report
+suspected checker defects separately. Compare each correction with its saved
+pre-change scene and check both the intended improvement and surrounding routes.
 
 Deliver the editable scene, faithful previews and retained evidence with the
 assessment results and named limits. Failed or unavailable required checks keep
