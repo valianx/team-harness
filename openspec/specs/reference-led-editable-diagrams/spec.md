@@ -37,6 +37,12 @@ The diagram workflow SHALL honor the requested engine and reuse approved scene, 
 
 Connections SHALL use native editable arrow elements, including native elbows when appropriate, with coherent endpoints, supported bindings and reciprocal bound labels. Text SHALL be measured with the selected fonts ready. Revisions SHALL read and preserve the current editable scene, retain unaffected identities and human edits, and create a recoverable backup before changing an approved file. Generated drafts and historical generators SHALL NOT silently replace the approved editable scene.
 
+Orthogonal routes SHOULD use native elbows by default; an approved reference or geometry MAY justify other native paths. Edit proof SHALL choose a measured free destination within existing enclosing bounds, retain the minimum movement requirement and run post-edit connection checks. Unavailable safe movement SHALL remain explicit rather than falling back to a colliding drag.
+
+#### Scenario: The first drag direction is occupied
+- **WHEN** a candidate edit-proof move would overlap another component or leave its container
+- **THEN** the verifier tests another bounded direction and reports unavailable proof if none is safe, without modifying the source
+
 #### Scenario: A component or arrow is moved
 - **WHEN** a native editor imports a diagram and a bound component or connection is moved
 - **THEN** its supported bindings, arrow geometry and associated labels remain coherent and editable rather than becoming disconnected line segments
@@ -52,6 +58,8 @@ Delivery SHALL include the native editable scene and faithful exports assessed a
 Verification SHALL retain connection-visibility observations independently of label-position fidelity: a correctly positioned bound label SHALL NOT conceal its connection and direction. Per-flow presentation review SHALL use actual fitted text observations rather than source font sizes alone. Prerequisite validation repairs SHALL be bounded separately; a rejected preflight without a native render SHALL NOT consume a visual corrective cycle.
 
 Composition review SHALL expose measured findings with element identities and focused native-export captures. Alignment and equal-spacing checks SHALL use declared layout groups. Approximate geometry SHALL remain advisory, and missing observations SHALL NOT certify success. Corrections SHALL preserve a pre-change scene and compare revisions at a common framing and scale while retaining separate visual and source-fidelity judgment.
+
+The verifier SHALL return compact statuses, diagnostic totals and evidence paths while retaining complete findings in its report. Passing verification MAY be reused only for identical scene content, verifier/renderer identity and invocation options; changed views and affected compositions SHALL be checked again.
 
 #### Scenario: A composition has a local visual defect
 - **WHEN** native composition review observes text overflow, overlaps or a route crossing an unrelated element

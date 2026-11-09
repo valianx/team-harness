@@ -41,7 +41,8 @@ when an alternative is needed; connected destinations require scoped authorizati
    IDs, metadata, annotations, styles and positions. Historical generators
    produce drafts; the current scene is the revision source.
 5. Build native editable arrows with coherent endpoints, supported bindings,
-   native elbows where appropriate and reciprocal bound labels. Load the
+   native elbows by default for orthogonal routes and reciprocal bound labels.
+   Use other native paths when the reference or geometry requires them. Load the
    selected fonts before measuring text. Reserve room for readable labels,
    their masks and visible arrowheads; route around unrelated elements.
 
@@ -53,12 +54,12 @@ approved context supply no palette. Keep format details in these references.
 ## Verify the current revision
 
 Final editable delivery requires [native verification](references/native/README.md)
-with the reproducibly identified editor and renderer. Use the existing pinned
-verifier in a copied local tool environment; retain its dependency identity,
+with the reproducibly identified editor and renderer. Reuse a matching prepared
+local tool environment; retain its dependency identity,
 recovered scenes, editor captures, SVG/PNG exports and verification report.
 
-For scenes with connections, select a bound component with room for the demonstration
-drag and pass its ID. Follow the native guide for setup and safe patch commands.
+For scenes with connections, pass a bound component ID. The verifier plans a drag
+into free space within its enclosing bounds; unavailable space keeps proof pending.
 
 ```bash
 node "{copied_references}/native/verify.mjs" "{source_file}" \
@@ -66,11 +67,14 @@ node "{copied_references}/native/verify.mjs" "{source_file}" \
   --edit-id "{bound_component_id}" --review
 ```
 
-Read the composition findings and inspect the overview plus flagged crops. Use
+Start with the CLI summary and inspect the overview plus flagged crops. Read the
+full report for relevant findings, and helper code only to diagnose checker failures. Use
 `--focus ID,ID` to examine another region and `--before BACKUP` to compare revisions
 at the same framing. Declare intended rows/columns through `--layout JSON` when
 alignment or equal spacing matters. Geometry warnings need visual judgment;
 missing observations and unresolved errors keep the scene a draft.
+Reuse passing checks only while scene SHA-256, verifier/renderer identity and
+invocation options match. Recheck changed views and their affected compositions.
 
 Connection-free scenes record native binding verification as not applicable.
 For desktop per-flow presentation, append `--presentation` and inspect actual

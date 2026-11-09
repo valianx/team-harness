@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { nativeArrowPaint, nativeLabelGroup, observeComposition } from './observations.mjs';
+import { planDrag } from './drag.mjs';
 import 'official-sdk/index.css';
 
 window.EXCALIDRAW_ASSET_PATH = `/node_modules/${new URLSearchParams(location.search).get('sdk') === 'stable' ? 'excalidraw-stable' : '@excalidraw/excalidraw'}/dist/prod/`;
@@ -51,7 +52,10 @@ window.getDragPoint = id => {
   const element = api.getSceneElements().find(value => value.id === id);
   if (!element) throw new Error(`No editable element ${id}`);
   api.updateScene({ appState: { selectedElementIds: { [id]: true } } });
-  return sdk.sceneCoordsToViewportCoords({ sceneX: element.x + element.width / 2, sceneY: element.y + element.height / 2 }, api.getAppState());
+  const state = api.getAppState();
+  const pointer = sdk.sceneCoordsToViewportCoords({ sceneX: element.x + element.width / 2, sceneY: element.y + element.height / 2 }, state);
+  return { ...pointer, zoom: state.zoom.value, plan: planDrag(api.getSceneElements(), id, { zoom: state.zoom.value,
+    viewportPoint: pointer, viewport: { width: window.innerWidth, height: window.innerHeight } }) };
 };
 
 // Native SVG head footprints include stroke clearance; the intended shaft cutout is allowed.

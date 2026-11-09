@@ -9,6 +9,8 @@ import { createServer } from 'vite';
 import { findPython } from './python.mjs';
 import { inspectComposition } from './composition.mjs';
 import { writeComparison, writeReview } from './review-output.mjs';
+import { summarizeVerification } from './summary.mjs';
+import { planDrag } from './drag.mjs';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const { values, positionals } = parseArgs({ allowPositionals: true, options: {
@@ -194,9 +196,14 @@ try {
     const target = byId(imported).get(editId);
     if (!target?.boundElements?.some(bound => bound.type === 'arrow')) throw new Error('--edit-id must name a component with bound arrows');
     const point = await page.evaluate(id => window.getDragPoint(id), editId);
+    if (point.plan.status !== 'ready') {
+      report.edit = { id: editId, status: 'unavailable', reason: point.plan.reason };
+      report.nativeEditability = 'unavailable';
+      throw new Error(`Native edit proof unavailable: ${point.plan.reason}`);
+    }
     await page.mouse.move(point.x, point.y);
     await page.mouse.down();
-    await page.mouse.move(point.x + 60, point.y + 45, { steps: 12 });
+    await page.mouse.move(point.x + point.plan.pointerDelta.x, point.y + point.plan.pointerDelta.y, { steps: 12 });
     await page.mouse.up();
     await page.waitForFunction(id => window.recoverScene().elements.find(element => element.id === id)?.version > 1, editId);
     const edited = await page.evaluate(() => window.recoverScene());
@@ -204,10 +211,17 @@ try {
     checkPreserved(imported, edited, 'edit');
     guard(resolve(output, 'edited.excalidraw'));
     const moved = byId(edited).get(editId);
-    report.edit = { id: editId, movedDistance: Math.hypot(moved.x - target.x, moved.y - target.y),
+    const actualDelta = { x: (moved.x - target.x) * point.zoom, y: (moved.y - target.y) * point.zoom };
+    const actualPlan = planDrag(imported.elements, editId, { zoom: point.zoom, pointerDeltas: [actualDelta],
+      viewportPoint: { x: point.x, y: point.y }, viewport: { width: Number(values.width), height: 900 } });
+    report.edit = { id: editId, pointerDeltaCssPx: point.plan.pointerDelta, plannedDestination: point.plan.destination,
+      destination: { x: moved.x, y: moved.y, width: moved.width, height: moved.height }, destinationSafety: actualPlan.status,
+      movedDistance: Math.hypot(moved.x - target.x, moved.y - target.y),
       changedArrowIds: imported.elements.filter(element => element.type === 'arrow' && [element.startBinding?.elementId, element.endBinding?.elementId].includes(editId)
         && !same([element.x, element.y, element.points], [byId(edited).get(element.id)?.x, byId(edited).get(element.id)?.y, byId(edited).get(element.id)?.points])).map(element => element.id) };
     if (report.edit.movedDistance < 20 || !report.edit.changedArrowIds.length) report.errors.push('Native drag did not move the component and its bound arrow geometry');
+    if (actualPlan.status !== 'ready') report.errors.push(`Recovered edit destination is not safe: ${actualPlan.reason}`);
+    if (['width', 'height', 'angle'].some(key => Math.abs(moved[key] - target[key]) > .001)) report.errors.push('Native pointer proof resized or rotated the component');
     const changedExport = await page.evaluate(({ scale, review }) => window.exportScene(scale, review), { scale: Number(values.scale), review: values.review });
     await writeFile(resolve(output, 'edited.svg'), changedExport.svg);
     await writeFile(resolve(output, 'edited.png'), Buffer.from(changedExport.png, 'base64'));
@@ -240,8 +254,5 @@ try {
   await server?.close();
   await writeFile(resolve(output, 'verification.json'), JSON.stringify(report, null, 2) + '\n');
 }
-console.log(JSON.stringify({ report: resolve(output, 'verification.json'), nativeEditability: report.nativeEditability,
-  labelVisibility: report.labelVisibility, visibilityErrors: report.visibilityErrors, presentationReadability: report.presentationReadability,
-  ...(values.review ? { composition: { status: report.composition.status, initial: report.composition.initial?.counts, edited: report.composition.edited?.counts }, review: report.review } : {}),
-  presentationFailures: report.presentationFailures, errors: report.errors }));
+console.log(JSON.stringify(summarizeVerification(report, resolve(output, 'verification.json'))));
 process.exitCode = report.verification === 'pass' ? 0 : 1;
