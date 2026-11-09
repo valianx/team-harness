@@ -1,6 +1,6 @@
 ---
 name: excalidraw-diagram
-description: "Create Excalidraw diagram JSON files that make visual arguments. Use when the user wants to visualize workflows, architectures, or concepts."
+description: "Use when an editable Excalidraw diagram is requested for a workflow, architecture or concept, including source-led composition and revisions."
 metadata:
   team-harness/config: "__TEAM_HARNESS_OPENCODE_CONFIG__"
 ---

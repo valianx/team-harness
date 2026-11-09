@@ -1,10 +1,14 @@
 # Native verification
 
 Use Node 22.12+ and Python 3 (`TH_NATIVE_PYTHON` can select its executable).
-Copy the complete `references` directory into the selected external workspace.
+Prepare the complete `references` directory once outside the installation.
 Inside its `native` directory run `npm ci` and `npx playwright install chromium`.
+Reuse it while reference files and locked dependency identity match this skill revision.
 Run `node verify.mjs /absolute/scene.excalidraw --output-dir /absolute/evidence --edit-id component-id`.
-Select a bound component with room for the demonstration drag; inspect both recovered exports and retain failed attempts rather than overwriting the approved scene.
+Select a bound component; the verifier tests bounded candidate moves into free space,
+preserving enclosing bounds and minimum movement. No safe destination stays explicitly
+unavailable. Route/label checks still run after the real drag; inspect both recovered exports.
+CLI output is a bounded status/count/path summary; complete diagnostics remain in `verification.json`.
 For a desktop per-flow presentation append `--presentation` (also supported by the Python wrapper): fitted names/relationship labels must meet 14/11 CSS px at 1280×720 and 1440×900. Generic mode reports typography without imposing those per-flow targets on collection overviews.
 Compare measured text IDs/counts with the source inventory and inspect unbound text separately; classified measurements do not establish source completeness.
 The Python wrapper remains available: `python3 ../render_excalidraw.py /absolute/scene.excalidraw --output /absolute/scene.png`.
@@ -24,6 +28,21 @@ exports and `verification.json`. Native/structural checks cannot certify source
 fidelity or visual readability; those remain explicitly unassessed in the report.
 Inspect actual arrow/label visibility before and after the edit as well as label positions. A native mask concealing a connection or its arrowhead fails verification; keep the observed editability facts and source/visual assessments separate.
 Connection-free scenes export with native binding verification `not-applicable`.
+
+Append `--review` for measured composition diagnostics and up to eight annotated
+native-export crops before and after the edit. `verification.json` separates
+`composition` findings from editability and leaves `visual` unassessed. Overflow,
+overlap and unrelated route crossings use recovered geometry and font-ready SVG
+text; approximate geometry produces warnings and missing measurements stay unavailable.
+Inspect warnings and the faithful overview, including intentional containment.
+Use `--focus card-id,label-id` for other crops; `--before /absolute/backup.excalidraw`
+adds a before/current comparison with the same world-coordinate framing and scale.
+Both source files remain unchanged. Keep originals outside generated `review-*` directories.
+For intended alignment, pass `--layout /absolute/layout.json`, for example
+`{"alignmentGroups":[{"ids":["a","b","c"],"axis":"y","anchor":"center","spacing":"equal","tolerance":2}]}`.
+The named axis aligns anchors; equal spacing compares gaps on the other axis.
+These checks use scene units, convex footprints and route centerlines; they do
+not certify aesthetics, stroke-envelope clearance or arbitrary intentional offsets.
 
 Before revising approved work, read the current file and compute its SHA-256.
 Use `python3 ../render_excalidraw.py APPROVED --patch PATCH.json --expected-sha256 HASH --backup-dir DIR`.

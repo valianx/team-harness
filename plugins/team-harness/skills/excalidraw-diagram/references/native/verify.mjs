@@ -1,33 +1,58 @@
 import { createHash } from 'node:crypto';
-import { lstat, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { resolve, dirname } from 'node:path';
+import { lstat, mkdir, readFile, realpath, stat, writeFile } from 'node:fs/promises';
+import { resolve, dirname, relative, sep, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
 import { findPython } from './python.mjs';
+import { inspectComposition } from './composition.mjs';
+import { writeComparison, writeReview } from './review-output.mjs';
+import { summarizeVerification } from './summary.mjs';
+import { planDrag } from './drag.mjs';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const { values, positionals } = parseArgs({ allowPositionals: true, options: {
   'output-dir': { type: 'string' }, output: { type: 'string' }, 'edit-id': { type: 'string' },
   sdk: { type: 'string', default: 'pinned' }, scale: { type: 'string', default: '2' }, width: { type: 'string', default: '1440' },
   presentation: { type: 'boolean', default: false },
+  review: { type: 'boolean', default: false }, focus: { type: 'string' },
+  before: { type: 'string' }, layout: { type: 'string' },
 } });
 if (positionals.length !== 1 || !values['output-dir'] || !['pinned', 'stable'].includes(values.sdk)) {
-  throw new Error('Usage: node verify.mjs INPUT --output-dir DIR [--edit-id ID] [--sdk pinned|stable] [--presentation]');
+  throw new Error('Usage: node verify.mjs INPUT --output-dir DIR [--edit-id ID] [--sdk pinned|stable] [--presentation] [--review [--focus ID,ID] [--before SCENE] [--layout JSON]]');
 }
+if (!values.review && (values.focus || values.before || values.layout)) throw new Error('Focus, comparison and layout diagnostics require --review');
+const focusIds = values.focus ? values.focus.split(',').filter(Boolean) : [];
+if (focusIds.length > 8) throw new Error('Request at most eight focused elements per review');
 const input = resolve(positionals[0]);
 const output = resolve(values['output-dir']);
 await mkdir(output, { recursive: true });
 const raw = await readFile(input);
 const inputStat = await stat(input);
+const beforePath = values.before ? resolve(values.before) : null;
+const beforeRaw = beforePath ? await readFile(beforePath) : null;
+const beforeStat = beforePath ? await stat(beforePath) : null;
+const protectedSources = [inputStat, beforeStat].filter(Boolean).map(({ dev, ino }) => ({ dev, ino }));
+if (values.review) {
+  const physicalOutput = await realpath(output);
+  const reviewDirectories = await Promise.all(['review-initial', 'review-edited', 'review-comparison'].map(async name =>
+    realpath(resolve(output, name)).catch(error => { if (error.code !== 'ENOENT') throw error; return resolve(physicalOutput, name); })));
+  for (const source of [input, beforePath].filter(Boolean)) {
+    const physicalSource = await realpath(source);
+    if (reviewDirectories.some(directory => {
+      const child = relative(directory, physicalSource);
+      return child === '' || child !== '..' && !child.startsWith('..' + sep) && !isAbsolute(child);
+    })) throw new Error('Review scenes must be outside generated review directories');
+  }
+}
 for (const destination of ['imported.excalidraw', 'edited.excalidraw', 'scene.svg', 'scene.png', 'editor.png',
   'edited.svg', 'edited.png', 'edited-editor.png', 'verification.json'].map(name => resolve(output, name))
   .concat(values.output ? [resolve(values.output)] : [])) {
   let existing;
   try { existing = await lstat(destination); } catch (error) { if (error.code !== 'ENOENT') throw error; }
-  if (existing?.isSymbolicLink() || existing && existing.dev === inputStat.dev && existing.ino === inputStat.ino) {
+  if (existing?.isSymbolicLink() || existing && [inputStat, beforeStat].filter(Boolean).some(source => existing.dev === source.dev && existing.ino === source.ino)) {
     throw new Error('Output destination aliases the input or is a symlink; choose separate evidence paths');
   }
 }
@@ -44,6 +69,11 @@ const report = { input, inputSha256: createHash('sha256').update(raw).digest('he
   presentationRequested: values.presentation, presentationTargets: { componentTextPx: 14, relationshipTextPx: 11 },
   presentationReadability: values.presentation ? 'missing' : 'not-applicable', presentationFailures: [],
   sourceFidelity: 'unassessed', visual: 'unassessed', errors: [], browserErrors: [] };
+const reviewOptions = values.layout ? JSON.parse(await readFile(resolve(values.layout), 'utf8')) : {};
+if (values.review) {
+  report.composition = { status: 'unavailable' };
+  report.review = { ...(beforeRaw ? { beforeSha256: createHash('sha256').update(beforeRaw).digest('hex') } : {}) };
+}
 const byId = data => new Map(data.elements.map(element => [element.id, element]));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 function checkPreserved(before, after, stage) {
@@ -109,7 +139,8 @@ try {
   const address = server.httpServer.address();
   browser = await chromium.launch({ headless: true });
   report.browser = { engine: 'chromium', version: browser.version() };
-  const page = await browser.newPage({ viewport: { width: Number(values.width), height: 900 }, deviceScaleFactor: 1 });
+  const context = await browser.newContext({ viewport: { width: Number(values.width), height: 900 }, deviceScaleFactor: 1 });
+  const page = await context.newPage();
   page.on('pageerror', error => report.browserErrors.push(error.message));
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
   await page.goto(`http://127.0.0.1:${address.port}/?sdk=${values.sdk}`);
@@ -127,7 +158,7 @@ try {
   checkPreserved(scene, imported, 'import');
   guard(resolve(output, 'imported.excalidraw'));
   if (!report.fonts.ready) report.errors.push('Official scene fonts were not verified ready');
-  const exported = await page.evaluate(scale => window.exportScene(scale), Number(values.scale));
+  const exported = await page.evaluate(({ scale, review }) => window.exportScene(scale, review), { scale: Number(values.scale), review: values.review });
   await writeFile(resolve(output, 'scene.svg'), exported.svg);
   await writeFile(resolve(output, 'scene.png'), Buffer.from(exported.png, 'base64'));
   if (values.output) await writeFile(resolve(values.output), Buffer.from(exported.png, 'base64'));
@@ -139,6 +170,24 @@ try {
   report.fittedTypography = observeExport(exported, 'export');
   for (const check of exported.labelChecks) if (check.error || check.errorDistance > 1.5) report.errors.push(`export: ${check.id}.labelPosition differs from native path (${check.error || check.errorDistance})`);
   await page.screenshot({ path: resolve(output, 'editor.png') });
+  if (values.review) {
+    report.composition.initial = inspectComposition(exported.observations, reviewOptions);
+    report.review.initial = await writeReview(context, exported, report.composition.initial, output, 'initial', focusIds, protectedSources);
+    if (beforeRaw) {
+      guard(beforePath);
+      const beforePage = await context.newPage();
+      await beforePage.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+      beforePage.on('pageerror', error => report.browserErrors.push(`comparison: ${error.message}`));
+      try {
+        await beforePage.goto(page.url());
+        await beforePage.waitForFunction(() => window.__nativeReady === true, undefined, { timeout: 40_000 });
+        const fonts = await beforePage.evaluate(data => window.mountScene(data), JSON.parse(beforeRaw));
+        if (!fonts.ready) throw new Error('Comparison scene fonts are unavailable');
+        const previous = await beforePage.evaluate(() => window.exportScene(1, true));
+        report.review.comparison = await writeComparison(context, previous, exported, output, protectedSources);
+      } finally { await beforePage.close(); }
+    }
+  }
   const editId = values['edit-id'] || imported.elements.find(element => element.type !== 'arrow' && element.type !== 'text'
     && element.boundElements?.some(bound => bound.type === 'arrow'))?.id;
   const hasArrows = imported.elements.some(element => element.type === 'arrow');
@@ -147,9 +196,14 @@ try {
     const target = byId(imported).get(editId);
     if (!target?.boundElements?.some(bound => bound.type === 'arrow')) throw new Error('--edit-id must name a component with bound arrows');
     const point = await page.evaluate(id => window.getDragPoint(id), editId);
+    if (point.plan.status !== 'ready') {
+      report.edit = { id: editId, status: 'unavailable', reason: point.plan.reason };
+      report.nativeEditability = 'unavailable';
+      throw new Error(`Native edit proof unavailable: ${point.plan.reason}`);
+    }
     await page.mouse.move(point.x, point.y);
     await page.mouse.down();
-    await page.mouse.move(point.x + 60, point.y + 45, { steps: 12 });
+    await page.mouse.move(point.x + point.plan.pointerDelta.x, point.y + point.plan.pointerDelta.y, { steps: 12 });
     await page.mouse.up();
     await page.waitForFunction(id => window.recoverScene().elements.find(element => element.id === id)?.version > 1, editId);
     const edited = await page.evaluate(() => window.recoverScene());
@@ -157,11 +211,18 @@ try {
     checkPreserved(imported, edited, 'edit');
     guard(resolve(output, 'edited.excalidraw'));
     const moved = byId(edited).get(editId);
-    report.edit = { id: editId, movedDistance: Math.hypot(moved.x - target.x, moved.y - target.y),
+    const actualDelta = { x: (moved.x - target.x) * point.zoom, y: (moved.y - target.y) * point.zoom };
+    const actualPlan = planDrag(imported.elements, editId, { zoom: point.zoom, pointerDeltas: [actualDelta],
+      viewportPoint: { x: point.x, y: point.y }, viewport: { width: Number(values.width), height: 900 } });
+    report.edit = { id: editId, pointerDeltaCssPx: point.plan.pointerDelta, plannedDestination: point.plan.destination,
+      destination: { x: moved.x, y: moved.y, width: moved.width, height: moved.height }, destinationSafety: actualPlan.status,
+      movedDistance: Math.hypot(moved.x - target.x, moved.y - target.y),
       changedArrowIds: imported.elements.filter(element => element.type === 'arrow' && [element.startBinding?.elementId, element.endBinding?.elementId].includes(editId)
         && !same([element.x, element.y, element.points], [byId(edited).get(element.id)?.x, byId(edited).get(element.id)?.y, byId(edited).get(element.id)?.points])).map(element => element.id) };
     if (report.edit.movedDistance < 20 || !report.edit.changedArrowIds.length) report.errors.push('Native drag did not move the component and its bound arrow geometry');
-    const changedExport = await page.evaluate(scale => window.exportScene(scale), Number(values.scale));
+    if (actualPlan.status !== 'ready') report.errors.push(`Recovered edit destination is not safe: ${actualPlan.reason}`);
+    if (['width', 'height', 'angle'].some(key => Math.abs(moved[key] - target[key]) > .001)) report.errors.push('Native pointer proof resized or rotated the component');
+    const changedExport = await page.evaluate(({ scale, review }) => window.exportScene(scale, review), { scale: Number(values.scale), review: values.review });
     await writeFile(resolve(output, 'edited.svg'), changedExport.svg);
     await writeFile(resolve(output, 'edited.png'), Buffer.from(changedExport.png, 'base64'));
     await page.screenshot({ path: resolve(output, 'edited-editor.png') });
@@ -170,13 +231,22 @@ try {
     report.editedLabelVisibilityChecks = changedExport.labelVisibilityChecks;
     report.editedTypography = changedExport.typography;
     report.editedFittedTypography = observeExport(changedExport, 'edited export');
+    if (values.review) {
+      report.composition.edited = inspectComposition(changedExport.observations, reviewOptions);
+      report.review.edited = await writeReview(context, changedExport, report.composition.edited, output, 'edited', focusIds, protectedSources);
+    }
     for (const check of changedExport.labelChecks) if (check.error || check.errorDistance > 1.5) report.errors.push(`edited export: ${check.id}.labelPosition differs from native path (${check.error || check.errorDistance})`);
   }
   if (report.browserErrors.length) report.errors.push('Native editor raised browser errors');
   report.nativeEditability = report.errors.length ? 'fail' : hasArrows ? 'pass' : 'not-applicable';
   report.labelVisibility = report.visibilityErrors.length ? 'fail' : report.labelVisibilityChecks.length ? 'pass' : 'not-applicable';
   report.presentationReadability = !values.presentation ? 'not-applicable' : report.presentationFailures.length ? 'fail' : 'pass';
-  report.verification = report.errors.length || report.visibilityErrors.length || report.presentationFailures.length ? 'fail' : 'pass';
+  if (values.review) {
+    const statuses = [report.composition.initial?.status, report.composition.edited?.status].filter(Boolean);
+    report.composition.status = statuses.includes('unavailable') ? 'unavailable' : statuses.includes('fail') ? 'fail' : 'pass';
+  }
+  report.verification = report.errors.length || report.visibilityErrors.length || report.presentationFailures.length ||
+    values.review && report.composition.status !== 'pass' ? 'fail' : 'pass';
 } catch (error) {
   report.errors.push(error.message);
 } finally {
@@ -184,7 +254,5 @@ try {
   await server?.close();
   await writeFile(resolve(output, 'verification.json'), JSON.stringify(report, null, 2) + '\n');
 }
-console.log(JSON.stringify({ report: resolve(output, 'verification.json'), nativeEditability: report.nativeEditability,
-  labelVisibility: report.labelVisibility, visibilityErrors: report.visibilityErrors, presentationReadability: report.presentationReadability,
-  presentationFailures: report.presentationFailures, errors: report.errors }));
+console.log(JSON.stringify(summarizeVerification(report, resolve(output, 'verification.json'))));
 process.exitCode = report.verification === 'pass' ? 0 : 1;

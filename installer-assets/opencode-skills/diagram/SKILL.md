@@ -1,6 +1,6 @@
 ---
 name: diagram
-description: "Create an Excalidraw diagram for a concept or workflow."
+description: "Use when an Excalidraw diagram is requested for a concept, workflow or architecture."
 metadata:
   team-harness/config: "__TEAM_HARNESS_OPENCODE_CONFIG__"
 ---

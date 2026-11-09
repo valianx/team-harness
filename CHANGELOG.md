@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.57.1] - 2026-11-09
+
+### Changed
+
+- Simplify Excalidraw authoring with focused guidance, native elbow defaults and optional connected tools.
+- Review Excalidraw with measured findings, focused captures, safe edit proofs and compact reports, including labels inside frames.
+
 ## [3.57.0] - 2026-10-26
 
 ### Changed
