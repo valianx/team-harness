@@ -34,6 +34,10 @@ for (const relative of [
   "skills/find-bugs/SKILL.md",
   "plugins/team-harness/skills/find-bugs/SKILL.md",
   "installer-assets/opencode-skills/th-find-bugs/SKILL.md",
+  "skills/cloudflare-security/SKILL.md",
+  "plugins/team-harness/skills/cloudflare-security/SKILL.md",
+  "installer-assets/opencode-skills/cloudflare-security/SKILL.md",
+  "installer-assets/pi-skills/cloudflare-security/SKILL.md",
   "plugins/team-harness/hooks/run-ts-hook.sh",
 ]) assert.ok((await readFile(path.join(root, relative))).length > 0, `missing curated Claude asset: ${relative}`);
 
@@ -58,6 +62,7 @@ const forbidden = [
   /(?:^|\/)\_bmad\/tea\//,
   /^openspec\//,
   /^(?:\.agents|\.claude|\.opencode)\/skills\/find-bugs\//,
+  /(?:^|\/)security-audit\//,
 ];
 let inspectedPackageFiles = 0;
 for (const packageRoot of new Set(Object.values(ownership.packages).flat())) {
@@ -83,13 +88,16 @@ const providerFixtures = [
   ".agents/skills/superpowers/verification-before-completion/SKILL.md",
   ".agents/skills/bmad-testarch-test-review/SKILL.md",
   ".agents/skills/find-bugs/SKILL.md",
+  ".agents/skills/security-audit/SKILL.md",
   ".claude/commands/opsx/verify.md",
   ".claude/skills/superpowers/verification-before-completion/SKILL.md",
   ".claude/skills/bmad-testarch-test-review/SKILL.md",
   ".claude/skills/find-bugs/SKILL.md",
+  ".claude/skills/security-audit/SKILL.md",
   ".opencode/commands/opsx-verify.md",
   ".opencode/commands/bmad-testarch-test-review.md",
   ".opencode/skills/find-bugs/SKILL.md",
+  ".opencode/skills/security-audit/SKILL.md",
   ".superpowers/sdd/example/plan.md",
   "_bmad/tea/config.yaml",
   "openspec/changes/example/proposal.md",
@@ -103,6 +111,8 @@ for (const required of [
   ".opencode/commands/bmad-testarch-*.md", "_bmad/tea/**",
   ".agents/skills/find-bugs/**", ".claude/skills/find-bugs/**",
   ".opencode/skills/find-bugs/**",
+  ".agents/skills/security-audit/**", ".claude/skills/security-audit/**",
+  ".opencode/skills/security-audit/**",
 ]) assert.ok(declaredExternalPatterns.includes(required), `missing external ownership: ${required}`);
 
 for (const fixture of [
@@ -114,6 +124,8 @@ for (const fixture of [
   ".agents/skills/find-bugs/SKILL.md",
   ".claude/skills/find-bugs/SKILL.md",
   ".opencode/skills/find-bugs/SKILL.md",
+  "security-audit/SKILL.md",
+  "skills/security-audit/SKILL.md",
   "opsx-verify.md",
   "bmad-testarch-test-review.md",
 ]) {

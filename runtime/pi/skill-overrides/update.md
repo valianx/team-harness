@@ -1,5 +1,10 @@
 # Update Team Harness in Pi
 
+For the explicit `cloudflare-security` target, follow
+[Cloudflare security](../cloudflare-security/SKILL.md) with the `update` operation
+and requested scope. Complete this provider route before TH maintenance and
+continue the TH flow only when TH update was also requested.
+
 Maintain the selected Pi-owned TH package. Bind its existing source, scope,
 absolute package root and active Pi agent directory from native discovery;
 preserve unrelated packages, settings, authentication, model and thinking.

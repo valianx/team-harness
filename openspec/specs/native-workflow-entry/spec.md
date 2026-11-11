@@ -154,6 +154,10 @@ Team Harness startup context and managed guidance SHALL describe available workf
 - **WHEN** the operator selects ui-design in Codex, Claude Code or OpenCode
 - **THEN** the current general agent can discover its visual-design method, distinguish it from design and sketch, and preserve workspace, authorization and native coordination
 
+#### Scenario: Cloudflare security is selected
+- **WHEN** the operator requests `cloudflare-security` in a supported runtime
+- **THEN** the current general agent can discover its preparation and audit entry, distinguish it from upstream `security-audit` and apply the installed method with native permissions
+
 ### Requirement: Preserve useful collaboration context
 Team Harness SHALL preserve voice guidance, language and English-learning preferences, workspace/Obsidian configuration, specialist coordination and recoverable workflow methods. Session discovery, traces, notifications and precompact context SHALL remain available independently of retired execution guards. Native runtime permissions SHALL govern execution; TH SHALL NOT weaken or replace the operator's configured policy. A workflow requiring an external workspace SHALL use the active runtime's access mechanism without provisioning settings belonging to another runtime.
 

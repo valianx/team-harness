@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Cloudflare Security"
+  short_description: "Team Harness Cloudflare Security workflow"
+  default_prompt: "Use $team-harness:cloudflare-security for this request."

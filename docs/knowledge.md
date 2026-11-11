@@ -301,6 +301,7 @@ superseded unless a bullet explicitly records the current two-posture contract.
 - [decision] PR footers state whether a necessary human check remains; sufficient automated checks and advisory agent reviews use false, independently of technical risk. → `skills/create-pr/SKILL.md`
 - [decision] Application research consumes official REA Evidence; audit and find-bugs remain independent native methods. → `skills/research-app/SKILL.md`
 - [decision] UI design follows installed Impeccable methods while preserving product identity, project ownership and native authorization (v3.44.0). → `skills/ui-design/SKILL.md`
+- [decision] Cloudflare security uses the official Skills CLI provider lifecycle and installed upstream methods through `cloudflare-security`.
 - [decision] Full-audit coordinates one integral analysis report; cross-repo remains the focused contract/invariant method on shared runtime projections. → `skills/full-audit/SKILL.md`
 - [decision] Eval retrospective assesses an existing effort's evidence and omissions without rerunning it; scenario and baseline modes remain separate. → `skills/eval/SKILL.md`
 - [constraint] Setup diagnostics distinguish native package files, configuration and observed activation; optional capabilities never become universal installation prerequisites.

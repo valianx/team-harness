@@ -17,6 +17,19 @@ may accept, reject or defer a recommendation with its reason. Preserve original
 results and disclose missing evidence; proceeding does not turn an unrun check
 into a pass. Native permissions and the operator's scope still govern execution.
 
+## Cloudflare security audits
+
+Select [cloudflare-security](../../cloudflare-security/SKILL.md) when the operator
+requests Cloudflare security guidance, installation or an audit. Explicit
+`setup cloudflare-security` and `update cloudflare-security` use its preparation
+and maintenance routes. Its [provider reference](../../cloudflare-security/references/provider.md)
+owns Skills CLI commands, runtime selectors, scopes and readiness checks.
+Cloudflare maintains `security-audit` in its official repository. Read its actual
+installed instructions and applicable companions, preserving upstream evidence,
+sandbox and reporting requirements. Main retains coordination, scope and decisions.
+Keep this optional provider outside ordinary TH setup/update and unselected
+security work. Its methods, scripts and run artifacts stay under their own owner.
+
 ## REA application research
 
 Select REA at `research-app` entry/resumption or for explicit `setup rea` / `update rea`.

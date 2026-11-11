@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.58.0] - 2026-11-11
+
+### Added
+
+- Install, update and use Cloudflare's official security-audit skill through the optional cloudflare-security workflow.
+
 ## [3.57.1] - 2026-11-09
 
 ### Changed
