@@ -1,6 +1,6 @@
 ---
 name: ui-design
-description: "Create, refine or audit product-grounded UI with Impeccable; continue implementation only within the requested endpoint."
+description: "Create, refine or audit product-grounded UI with Impeccable and relevant Google web guidance; continue only within the requested endpoint."
 metadata:
   team-harness/config: "__TEAM_HARNESS_OPENCODE_CONFIG__"
 ---

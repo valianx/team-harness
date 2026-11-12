@@ -314,3 +314,4 @@ superseded unless a bullet explicitly records the current two-posture contract.
 - [constraint] Approved diagram references guide scoped composition; native editing/export, source fidelity, visual quality and unassisted generation require separate evidence.
 - [decision] Excalidraw uses local tools and conditional references by default; connected tools remain optional and PNG previews do not certify native editing.
 - [pattern] Excalidraw corrections combine native geometry findings, focused captures and common-framing revision comparisons; visual judgment stays separate.
+- [decision] UI design consults Google's official Modern Web Guidance CLI for bounded technical decisions without vendoring its catalog or replacing Impeccable.

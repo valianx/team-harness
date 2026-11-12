@@ -39,6 +39,21 @@ TH SHALL read and follow the installed Impeccable instructions and matching supp
 - **WHEN** the selected upstream method depends on an unavailable service or tool
 - **THEN** TH performs supported independent work and reports the missing capability rather than inventing an offline equivalent
 
+### Requirement: Technical web guidance complements visual methods
+For material web-platform, accessibility, performance or compatibility decisions in a UI task, TH SHALL consult relevant Google Modern Web Guidance through its official CLI when usable, without replacing Impeccable's visual methods or making every UI task depend on it. TH SHALL reuse a functioning provider, resolve its actual version and help, and distinguish installation from successful retrieval. Preparation SHALL use a verified exact package version within authorization; TH SHALL NOT silently install broad upstream activation rules, enable automatic updates, or treat a pinned CLI as an immutable remote catalog. Queries SHALL be bounded to generic technical patterns without private project data, retrieving only relevant search-returned IDs and retaining their provenance. Guidance SHALL preserve project stack, browser targets, native permissions and the requested endpoint. Missing capability, failed retrieval or irrelevant results SHALL leave independent authorized work available with explicit evidence limits. Repository-wide modernization scans SHALL NOT become routine UI preparation.
+
+#### Scenario: A web surface needs a compatibility decision
+- **WHEN** an authorized UI task has a material web-platform question and the official CLI is usable
+- **THEN** TH consults a bounded relevant search and retrieval, records the actual version and guide provenance, and evaluates the recommendation against project browser targets without substituting it for rendered or functional verification
+
+#### Scenario: The provider needs preparation or is unavailable
+- **WHEN** the CLI is absent, unsupported, denied network access, fails or returns no relevant result
+- **THEN** TH reports the specific limitation, performs only authorized preparation and continues independent work without claiming successful retrieval or silently changing installation/update policy
+
+#### Scenario: Guidance conflicts with product constraints
+- **WHEN** retrieved guidance suggests an unsupported API, stack migration or broader work than the requested endpoint
+- **THEN** TH retains the existing constraints, chooses a supported fallback or leaves the dependent decision explicit, and does not transmit private project data to refine the query
+
 ### Requirement: Unsettled visual direction uses contextual references
 When identity or color direction is unsettled or its replacement is authorized, TH SHALL perform bounded internet research after reading incumbent assets and supplied references. Selected sources SHALL relate to the product's audience, content, use scene or intended identity; TH SHALL retain source links, relevant observations and adaptation reasons instead of copying another identity or selecting a generic trending palette. Alternatives SHALL be compared only when they resolve a material open direction and SHALL use the same actual representative product screen. The selected upstream workflow SHALL map direction to semantic color roles and assess applicable accessibility, interaction states and themes while retaining established brand and status conventions within scope.
 
