@@ -84,7 +84,7 @@ Operators run this skill routinely; the value is a clean result, not a play-by-p
 - **The harness's activity indicator is the progress bar.** While the tool calls run, Claude Code shows its own running-command indicator; that is the progress signal. A skill cannot render an animated progress bar of its own, and must not simulate one with repeated text, percentage prints, or spinner characters. Rely on the harness indicator during execution and the single final report after it.
 - **Emit exactly one operator-facing message: the final report** (step 7), after all steps complete. There are two, and only two, exceptions: (1) an error that halts the flow (see Error handling) — report it immediately, then stop; (2) the **gated python3-install offer** in Step 6b. It is the sole inline consent step because it authorizes a system package action outside this repository's scope; it is exempt from the single-final-report rule for that reason, not a silent narration leak. No other step in this flow gets a third exception.
 - **The report is the product.** It must read like the output of a mature CLI tool: a titled status block with left-aligned labels and aligned values, neutral declarative voice, no emoji, no celebration, no filler. Keep it scannable in a couple of seconds.
-- **Report the actual outcome.** Ordinary updates have no restart/reconnect commentary, including negative assurances and hypothetical advice. Keep activation observations in diagnostic evidence; report a failure or concrete operator action with its impact and supported next step. Missing visibility alone is not an action.
+- **Report the actual outcome.** Ordinary updates have no restart/reconnect commentary, including negative assurances and hypothetical advice. Briefly state pending native reload or unverified activation; keep component details in diagnostics. Report a failure or concrete operator action with its impact and supported next step.
 
 ---
 
@@ -112,7 +112,7 @@ This skill performs steps 1 and 2 via the `claude` CLI (both are runnable from B
 
 4. **Compare.** Compare installed (step 1) vs latest (step 3) using semantic-version ordering:
    - **Update available** (latest > installed): proceed to step 5 (download).
-   - **Already current** (latest == installed): no download needed; skip to step 6 (block sync still runs). State that the plugin is current; no reload required.
+   - **Already current** (latest == installed): no download needed; skip to step 6 (block sync still runs). Installation is current; native session reload remains operator-driven.
    - **Installed ahead** (installed > latest): unusual; report both versions, note the catalog may not have propagated the latest release yet, and skip the download.
 
 5. **Download the new version** (only when an update is available). Run `claude plugin update th@team-harness-marketplace`. This fetches the new version into the plugin cache. Surface any error verbatim and stop on failure. Do NOT skip this — the catalog refresh in step 2 does not download files, so without this step `/reload-plugins` has nothing new to activate.
@@ -538,7 +538,7 @@ Install python3 now for full coverage? [Y/n]
      managed blocks      <per-block outcome — examples: "in sync (2/2)", "orchestrator-dispatch-rule: updated; voice-rule: already current", "orchestrator-dispatch-rule: preserved (operator-edited); voice-rule: already current", "orchestrator-dispatch-rule: force-adopted; voice-rule: already current", "orchestrator-dispatch-rule: inserted; voice-rule: inserted">
      python3             <"available" | "WARN: absent — python-dependent skills degraded" | "installed — full coverage active" | "installed — unavailable on this session's PATH">
    ```
-   Closing line: `Next: /reload-plugins to activate <Y>.`
+   Closing line: `Next: /reload-plugins in this session to activate <Y>; activation is not verified.`
 
    **(b) Already current** (no download):
    ```
@@ -550,9 +550,11 @@ Install python3 now for full coverage? [Y/n]
      managed blocks      <e.g. "in sync (2/2)" or "orchestrator-dispatch-rule: updated; voice-rule: already current" or "orchestrator-dispatch-rule: preserved (operator-edited); voice-rule: already current">
      python3             <"available" | "WARN: absent — python-dependent skills degraded" | "installed — full coverage active" | "installed — unavailable on this session's PATH">
    ```
-   Closing line: `No action required.`
+   Closing line: `Next: /reload-plugins in this session; activation is not verified.`
 
    **(c) Installed ahead** (installed > latest): use template (b) with the title `th update — installed ahead of catalog`, show both versions, and a closing line noting the catalog may not have propagated the latest release yet.
+
+   After (a) or (b), always append: `Remember to run /reload-plugins in other open sessions before continuing with TH.` This applies on every OS without requiring discovery of other sessions. Do not reload them on the operator's behalf.
 
    In every case the `managed blocks` row reflects step 6's outcome. If the block sync wrote changes, the closing line for template (a)/(b) also notes that a backup of `~/.claude/CLAUDE.md` was written at `~/.claude/CLAUDE.md.bak`.
 
@@ -564,8 +566,8 @@ Install python3 now for full coverage? [Y/n]
 Add a `dependencies` row to the final status block with per-provider old/new
 versions and outcomes from the shared maintenance receipt. These additions
 override the literal template requirement above. If any selected dependency is
-pending, replace `No action required.` with its concrete next step and label the
-overall report partial, even when TH itself is current. A provider failure does
+pending, add its concrete next step and label the overall report partial, even
+when TH itself is current. Preserve the reload action and reminder. A provider failure does
 not trigger the TH-only stop rules below; continue independent authorized work.
 
 ## Error handling

@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use native read-only review alternatives without redundant attestations or blocking authorized work on missing coverage.
 
+## [3.59.1] - 2026-11-12
+
+### Fixed
+
+- Reload the current session after updates where supported and always remind operators to reload other open sessions.
+
 ## [3.59.0] - 2026-11-12
 
 ### Added

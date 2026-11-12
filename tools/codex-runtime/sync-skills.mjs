@@ -234,7 +234,11 @@ summarize the canonical instructions.
 }
 
 async function renderPiAdapter(rootDir, name, canonical) {
-  const frontmatter = `---\nname: th-${name}\ndescription: ${yamlString(canonical.description)}\n${canonical.explicitOnly ? "disable-model-invocation: true\n" : ""}---`;
+  const description = new Map([
+    ["update", "Update the Pi-owned Team Harness package, reconcile settings, and attempt current-session reload separately from installation."],
+    ["reload", "Reload the installed Team Harness package in the current Pi session with native controls and report verified activation separately from refreshed files."],
+  ]).get(name) ?? canonical.description;
+  const frontmatter = `---\nname: th-${name}\ndescription: ${yamlString(description)}\n${canonical.explicitOnly ? "disable-model-invocation: true\n" : ""}---`;
   let body;
   if (piBodyOverrides.has(name)) {
     const source = join(rootDir, "runtime/pi/skill-overrides", `${name}.md`);

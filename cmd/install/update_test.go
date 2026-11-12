@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -236,7 +237,63 @@ func TestApplyUpdateDiff_ReportsChangedOpenCodeWithoutRestartAdvice(t *testing.T
 	if !strings.Contains(output, "/th-reload") {
 		t.Fatalf("changed OpenCode update lost its concrete native reload hint: %q", output)
 	}
+	assertOpenCodeUpdateReminder(t, output)
 	assertUpdateOutputHasNoSessionAdvice(t, "changed OpenCode update", output)
+}
+
+func TestPrintAlreadyCurrent_ReportsPendingActivationAndOtherSessions(t *testing.T) {
+	output := captureUpdateStdout(t, func() { printAlreadyCurrent(version) })
+	assertOpenCodeUpdateReminder(t, output)
+	if !strings.Contains(output, "activation is unverified") || strings.Contains(output, "No action required") {
+		t.Fatalf("current installation must not imply current-session activation: %q", output)
+	}
+}
+
+func assertOpenCodeUpdateReminder(t *testing.T, output string) {
+	t.Helper()
+	if strings.Count(output, "Remember to run /th-reload in other open OpenCode sessions before continuing with TH.") != 1 {
+		t.Fatalf("successful terminal update must emit one other-session reminder: %q", output)
+	}
+}
+
+func TestUpdateOpencodePS1_AlreadyCurrentReminder(t *testing.T) {
+	var shell string
+	for _, candidate := range []string{"pwsh", "powershell"} {
+		if resolved, err := exec.LookPath(candidate); err == nil {
+			shell = resolved
+			break
+		}
+	}
+	if shell == "" {
+		t.Skip("PowerShell unavailable; native Windows installer CI covers this path")
+	}
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "opencode"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "opencode", ".team-harness.json"), []byte(`{"installed_version":"9.9.9"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	script, err := filepath.Abs(filepath.Join("..", "..", "bin", "update-opencode.ps1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	quote := func(value string) string { return "'" + strings.ReplaceAll(value, "'", "''") + "'" }
+	command := "$env:PROCESSOR_ARCHITECTURE='AMD64'; $env:OPENCODE_CONFIG_DIR=''; $env:APPDATA=" + quote(root) + `;
+function Invoke-WebRequest {
+    param([string]$Uri, [switch]$UseBasicParsing, [int]$TimeoutSec, [string]$ErrorAction)
+    if (-not $Uri.EndsWith('/VERSION')) { throw 'unexpected download' }
+    return @{ Content = '9.9.9' }
+}
+& ` + quote(script)
+	output, err := exec.Command(shell, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command).CombinedOutput()
+	if err != nil {
+		t.Fatalf("PowerShell already-current fixture: %v: %s", err, output)
+	}
+	assertOpenCodeUpdateReminder(t, string(output))
+	if !strings.Contains(string(output), "activation is unverified") {
+		t.Fatalf("PowerShell bootstrap must not imply session activation: %s", output)
+	}
 }
 
 func assertUpdateOutputHasNoSessionAdvice(t *testing.T, label, output string) {

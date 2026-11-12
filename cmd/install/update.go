@@ -253,6 +253,7 @@ func applyUpdateDiff(diff PlanDiff, cfgPath string, placer *opencodePlacer) {
 	// Installation and activation are separate; reload verifies the live host.
 	fmt.Println()
 	fmt.Println("Asset files updated on disk. Use /th-reload to verify activation in this conversation.")
+	fmt.Println("Remember to run /th-reload in other open OpenCode sessions before continuing with TH.")
 }
 
 // confirmApply prompts the operator for [Y/n] and returns true when the
@@ -323,5 +324,6 @@ func printAlreadyCurrent(installedVersion string) {
 	fmt.Println("th update — already current")
 	fmt.Printf("  installed version   %s\n", installedVersion)
 	fmt.Printf("  latest version      %s\n", version)
-	fmt.Println("No action required.")
+	fmt.Println("Session activation is unverified. Run /th-reload in your current session.")
+	fmt.Println("Remember to run /th-reload in other open OpenCode sessions before continuing with TH.")
 }
