@@ -46,7 +46,7 @@ nothing else.
 
 ## Report the result
 
-After the command exits, report exactly one of the three states:
+After the command exits, retain exactly one of the three TH states:
 
 - **already current** — no writes, no download.
 - **updated** — asset files were applied; activation is verified separately.
@@ -60,6 +60,19 @@ reports the version and outcome without restart/reconnect commentary or negative
 assurances. Surface actual failures and concrete operator actions with their impact
 and supported next step; unavailable observations alone stay in diagnostic evidence.
 Do not run reload after an updater failure or `installed ahead`.
+
+After `already current` or `updated`, validate the resulting installation at the
+selected opencode config root and load its
+`skills/spec/references/dependency-maintenance.md`. Execute that selected-dependency
+pass before the final report, including when TH itself needed no writes. Use the
+installed reference rather than stale command instructions; do not rerun the TH
+updater or substitute a different config root. If the reference cannot be loaded
+or the snapshot validated, keep dependency maintenance pending with the exact cause.
+Dependency work is independent of reload: an activation failure does not block
+otherwise authorized maintenance. Preserve owner scope, pins and native permissions.
+Report dependency receipts separately from the TH state and activation evidence;
+`already current` means no TH writes, not that dependencies were unchanged. Mark
+the overall result partial with next steps when any selected dependency is pending.
 
 ## Integrity floor
 
