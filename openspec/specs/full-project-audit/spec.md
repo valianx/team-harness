@@ -19,6 +19,10 @@ The audit SHALL assess product/actors/threats, architecture/contracts, security,
 - **WHEN** the target is a backend without screens and its database cannot be reached
 - **THEN** UI is excluded with a reason while persistence and relevant integration remain explicit unverified limits within the other applicable dimensions
 
+#### Scenario: The security lens selects an upstream provider
+- **WHEN** a full audit passes a bounded security assignment through `security` and Cloudflare fits its scope and available capabilities
+- **THEN** Main follows that security method's optional provider route within authorized installation and use scope, selects the upstream mode for the assignment and retains evidence and limits in the principal report with links to required provider artifacts
+
 ### Requirement: Full audit delivers one integral report
 The default principal deliverable SHALL be one `00-full-audit.md` in the selected workspace, containing decision summary, scope/topology, unique material findings, repository and boundary context, coverage/evidence/limits, prioritized improvements and optimizations, dependencies, tradeoffs and verifiable closure criteria. Findings SHALL retain canonical cause/ID and linked occurrences rather than summed lens counts; severity, priority and confidence SHALL remain distinct. Lens annexes and evidence SHALL be incorporated or linked without automatically becoming separately published documents. Explicit requested grouping or format SHALL take precedence.
 

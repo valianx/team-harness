@@ -19,6 +19,11 @@ Never print raw settings/command output. Offer minimal setup or reuse first, pre
 Skip unselected optional integrations and their surveys; prepare only capabilities the operator chose.
 Preserve model/thinking and unavailable Space bindings; offer alternatives only for explicitly selected new work.
 
+For the explicit `cloudflare-security` target, follow
+[Cloudflare security](../cloudflare-security/SKILL.md) with the `install` operation
+and requested scope. Complete this provider route before TH configuration and
+continue the TH flow only when TH setup was also requested.
+
 Bind the loaded TH package's absolute root, selected Git/local source and install
 scope from native package discovery and its `package.json` manifest. The package
 root differs from the agent directory. Resolve the latter through Pi's native

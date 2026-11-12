@@ -11,6 +11,11 @@ Analyze the input: $ARGUMENTS
 
 ## Upstream provider updates
 
+For the explicit `cloudflare-security` target, follow
+[Cloudflare security](../cloudflare-security/SKILL.md) with the `update` operation
+and requested scope. Complete this provider route before TH maintenance and
+continue the TH flow only when TH update was also requested.
+
 Route the explicit targets `openspec`, `superpowers`, `tea`, `rea`, `semgrep`,
 `dependency-cruiser`, `knip`, `sentry`, `quality` and `quality-tools`
 (also `bmad tea`)

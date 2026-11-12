@@ -6,6 +6,44 @@ while preserving native execution, provider ownership and the selected workspace
 
 ## Requirements
 
+### Requirement: Cloudflare security is a selected upstream workflow
+TH SHALL offer `cloudflare-security` to install, update or apply the official `cloudflare/security-audit-skill` provider through its documented Skills CLI lifecycle. The TH entry SHALL remain distinct from upstream `security-audit`. Main SHALL resolve the active runtime, requested target, existing owner, installation scope and actual source identity, reuse healthy installations and preserve unrelated provider files. Default new preparation SHALL use project scope and the selected agent. Explicit global scope SHALL use the documented global option. Installed files, native discovery and usable capability SHALL remain distinct. Explicit `setup cloudflare-security` and `update cloudflare-security` SHALL route to this provider without entering unrelated TH configuration. Ordinary TH maintenance SHALL leave the provider on its independently selected lifecycle.
+
+#### Scenario: The selected provider is absent
+- **WHEN** the operator requests Cloudflare security work or installation and authorizes the necessary preparation
+- **THEN** Main verifies official CLI options and prerequisites, prepares only the selected capability, records its actual destination/source and reports installation and native readiness separately
+
+#### Scenario: A security audit selects Cloudflare
+- **WHEN** `security` determines that the requested question and available capabilities fit the Cloudflare method, or the operator selects that provider
+- **THEN** Main uses `cloudflare-security` to resolve the installed method and any authorized preparation, preserving the assigned scope and reporting a selected unavailable capability while continuing independent analysis
+
+#### Scenario: The TH assets scanner is requested
+- **WHEN** the operator selects `audit-security`
+- **THEN** the deterministic TH-assets scanner retains its existing scope and execution independently of Cloudflare selection
+
+#### Scenario: Maintenance affects shared installations
+- **WHEN** the supported provider update can affect shared content or additional agent links
+- **THEN** Main inspects that scope, uses a supported route within existing authorization and reports any unresolved additional effects before dependent maintenance
+
+#### Scenario: An unrelated skill owns the upstream name
+- **WHEN** another source owns an existing `security-audit` installation
+- **THEN** Main preserves it and resolves ownership before changing that destination
+
+### Requirement: Cloudflare methods and artifacts retain their owner
+TH SHALL read the installed Cloudflare instructions and relevant companions for the requested guidance or full-audit mode, preserving their evidence thresholds, independent verification, sandbox requirements and validators. Full-audit operational files SHALL use a declared real local destination supported by upstream, with useful results linked from the bound TH workspace. The provider's skills, scripts, schemas and run artifacts SHALL remain outside TH distribution. Native permissions, operator scope and Main's coordination SHALL govern execution and follow-up decisions.
+
+#### Scenario: A focused security question is requested
+- **WHEN** the operator asks Cloudflare for guidance or a focused review
+- **THEN** Main follows the installed guidance mode and loads only applicable references within the requested scope
+
+#### Scenario: Full audit execution lacks isolation
+- **WHEN** a requested Cloudflare audit cannot enforce an upstream-required sandbox capability
+- **THEN** Main follows the upstream pending-validation contract, preserves completed evidence and reports the exact missing capability without claiming the unavailable check ran
+
+#### Scenario: Team Harness assets are synchronized
+- **WHEN** TH regenerates or packages its skills beside installed Cloudflare assets
+- **THEN** the TH entry remains distributed and the independently owned `security-audit` files remain preserved outside package output
+
 ### Requirement: Verification providers retain upstream ownership
 TH SHALL consume Superpowers, BMAD TEA and selected quality tools or skills from their official maintained distributions and SHALL NOT vendor, rewrite or redistribute their engines, skills, agents, templates or runtime hooks. The same ownership boundary SHALL apply to the REA application-research dependency. Provider-generated integrations SHALL remain distinguishable from TH-owned assets and excluded from TH packaging and generated projections. TH SHALL maintain one shared integration reference documenting OpenSpec, Superpowers, TEA, selected quality providers and REA's purposes, triggers, inputs, invocation, outputs, official lifecycle routes and known limitations. Consumer workflows SHALL reference it; provider algorithms, checklists and manuals SHALL remain upstream rather than being reimplemented in TH. Documenting REA in that reference SHALL NOT select it for verification or quality diagnosis.
 
