@@ -32,3 +32,6 @@ an OS sandbox. Preserve successful evidence for unchanged components on the
 same backend and report unverified components explicitly. Propose a narrower
 reconnect only for an observed stale component or a documented native
 limitation after available refresh controls have been used.
+
+Record the bound conversation alongside the installed target and activation
+outcome, including when update invokes reload or the package is already current.

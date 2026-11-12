@@ -57,8 +57,12 @@ After `already current` or `updated`, load the native `reload` skill and execute
 its activation procedure for this conversation using its result contract for an
 update invocation. Retain activation diagnostics separately. The ordinary summary
 reports the version and outcome without restart/reconnect commentary or negative
-assurances. Surface actual failures and concrete operator actions with their impact
-and supported next step; unavailable observations alone stay in diagnostic evidence.
+assurances. Briefly disclose unsupported reload or unverified activation, retaining
+component details in diagnostics. Include one reminder to run the native TH reload
+in other open OpenCode sessions before continuing with TH, even when the reload
+skill cannot be loaded. Do not discover, switch to or reload those sessions.
+Surface actual failures and concrete operator actions with their impact and
+supported next step.
 Do not run reload after an updater failure or `installed ahead`.
 
 After `already current` or `updated`, validate the resulting installation at the
