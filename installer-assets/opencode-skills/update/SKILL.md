@@ -71,7 +71,11 @@ and execute its activation procedure for this conversation. Keep the updater's
 installation result separate from reload's diagnostic evidence and use its result
 contract for an update invocation. The ordinary summary reports the version and
 actual outcome without restart/reconnect commentary, including negative assurances
-or hypothetical advice. Missing activation visibility stays in the diagnostic
-record. Report actual failures or demonstrated activation problems with their
+or hypothetical advice. State briefly when current-session reload is unsupported
+or activation remains unverified; retain component details in diagnostics.
+Always append one reminder after `updated` or `already current`: `Remember to run
+/th-reload in other open sessions before continuing with TH.` This applies on
+every OS without requiring discovery of other sessions; do not reload them.
+Report actual failures or demonstrated activation problems with their
 impact and supported next step; do not equate updated files with a live reload.
 Do not activate after a failed updater or `installed ahead` result.

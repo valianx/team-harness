@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Keep optional update diagnostics quiet and guide operators to reload older conversations without unnecessary restart advice.
+- Reload the current session after updates where supported and always remind operators to reload other open sessions.
 
 ## [3.59.0] - 2026-11-12
 

@@ -94,19 +94,20 @@ For an explicit reload or diagnostic request, report in the operator's language:
 When update invokes reload, return these observations to the update flow as
 diagnostic evidence. The ordinary operator summary gives the installed version
 and actual update outcome. Omit routine restart/reconnect commentary, including
-negative assurances and hypothetical next steps; unavailable observations alone
-stay in the diagnostic record. Report a failed operation, observed stale component
-or actual operator action with its impact and supported remedy. A demonstrated
+negative assurances and hypothetical next steps. State briefly when current-session
+reload is unsupported or activation remains unverified; retain component details
+in diagnostics. Report a failed operation, observed stale component or actual
+operator action with its impact and supported remedy. A demonstrated
 reconnect need still follows the component-evidence contract above.
 
 An update-triggered reload covers only its bound conversation, on every supported
-operating system. Record that scope alongside the target and outcome. When the
-operator will resume a known pre-update conversation outside that scope, the
-update summary may name the native TH reload command to run there before using
-TH. This is a conversation handoff, not a claim that a restart is required or
-that every open conversation was refreshed. Do not repeat the handoff for a
-conversation already verified against the target, and do not switch to or reload
-unrelated conversations. Optional compatibility-alias outcomes remain diagnostic;
+operating system, including equal-version updates. Record that scope alongside
+the target and outcome. Every successful update summary includes one concise
+reminder to run the native TH reload in other open sessions before continuing
+with TH, without requiring discovery or prior knowledge of those sessions.
+This reminder does not claim a restart is required or that other sessions were
+refreshed. Do not switch to or reload unrelated conversations.
+Optional compatibility-alias outcomes remain diagnostic;
 an actual failed resource read still receives its concrete recovery action.
 
 Do not infer `active` from the absence of reported errors. Keep installation

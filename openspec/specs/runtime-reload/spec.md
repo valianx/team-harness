@@ -80,17 +80,21 @@ reconnect scope. Reload SHALL respect an operator constraint to avoid restarting
 - **THEN** reload completes independent refreshes and reports that specific setting, its deferred effect and the smallest reconnect scope, while preserving a no-restart constraint
 
 ### Requirement: Successful updates attempt session activation separately
-Codex and OpenCode update SHALL invoke reload after a successful installation or
+Codex, OpenCode and Pi update SHALL invoke reload after a successful installation or
 current-version verification. The installation result SHALL remain authoritative
 for disk convergence, and reload SHALL independently assess activation. A pending
 approval or failed update SHALL NOT trigger activation of an unverified target.
 
-Across Claude Code, Codex and OpenCode, the ordinary update response SHALL report
+Across Claude Code, Codex, OpenCode and Pi, the ordinary update response SHALL report
 the version and actual installation outcome without routine restart or reconnect
 commentary, including negative assurances and hypothetical advice. Activation
-observations SHALL remain distinct in retained diagnostic evidence; missing host
-controls alone SHALL NOT add a restart caveat or imply full activation. Explicit
+observations SHALL remain distinct in retained diagnostic evidence. The response
+SHALL briefly disclose unsupported current-session reload or unverified activation;
+missing host controls alone SHALL NOT add a restart caveat or imply full activation. Explicit
 reload or diagnostic requests SHALL still receive the detailed activation result.
+Every successful update, including current-version verification on any OS, SHALL
+include one native reload reminder for other open sessions without requiring
+knowledge of them. Update SHALL NOT switch to or reload those other sessions.
 
 Update SHALL report a failed operation, an observed stale component or an actual
 required operator action with its concrete impact and supported next step. Any
@@ -103,22 +107,22 @@ ordinary summaries SHALL NOT include conditional reconnect boilerplate.
 
 #### Scenario: Update succeeds with incomplete activation visibility
 - **WHEN** installation converges but the host exposes no control to inspect part of live activation
-- **THEN** the update response states the installed version and outcome without restart or reconnect commentary, while diagnostic evidence retains the unverified component without claiming it active
+- **THEN** the update response states the installed version, outcome and unverified activation without restart or reconnect commentary, while diagnostic evidence retains the component details without claiming it active
 
 #### Scenario: Installation is already current
-- **WHEN** update verifies the current version and no operator action is needed
-- **THEN** the response states that TH is current without a restart assurance or speculative caveat
+- **WHEN** update verifies the current version, including an equal-version run
+- **THEN** it follows the current-session activation procedure and reminds the operator to reload other open sessions, without a restart assurance or speculative caveat
 
 #### Scenario: Optional alias is unavailable without a failed resource read
 - **WHEN** installation succeeds but an optional compatibility alias is skipped
 - **THEN** update retains the alias result in diagnostic evidence and omits it from the ordinary operator summary
 
-#### Scenario: Operator resumes another pre-update conversation
-- **WHEN** the operator will continue a known pre-update conversation outside the update invocation and target activation has not been verified there
-- **THEN** update gives one native TH reload handoff for that conversation, without refreshing it remotely or claiming a restart is required
+#### Scenario: Other open sessions are not known to the updater
+- **WHEN** an update succeeds on Linux, macOS or Windows without discovering other sessions
+- **THEN** its summary always includes one concise native reload reminder for other open sessions, without refreshing them remotely or claiming a restart is required
 
 #### Scenario: Successful update runs on Linux
-- **WHEN** Codex or OpenCode installation or current-version verification succeeds on Linux, macOS or Windows
+- **WHEN** Codex, OpenCode or Pi installation or current-version verification succeeds on Linux, macOS or Windows
 - **THEN** update performs its supported current-conversation activation pass independently of optional alias creation and records the conversation scope separately
 
 #### Scenario: Claude Code needs its native plugin reload

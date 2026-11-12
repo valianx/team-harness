@@ -233,8 +233,9 @@ computer remotely does not establish activation in that computer's open conversa
 
 Keep the operator summary focused on the version, actual outcome and any concrete
 action. An ordinary successful update has no restart or reconnect commentary,
-including "no restart needed" or "reconnect only if needed". Missing visibility
-alone stays in diagnostic evidence. Report actual failures or demonstrated
+including "no restart needed" or "reconnect only if needed". State briefly when
+current-session reload is unsupported or activation remains unverified; retain
+component details in diagnostics. Report actual failures or demonstrated
 activation problems with the affected component, impact and supported next step;
 do not turn an unknown observation into hypothetical advice.
 Keep `skipped-symlink-privilege` and `skipped-read-only` snapshot-alias statuses
@@ -243,11 +244,10 @@ omissions are not update failures or operator actions; actual failed bridge
 operations still follow partial-convergence recovery. If a resource read fails through an obsolete path,
 report the affected workflow and use the verified installed resource through
 `$team-harness:reload`, rather than suggesting symlink privileges.
-When the operator is continuing known pre-update conversations outside this
-invocation, include one useful handoff: `In those conversations, run
-$team-harness:reload before continuing with TH.` Do not give this handoff for
-the current conversation after its reload was attempted, or for other conversations
-with verified target activation. Do not reload other conversations on their behalf.
+After every `current` or `converged` result, include one reminder:
+`Remember to run $team-harness:reload in other open sessions before continuing
+with TH.` This applies regardless of OS or knowledge of other sessions, including
+equal-version runs. Do not reload other conversations on the operator's behalf.
 Do not run reload after a partial result or invalid receipt.
 
 When returning to a setup request, read `NEW_PLUGIN/skills/setup/SKILL.md` before
