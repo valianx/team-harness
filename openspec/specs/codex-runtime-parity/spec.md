@@ -152,12 +152,17 @@ continuation without evidence.
 - **THEN** TH states the minimum release and capability boundary, preserves existing remote identity on supported readers and makes no older-reader forward-support or unverified cross-host execution claim
 
 ### Requirement: Inline reviewer readiness preserves the current conversation
-Local Codex review SHALL use the selected native read-only reviewer role in the
-current conversation. Installed-role inspection SHALL be diagnostic when needed,
+Local Codex review SHALL use the selected reviewer instructions through supported
+native read-only execution, preferring dispatch in the current conversation.
+A supported native alternative MAY run separately without changing Main's chat.
+Installed-role inspection SHALL be diagnostic for observed failures,
 not a repeated byte-digest or model-default authorization gate. Main SHALL preserve
 native model preferences and disclose unavailable execution or observed stale
 activation. A new conversation or proof of loaded profile bytes SHALL NOT be
-required. A writable role SHALL NOT substitute for unavailable read-only execution.
+required. Unavailable tool metadata or exhaustive permission attestation SHALL NOT
+block an otherwise supported route. A writable role SHALL NOT substitute for
+unavailable read-only execution; Main SHALL disclose missing coverage and continue
+unless an explicit operator condition remains unmet.
 
 #### Scenario: Setup changes only another agent
 - **WHEN** the selected native read-only reviewer remains available

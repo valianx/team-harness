@@ -22,6 +22,10 @@ Current installation and recovery examples SHALL deliver configuration to the pr
 - **WHEN** a supported native read-only alternative cannot recover the selected review
 - **THEN** Main records incomplete coverage without manufacturing a pass, preserves native permissions and decides delivery under existing operator authorization; only an explicit unmet operator condition requires a new decision.
 
+#### Scenario: The current dispatch API cannot select a reviewer role
+- **WHEN** a supported native read-only alternative can run the selected role's instructions with its configured model and effort
+- **THEN** Main uses that route, including a separate native CLI run when appropriate, without requiring unavailable tool metadata, exhaustive permission attestation or a new conversation, and never broadens native permissions or claims an installed file is an executed review.
+
 #### Scenario: An operator copies the optional MCP installation example
 - **WHEN** optional MCP values are supplied using the documented Unix pipeline
 - **THEN** the installer process receives those selected values
@@ -235,7 +239,7 @@ The GCP workflow SHALL retain inspect, plan, validated script, independent revie
 - **THEN** the coordinator checks its evidence and resolves actual blockers before apply, preserves limitations and does not treat a reviewer label as an operator instruction
 
 ### Requirement: Inline review uses observable native role evidence
-Inline review SHALL use the selected installed reviewer definition and native read-only dispatch. TH SHALL NOT require a session marker or proof of loaded profile bytes that the host does not expose. The coordinator SHALL verify the installed managed definition, keep immutable target and coverage checks, and state any activation visibility limit without claiming in-memory attestation. An unavailable native read-only role or invalid selected definition SHALL remain unavailable. A restart SHALL be proposed only for an independently demonstrated activation need. Every inline-review entry point, including Codex init, SHALL use the same evidence boundary.
+Inline review SHALL use the selected installed reviewer instructions through supported native read-only execution, including a supported alternative when the current dispatch API cannot select the role. TH SHALL NOT require a session marker, exhaustive permission attestation or proof of loaded profile bytes that the host does not expose. Installed-role inspection SHALL diagnose observed failures rather than gate every dispatch. The coordinator SHALL keep immutable target and coverage checks and state activation visibility limits without claiming in-memory attestation. An invalid definition or unavailable native read-only capability SHALL remain unavailable; a writable agent instructed not to edit SHALL NOT substitute. A restart SHALL be proposed only for an independently demonstrated activation need. Every inline-review entry point, including Codex init, SHALL use the same evidence boundary.
 
 #### Scenario: Native reviewer is available but loaded bytes are not observable
 - **WHEN** the installed managed definition is verified and the host provides the native read-only reviewer role without loaded-byte attestation
