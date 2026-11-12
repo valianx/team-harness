@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.59.0] - 2026-11-12
+
+### Added
+
+- Complement Impeccable UI design with bounded Google web guidance through its official CLI.
+### Changed
+
+- TH update maintains selected integration dependencies while preserving unrelated tools and reporting partial outcomes.
+
 ## [3.58.0] - 2026-11-11
 
 ### Added

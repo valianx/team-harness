@@ -60,6 +60,13 @@ incumbent components, stack and status meanings within authorization.
 
 ## Deliver and continue within scope
 
+For web surfaces with material platform, accessibility, performance or browser
+compatibility decisions, consult [Google Modern Web Guidance](references/modern-web-guidance.md)
+before dependent implementation, or as evidence in an audit. It complements
+Impeccable's visual methods; it does not replace product direction or make every
+UI request depend on an external service. Use bounded, relevant guidance and
+preserve the project's stack, supported browsers and authorized endpoint.
+
 Use [design](../design/SKILL.md) for needed solution decisions under its
 functional-first proposal contract; reconcile canonical OpenSpec intent when
 present. Before frontend implementation, present or reuse an accurate structural

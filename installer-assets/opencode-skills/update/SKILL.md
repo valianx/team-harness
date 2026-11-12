@@ -5,6 +5,12 @@ description: Update Team Harness for opencode through the dedicated checksum-ver
 
 # Update Team Harness in opencode
 
+For a TH update, execute [selected TH dependency maintenance](../spec/references/dependency-maintenance.md)
+from the validated resulting snapshot as an independent pass before the final report.
+Use the consuming operator’s active project/host selections, not this repository’s
+development dependencies. Keep dependency outcomes separate from native TH update
+and activation evidence; continue independent authorized work after partial failure.
+
 For the explicit `cloudflare-security` target, follow
 [Cloudflare security](../cloudflare-security/SKILL.md) with the `update` operation
 and requested scope. Complete this provider route before TH maintenance and
@@ -23,7 +29,7 @@ only to a separately requested TH operation.
 
 For an explicit `rea` target, follow [REA application research](../spec/references/upstream-tools.md#rea-application-research)
 for the active client and return from this provider-only route. REA is separate
-from quality selection and is never prepared by full TH setup or update.
+from quality selection; maintain it during TH update only when already selected.
 
 Before routing a bare `find-bugs` target, resolve the owner from the live task:
 TH project/module diagnosis or Sentry's upstream captured-change method. If it
@@ -33,8 +39,8 @@ TH's OpenCode entry is `th-find-bugs`.
 
 Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
 when the operator explicitly requests an OpenSpec, Superpowers, TEA, or quality-provider
-update. This flow updates Team Harness only; it never updates those providers as a side
-effect. For an explicit request, use the provider's official package, plugin, Skills CLI or
+update. Unselected providers remain untouched; selected dependencies follow the
+maintenance pass above. For an explicit request, use the provider's official package, plugin, Skills CLI or
 BMAD module lifecycle under native permissions. Preserve provider-owned files and
 configuration, and report installed, discoverable and usable capability separately from
 active session; propose a reload/restart only for a documented host limitation or observed
