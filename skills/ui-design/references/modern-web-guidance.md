@@ -7,7 +7,7 @@ or install its broad automatic activation rules into a project.
 ## Resolve the official CLI
 
 Consult the [official getting-started guide](https://developer.chrome.com/docs/modern-web-guidance/get-started)
-and [upstream package](https://github.com/GoogleChrome/modern-web-guidance/blob/main/package.json).
+and [official npm package](https://www.npmjs.com/package/modern-web-guidance).
 Resolve the active runtime's existing CLI, package version, Node requirement and
 current command help. Record installed, discoverable and usable separately;
 reuse a functioning installation without an automatic update. A package record
@@ -21,21 +21,25 @@ first; do not use floating `@latest` for unattended execution. Upstream `install
 can enable automatic updates: do not run it as a query prerequisite or silently
 change update policy. Updating TH does not update this provider.
 
-The upstream command shape is `search <query>` followed by `retrieve <id>`.
-After verifying the selected version and its help, invoke that existing CLI or
-the exact npm version, for example:
+Verified baseline: npm `1.0.0`, publisher `GoogleChrome`, source repository
+`GoogleChrome/modern-web-guidance-src`, Node `>=22`. Help, search and retrieval
+were exercised on Node 24.14.1. Recheck the selected version's help before use.
+Set `DISABLE_TELEMETRY=1` for the invocation using the host shell's environment
+syntax, without rewriting the user's profile. POSIX examples:
 
 ```sh
-npx modern-web-guidance@<verified-version> search "accessible modal dialog focus"
-npx modern-web-guidance@<verified-version> retrieve "<id-returned-by-search>"
+DISABLE_TELEMETRY=1 npx --yes modern-web-guidance@1.0.0 search "accessible modal dialog focus"
+DISABLE_TELEMETRY=1 npx --yes modern-web-guidance@1.0.0 retrieve dialog
 ```
 
-The placeholders require actual verified values; these are not ready-to-run
-commands or a claim that any particular version was tested. npm execution can
-download software and contact services; respect native permissions and existing
-preparation authorization. A pinned CLI does not establish an immutable remotely
-served catalog. Record the actual package identity, retrieval date and selected
-guide IDs/links with the resulting decision, not a second guidance repository.
+`dialog` was returned by that search; use actual returned IDs for other decisions.
+In 1.0.0 search/retrieval use bundled local assets, while enabled telemetry can
+send query text and guide IDs. npm can download software; respect native permissions
+and preparation authorization. Reassess transport/catalog behavior on upgrades.
+Keep the selected version for follow-up commands even when a guide suggests
+`@latest`. Large retrievals return a temporary file path: read that file fully
+before applying advice. Record actual package identity, date and selected guide
+IDs/links with the decision, not a second guidance repository.
 
 ## Consult only what the surface needs
 
