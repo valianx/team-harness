@@ -226,6 +226,10 @@ for an update invocation. This activation pass does not repeat installation-doma
 inspections or alter the receipt. Keep installation and activation evidence
 distinct; a skill reread alone does not prove active agents or services.
 `restartRequired` remains an internal activation signal for reload to assess.
+This pass applies on Linux, macOS and Windows, including equal-version runs;
+it is not conditional on creating a snapshot alias. Record the target conversation
+and activation outcome separately from the installation receipt. Updating another
+computer remotely does not establish activation in that computer's open conversations.
 
 Keep the operator summary focused on the version, actual outcome and any concrete
 action. An ordinary successful update has no restart or reconnect commentary,
@@ -233,6 +237,17 @@ including "no restart needed" or "reconnect only if needed". Missing visibility
 alone stays in diagnostic evidence. Report actual failures or demonstrated
 activation problems with the affected component, impact and supported next step;
 do not turn an unknown observation into hypothetical advice.
+Keep `skipped-symlink-privilege` and `skipped-read-only` snapshot-alias statuses
+in the diagnostic record, not the ordinary operator summary. These optional
+omissions are not update failures or operator actions; actual failed bridge
+operations still follow partial-convergence recovery. If a resource read fails through an obsolete path,
+report the affected workflow and use the verified installed resource through
+`$team-harness:reload`, rather than suggesting symlink privileges.
+When the operator is continuing known pre-update conversations outside this
+invocation, include one useful handoff: `In those conversations, run
+$team-harness:reload before continuing with TH.` Do not give this handoff for
+the current conversation after its reload was attempted, or for other conversations
+with verified target activation. Do not reload other conversations on their behalf.
 Do not run reload after a partial result or invalid receipt.
 
 When returning to a setup request, read `NEW_PLUGIN/skills/setup/SKILL.md` before

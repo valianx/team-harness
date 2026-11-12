@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.59.1] - 2026-11-12
+
+### Fixed
+
+- Keep optional update diagnostics quiet and guide operators to reload older conversations without unnecessary restart advice.
+
 ## [3.59.0] - 2026-11-12
 
 ### Added

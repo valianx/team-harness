@@ -109,6 +109,18 @@ ordinary summaries SHALL NOT include conditional reconnect boilerplate.
 - **WHEN** update verifies the current version and no operator action is needed
 - **THEN** the response states that TH is current without a restart assurance or speculative caveat
 
+#### Scenario: Optional alias is unavailable without a failed resource read
+- **WHEN** installation succeeds but an optional compatibility alias is skipped
+- **THEN** update retains the alias result in diagnostic evidence and omits it from the ordinary operator summary
+
+#### Scenario: Operator resumes another pre-update conversation
+- **WHEN** the operator will continue a known pre-update conversation outside the update invocation and target activation has not been verified there
+- **THEN** update gives one native TH reload handoff for that conversation, without refreshing it remotely or claiming a restart is required
+
+#### Scenario: Successful update runs on Linux
+- **WHEN** Codex or OpenCode installation or current-version verification succeeds on Linux, macOS or Windows
+- **THEN** update performs its supported current-conversation activation pass independently of optional alias creation and records the conversation scope separately
+
 #### Scenario: Claude Code needs its native plugin reload
 - **WHEN** a new plugin version is installed and activation requires the operator's supported reload command
 - **THEN** update reports the version and that command without appending hypothetical reconnect advice

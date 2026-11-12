@@ -99,6 +99,16 @@ stay in the diagnostic record. Report a failed operation, observed stale compone
 or actual operator action with its impact and supported remedy. A demonstrated
 reconnect need still follows the component-evidence contract above.
 
+An update-triggered reload covers only its bound conversation, on every supported
+operating system. Record that scope alongside the target and outcome. When the
+operator will resume a known pre-update conversation outside that scope, the
+update summary may name the native TH reload command to run there before using
+TH. This is a conversation handoff, not a claim that a restart is required or
+that every open conversation was refreshed. Do not repeat the handoff for a
+conversation already verified against the target, and do not switch to or reload
+unrelated conversations. Optional compatibility-alias outcomes remain diagnostic;
+an actual failed resource read still receives its concrete recovery action.
+
 Do not infer `active` from the absence of reported errors. Keep installation
 verification separate from session activation. If an operator workspace already
 exists, append concise activation evidence there; do not create a workspace or
