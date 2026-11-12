@@ -153,6 +153,8 @@ esac
 assert_true "non-interactive alone: pre-check reports already current" "$ALREADY_CURRENT_SHOWN"
 assert_true "non-interactive alone: pre-check exits 0" "$([ "$EXIT_A" -eq 0 ] && echo 1 || echo 0)"
 assert_true "non-interactive alone: no download attempted" "$([ "$DOWNLOAD_A" -eq 0 ] && echo 1 || echo 0)"
+assert_true "already-current terminal update: one other-session reminder" "$([ "$(printf '%s\n' "$OUTPUT_A" | grep -c 'Remember to run /th-reload in other open OpenCode sessions before continuing with TH.')" -eq 1 ] && echo 1 || echo 0)"
+assert_true "already-current terminal update: activation remains unverified" "$(case "$OUTPUT_A" in *'activation is unverified'*) echo 1 ;; *) echo 0 ;; esac)"
 
 # Case B: --opencode-dir must still skip the pre-check (the config root the
 # shell-side check reads is not necessarily the one the operator targeted).
