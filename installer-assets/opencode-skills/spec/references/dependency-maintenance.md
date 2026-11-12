@@ -46,7 +46,11 @@ prerequisites as pending while continuing independent dependencies.
   and skill name. Updating the CLI package and updating installed skills are
   different outcomes. Never use an unscoped all-skills update. Check shared-root
   effects before refreshing a provider; preserve unrelated host installations.
-- Modern Web Guidance uses its official npm CLI with `DISABLE_TELEMETRY=1`
+- [Impeccable](../../ui-design/references/impeccable.md) retains its official
+  installer and recorded-provider update scope; do not assume a single-provider
+  update flag or overwrite independently owned installations.
+- [Modern Web Guidance](../../ui-design/references/modern-web-guidance.md)
+  uses its official npm CLI with `DISABLE_TELEMETRY=1`
   for every invocation. A version-pinned `npx --yes modern-web-guidance@VERSION`
   route needs no global installation. Prepare/verify the selected version with
   `--help`; report this as cached/on-demand, not a globally installed executable.
