@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Install, update and use Cloudflare's official security-audit skill through the optional cloudflare-security workflow.
+- Install, update and use Cloudflare security audits directly or through scoped security and full-audit workflows.
 
 ## [3.57.1] - 2026-11-09
 

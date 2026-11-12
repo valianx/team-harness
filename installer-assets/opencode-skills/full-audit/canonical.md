@@ -16,7 +16,8 @@ remains unverified rather than passed or not applicable.
 Use the existing methods for their questions: [audit](../audit/SKILL.md) and its
 [coverage method](../audit/references/coverage-method.md) for architecture and
 capability traces; [find-bugs](../th-find-bugs/SKILL.md) for functional mechanisms;
-[security](../security/SKILL.md) for security; [ui-design](../ui-design/SKILL.md)
+[security](../security/SKILL.md) for security and its optional Cloudflare method,
+selected by the security scope and available capability; [ui-design](../ui-design/SKILL.md)
 for analysis-only UI/UX with maintained upstream methods; and
 [cross-repo](../cross-repo/SKILL.md) for contract/invariant seams. Select pertinent
 testing, data/performance and actual-provider advice using their existing methods.

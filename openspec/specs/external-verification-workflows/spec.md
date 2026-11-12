@@ -13,6 +13,14 @@ TH SHALL offer `cloudflare-security` to install, update or apply the official `c
 - **WHEN** the operator requests Cloudflare security work or installation and authorizes the necessary preparation
 - **THEN** Main verifies official CLI options and prerequisites, prepares only the selected capability, records its actual destination/source and reports installation and native readiness separately
 
+#### Scenario: A security audit selects Cloudflare
+- **WHEN** `security` determines that the requested question and available capabilities fit the Cloudflare method, or the operator selects that provider
+- **THEN** Main uses `cloudflare-security` to resolve the installed method and any authorized preparation, preserving the assigned scope and reporting a selected unavailable capability while continuing independent analysis
+
+#### Scenario: The TH assets scanner is requested
+- **WHEN** the operator selects `audit-security`
+- **THEN** the deterministic TH-assets scanner retains its existing scope and execution independently of Cloudflare selection
+
 #### Scenario: Maintenance affects shared installations
 - **WHEN** the supported provider update can affect shared content or additional agent links
 - **THEN** Main inspects that scope, uses a supported route within existing authorization and reports any unresolved additional effects before dependent maintenance

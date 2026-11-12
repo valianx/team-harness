@@ -6,6 +6,18 @@ area, focus there; otherwise inspect the current project. Use
 [workspace](../workspace/SKILL.md) for the bound context; supply selected pinned
 excerpts/captures and separate repository/operational paths to native reviewers.
 
+Select methods by the requested surface, depth and available capabilities.
+[Cloudflare security](../cloudflare-security/SKILL.md) is an optional upstream
+method when it fits the security question or the operator selects it. Reuse a
+usable installation and follow that entry's official preparation route only
+within the authorized scope. Record unavailable selected capabilities and
+continue independent analysis with the applicable OWASP, CWE and ASVS guidance.
+
+When contributing to `full-audit`, pass the bounded security assignment and
+requested endpoint to the selected provider. Follow its installed mode for
+that assignment and retain its evidence and limits in the caller's consolidated
+report, linking provider artifacts when its selected mode requires them.
+
 Inspect code and relevant configuration without changing product behavior.
 Use current authoritative references when their version matters. Report concrete
 findings with evidence, reachable conditions, impact, suggested corrections and
