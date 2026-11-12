@@ -3,7 +3,7 @@
 
 ## Current workflow guidance
 
-- [decision] Reviews use supported native read-only routes without extra permission attestation; missing specialist coverage is disclosed, not a delivery gate.
+- [decision] Reviews use supported native read-only routes without extra permission attestation; disclose missing coverage and honor explicit review-completion conditions.
 
 - [constraint] Review packages resolve refs once; native installers bind settings and method paths before hashing projected assets.
 
