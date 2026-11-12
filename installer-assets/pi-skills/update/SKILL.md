@@ -7,6 +7,12 @@ description: "Update the th plugin — refresh catalog, download the new version
 
 # Update Team Harness in Pi
 
+For a TH update, execute [selected TH dependency maintenance](../spec/references/dependency-maintenance.md)
+from the validated resulting snapshot as an independent pass before the final report.
+Use the consuming operator’s active project/host selections, not this repository’s
+development dependencies. Keep dependency outcomes separate from native TH update
+and activation evidence; continue independent authorized work after partial failure.
+
 For the explicit `cloudflare-security` target, follow
 [Cloudflare security](../cloudflare-security/SKILL.md) with the `update` operation
 and requested scope. Complete this provider route before TH maintenance and
@@ -46,8 +52,8 @@ publication remains incomplete and must not be reported as activated.
 
 When the operator selected an upstream provider update, use only its owner and
 Pi route from [upstream tools](../spec/references/upstream-tools.md), preserving
-its selected root/scope. Updating TH does not reinstall OpenSpec, TEA/BMAD,
-Superpowers or unrelated providers. Check installed, discoverable and usable
+its selected root/scope. Maintain only selected TH dependencies through the
+shared maintenance pass; preserve unrelated providers. Check installed, discoverable and usable
 states independently.
 
 After the selected package is current, follow [Pi reload](../reload/SKILL.md).

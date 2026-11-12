@@ -31,7 +31,9 @@ Maintenance example: `npx impeccable update --scope=project --no-hooks`.
 Update has **no provider selector** and refreshes **all providers recorded in
 that scope**. Inspect actual effects; run only when authorization covers them.
 Otherwise retain usable capabilities and report the exact pending maintenance
-scope. Updating TH does not update Impeccable.
+scope. TH update maintains Impeccable only when selected under the
+[dependency maintenance contract](../../spec/references/dependency-maintenance.md),
+with the same ownership and provider-scope limits.
 
 The researched baseline at source `245ad82def45831dc56a21b683c7a1ff530b06cc`
 is [package](https://github.com/pbakaus/impeccable/blob/245ad82def45831dc56a21b683c7a1ff530b06cc/package.json)/compiled skill `4.5.2`, engine `0.1.14`, with Node `>=22.18` for npm.

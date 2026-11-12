@@ -27,7 +27,7 @@ owns Skills CLI commands, runtime selectors, scopes and readiness checks.
 Cloudflare maintains `security-audit` in its official repository. Read its actual
 installed instructions and applicable companions, preserving upstream evidence,
 sandbox and reporting requirements. Main retains coordination, scope and decisions.
-Keep this optional provider outside ordinary TH setup/update and unselected
+Keep this optional provider outside unselected TH setup/update and unselected
 security work. Its methods, scripts and run artifacts stay under their own owner.
 
 ## REA application research
@@ -195,7 +195,7 @@ settings require one; report installed, discoverable and active states separatel
 version against the policy baseline and its prerequisites; validate compatibility
 for another version instead of forcing a downgrade or pinning an unavailable
 marketplace release. A failed action or pending activation gets a concrete recovery,
-not a generic restart. Updating TH does not reinstall these providers.
+not a generic restart. TH update maintains only selected dependencies through its shared maintenance pass.
 
 TEA preparation uses BMAD's official module installer (`npx bmad-method install`),
 which generates project-local native entries and uses `uv` for shared scripts.

@@ -7,6 +7,12 @@ Analyze the input: $ARGUMENTS
 
 ## Upstream provider updates
 
+For a TH update, execute [selected TH dependency maintenance](../spec/references/dependency-maintenance.md)
+from the validated resulting snapshot as an independent pass before the final report.
+Use the consuming operator’s active project/host selections, not this repository’s
+development dependencies. Keep dependency outcomes separate from native TH update
+and activation evidence; continue independent authorized work after partial failure.
+
 For the explicit `cloudflare-security` target, follow
 [Cloudflare security](../cloudflare-security/SKILL.md) with the `update` operation
 and requested scope. Complete this provider route before TH maintenance and
@@ -25,7 +31,7 @@ only to a separately requested TH operation.
 
 For an explicit `rea` target, follow [REA application research](../spec/references/upstream-tools.md#rea-application-research)
 for the active client and return from this provider-only route. REA is separate
-from quality selection and is never prepared by full TH setup or update.
+from quality selection; maintain it during TH update only when already selected.
 
 Before routing a bare `find-bugs` target, resolve the owner from the live task:
 TH project/module diagnosis or Sentry's upstream captured-change method. If it
@@ -35,9 +41,9 @@ TH's OpenCode entry is `th-find-bugs`.
 
 Read [the shared upstream-tool integration reference](../spec/references/upstream-tools.md)
 when the operator explicitly requests an OpenSpec, Superpowers, TEA, or quality-provider
-update. This skill updates Team Harness only; it never installs or updates providers as a
-side effect. For an explicit provider request, use its official mechanism under native
-permissions:
+update. Unselected providers remain untouched. Selected dependencies follow the
+maintenance pass above; explicit provider requests use their official mechanisms
+under native permissions:
 
 - OpenSpec: official package-manager update, then its project `update` when generated
   workflows need refreshing.
@@ -552,6 +558,15 @@ Install python3 now for full coverage? [Y/n]
 
    When the `managed blocks` row contains `preserved (operator-edited)`, append this hint line outside the fence:
    `Note: one or more managed blocks contain operator edits and were not overwritten. Run /th:update --force-blocks to adopt the canonical version, or delete the block from ~/.claude/CLAUDE.md and re-run to re-insert it.`
+
+## Dependency result additions
+
+Add a `dependencies` row to the final status block with per-provider old/new
+versions and outcomes from the shared maintenance receipt. These additions
+override the literal template requirement above. If any selected dependency is
+pending, replace `No action required.` with its concrete next step and label the
+overall report partial, even when TH itself is current. A provider failure does
+not trigger the TH-only stop rules below; continue independent authorized work.
 
 ## Error handling
 

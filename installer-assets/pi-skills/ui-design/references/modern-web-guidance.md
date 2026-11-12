@@ -19,7 +19,8 @@ required for CLI queries. When preparation is needed, use a verified exact
 package version and the official route within authorization. Inspect its effects
 first; do not use floating `@latest` for unattended execution. Upstream `install`
 can enable automatic updates: do not run it as a query prerequisite or silently
-change update policy. Updating TH does not update this provider.
+change update policy. TH update maintains this provider only when selected under
+the [dependency maintenance contract](../../spec/references/dependency-maintenance.md).
 
 Verified baseline: npm `1.0.0`, publisher `GoogleChrome`, source repository
 `GoogleChrome/modern-web-guidance-src`, Node `>=22`. Help, search and retrieval
