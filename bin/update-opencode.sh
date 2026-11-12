@@ -128,7 +128,8 @@ if [ -n "$INSTALLED_VERSION" ] && [ -n "$LATEST_VERSION" ]; then
         echo "th update — already current"
         echo "  installed version   ${INSTALLED_VERSION}"
         echo "  latest version      ${LATEST_VERSION}"
-        echo "No action required."
+        echo "Session activation is unverified. Run /th-reload in your current session."
+        echo "Remember to run /th-reload in other open OpenCode sessions before continuing with TH."
         exit 0
     fi
 

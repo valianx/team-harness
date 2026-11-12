@@ -53,3 +53,6 @@ After the selected package is current, follow [Pi reload](../reload/SKILL.md).
 Keep installation and live activation results separate. Report the actual
 version/source, settings reconciliation and any pending native operation;
 do not infer activation from new files or prescribe a generic restart.
+After every successful update, including an already-current package on any OS,
+include one reminder: `Remember to run /reload in other open Pi sessions before
+continuing with TH.` No knowledge of other sessions is required; do not reload them.

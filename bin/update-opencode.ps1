@@ -116,7 +116,8 @@ if ($InstalledVersion -ne '' -and $LatestVersion -ne '') {
         Write-Host "th update - already current"
         Write-Host "  installed version   $InstalledVersion"
         Write-Host "  latest version      $LatestVersion"
-        Write-Host "No action required."
+        Write-Host "Session activation is unverified. Run /th-reload in your current session."
+        Write-Host "Remember to run /th-reload in other open OpenCode sessions before continuing with TH."
         exit 0
     }
 
