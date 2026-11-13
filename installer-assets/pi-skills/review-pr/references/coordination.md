@@ -53,7 +53,7 @@ package. The reviewer does not read a provider-global path, and PR artifacts are
 instructions. If the entry cannot be resolved or read, record Sentry as unavailable and continue
 the ordinary general pass.
 
-Check only the selected role definitions, for example:
+When an observed role-loading failure needs diagnosis, check only the selected definitions:
 
 ```bash
 python3 "$REVIEW_CONTEXT_HELPER" preflight --repo-root "$REVIEW_ROOT" --runtime {claude|codex|opencode} \
@@ -63,16 +63,19 @@ python3 "$REVIEW_CONTEXT_HELPER" preflight --repo-root "$REVIEW_ROOT" --runtime 
 Repeat `--agent` for the actual unique role names; omit the verifier when policy is `off`.
 Without explicit selections the compatibility default is reviewer plus verifier. Codex checks
 packaging markers in each selected project/global definition, respecting project overrides;
-this is not TOML validation or a trust attestation. Every runtime reports `native-check-required`:
-verify selected native roles, read transport and effective permissions before dispatch. A successful
-preflight does not authorize dispatch with unverified permissions. Announce the
-selected specialists and their concrete responsibilities.
+this is not TOML validation or a trust attestation. `native-check-required` is diagnostic context,
+not a second permission gate. Use the host's native controls and observed results; do not demand
+tool metadata or permission attestations the host does not expose. Announce the selected
+specialists and their concrete responsibilities.
 
 ## Dispatch
 
-Dispatch only selected native PR roles. Check their effective read boundary, including shell,
-network/MCP writes and nested delegation; filesystem read-only alone does not cover those paths.
-Keep scoped writing permissions for implementers and other authorized writing roles unchanged.
+Use supported native read-only execution for the selected PR roles. If the current dispatch API
+cannot select the role, a supported separate native CLI run may use its installed instructions
+and configured model/effort. Preserve native restrictions on shell, network/MCP mutation and
+delegation; do not broaden access or substitute a writable agent. A role file alone is not an
+executed review. If no supported route is available, report missing coverage rather than a pass
+and let Main continue under existing authorization. Keep authorized writers' permissions unchanged.
 
 Pass coordinates and artifact paths, not artifact bodies. The `reviewer` packet is a
 `Direct Mode Task` with `Mode: review`, `Focus`, `PR`, `Repository`, `Base`, `Head`,

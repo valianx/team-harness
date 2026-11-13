@@ -32,11 +32,12 @@ unchecked copies remain unverified and fully checked surfaces need no empty disp
 
 ## Native execution and focused inspection
 
-Use the host's native read-only role. Preserve its supported model/effort choices;
-installed-profile inspection is for diagnosis, not a repeated hash attestation or
-comparison with packaged model defaults. Do not require loaded-byte proof or a
-new conversation. If the read-only capability is unavailable, do not substitute
-a writable role whose prompt merely says not to edit.
+Use the selected role's instructions and model/effort through supported native
+read-only execution, including a separate CLI when current dispatch cannot
+select it. Inspect profiles only for observed failures; require no unavailable
+permission or loaded-byte attestation. Never substitute a writable agent. If no
+route remains, report missing coverage; Main continues unless an explicit
+operator condition is unmet.
 
 Reviewers inspect the packaged base/head and selected scope, including pertinent
 dependencies needed to establish behavior. Use immutable local Git content for

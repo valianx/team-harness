@@ -28,7 +28,7 @@ ownership, and publication contract below; they do not start a second Review Mod
 
 ## Non-negotiable invariants
 
-1. Main coordinates through the active runtime's native dispatch tools. PR-review specialists
+1. Main coordinates through supported native execution or delegation. PR-review specialists
    advise with scoped read access; they never edit, publish, change coordinator state or delegate.
    Main owns synthesis and evidence-backed decisions. Do not spawn another orchestrator.
 2. Bind every assessment and external result to the immutable reviewed `head_oid`, relevant
@@ -113,8 +113,8 @@ not these coordinator instructions or other specialists' initial conclusions.
    check shared prerequisites, prepare the owned immutable run, read base policy and prior-review
    identity. Preserve the snapshot until every reader has joined and integrity checks finish.
 2. **Assign and review.** Read [coordination.md](references/coordination.md). Map fixed coverage
-   obligations to risks and dependencies, check only selected native roles and effective
-   permissions, and dispatch independent assessments with progressive context. An external scan is
+   obligations to risks and dependencies, use available native read-only execution, and dispatch
+   independent assessments with progressive context. An external scan is
    coordinator evidence rather than another lens; an installed Sentry method stays inside the
    existing general reviewer. Apply the pre-dispatch freshness check from the snapshot reference
    immediately before dispatch.

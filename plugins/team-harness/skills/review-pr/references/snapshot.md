@@ -31,11 +31,12 @@ policy and selected coverage are known.
 It returns `ok` with a `blockers` list. Repair authorized prerequisites and retry the affected
 check; if trustworthy capture remains unavailable, report the concrete blocker.
 
-For a selected-role blocker, repair the relevant installation or use its supported refresh and
-verify native availability again. Require a new session only with evidence that this runtime
-cannot refresh the specific missing capability. Native dispatch may inherit parent overrides;
-role-file defaults alone do not prove effective permissions. Never substitute an unrestricted
-agent for a PR-review role.
+If the selected role cannot be dispatched, use a supported native read-only alternative with
+the same role instructions, scope and model/effort preferences. Diagnose installation or refresh
+only for an observed failure; require a new session only for a demonstrated activation need.
+Never replace native read-only execution with a writable agent instructed not to edit. If no
+supported route remains, preserve findings, disclose missing coverage and continue Main's work;
+only an explicit unmet operator condition requires a new decision.
 
 ### 2. Prepare the isolated review run
 
