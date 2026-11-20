@@ -37,9 +37,14 @@ ROLES = (
     "reviewer-consolidator",
 )
 MANAGED_MARKER = "# Code generated from runtime/schema/codex-agents.json; DO NOT EDIT."
-DEFAULT_SUBAGENT_MODEL = "gpt-6.1-sol"
+DEFAULT_SUBAGENT_MODEL = "gpt-6.2-sol"
 DEFAULT_SUBAGENT_REASONING_EFFORT = "max"
-LEGACY_SUBAGENT_PAIRS = frozenset({("gpt-5.6-terra", "medium"), ("gpt-5.6-luna", "max"), ("gpt-6-luna", "max")})
+LEGACY_SUBAGENT_PAIRS = frozenset({
+    ("gpt-5.6-terra", "medium"),
+    ("gpt-5.6-luna", "max"),
+    ("gpt-6-luna", "max"),
+    ("gpt-6.1-sol", "max"),
+})
 # Filling a partial operator choice can form a legacy pair; retain its ownership.
 CUSTOM_DEFAULTS_MARKER = "# Team Harness: preserve operator-selected subagent defaults."
 PROJECT_DOC_FALLBACK = "CLAUDE.md"

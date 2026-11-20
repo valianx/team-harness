@@ -20,8 +20,9 @@ language preferences and optional GitHub identity routes, leaves personal MCP
 configuration and credentials untouched, preserves native execution preferences,
 and places twenty bundled specialist
 agents in project or global scope: seven standard logical roles, seven
-Sol 6.1 `pipeline-*` identities, one direct read-only inline reviewer,
-and five for immutable PR review.
+Sol 6.2 `pipeline-*` identities, one direct read-only inline reviewer,
+and five for immutable PR review. Sol 6.2 requires Codex 0.166.0 or later and
+workspace access to that model.
 An explicit setup import can copy missing values from Claude Code or opencode
 without printing opaque values; normal Codex modes never read another
 runtime's configuration and existing Codex-native values always win.
@@ -140,7 +141,7 @@ CI and the prepublish guard require these sites to be changed together when a
 distributed runtime input changes. Repositories that predate the Codex plugin
 or installer path retain optional-site compatibility until that path exists.
 
-The seven Sol 6.1 `pipeline-*` identities are optional packaged roles
+The seven Sol 6.2 `pipeline-*` identities are optional packaged roles
 for bounded native delegation. A coordinated workflow can use whichever assigned
 role is available; setup/update install the complete set for predictable coverage,
 but their presence is not a preflight, permission or startup requirement. The
@@ -195,23 +196,22 @@ standard installed specialists:
 
 | Claude role metadata | Codex model | Effort |
 |---|---|---|
-| `opus` | `gpt-6.1-sol` | `xhigh` |
-| `sonnet` + `high` or `xhigh` | `gpt-6.1-sol` | `max` |
-| `sonnet` + `medium` | `gpt-6.1-sol` | `max` |
-| `haiku` | `gpt-6.1-sol` | `max` |
+| `opus` | `gpt-6.2-sol` | `xhigh` |
+| `sonnet` + `high` or `xhigh` | `gpt-6.2-sol` | `max` |
+| `sonnet` + `medium` | `gpt-6.2-sol` | `max` |
+| `haiku` | `gpt-6.2-sol` | `max` |
 
 All twenty shipped specialists, including the seven `pipeline-*` aliases, pin
-`gpt-6.1-sol` with the effort shown above. Astra is reserved for Main's chat.
+`gpt-6.2-sol` with the effort shown above. Astra is reserved for Main's chat.
 Delegation must not inherit the chat model or require changing it with `/model`.
-If the active host cannot dispatch Sol 6.1, report the exact limitation and
+If the active host cannot dispatch Sol 6.2, report the exact limitation and
 continue suitable work directly without silently substituting another model.
 
 The role table is independent from the generic fallback. Global setup and
 update install a missing fallback and atomically migrate the exact formerly
-managed `gpt-5.6-terra` / `medium`, `gpt-5.6-luna` / `max`, and
-`gpt-6-luna` / `max` pairs to `gpt-6.1-sol` / `max`, with a
-backup. Any other complete operator-selected pair is preserved as
-`custom-preserved`. A
+managed `gpt-5.6-terra` / `medium`, `gpt-5.6-luna` / `max`, `gpt-6-luna` / `max`,
+and `gpt-6.1-sol` / `max` pairs to `gpt-6.2-sol` / `max`, with a backup.
+Other complete operator-selected pairs are reported as `custom-preserved`. A
 fallback or named-role change reports `restartRequired: true`; the active Codex
 runtime must reload those roles or reconnect and resume the same conversation.
 The reload skill reports whether the active host can perform and verify that

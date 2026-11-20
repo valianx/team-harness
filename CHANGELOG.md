@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.59.3] - 2026-11-20
+
+### Changed
+
+- Upgrade Codex specialists and the managed subagent fallback to GPT-6.2 Sol.
+
 ## [3.59.2] - 2026-11-12
 
 ### Fixed

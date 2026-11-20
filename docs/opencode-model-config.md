@@ -55,15 +55,13 @@ profile categories do not guarantee a price or quality difference.
 
 ### Claude Code alias ownership
 
-The Claude Code source alias `model: opus` remains semantic and is not rewritten
-in the canonical agent files. Claude Code 2.1.280 and newer resolve that alias to
-Opus 5.5 for Anthropic API, Bedrock, and Google providers. Microsoft Foundry may
-continue resolving `opus` to Opus 4.6 or a provider-specific override; that
-availability and upgrade decision belongs to the runtime/provider. Team Harness
-only uses the alias as the default tier input and pins the opt-in Anthropic
-opencode projection to `claude-opus-5-5`, `claude-sonnet-5-5` and
-`claude-haiku-5-5`. Existing concrete model ids remain
-unchanged and pass through as authored. See Claude Code's [model configuration
+Canonical agents use the `opus`, `sonnet`, and `haiku` aliases. On Anthropic's
+API, they default to Opus 5.5, Sonnet 5.5, and Haiku 5.5 starting with Claude Code
+2.1.280, 2.1.284, and 2.1.293 respectively. Other providers, operator overrides,
+and parent sessions pinned to the same model family can resolve to a different
+version. The opt-in Anthropic OpenCode projection pins `claude-opus-5-5`,
+`claude-sonnet-5-5`, and `claude-haiku-5-5`. Existing concrete model IDs pass
+through as authored. See Claude Code's [model configuration
 reference](https://code.claude.com/docs/en/model-config) and Anthropic's [model
 overview](https://platform.claude.com/docs/en/models/overview) for the
 runtime/provider mappings.

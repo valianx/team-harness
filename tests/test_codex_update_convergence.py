@@ -568,7 +568,12 @@ class ConvergenceFixture(unittest.TestCase):
 
     def test_managed_fallbacks_upgrade_with_backup_then_remain_current(self) -> None:
         config = self.codex_home / "config.toml"
-        for model, effort in (("gpt-5.6-terra", "medium"), ("gpt-5.6-luna", "max"), ("gpt-6-luna", "max")):
+        for model, effort in (
+            ("gpt-5.6-terra", "medium"),
+            ("gpt-5.6-luna", "max"),
+            ("gpt-6-luna", "max"),
+            ("gpt-6.1-sol", "max"),
+        ):
             with self.subTest(model=model):
                 original = (
                     'model = "operator-main"\nproject_doc_fallback_filenames = ["CLAUDE.md"]\n'
@@ -580,7 +585,7 @@ class ConvergenceFixture(unittest.TestCase):
                 self.assertEqual(receipt["status"], "converged")
                 document = tomllib.loads(config.read_text(encoding="utf-8"))
                 self.assertEqual(document["model"], "operator-main")
-                self.assertEqual(document["agents"]["default_subagent_model"], "gpt-6.1-sol")
+                self.assertEqual(document["agents"]["default_subagent_model"], "gpt-6.2-sol")
                 self.assertEqual(document["agents"]["default_subagent_reasoning_effort"], "max")
                 self.assertEqual(config.with_name("config.toml.bak").read_bytes(), original)
                 final_bytes = config.read_bytes()
@@ -598,7 +603,7 @@ class ConvergenceFixture(unittest.TestCase):
             ),
             (
                 "default_subagent_reasoning_effort = 'high' # selected effort\n",
-                {"default_subagent_model": "gpt-6.1-sol", "default_subagent_reasoning_effort": "high"},
+                {"default_subagent_model": "gpt-6.2-sol", "default_subagent_reasoning_effort": "high"},
             ),
             (
                 'default_subagent_model = "operator-model"',
@@ -611,6 +616,10 @@ class ConvergenceFixture(unittest.TestCase):
             (
                 'default_subagent_model = "gpt-6-luna"\n',
                 {"default_subagent_model": "gpt-6-luna", "default_subagent_reasoning_effort": "max"},
+            ),
+            (
+                'default_subagent_model = "gpt-6.1-sol"\n',
+                {"default_subagent_model": "gpt-6.1-sol", "default_subagent_reasoning_effort": "max"},
             ),
         )
         for configured, expected in cases:
@@ -643,7 +652,7 @@ class ConvergenceFixture(unittest.TestCase):
         config = self.codex_home / "config.toml"
         original = (
             '# operator formatting\n[agents]\n'
-            'default_subagent_model = "gpt-6.1-sol" # current model\n'
+            'default_subagent_model = "gpt-6.2-sol" # current model\n'
             "default_subagent_reasoning_effort = 'max' # current effort\n"
             '[other]\npreserve = true\n'
         ).encode()
@@ -684,7 +693,11 @@ class ConvergenceFixture(unittest.TestCase):
 
     def test_other_complete_fallback_pairs_remain_operator_owned(self) -> None:
         config = self.codex_home / "config.toml"
-        for model, effort in (("gpt-5.6-luna", "high"), ("gpt-6-sol", "xhigh")):
+        for model, effort in (
+            ("gpt-5.6-luna", "high"),
+            ("gpt-6-sol", "xhigh"),
+            ("gpt-6.1-sol", "xhigh"),
+        ):
             with self.subTest(model=model):
                 original = (
                     'model = "operator-main"\nproject_doc_fallback_filenames = ["CLAUDE.md"]\n'

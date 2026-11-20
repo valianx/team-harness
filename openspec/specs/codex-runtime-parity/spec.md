@@ -218,45 +218,49 @@ Main SHALL check the native roles and capabilities needed for the current assign
 
 #### Scenario: The standard role profile is selected
 - **WHEN** no live override replaces the installed standard profile
-- **THEN** native dispatch uses Sol 6.1 with each role's existing max or xhigh reasoning, with observed activation limits reported honestly.
+- **THEN** native dispatch uses Sol 6.2 with each role's existing max or xhigh reasoning, with observed activation limits reported honestly.
 
-### Requirement: Codex specialists use Sol 6.1 independently of Main
-The standard Team Harness Codex profile SHALL assign gpt-6.1-sol to all delivered specialists, including pipeline aliases. Opus projections SHALL retain xhigh reasoning; Sonnet and Haiku projections SHALL retain max reasoning. Astra SHALL be reserved for Main's chat and SHALL NOT be selected or inherited by delegated agents. Main's model SHALL remain independently selected. Retired spec-validator and pr-creator roles SHALL remain absent.
+### Requirement: Codex specialists use Sol 6.2 independently of Main
+The standard Team Harness Codex profile SHALL assign gpt-6.2-sol to all delivered specialists, including pipeline aliases. Opus projections SHALL retain xhigh reasoning; Sonnet and Haiku projections SHALL retain max reasoning. Astra SHALL be reserved for Main's chat and SHALL NOT be selected or inherited by delegated agents. Main's model SHALL remain independently selected. Retired spec-validator and pr-creator roles SHALL remain absent.
 
 #### Scenario: Standard agent projections are generated
 - **WHEN** the registry generates runtime agents, packaged copies and the roster
-- **THEN** all twenty delivered specialists explicitly select Sol 6.1 with their existing reasoning efforts, including pipeline aliases
+- **THEN** all twenty delivered specialists explicitly select Sol 6.2 with their existing reasoning efforts, including pipeline aliases
 
 #### Scenario: Main uses Astra
 - **WHEN** Main coordinates a pipeline from an Astra chat
-- **THEN** delegated specialists use Sol 6.1 without changing Main's model
+- **THEN** delegated specialists use Sol 6.2 without changing Main's model
 
 #### Scenario: A pipeline runs without a live model override
 - **WHEN** Main dispatches standard pipeline specialists
-- **THEN** all use Sol 6.1 with max for implementer, tester, cleaner and delivery, and xhigh for architect, QA and security
+- **THEN** all use Sol 6.2 with max for implementer, tester, cleaner and delivery, and xhigh for architect, QA and security
 
 #### Scenario: Explicit native model selection
-- **WHEN** the operator selects a supported reasoning effort for delegated Sol 6.1 agents
+- **WHEN** the operator selects a supported reasoning effort for delegated Sol 6.2 agents
 - **THEN** coordination uses the host's supported selection route without changing Main's chat model or introducing a TH model resolver
 
-#### Scenario: The live host lacks Sol 6.1 dispatch
-- **WHEN** the active native dispatch capability cannot select Sol 6.1
+#### Scenario: The live host lacks Sol 6.2 dispatch
+- **WHEN** the active native dispatch capability cannot select Sol 6.2
 - **THEN** Main reports that limitation and continues suitable work directly without silently substituting another model
 
 #### Scenario: The phase roles are installed in another runtime
 - **WHEN** skills and roles are distributed to Claude Code or OpenCode
 - **THEN** they retain their existing runtime model policy
 
-### Requirement: The managed generic fallback converges on Sol 6.1 max
-The generated Codex project configuration and newly installed runtime configuration SHALL use `gpt-6.1-sol` with `max` reasoning as the generic subagent fallback. Setup and update SHALL migrate only the exact managed `gpt-5.6-terra` / `medium`, `gpt-5.6-luna` / `max`, and `gpt-6-luna` / `max` pairs to Sol 6.1/max with the existing backup and native activation reporting, while preserving every other complete operator-selected pair.
+### Requirement: The managed generic fallback converges on Sol 6.2 max
+The generated Codex project configuration and newly installed runtime configuration SHALL use `gpt-6.2-sol` with `max` reasoning as the generic subagent fallback. Setup and update SHALL migrate only the exact managed `gpt-5.6-terra` / `medium`, `gpt-5.6-luna` / `max`, `gpt-6-luna` / `max`, and `gpt-6.1-sol` / `max` pairs to Sol 6.2/max with the existing backup and native activation reporting, while preserving every other complete operator-selected pair.
 
 #### Scenario: Setup encounters the former managed Terra fallback
 - **WHEN** setup or update reconciles a configuration whose generic subagent fallback is `gpt-5.6-terra` with `medium` effort
-- **THEN** it atomically replaces the model and effort with Sol 6.1/max, preserves unrelated configuration, creates the required backup, and reports the changed configuration for the existing native activation procedure
+- **THEN** it atomically replaces the model and effort with Sol 6.2/max, preserves unrelated configuration, creates the required backup, and reports the changed configuration for the existing native activation procedure
 
 #### Scenario: Setup encounters the former managed Luna fallback
 - **WHEN** setup or update reconciles `gpt-5.6-luna` or `gpt-6-luna` with `max` effort
-- **THEN** it migrates to `gpt-6.1-sol` with `max`, preserves unrelated configuration, and a second reconciliation is a no-op
+- **THEN** it migrates to `gpt-6.2-sol` with `max`, preserves unrelated configuration, and a second reconciliation is a no-op
+
+#### Scenario: Setup encounters the former managed Sol fallback
+- **WHEN** setup or update reconciles the managed `gpt-6.1-sol` / `max` fallback
+- **THEN** it backs up the configuration and migrates the fallback to `gpt-6.2-sol` / `max` while preserving other settings
 
 #### Scenario: Setup encounters a custom fallback
 - **WHEN** setup or update reconciles a complete fallback other than the current or exact former managed pairs, including Luna 5.6 with a different effort

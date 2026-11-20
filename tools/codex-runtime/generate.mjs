@@ -141,9 +141,9 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
   if (!projectDefaults || typeof projectDefaults !== "object" || Array.isArray(projectDefaults)) {
     fail("project_defaults must be an object");
   }
-  if (projectDefaults.default_subagent_model !== "gpt-6.1-sol"
+  if (projectDefaults.default_subagent_model !== "gpt-6.2-sol"
       || projectDefaults.default_subagent_reasoning_effort !== "max") {
-    fail("project_defaults must set the generic Sol 6.1/max fallback");
+    fail("project_defaults must set the generic Sol 6.2/max fallback");
   }
   if (!Array.isArray(projectDefaults.project_doc_fallback_filenames)
       || projectDefaults.project_doc_fallback_filenames.length !== 1
@@ -362,7 +362,7 @@ export async function render({ rootDir = repositoryRoot, profileName } = {}) {
     "",
     "Author shared role intent in `agents/*.md`. Codex model and effort values are projected from that frontmatter, while Codex-specific execution instructions live in `runtime/codex/instructions/*.md` and workflow adapters live in `plugins/team-harness/skills/`. A semantic prompt change is not translated automatically into those adapters, so review both surfaces when behavior should change in Claude Code and Codex.",
     "",
-    "The seven additional `pipeline-*` custom-agent identities reuse the corresponding logical role adapter and explicitly pin `gpt-6.1-sol` with the same reasoning effort as their standard counterparts. Main keeps its independently selected chat model; Astra is reserved for that chat and is not inherited by specialists. Report unavailable Sol 6.1 dispatch without silently substituting another model. These aliases are optional native roles, not a preflight or permission requirement.",
+    "The seven additional `pipeline-*` custom-agent identities reuse the corresponding logical role adapter and explicitly pin `gpt-6.2-sol` with the same reasoning effort as their standard counterparts. Main keeps its independently selected chat model; Astra is reserved for that chat and is not inherited by specialists. Report unavailable Sol 6.2 dispatch without silently substituting another model. These aliases are optional native roles, not a preflight or permission requirement.",
     "",
     "After changing any canonical agent's model or effort, an installed role contract, a Codex instruction adapter, or `runtime/schema/codex-agents.json`, run `$sync-codex-agents`. The equivalent repository commands are:",
     "",
