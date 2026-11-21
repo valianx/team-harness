@@ -1,6 +1,6 @@
 ---
 name: architecture-proposal
-description: "Write or revise an architecture proposal from decisions in the conversation, a draft or a GitHub issue."
+description: "Write or revise architecture proposal documents from decisions in the conversation, a draft or a GitHub issue."
 metadata:
   team-harness/config: "__TEAM_HARNESS_OPENCODE_CONFIG__"
   opencode/autoinvoke: "false"

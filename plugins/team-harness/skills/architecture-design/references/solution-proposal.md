@@ -1,13 +1,16 @@
 # Solution proposal
 
-Use the system name as the title. Make the proposal understandable without
-the originating chat. Use the requested language, defaulting to the language
-of the conversation. Organize sections around the reader's questions, such
-as "When does Operations review a payment?" or "Who owns the review queue?"
-End with technical design. Adapt
-detail and headings to the facts of the solution.
+Deliver two standalone documents by default, a detailed proposal for
+implementation and a concise presentation document for the team. Honor an
+explicit choice of documents, format or destination. Put the system name in
+each title and distinguish the two purposes. Make each document understandable
+without the originating chat or the other document. Use the requested
+language, defaulting to the language of the conversation. Organize sections
+around the reader's questions and put functional content first.
 
-## Functional proposal
+## Detailed proposal
+
+### Functional proposal
 
 Start with who uses the system, what triggers it, which rules determine each
 outcome and what people can observe. Explain the problem and the general
@@ -22,7 +25,7 @@ consequences of technical choices here when they affect experience, cost,
 scope or delivery. Identify verified facts, recommendations and unknowns.
 Label estimates with their assumptions.
 
-## Technical design
+### Technical design
 
 Describe the affected current system and proposed responsibilities, boundaries,
 integrations and interfaces. Explain which component owns each responsibility,
@@ -34,9 +37,12 @@ For a multi-service flow, show who calls whom and what data moves. Use the
 Excalidraw workflow to create the diagram or update the existing one.
 [excalidraw-diagram](../../excalidraw-diagram/SKILL.md)
 
-For a proposed data exchange, include a representative DTO and explain how
-the consumer uses each field. Keep field meanings and examples consistent
-with the business rules and data on the diagram.
+Document new and changed interfaces at the level needed to implement them.
+Identify the producer, consumer, operation or trigger, inputs and outputs,
+and applicable failure and recovery behavior. For a proposed data exchange,
+include a representative DTO with field names, types, requiredness and how
+the consumer uses each field. Keep examples consistent with the business
+rules and data on the diagram.
 
 For database changes, include the affected current and proposed model, covering
 fields, relationships, constraints and migration effects. Justify each newly
@@ -47,37 +53,47 @@ technical implications here. [sketch](../../sketch/SKILL.md)
 Embed useful visuals so the proposal is readable on its own. Link editable
 sources as supporting assets.
 
-Outline implementation increments, dependencies and verification against the
-acceptance criteria. Address migration, rollback, operation and measurable
-quality needs where applicable. State missing material inputs rather than
-inventing schemas, infrastructure, performance targets or delivery dates.
+Describe implementation increments and dependencies. Explain how to verify
+the acceptance criteria and applicable failure paths. Include migration,
+rollback, operating procedures and measurable quality needs where applicable.
+Mark missing facts and open decisions where they affect implementation.
 
-## One deliverable and coherent sources
+## Team presentation document
 
-Keep one logical proposal in the selected Page or file workspace. Honor explicit
-destinations and formats. Use headings and a contents list when useful. Separate
-narrative documents only when the operator asks.
+Lead with the functional proposal. Give the team enough context to discuss
+who uses the system, what starts the flow, the proposed rules and outcomes,
+and the scope of the first delivery. Keep the detail to what the team needs
+to understand and discuss the proposal.
 
-For standalone design, this document holds the solution under discussion. If
-OpenSpec already owns the intent, synthesize its requirements and decisions
-faithfully, identify and link the canonical sources, and reconcile changes
-there before refreshing the proposal. Keep task tracking in OpenSpec. On revision,
-reuse the existing proposal and check changed decisions against every affected
-explanation, example, table, diagram and interface contract.
+Close with a short technical section about what the proposal introduces.
+For each new or changed interaction, name the participants and the new
+exchange or behavior. Explain what each new DTO carries and why, or summarize
+only the change to an existing DTO. Keep unchanged flows and full field
+definitions in the detailed proposal where relevant. If communication and
+contracts stay the same, say so in one sentence.
 
-Follow workspace guidance for working artifacts. Before delivery, apply the
-`write-documents` editorial pass to resolve contradictions and surface open
-decisions. Check that Operations can explain the behavior from the opening
-sections and Engineering can identify ownership and interfaces from the
-technical design.
+## Deliver and revise
+
+Save each document as its own deliverable in the selected workspace. In a
+file workspace, use distinct filenames. In a Page workspace, retain both links
+in the bound effort Page. Link editable visuals as supporting assets. Honor an
+explicit request for one document at the depth its audience needs.
+
+Use the same source decisions for both documents. If OpenSpec already owns
+the intent, link its requirements and decisions and reconcile scope and design
+changes there before updating the documents. On revision, read and update the
+existing documents. Check each affected explanation, example, table, diagram
+and interface contract against the current decisions.
+
+Before delivery, apply the `write-documents` editorial pass to both documents.
+Resolve contradictions and keep open decisions visible where they matter.
+Check that Operations can explain the proposed behavior from the presentation
+and Engineering has the implementation detail in the detailed proposal.
 [write-documents](../../write-documents/SKILL.md)
 
 ## Industry references
 
-These sources inform content; the single-document default is TH's chosen
-workflow preference, not a universal industry rule:
-
-- [Atlassian PRD](https://www.atlassian.com/agile/product-management/requirements): shared product context and concise requirements.
-- [arc42 stakeholder needs](https://docs.arc42.org/tips/1-20/): adapt content and detail to readers.
-- [C4 context](https://c4model.com/diagrams/system-context): explain people, systems and boundaries before technical detail.
-- [Design Docs at Google](https://www.industrialempathy.com/posts/design-docs-at-google/): Malte Ubl's account of decisions and trade-offs, not an official Google standard.
+- Shared product context and concise requirements. [Atlassian PRD](https://www.atlassian.com/agile/product-management/requirements)
+- Content and detail adapted to readers. [arc42 stakeholder needs](https://docs.arc42.org/tips/1-20/)
+- People, systems and boundaries before technical detail. [C4 context](https://c4model.com/diagrams/system-context)
+- Malte Ubl's account of decisions and trade-offs. [Design Docs at Google](https://www.industrialempathy.com/posts/design-docs-at-google/)

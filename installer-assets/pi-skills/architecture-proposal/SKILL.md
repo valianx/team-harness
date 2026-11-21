@@ -1,6 +1,6 @@
 ---
 name: th-architecture-proposal
-description: "Write or revise an architecture proposal from decisions in the conversation, a draft or a GitHub issue."
+description: "Write or revise architecture proposal documents from decisions in the conversation, a draft or a GitHub issue."
 disable-model-invocation: true
 ---
 

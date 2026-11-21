@@ -1,6 +1,6 @@
 ---
 name: architecture-design
-description: "Design a system or write an architecture proposal that explains how it works before describing the technical decisions."
+description: "Design a system or write a detailed architecture proposal and a concise document for team review."
 metadata:
   team-harness/config: "__TEAM_HARNESS_OPENCODE_CONFIG__"
 ---

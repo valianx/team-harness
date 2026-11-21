@@ -46,8 +46,9 @@ prerequisite.
   in `plan-and-execute` mode, and `/th:recover` for existing state.
 - **Workflow skills:** `/th:plan`, `/th:architecture-design`, `/th:plan-review`,
   `/th:ui-design` for product-grounded visual work. `architecture-design` owns
-  solution proposals and `sketch` owns structural previews. `/th:architecture-proposal`
-  writes the document from agreed decisions. `/th:design` remains an explicit
+  a full low-level proposal and a shorter functional-first team proposal by
+  default, and `sketch` owns structural previews. `/th:architecture-proposal`
+  writes these proposals from agreed decisions. `/th:design` remains an explicit
   compatibility alias. Other workflows include
   `/th:research`, `/th:research-app`, `/th:learn`, `/th:spike`, `/th:test`, `/th:test-cross-browser`,
   `/th:test-pipeline`, `/th:validate`, `/th:define-ac`, `/th:security`,

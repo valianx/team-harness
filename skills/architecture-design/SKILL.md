@@ -1,15 +1,15 @@
 ---
 name: architecture-design
-description: Design a system or write an architecture proposal that explains how it works before describing the technical decisions.
+description: Design a system or write a detailed architecture proposal and a concise document for team review.
 ---
 
 # Architecture design
 
 Reuse the bound file or Page context through [workspace](../workspace/SKILL.md).
 Honor the operator's output format and destination. Use declared local storage
-for required file artifacts. Main retains the proposal and links to supporting
-assets in the bound context. Read a supplied issue through the active host's
-GitHub tools.
+for required file artifacts. Main retains the proposal documents and links to
+supporting assets in the bound context. Read a supplied issue through the
+active host's GitHub tools.
 
 ## Write a proposal
 
@@ -20,8 +20,10 @@ conversation and any supplied draft or issue. Ask only when a missing
 decision prevents a faithful draft. Record other unresolved decisions where
 they affect the proposal.
 
-Follow the [solution proposal guide](references/solution-proposal.md) to write,
-review and deliver the finished document with its open decisions.
+By default, deliver a detailed proposal for implementation and a concise
+presentation document for the team. Honor any explicitly requested output.
+Follow the [solution proposal guide](references/solution-proposal.md) to write
+and review both documents from the same decisions.
 
 ## Continue architecture design
 

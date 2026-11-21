@@ -18,8 +18,9 @@ shorten or omit entries when a large installed catalog reaches its discovery
 budget. The packaged sibling directories are the complete authority.
 
 Present `architecture-design` as the primary architecture workflow. Identify
-`architecture-proposal` as its document alias and `design` as its compatibility
-alias, keeping their individual rows.
+`architecture-proposal` as its proposal-writing alias and `design` as its
+compatibility alias, keeping their individual rows. Proposal requests default
+to full low-level and concise team documents.
 
 After the table, add one compact hint: use `/skills` or type
 `$team-harness` in the Codex composer to browse and autocomplete these skills.

@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Use `architecture-design` to turn agreed decisions into a proposal for Operations and Engineering.
+- Use `architecture-design` to produce a detailed engineering proposal and a concise, functional-first proposal for the team.
 
 ## [3.59.3] - 2026-11-20
 

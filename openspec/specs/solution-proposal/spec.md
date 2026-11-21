@@ -1,53 +1,54 @@
 # solution-proposal Specification
 
 ## Purpose
-Make architecture proposals understandable to product and operations readers and actionable for developers through the architecture-design workflow, using agreed context without depending on the originating chat or creating a parallel development process.
+Deliver a complete engineering proposal and a short team document through architecture-design, using shared decisions and agreed context without depending on the originating chat or creating a parallel development process.
 
 ## Requirements
 
 ### Requirement: Architecture design reuses the agreed context
 
-The principal skill SHALL be named `architecture-design`, with English instructions. `architecture-proposal` SHALL explicitly request its reader-facing proposal. Existing `design` invocations that request a proposal SHALL use the same document defaults. Invocations within a selected coordination workflow SHALL retain that workflow's ownership and applicable endpoint. The skill SHALL support standalone invocation after decisions have been agreed in conversation and SHALL reuse a supplied draft or issue as source context. Sufficient agreed context SHALL lead to a complete document without requiring the operator to repeat the brief or request its structure. Missing material decisions SHALL remain explicit.
+The principal skill SHALL be named `architecture-design`, with English instructions. `architecture-proposal` SHALL explicitly request its proposal deliverables. Existing `design` invocations that request a proposal SHALL use the same defaults. Invocations within a selected coordination workflow SHALL retain that workflow's ownership and applicable endpoint. The skill SHALL support standalone invocation after decisions have been agreed in conversation and SHALL reuse a supplied draft or issue as source context. Sufficient agreed context SHALL lead to complete deliverables without requiring the operator to repeat the brief or request their structure. Missing material decisions SHALL remain explicit.
 
 #### Scenario: The idea is ready to document
 - **WHEN** the operator has agreed the design in Spanish and invokes only `architecture-proposal`
-- **THEN** the skill delivers a complete Spanish proposal that can be read without the chat, using the agreed facts and current decisions
+- **THEN** the skill delivers a complete Spanish engineering proposal and a short Spanish team document that can each be read without the chat, using the agreed facts and current decisions
 - **AND** it does not restart discovery, request the brief again or return only an outline
 
 #### Scenario: A draft or issue supplies the design
 - **WHEN** the operator requests a proposal based on an existing draft or issue
-- **THEN** the skill uses that source, preserves unresolved decisions and requests only information material to the deliverable that the source and existing context do not establish
+- **THEN** the skill uses that source, preserves unresolved decisions and requests only information material to the deliverables that the source and existing context do not establish
 
 #### Scenario: An existing design invocation requests the same deliverable
 - **WHEN** the operator requests a solution proposal through `design`
-- **THEN** the proposal follows the same language, structure, source-fidelity and delivery defaults as `architecture-proposal`
+- **THEN** the deliverables follow the same language, structure, source-fidelity and delivery defaults as `architecture-proposal`
 
 #### Scenario: Design continues within coordination
 - **WHEN** an existing `design` invocation continues design in an active selected workflow
 - **THEN** it reuses that workflow's plan, ownership and authorization without creating a competing coordination process or automatically requiring a separate audience proposal
 
-### Requirement: Architecture design delivers one document for both audiences
+### Requirement: Architecture design delivers two complementary documents
 
-The skill SHALL deliver one reader-facing solution proposal with a clearly identified functional part before its closing technical part. It SHALL use the explicitly requested document language, defaulting to the language of the conversation, and title the document with the system or capability name. Headings SHALL answer the reader's questions. It SHALL keep the proposal in one document regardless of length unless the operator explicitly requests separation. Supporting visual assets and canonical workflow records SHALL NOT become separate audience proposals by default.
+By default, the skill SHALL deliver a full engineering proposal and a separate short team document. Each SHALL use the explicitly requested document language, defaulting to the language of the conversation, and identify the system or capability and document purpose in its title. Headings SHALL answer its readers' questions. Both documents SHALL share the same scope, current decisions, acceptance criteria and unresolved issues, with detail proportionate to their purpose. The skill SHALL honor explicit operator requests for a different document count, coverage, format or destination. Length SHALL NOT create additional narrative documents. Visual assets and canonical workflow records MAY support the two deliverables.
 
 #### Scenario: A proposal serves product and development
 - **WHEN** the operator requests a proposed solution for a PO and developers
-- **THEN** one document presents functional context first and technical design afterward, understandable without reading the chat
+- **THEN** the engineering proposal supplies the complete implementation design and the short team document explains functional behavior before its limited technical overview
+- **AND** each document is understandable without reading the chat
 
 #### Scenario: The proposal grows
-- **WHEN** the solution requires substantial technical detail and no split was requested
-- **THEN** the agent organizes that detail within the same document using headings and navigation rather than automatically creating a second proposal
+- **WHEN** the solution requires substantial engineering detail
+- **THEN** the engineering proposal retains that detail with useful navigation and the team document remains short
 
-#### Scenario: The operator asks for separate documents
-- **WHEN** the operator explicitly requests separation
-- **THEN** the agent separates the requested parts and links their shared scope and decisions without maintaining conflicting copies
+#### Scenario: The operator specifies the deliverables
+- **WHEN** the operator explicitly requests only one document or specifies different coverage or destinations
+- **THEN** the skill follows that request while preserving consistent shared decisions across the requested deliverables
 
 ### Requirement: Functional content supports product decisions
 
-The proposal SHALL explain the problem, who uses the system, expected outcomes, what triggers its behavior, the rules determining outcomes and what users observe. It SHALL explain the general capability before the scope and observable acceptance criteria of the first delivery or pilot. Relevant flows, alternate/error behavior, exclusions, assumptions, risks and unresolved decisions SHALL be explicit. Applicable wireframes SHALL appear with the functional explanation. Technical choices that affect user experience, cost, scope or delivery SHALL have their product consequences explained there. Unverified facts and estimates SHALL be identified as assumptions rather than commitments.
+The team document SHALL start with the problem, who uses the system, expected outcomes, what triggers its behavior, the rules determining outcomes and what users observe. It SHALL explain the general capability before the scope and observable acceptance criteria of the first delivery or pilot. Relevant alternate/error behavior, exclusions, assumptions, risks and unresolved decisions SHALL be explicit. Applicable wireframes SHALL accompany the behavior they explain. Technical choices that affect user experience, cost, scope or delivery SHALL have their product consequences explained here. Unverified facts and estimates SHALL remain identified assumptions in both documents.
 
 #### Scenario: The PO reads only the functional part
-- **WHEN** the PO evaluates the proposal without reading technical details
+- **WHEN** the PO evaluates the team document's functional explanation
 - **THEN** they can understand the intended behavior, its acceptance and the trade-offs requiring a product decision
 
 #### Scenario: Operations explains when behavior starts
@@ -55,13 +56,13 @@ The proposal SHALL explain the problem, who uses the system, expected outcomes, 
 - **THEN** they can explain who uses the system, the triggering conditions, how its rules determine the result and the outcome users observe
 - **AND** the general behavior is established before the first delivery's narrower scope and acceptance criteria
 
-### Requirement: Technical content enables a proportionate handoff
+### Requirement: The engineering proposal enables a complete handoff
 
-The closing technical part SHALL explain the architectural decision, why it fits the problem, its operating cost, component responsibilities, boundaries, relevant integrations and interfaces, meaningful alternatives, dependencies, implementation increments and verification approach. For a multi-service flow, the skill SHALL reuse the existing Excalidraw skill to embed a communication map showing who calls whom and what data moves between services. For a proposed data exchange, it SHALL include a representative DTO and explain how the consumer uses each field. It SHALL reuse sketch guidance for affected data models and frontend wireframes, justify new persistent data and preserve useful existing designs. Migration, operation and measurable quality concerns SHALL be addressed when relevant. Missing material inputs SHALL remain explicit. Unaffected topics SHALL NOT generate speculative designs or empty annexes.
+The engineering proposal SHALL include the agreed functional scope and the full low-level design needed to implement it. It SHALL explain the architectural decision and rationale, operating cost, component responsibilities and boundaries, relevant integrations, interfaces, data contracts, meaningful alternatives, dependencies, implementation increments and verification approach. For a multi-service flow, the skill SHALL reuse the existing Excalidraw skill to embed a communication map. Proposed exchanges SHALL include representative DTOs and each field's consumer use. It SHALL reuse sketch guidance for affected data models and frontend wireframes, justify new persistent data and preserve useful existing designs. Migration, rollback, operation and measurable quality concerns SHALL be addressed when applicable. Missing material inputs SHALL remain explicit. Unaffected topics SHALL NOT generate speculative designs or empty annexes.
 
 #### Scenario: Engineering receives a multi-service proposal
 - **WHEN** the proposed solution exchanges data between services
-- **THEN** the closing technical section identifies component ownership, the selected architecture and its rationale and operating cost
+- **THEN** the engineering proposal identifies component ownership, the selected architecture and its rationale and operating cost with implementation-level detail
 - **AND** an embedded communication map and a representative DTO explain the calls, exchanged data and each field's consumer use
 
 #### Scenario: The solution changes persistence and a screen
@@ -72,19 +73,32 @@ The closing technical part SHALL explain the architectural decision, why it fits
 - **WHEN** the proposal only changes a workflow skill
 - **THEN** the document describes that workflow and its checks without inventing database columns, screens or unrelated infrastructure
 
+### Requirement: The team document closes with the new exchanges
+
+After its functional explanation, the team document SHALL summarize what the design introduces in component communication and DTOs. For a new exchange, it SHALL identify the participants, what data moves and its purpose. For an existing exchange or DTO, it SHALL cover only the proposed change. Full field definitions belong in the engineering proposal. When communication and contracts stay the same, the team document SHALL close with a single sentence stating that.
+
+#### Scenario: The design combines an unchanged flow and a new exchange
+- **WHEN** an existing provider-status flow and DTO remain unchanged and the proposal adds a review-instruction exchange
+- **THEN** the team document's technical overview explains the new review exchange, its participants and DTO
+- **AND** it uses existing participants only as necessary context and leaves the unchanged flow and DTO out of the overview
+
+#### Scenario: The design introduces no exchange change
+- **WHEN** the proposal changes a local CLI argument without adding or changing component exchanges or DTOs
+- **THEN** the team document explains the functional change and closes with a sentence confirming that communication and contracts stay the same
+
 ### Requirement: Proposals preserve workflow ownership and portability
 
-The proposal SHALL use the selected workspace, honor explicit output destinations and keep consumer working artifacts out of commits unless they have a necessary durable role. It SHALL reuse write-documents for an editorial pass before delivery. When decisions change, the skill SHALL reconcile the affected prose, worked examples, tables, diagrams and contracts while preserving unresolved issues. When OpenSpec already owns intent, the proposal SHALL be a readable synthesis linked to that source, with scope and decision changes reconciled there rather than maintained independently. A design-only request SHALL end with the proposal and unresolved questions. Creating it SHALL NOT activate implementation, pipeline coordination or additional approval gates. Supported hosts SHALL expose equivalent proposal behavior through their native entries.
+Both documents and supporting assets SHALL use the selected workspace while honoring explicit destinations. Consumer working artifacts SHALL stay out of commits unless they have a necessary durable role. The skill SHALL reuse write-documents for an editorial pass before delivery. A decision change SHALL reconcile affected prose, worked examples, tables, diagrams and contracts across both documents while preserving unresolved issues. When OpenSpec owns intent, the documents SHALL synthesize and link that source, with scope and decision changes reconciled there. A design-only request SHALL end with the requested deliverables and unresolved questions. Creating them SHALL NOT activate implementation, pipeline coordination or additional approval gates. Supported hosts SHALL expose equivalent proposal behavior through their native entries.
 
 #### Scenario: An agreed decision changes
-- **WHEN** the operator changes a decision represented in the proposal
-- **THEN** every affected explanation, example, rule table, diagram and data contract uses the current decision
+- **WHEN** the operator changes a shared decision
+- **THEN** every affected explanation, example, rule table, diagram and data contract across both documents uses the current decision
 - **AND** unresolved issues remain visible and canonical intent is reconciled when applicable
 
 #### Scenario: Design accompanies an existing OpenSpec change
 - **WHEN** a proposal is requested for a change that already has requirements and design decisions
-- **THEN** the proposal explains those sources to its readers, links them and reconciles changes without creating another editable task plan or replacing OpenSpec's file layout
+- **THEN** both documents explain and link those sources and reconcile changes without creating another editable task plan or replacing OpenSpec's file layout
 
 #### Scenario: A standalone proposal is requested in Obsidian mode
-- **WHEN** the operator asks only for a solution proposal using any supported host
-- **THEN** the agent delivers it in the configured workspace without a local duplicate, mandatory repository initialization, implementation or pipeline activation
+- **WHEN** the operator requests a design-only solution proposal using any supported host
+- **THEN** the agent delivers both documents in the configured workspace without a local duplicate, mandatory repository initialization, implementation or pipeline activation

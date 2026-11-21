@@ -43,12 +43,14 @@ with bugs, security findings, improvements, optimizations, evidence and limits.
 It reuses known project paths and ends at analysis; `cross-repo` remains the
 focused contract/invariant method. OpenCode discovers the native `full-audit` skill.
 
-`architecture-design` delivers one solution proposal with functional content first,
-then architecture and implementation detail. It includes affected
-data models and frontend wireframes, and reuses existing OpenSpec intent.
-The document stays together regardless of length. Ask explicitly to split it.
-Design-only work ends with the proposal in the selected workspace context.
-Use `architecture-proposal` to write the document from agreed decisions.
+`architecture-design` writes two proposals by default. The full low-level
+proposal carries the implementation detail, affected data models and frontend
+wireframes. The shorter team presentation proposal explains functional behavior
+first, then summarizes new interactions between components and new or changed DTOs.
+Both reuse existing OpenSpec intent and stay consistent with the same decisions.
+Honor explicitly requested deliverables and formats. Design-only work ends with
+the requested proposals in the selected workspace context.
+Use `architecture-proposal` to write these proposals from agreed decisions.
 `design` remains an explicit compatibility alias for `architecture-design`.
 
 `spec` is the lightweight path: the current agent carries planning,
