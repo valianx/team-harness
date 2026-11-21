@@ -21,6 +21,10 @@ explicit OpenCode and Codex subcommands.
 | `/th-update` | `/th:update` |
 | All other `/skill-name` commands | `/th:skill-name` |
 
+Use `/th:architecture-design` for solution architecture. `/th:architecture-proposal`
+writes the document from agreed decisions, and `/th:design` remains an explicit
+compatibility alias.
+
 The namespace prefix `th:` is mandatory in plugin mode. The coordinator (`@th:orchestrator`) continues to work unchanged in chat mentions.
 
 ### File locations

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Harness Architecture Design"
+  short_description: "Team Harness Architecture Design workflow"
+  default_prompt: "Use $team-harness:architecture-design for this request."

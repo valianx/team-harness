@@ -2,3 +2,5 @@ interface:
   display_name: "Team Harness Design"
   short_description: "Team Harness Design workflow"
   default_prompt: "Use $team-harness:design for this request."
+policy:
+  allow_implicit_invocation: false

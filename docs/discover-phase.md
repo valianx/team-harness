@@ -482,7 +482,7 @@ The verification fires when **ALL** of the following hold:
 1. **Task origin is an external report.** The task originated from one of: a GitHub issue, a GitHub issue comment, a GitHub PR review comment, or a ClickUp task routed into the pipeline via `/th:issue` or equivalent.
 2. **The report names specific scope.** The report mentions specific files, functions, patterns, behaviours, or line numbers that can be grepped or read.
 
-The verification is a **no-op** for direct operator requests (chat, `/th:design`, `/th:implement`) — those are current by definition.
+The verification is a **no-op** for direct operator requests (chat, `/th:architecture-design`, `/th:implement`) — those are current by definition.
 
 ### 13.3 Procedure
 

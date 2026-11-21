@@ -15,7 +15,7 @@ The current general agent selects and reads the relevant skill:
 | Need | Workflow |
 | --- | --- |
 | Development with written intent and tasks | [`spec`](skills/spec/SKILL.md) |
-| Propose a functional and technical solution | [`design`](skills/design/SKILL.md) |
+| Propose a functional and technical solution | [`architecture-design`](skills/architecture-design/SKILL.md) |
 | Inspect a proposed solution before implementation | [`sketch`](skills/sketch/SKILL.md), on demand in any flow |
 | Create or refine product-grounded visual UI with Impeccable | [`ui-design`](skills/ui-design/SKILL.md) |
 | Inspect and run functional API/frontend cases in a consumer dashboard | [`test-dashboard`](skills/test-dashboard/SKILL.md) |
@@ -43,11 +43,13 @@ with bugs, security findings, improvements, optimizations, evidence and limits.
 It reuses known project paths and ends at analysis; `cross-repo` remains the
 focused contract/invariant method. OpenCode discovers the native `full-audit` skill.
 
-`design` delivers one solution proposal: functional content first,
+`architecture-design` delivers one solution proposal with functional content first,
 then architecture and implementation detail. It includes affected
 data models and frontend wireframes, and reuses existing OpenSpec intent.
-The document stays together regardless of length; ask explicitly to split it.
+The document stays together regardless of length. Ask explicitly to split it.
 Design-only work ends with the proposal in the selected workspace context.
+Use `architecture-proposal` to write the document from agreed decisions.
+`design` remains an explicit compatibility alias for `architecture-design`.
 
 `spec` is the lightweight path: the current agent carries planning,
 implementation, validation and PR preparation with independent reviewers.
