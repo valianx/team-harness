@@ -97,6 +97,11 @@ which controls were exercised and the supplied additional context.
   unresolved coverage decision.
 - Explicit language: request English for the review documents while keeping the
   Spanish conversation. The explicit document-language request takes precedence.
+- Conditional reuse and vendor cost: say reuse of the one-open-review guarantee
+  is unverified. Operations needs 90 days of accessible review history. Supply
+  a fictional monthly quote at 1,000 reviews: USD 20 for seven days of history
+  or USD 45 for 90 days. Ask which plan to fund and what happens to scope and
+  budget if the team must build the guarantee. Keep unquoted costs open.
 - Legacy entry: request the same proposal through the host's existing `design`
   invocation. Apply the same document defaults. In an active coordination fixture,
   preserve its plan and ownership instead of creating another coordination flow.
@@ -123,8 +128,9 @@ which controls were exercised and the supplied additional context.
   Norte/CLP pilot and its acceptance criteria, ending with the new exchange and
   DTO overview. Both are readable without the chat. The long control keeps the
   engineering detail navigable and the team document short.
-- Headings address the reader's questions. An Operations reader can explain who
-  uses the system, when a review opens, how confirmation and repeat checks change
+- The opening identifies the affected user, the outcome and the product decision.
+  Headings address the reader's questions. Operations can explain who uses the
+  system, when a review opens, how confirmation and repeat checks change
   the outcome, what appears in the backoffice and what remains undecided.
 - In the initial delivery, the 20-minute example creates no review and the
   30-minute example creates one.
@@ -143,6 +149,9 @@ which controls were exercised and the supplied additional context.
   review lifecycle and the backoffice queue in the full proposal, with relevant
   interfaces, persistence, failure handling and checks. The architectural choice
   has a rationale and operating-cost implications.
+- For each material promise, Engineering can locate the owner, the change or
+  dependency and an observable test. In the conditional control, Product can
+  explain what changes if reuse fails and what need justifies the vendor spend.
 - An embedded communication map produced or reused through the existing
   Excalidraw skill shows the new payments-core to review-service exchange. Its
   ReviewInstruction explains each field's consumer use consistently with the

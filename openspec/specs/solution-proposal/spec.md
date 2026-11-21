@@ -64,6 +64,12 @@ The team document SHALL start with the problem, who uses the system, expected ou
 #### Scenario: The PO reads only the functional part
 - **WHEN** the PO evaluates the team document's functional explanation
 - **THEN** they can understand the intended behavior, its acceptance and the trade-offs requiring a product decision
+- **AND** the opening of either standalone proposal identifies the affected user, the observable change and the product decision already made or still needed
+
+#### Scenario: The recommended service costs more than another option
+- **WHEN** the team compares vendor options at its expected usage
+- **THEN** it can identify the user need that justifies the spend, which option meets it, the price basis and source, and any terms still to confirm
+- **AND** the estimate distinguishes the provider price from implementation and operating costs
 
 #### Scenario: Operations explains when behavior starts
 - **WHEN** an operations reader reads the functional explanation without technical details or the originating conversation
@@ -78,6 +84,11 @@ The engineering proposal SHALL include the agreed functional scope and the full 
 - **WHEN** the proposed solution exchanges data between services
 - **THEN** the engineering proposal identifies component ownership, the selected architecture and its rationale and operating cost with implementation-level detail
 - **AND** an embedded communication map and a representative DTO explain the calls, exchanged data and each field's consumer use
+
+#### Scenario: A material product promise relies on an unverified capability
+- **WHEN** the promised outcome depends on behavior another component may already provide
+- **THEN** the detailed proposal identifies the owner, the proposed change or assumed dependency and the observable test for the promise
+- **AND** it identifies who can confirm reuse and explains the consequence for scope, cost or rollout in both proposals when the team decision depends on it
 
 #### Scenario: The solution changes persistence and a screen
 - **WHEN** the proposal changes a data model and frontend behavior

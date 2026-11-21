@@ -13,7 +13,10 @@ its role explains a user experience, integration decision or cost.
 
 Use the requested language, defaulting to the language of the conversation.
 Make each document understandable on its own. Put functional content first
-and organize sections around the reader's questions.
+and organize sections around the reader's questions. Open each proposal in
+two or three sentences with the affected user, the change they will experience
+and the product decision the team needs to make. If that decision is already
+settled, state it and identify any remaining choice that affects delivery.
 
 ## Detailed proposal
 
@@ -37,8 +40,18 @@ Label estimates with their assumptions.
 Describe the affected current system and proposed responsibilities, boundaries,
 integrations and interfaces. Explain which component owns each responsibility,
 why the chosen approach fits, its operating costs and meaningful alternatives.
-Identify the factors driving operating costs and record unknowns when amounts
-cannot be estimated.
+Identify the main cost drivers and any items still to price.
+When comparing provider costs, start with the user need that warrants the
+spend. Show which option meets it at the expected usage, the source and basis
+for the price, and what still needs confirmation. Distinguish the provider's
+price from implementation and operating estimates. Revisit the estimate when
+an unverified dependency changes scope.
+
+For each user-visible promise that affects scope, identify the component or
+team responsible, what already exists, what changes, and the observable test.
+Where reuse is an assumption, name who can verify it and what changes in
+scope, cost or rollout if it proves false. Carry that consequence into the
+team proposal when it affects the decision.
 
 For a multi-service flow, show who calls whom and what data moves. Use the
 Excalidraw workflow to create the diagram or update the existing one.
@@ -98,8 +111,9 @@ Excalidraw scene and refresh its embedded view.
 Before delivery, apply the `write-documents` editorial pass to both documents.
 Check that the title would still describe the user's task if the provider changed.
 Resolve contradictions and keep open decisions visible where they matter.
-Check that Operations can explain the proposed behavior from the presentation
-and Engineering has the implementation detail in the detailed proposal.
+Read each document on its own. Can Product and Operations explain what changes,
+what they must decide and why the recommended spend is needed? Can Engineering
+trace each material promise to an owner, a change or dependency, and a test?
 [write-documents](../../write-documents/SKILL.md)
 
 Present both PDFs as finished documents. Show only the date in the running
