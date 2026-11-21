@@ -12,6 +12,7 @@ The principal skill SHALL be named `architecture-design`, with English instructi
 #### Scenario: The idea is ready to document
 - **WHEN** the operator has agreed the design in Spanish and invokes only `architecture-proposal`
 - **THEN** the skill delivers a full Spanish engineering proposal and a short Spanish team document for review that can each be read without the chat, using the agreed facts and current decisions
+- **AND** the short document uses the subtitle "Propuesta de arquitectura" and the full document uses "Propuesta de arquitectura al detalle"
 - **AND** it does not restart discovery, request the brief again or return only an outline
 
 #### Scenario: A draft or issue supplies the design
@@ -28,7 +29,7 @@ The principal skill SHALL be named `architecture-design`, with English instructi
 
 ### Requirement: Architecture design delivers two complementary documents
 
-By default, the skill SHALL develop a full engineering proposal and a separate short team document as revisable working drafts. Each SHALL use the explicitly requested document language, defaulting to the language of the conversation, and identify the system or capability and document purpose in its title. Headings SHALL answer its readers' questions. Both documents SHALL share the same scope, current decisions, acceptance criteria and unresolved issues, with detail proportionate to their purpose. The skill SHALL honor explicit operator requests for a different document count, coverage, format or destination. Length SHALL NOT create additional narrative documents. Visual assets and canonical workflow records MAY support the two deliverables.
+By default, the skill SHALL develop a full engineering proposal and a separate short team document as revisable working drafts. Both SHALL share a functional title that describes the capability or outcome in the users' terms. Each SHALL use a distinct subtitle for its purpose. The skill SHALL use the explicitly requested document language, defaulting to the language of the conversation. Headings SHALL answer its readers' questions. Both documents SHALL share the same scope, current decisions, acceptance criteria and unresolved issues, with detail proportionate to their purpose. The skill SHALL honor explicit operator requests for a different document count, coverage, format or destination. Length SHALL NOT create additional narrative documents. Visual assets and canonical workflow records MAY support the two deliverables.
 
 Default review delivery SHALL export two PDFs from the same identifiable working revision and retain their editable sources in the selected workspace. PDF export SHALL preserve the drafts' review context. If a requested format cannot be generated, the skill SHALL report that limit and identify the available source instead of claiming the export succeeded.
 
@@ -36,6 +37,11 @@ Default review delivery SHALL export two PDFs from the same identifiable working
 - **WHEN** the operator requests a proposed solution for a PO and developers
 - **THEN** the engineering proposal supplies the complete implementation design and the short team document explains functional behavior before its limited technical overview
 - **AND** each document is understandable without reading the chat
+
+#### Scenario: A provider delivers part of a capability
+- **WHEN** the proposed player sign-in uses an external identity provider
+- **THEN** both main titles describe players signing in to the casino and omit the provider name
+- **AND** the proposal names the provider where its responsibilities, integration and pricing matter
 
 #### Scenario: The proposal grows
 - **WHEN** the solution requires substantial engineering detail
@@ -48,6 +54,7 @@ Default review delivery SHALL export two PDFs from the same identifiable working
 #### Scenario: Drafts are exported for review
 - **WHEN** the operator requests the default review delivery
 - **THEN** two review PDFs represent the same identifiable revision and their editable sources remain in the selected workspace
+- **AND** each PDF has a date-only running header and final-quality presentation without draft or review legends, while its filename or metadata identifies the source revision
 - **AND** exporting them does not declare finality or approval and does not authorize implementation
 
 ### Requirement: Functional content supports product decisions

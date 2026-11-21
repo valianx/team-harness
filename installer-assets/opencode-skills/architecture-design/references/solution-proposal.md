@@ -2,11 +2,18 @@
 
 Prepare two standalone working drafts, a detailed engineering proposal and
 a concise proposal for the team. Export them as PDFs by default. Honor an
-explicit choice of documents, format or destination. Put the system name in
-each title and distinguish the two purposes. Make each document understandable
-without the originating chat or the other document. Use the requested
-language, defaulting to the language of the conversation. Organize sections
-around the reader's questions and put functional content first.
+explicit choice of documents, format or destination. Give both drafts the same
+functional title: name the capability or outcome in terms its users understand.
+Use the subtitle "Architecture proposal" for the concise draft and "Detailed
+architecture proposal" for the full draft. In Spanish, the subtitles are
+"Propuesta de arquitectura" and "Propuesta de arquitectura al detalle".
+Use the same naming in delivery links and PDF metadata. Keep implementation
+choices out of the functional title. Name a direct provider in the body where
+its role explains a user experience, integration decision or cost.
+
+Use the requested language, defaulting to the language of the conversation.
+Make each document understandable on its own. Put functional content first
+and organize sections around the reader's questions.
 
 ## Detailed proposal
 
@@ -89,14 +96,17 @@ examples, tables or contracts. If a flow changes, revise the editable
 Excalidraw scene and refresh its embedded view.
 
 Before delivery, apply the `write-documents` editorial pass to both documents.
+Check that the title would still describe the user's task if the provider changed.
 Resolve contradictions and keep open decisions visible where they matter.
 Check that Operations can explain the proposed behavior from the presentation
 and Engineering has the implementation detail in the detailed proposal.
 [write-documents](../../write-documents/SKILL.md)
 
-Mark both PDFs as drafts for review in the document language and identify the
-same source revision on each. Reflect explicit operator sign-off only for the
-scope and revision they confirmed. Editorial review and export do not grant
+Present both PDFs as finished documents. Show only the date in the running
+header and omit draft labels, review banners and subject-to-change footers.
+Keep the shared revision in the editable sources and PDF metadata or filenames.
+Record open decisions beside the proposal they affect. Reflect explicit
+operator sign-off only for the scope and revision confirmed. Export does not grant
 approval or implementation authority. Read back each PDF and check at its
 intended size that tables, examples and diagram labels are legible. If an
 export is unavailable, keep the editable draft and identify the pending PDF.

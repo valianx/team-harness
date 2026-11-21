@@ -107,14 +107,17 @@ which controls were exercised and the supplied additional context.
 
 ## Expected Behaviors
 
-- The alias alone produces two Spanish documents identified by the agreed system
-  name and their purpose, without another brief, structure request or discovery
-  restart. Explicit language, count, coverage, format and destination requests
-  take precedence.
+- The alias alone produces two Spanish documents with a shared functional title
+  about reviewing pending payments. The subtitles are "Propuesta de arquitectura"
+  and "Propuesta de arquitectura al detalle" for the short and full versions,
+  respectively. The provider appears where its role matters. The skill reuses
+  the existing brief and honors explicit language, count, coverage, format and
+  destination requests.
 - Default delivery supplies two review PDFs from the same identifiable working
   revision and preserves their editable sources in the selected workspace. Both
-  remain revisable drafts. Exporting them claims no approval, finality or
-  implementation authorization.
+  show just the date in the running header and present as finished documents
+  without draft legends. Unresolved decisions remain visible where relevant.
+  Exporting them grants no approval or implementation authorization.
 - The full engineering proposal provides low-level implementation detail. The
   separate short team document explains the general capability before the Banco
   Norte/CLP pilot and its acceptance criteria, ending with the new exchange and
