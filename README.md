@@ -47,9 +47,9 @@ focused contract/invariant method. OpenCode discovers the native `full-audit` sk
 proposal carries the implementation detail, affected data models and frontend
 wireframes. The shorter team presentation proposal explains functional behavior
 first, then summarizes new interactions between components and new or changed DTOs.
-Both reuse existing OpenSpec intent and stay consistent with the same decisions.
-Honor explicitly requested deliverables and formats. Design-only work ends with
-the requested proposals in the selected workspace context.
+Both are working drafts. The operator can validate individual decisions and
+revise them later. By default, the skill keeps the editable sources and exports
+both PDFs from the same revision. Explicit deliverables and formats take precedence.
 Use `architecture-proposal` to write these proposals from agreed decisions.
 `design` remains an explicit compatibility alias for `architecture-design`.
 

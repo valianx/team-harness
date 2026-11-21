@@ -15,13 +15,13 @@ active host's GitHub tools.
 
 Write a proposal when requested, whenever the operator invokes
 `architecture-proposal`, or when the operator invokes this skill without
-arguments after agreeing on the design. Use decisions from the current
-conversation and any supplied draft or issue. Ask only when a missing
-decision prevents a faithful draft. Record other unresolved decisions where
-they affect the proposal.
+arguments with a design under discussion. Use the current conversation and
+any supplied draft or issue. Work from what is known and identify open
+decisions. Ask only when a missing input prevents a useful draft.
 
-By default, deliver a detailed proposal for implementation and a concise
-presentation document for the team. Honor any explicitly requested output.
+By default, export two review PDFs from editable sources: a detailed
+engineering proposal and a concise team proposal. The operator validates
+decisions as the design evolves. Honor any explicitly requested output.
 Follow the [solution proposal guide](references/solution-proposal.md) to write
 and review both documents from the same decisions.
 

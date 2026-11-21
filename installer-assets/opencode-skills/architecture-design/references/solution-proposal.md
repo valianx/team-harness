@@ -1,7 +1,7 @@
 # Solution proposal
 
-Deliver two standalone documents by default, a detailed proposal for
-implementation and a concise presentation document for the team. Honor an
+Prepare two standalone working drafts, a detailed engineering proposal and
+a concise proposal for the team. Export them as PDFs by default. Honor an
 explicit choice of documents, format or destination. Put the system name in
 each title and distinguish the two purposes. Make each document understandable
 without the originating chat or the other document. Use the requested
@@ -79,17 +79,27 @@ file workspace, use distinct filenames. In a Page workspace, retain both links
 in the bound effort Page. Link editable visuals as supporting assets. Honor an
 explicit request for one document at the depth its audience needs.
 
-Use the same source decisions for both documents. If OpenSpec already owns
-the intent, link its requirements and decisions and reconcile scope and design
-changes there before updating the documents. On revision, read and update the
-existing documents. Check each affected explanation, example, table, diagram
-and interface contract against the current decisions.
+Keep the editable sources in the bound workspace. If OpenSpec owns the intent,
+link and reconcile its requirements and decisions there. Show which decisions
+the operator has confirmed, which are proposed, and which questions remain
+open. Apply feedback to the parts it covers. If a previously confirmed rule
+changes, bring the affected decisions back to review and carry forward the
+other confirmations. Update both drafts wherever the change affects prose,
+examples, tables or contracts. If a flow changes, revise the editable
+Excalidraw scene and refresh its embedded view.
 
 Before delivery, apply the `write-documents` editorial pass to both documents.
 Resolve contradictions and keep open decisions visible where they matter.
 Check that Operations can explain the proposed behavior from the presentation
 and Engineering has the implementation detail in the detailed proposal.
 [write-documents](../../write-documents/SKILL.md)
+
+Mark both PDFs as drafts for review in the document language and identify the
+same source revision on each. Reflect explicit operator sign-off only for the
+scope and revision they confirmed. Editorial review and export do not grant
+approval or implementation authority. Read back each PDF and check at its
+intended size that tables, examples and diagram labels are legible. If an
+export is unavailable, keep the editable draft and identify the pending PDF.
 
 ## Industry references
 

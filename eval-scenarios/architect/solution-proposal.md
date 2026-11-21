@@ -7,7 +7,7 @@ needs_scaffold: false
 
 # Architecture design — proposal from agreed decisions
 
-Review the deliverables produced through the current architecture-design skill and
+Review the working drafts produced through the current architecture-design skill and
 its proposal alias. Retain outputs in the assigned workspace, outside Git. Give
 the actor only Input and Context, with Context preceding Input as conversation
 history. An independent reader uses the supplied facts and criteria below.
@@ -71,8 +71,21 @@ which controls were exercised and the supplied additional context.
 
 - Long proposal: provide enough affected integrations and error cases to need
   substantial technical detail. Keep the default two deliverables.
-- Explicit scope or destination: request only the team document, or provide
-  separate explicit destinations. Verify the requested count, coverage and paths.
+- Partial feedback and revision: after the initial delivery, supply these operator
+  messages in order and inspect the revised drafts and exports.
+
+  > Confirmo el piloto Banco Norte/CLP y la apertura a los 30 minutos. Todavía
+  > tengo que revisar el diseño técnico y el DTO. La cobertura fuera de horario
+  > sigue abierta. Conserva estas confirmaciones parciales.
+  >
+  > Cambiemos solo el plazo a 45 minutos desde la creación del pago y déjalo para
+  > revisión. A los 30 minutos todavía no se abre, a los 45 se abre una sola vez.
+  > El piloto que confirmé sigue igual. Exporta otra revisión para compartir.
+
+- Explicit scope, format or destination: request only the team document, specify
+  an alternate format or provide separate destinations. Verify the requested
+  count, format, coverage and paths. If generation is unavailable, inspect the
+  reported limit and preserved editable source.
 - Existing-contract addition: agree an added field on an existing exchange.
   Verify that the team's overview explains the addition and its consumer use
   with only the context needed to identify the affected exchange.
@@ -80,9 +93,9 @@ which controls were exercised and the supplied additional context.
   including the current 30-minute rule and exclusions. Request a proposal based
   on that intent and verify source reconciliation for a later rule change.
 - Existing draft or issue: supply the same agreed facts through a draft or issue
-  instead of conversation history. Request the final proposal and preserve its
+  instead of conversation history. Request the review drafts and preserve their
   unresolved coverage decision.
-- Explicit language: request English for the final document while keeping the
+- Explicit language: request English for the review documents while keeping the
   Spanish conversation. The explicit document-language request takes precedence.
 - Legacy entry: request the same proposal through the host's existing `design`
   invocation. Apply the same document defaults. In an active coordination fixture,
@@ -96,7 +109,12 @@ which controls were exercised and the supplied additional context.
 
 - The alias alone produces two Spanish documents identified by the agreed system
   name and their purpose, without another brief, structure request or discovery
-  restart. Explicit language, coverage and destination requests take precedence.
+  restart. Explicit language, count, coverage, format and destination requests
+  take precedence.
+- Default delivery supplies two review PDFs from the same identifiable working
+  revision and preserves their editable sources in the selected workspace. Both
+  remain revisable drafts. Exporting them claims no approval, finality or
+  implementation authorization.
 - The full engineering proposal provides low-level implementation detail. The
   separate short team document explains the general capability before the Banco
   Norte/CLP pilot and its acceptance criteria, ending with the new exchange and
@@ -105,10 +123,19 @@ which controls were exercised and the supplied additional context.
 - Headings address the reader's questions. An Operations reader can explain who
   uses the system, when a review opens, how confirmation and repeat checks change
   the outcome, what appears in the backoffice and what remains undecided.
-- The 20-minute example creates no review. The 30-minute example creates one.
+- In the initial delivery, the 20-minute example creates no review and the
+  30-minute example creates one.
   Both documents' affected explanations, tables, examples, diagrams and contracts
   agree with the current rule, including the time origin. The earlier 15-minute
   decision is replaced as the effective rule.
+- With partial feedback, the existing document or workspace context retains the
+  explicit pilot and opening-rule confirmations and the open technical/DTO and
+  out-of-hours decisions. After the change to 45 minutes, both drafts and their
+  PDFs reconcile affected content and identify the same revised source. Only the
+  affected rule and its representations return to review, with the pilot
+  confirmation preserved.
+  The revised 30-minute example creates no review and the 45-minute example
+  creates one. Neither the revision nor its export expands approval.
 - Engineering can identify responsibility for payment state, provider queries,
   review lifecycle and the backoffice queue in the full proposal, with relevant
   interfaces, persistence, failure handling and checks. The architectural choice
@@ -144,14 +171,18 @@ which controls were exercised and the supplied additional context.
   operator to specify the document structure after invoking the alias.
 - Keeping the earlier threshold in an example, diagram, rule table or contract,
   or silently resolving the open out-of-hours coverage decision.
+- Treating export as approval or final delivery, losing partial confirmations,
+  reopening unaffected decisions or introducing a separate approval ledger,
+  mandatory gate or formal review states.
 - Adding speculative columns, integrations, SLOs, dates or unrelated sketches.
 - Claiming that projection checks prove live host activation or comprehension.
 - Scoring required phrases/headings instead of inspecting the actual proposal.
 
 ## Output Criteria
 
-Inspect the actual file set and both documents against the conversation's facts and
-current decision. Record concrete passages or visual evidence and deficiencies
+Inspect the actual file set, editable sources and review exports against the
+conversation's facts, current decision and explicit partial confirmations.
+Record concrete passages or visual evidence and deficiencies
 for Operations, Engineering, source fidelity, reconciliation and delivery side
 effects. Confirm the applicable editorial and visual skill use through retained
 evidence, without requiring a prescribed sentence in the proposal. Record the

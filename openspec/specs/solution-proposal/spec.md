@@ -1,7 +1,7 @@
 # solution-proposal Specification
 
 ## Purpose
-Deliver a complete engineering proposal and a short team document through architecture-design, using shared decisions and agreed context without depending on the originating chat or creating a parallel development process.
+Develop a full engineering proposal and a short team document as revisable working drafts through architecture-design, using shared decisions and agreed context without depending on the originating chat or creating a parallel development process.
 
 ## Requirements
 
@@ -11,7 +11,7 @@ The principal skill SHALL be named `architecture-design`, with English instructi
 
 #### Scenario: The idea is ready to document
 - **WHEN** the operator has agreed the design in Spanish and invokes only `architecture-proposal`
-- **THEN** the skill delivers a complete Spanish engineering proposal and a short Spanish team document that can each be read without the chat, using the agreed facts and current decisions
+- **THEN** the skill delivers a full Spanish engineering proposal and a short Spanish team document for review that can each be read without the chat, using the agreed facts and current decisions
 - **AND** it does not restart discovery, request the brief again or return only an outline
 
 #### Scenario: A draft or issue supplies the design
@@ -28,7 +28,9 @@ The principal skill SHALL be named `architecture-design`, with English instructi
 
 ### Requirement: Architecture design delivers two complementary documents
 
-By default, the skill SHALL deliver a full engineering proposal and a separate short team document. Each SHALL use the explicitly requested document language, defaulting to the language of the conversation, and identify the system or capability and document purpose in its title. Headings SHALL answer its readers' questions. Both documents SHALL share the same scope, current decisions, acceptance criteria and unresolved issues, with detail proportionate to their purpose. The skill SHALL honor explicit operator requests for a different document count, coverage, format or destination. Length SHALL NOT create additional narrative documents. Visual assets and canonical workflow records MAY support the two deliverables.
+By default, the skill SHALL develop a full engineering proposal and a separate short team document as revisable working drafts. Each SHALL use the explicitly requested document language, defaulting to the language of the conversation, and identify the system or capability and document purpose in its title. Headings SHALL answer its readers' questions. Both documents SHALL share the same scope, current decisions, acceptance criteria and unresolved issues, with detail proportionate to their purpose. The skill SHALL honor explicit operator requests for a different document count, coverage, format or destination. Length SHALL NOT create additional narrative documents. Visual assets and canonical workflow records MAY support the two deliverables.
+
+Default review delivery SHALL export two PDFs from the same identifiable working revision and retain their editable sources in the selected workspace. PDF export SHALL preserve the drafts' review context. If a requested format cannot be generated, the skill SHALL report that limit and identify the available source instead of claiming the export succeeded.
 
 #### Scenario: A proposal serves product and development
 - **WHEN** the operator requests a proposed solution for a PO and developers
@@ -40,8 +42,13 @@ By default, the skill SHALL deliver a full engineering proposal and a separate s
 - **THEN** the engineering proposal retains that detail with useful navigation and the team document remains short
 
 #### Scenario: The operator specifies the deliverables
-- **WHEN** the operator explicitly requests only one document or specifies different coverage or destinations
+- **WHEN** the operator explicitly requests only one document or specifies different coverage, formats or destinations
 - **THEN** the skill follows that request while preserving consistent shared decisions across the requested deliverables
+
+#### Scenario: Drafts are exported for review
+- **WHEN** the operator requests the default review delivery
+- **THEN** two review PDFs represent the same identifiable revision and their editable sources remain in the selected workspace
+- **AND** exporting them does not declare finality or approval and does not authorize implementation
 
 ### Requirement: Functional content supports product decisions
 
@@ -56,7 +63,7 @@ The team document SHALL start with the problem, who uses the system, expected ou
 - **THEN** they can explain who uses the system, the triggering conditions, how its rules determine the result and the outcome users observe
 - **AND** the general behavior is established before the first delivery's narrower scope and acceptance criteria
 
-### Requirement: The engineering proposal enables a complete handoff
+### Requirement: The engineering proposal supports implementation review
 
 The engineering proposal SHALL include the agreed functional scope and the full low-level design needed to implement it. It SHALL explain the architectural decision and rationale, operating cost, component responsibilities and boundaries, relevant integrations, interfaces, data contracts, meaningful alternatives, dependencies, implementation increments and verification approach. For a multi-service flow, the skill SHALL reuse the existing Excalidraw skill to embed a communication map. Proposed exchanges SHALL include representative DTOs and each field's consumer use. It SHALL reuse sketch guidance for affected data models and frontend wireframes, justify new persistent data and preserve useful existing designs. Migration, rollback, operation and measurable quality concerns SHALL be addressed when applicable. Missing material inputs SHALL remain explicit. Unaffected topics SHALL NOT generate speculative designs or empty annexes.
 
@@ -88,7 +95,7 @@ After its functional explanation, the team document SHALL summarize what the des
 
 ### Requirement: Proposals preserve workflow ownership and portability
 
-Both documents and supporting assets SHALL use the selected workspace while honoring explicit destinations. Consumer working artifacts SHALL stay out of commits unless they have a necessary durable role. The skill SHALL reuse write-documents for an editorial pass before delivery. A decision change SHALL reconcile affected prose, worked examples, tables, diagrams and contracts across both documents while preserving unresolved issues. When OpenSpec owns intent, the documents SHALL synthesize and link that source, with scope and decision changes reconciled there. A design-only request SHALL end with the requested deliverables and unresolved questions. Creating them SHALL NOT activate implementation, pipeline coordination or additional approval gates. Supported hosts SHALL expose equivalent proposal behavior through their native entries.
+Both documents and supporting assets SHALL use the selected workspace while honoring explicit destinations. Consumer working artifacts SHALL stay out of commits unless they have a necessary durable role. The skill SHALL reuse write-documents for an editorial pass before delivery. A decision change SHALL reconcile affected prose, worked examples, tables, diagrams and contracts across both documents while preserving unresolved issues. When OpenSpec owns intent, the documents SHALL synthesize and link that source, with scope and decision changes reconciled there. A design-only request SHALL end with the requested review deliverables and unresolved questions. Creating or exporting them SHALL NOT authorize implementation, activate pipeline coordination or introduce approval gates or formal review states. Supported hosts SHALL expose equivalent proposal behavior through their native entries.
 
 #### Scenario: An agreed decision changes
 - **WHEN** the operator changes a shared decision
@@ -102,3 +109,12 @@ Both documents and supporting assets SHALL use the selected workspace while hono
 #### Scenario: A standalone proposal is requested in Obsidian mode
 - **WHEN** the operator requests a design-only solution proposal using any supported host
 - **THEN** the agent delivers both documents in the configured workspace without a local duplicate, mandatory repository initialization, implementation or pipeline activation
+
+### Requirement: Review preserves partial operator confirmation
+
+The skill SHALL retain what the operator explicitly confirmed and what remains open in the existing document or workspace context. Confirmation SHALL identify the parts and source revision it covers and remain applicable to unchanged content in later revisions. A material change SHALL return only the affected parts to review and preserve unaffected confirmations. The updated documents and their exports SHALL keep this distinction visible without creating a separate approval ledger or competing source. Exporting a draft SHALL NOT imply approval of its contents, mark it final or authorize implementation.
+
+#### Scenario: Partial feedback is followed by a material change
+- **WHEN** the operator confirms the pilot and opening rule, leaves technical design open and later changes the opening threshold
+- **THEN** the skill reconciles the affected content in both working documents and presents the threshold change for review
+- **AND** the pilot confirmation and unresolved technical decisions remain recorded, while the updated PDFs share the revised source identity
