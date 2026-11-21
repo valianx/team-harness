@@ -1,0 +1,137 @@
+# Solution proposal
+
+Prepare two standalone working drafts, a detailed engineering proposal and
+a concise proposal for the team. Export them as PDFs by default. Honor an
+explicit choice of documents, format or destination. Give both drafts the same
+functional title: name the capability or outcome in terms its users understand.
+Use the subtitle "Architecture proposal" for the concise draft and "Detailed
+architecture proposal" for the full draft. In Spanish, the subtitles are
+"Propuesta de arquitectura" and "Propuesta de arquitectura al detalle".
+Use the same naming in delivery links and PDF metadata. Keep implementation
+choices out of the functional title. Name a direct provider in the body where
+its role explains a user experience, integration decision or cost.
+
+Use the requested language, defaulting to the language of the conversation.
+Make each document understandable on its own. Put functional content first
+and organize sections around the reader's questions. Open each proposal in
+two or three sentences with the affected user, the change they will experience
+and the product decision the team needs to make. If that decision is already
+settled, state it and identify any remaining choice that affects delivery.
+
+## Detailed proposal
+
+### Functional proposal
+
+Start with who uses the system, what triggers it, which rules determine each
+outcome and what people can observe. Explain the problem and the general
+capability before the first delivery's scope, exclusions and acceptance criteria.
+Cover alternate paths and errors. Use worked examples or rule tables where they
+clarify behavior, and ensure each example follows the rule it illustrates.
+Show applicable wireframes beside the behavior they explain, including relevant
+states and interactions.
+
+Expose assumptions, risks and decisions still needed. Explain the product
+consequences of technical choices here when they affect experience, cost,
+scope or delivery. Identify verified facts, recommendations and unknowns.
+Label estimates with their assumptions.
+
+### Technical design
+
+Describe the affected current system and proposed responsibilities, boundaries,
+integrations and interfaces. Explain which component owns each responsibility,
+why the chosen approach fits, its operating costs and meaningful alternatives.
+Identify the main cost drivers and any items still to price.
+When comparing provider costs, start with the user need that warrants the
+spend. Show which option meets it at the expected usage, the source and basis
+for the price, and what still needs confirmation. Distinguish the provider's
+price from implementation and operating estimates. Revisit the estimate when
+an unverified dependency changes scope.
+
+For each user-visible promise that affects scope, identify the component or
+team responsible, what already exists, what changes, and the observable test.
+Where reuse is an assumption, name who can verify it and what changes in
+scope, cost or rollout if it proves false. Carry that consequence into the
+team proposal when it affects the decision.
+
+For a multi-service flow, show who calls whom and what data moves. Use the
+Excalidraw workflow to create the diagram or update the existing one.
+[excalidraw-diagram](../../excalidraw-diagram/SKILL.md)
+
+Document new and changed interfaces at the level needed to implement them.
+Identify the producer, consumer, operation or trigger, inputs and outputs,
+and applicable failure and recovery behavior. For a proposed data exchange,
+include a representative DTO with field names, types, requiredness and how
+the consumer uses each field. Keep examples consistent with the business
+rules and data on the diagram.
+
+For database changes, include the affected current and proposed model, covering
+fields, relationships, constraints and migration effects. Justify each newly
+persisted field with its producer, consumer and reuse or derivation options.
+For frontend work, keep the wireframe with the functional part and explain its
+technical implications here. [sketch](../../sketch/SKILL.md)
+
+Embed useful visuals so the proposal is readable on its own. Link editable
+sources as supporting assets.
+
+Describe implementation increments and dependencies. Explain how to verify
+the acceptance criteria and applicable failure paths. Include migration,
+rollback, operating procedures and measurable quality needs where applicable.
+Mark missing facts and open decisions where they affect implementation.
+
+## Team presentation document
+
+Lead with the functional proposal. Give the team enough context to discuss
+who uses the system, what starts the flow, the proposed rules and outcomes,
+and the scope of the first delivery. Keep the detail to what the team needs
+to understand and discuss the proposal.
+
+Close with a short technical section about what the proposal introduces.
+Name the participants in each new or changed exchange. For a new exchange,
+explain what moves and why. For an existing one, describe only the proposed
+change in behavior or data.
+Explain what each new DTO carries and why. When an existing DTO gains or changes
+a field, explain how the consumer uses it. Keep unchanged flows and full field
+definitions in the detailed proposal where relevant. If communication and
+contracts stay the same, say so in one sentence.
+
+## Deliver and revise
+
+Save each document as its own deliverable in the selected workspace. In a
+file workspace, use distinct filenames. In a Page workspace, retain both links
+in the bound effort Page. Link editable visuals as supporting assets. Honor an
+explicit request for one document at the depth its audience needs.
+
+Keep the editable sources in the bound workspace. If OpenSpec owns the intent,
+link and reconcile its requirements and decisions there. Show which decisions
+the operator has confirmed, which are proposed, and which questions remain
+open. Apply feedback to the parts it covers. If a previously confirmed rule
+changes, bring the affected decisions back to review and carry forward the
+other confirmations. Update both drafts wherever the change affects prose,
+examples, tables or contracts. If a flow changes, revise the editable
+Excalidraw scene and refresh its embedded view.
+
+Before delivery, apply the `write-documents` editorial pass to each requested document.
+Check that the title would still describe the user's task if the provider changed.
+Resolve contradictions and keep open decisions visible where they matter.
+Read each document on its own. Can Product and Operations explain what changes,
+what they must decide and why the recommended spend is needed? Can Engineering
+trace each material promise to an owner, a change or dependency, and a test?
+[write-documents](../../write-documents/SKILL.md)
+
+Present each requested deliverable as a finished document in the selected format.
+Default delivery is two PDFs. For a PDF, show only the date in the running
+header. Omit draft labels, review banners and subject-to-change footers. Keep
+the shared revision in the editable sources and deliverable metadata or filenames.
+Record open decisions beside the proposal they affect. Reflect explicit
+operator sign-off only for the scope and revision confirmed. Export does not grant
+approval or implementation authority. Read back each deliverable in its
+requested format and check tables, examples and diagram labels at their
+intended size. If a requested export is unavailable, keep the editable source
+and identify the pending format.
+
+## Industry references
+
+- Shared product context and concise requirements. [Atlassian PRD](https://www.atlassian.com/agile/product-management/requirements)
+- Content and detail adapted to readers. [arc42 stakeholder needs](https://docs.arc42.org/tips/1-20/)
+- People, systems and boundaries before technical detail. [C4 context](https://c4model.com/diagrams/system-context)
+- Malte Ubl's account of decisions and trade-offs. [Design Docs at Google](https://www.industrialempathy.com/posts/design-docs-at-google/)

@@ -20,6 +20,8 @@ text. Keep mode names and invocations exact.
 | Mode | Purpose | Availability |
 |---|---|---|
 | `apply-review` | Apply PR review feedback using the conservative author-side workflow. | Claude Code + opencode + Codex |
+| `architecture-design` | Design a solution and write full low-level and concise team proposals by default. | Claude Code + opencode + Codex + Pi |
+| `architecture-proposal` | Write full low-level and concise team proposals from agreed decisions. | Claude Code + opencode + Codex + Pi |
 | `audit` | Analyze codebase architecture, health, and technical debt. | Claude Code + opencode + Codex |
 | `audit-security` | Run the repository's shipped-asset security self-scan. | Claude Code + opencode + Codex |
 | `background` | Dispatch bounded work through the active runtime's native background mechanism. | Claude Code + opencode + Codex |
@@ -31,7 +33,7 @@ text. Keep mode names and invocations exact.
 | `d2-diagram` | Create technical diagrams with the D2 language. | Claude Code + opencode + Codex |
 | `define-ac` | Define acceptance criteria for a feature or task. | Claude Code + opencode + Codex |
 | `deliver` | Prepare requested delivery from validated work using native authorization. | Claude Code + opencode + Codex |
-| `design` | Prepare a solution proposal with functional content before technical design. | Claude Code + opencode + Codex |
+| `design` | Invoke architecture-design through its explicit compatibility alias. | Claude Code + opencode + Codex + Pi |
 | `diagram` | Create an Excalidraw diagram for a concept or workflow. | Claude Code + opencode + Codex |
 | `docs` | Generate Obsidian documentation through the documentation pipeline. | Claude Code + opencode + Codex |
 | `eval` | Assess completed workflow evidence or evaluate and score agent scenarios. | Claude Code + opencode + Codex |

@@ -56,7 +56,7 @@ delegation and sequential repositories; native permissions govern execution.
 |---|---|
 | Written intent, tasks and authorized implementation | `skills/spec/SKILL.md` |
 | Broader coordinated development | `skills/pipeline/SKILL.md` |
-| Design or inspect a proposed solution | `skills/design/SKILL.md`, `skills/sketch/SKILL.md` |
+| Design or inspect a proposed solution | `skills/architecture-design/SKILL.md`, `skills/sketch/SKILL.md` |
 | Review an existing PR | `skills/review-pr/SKILL.md` |
 | Diagnose architecture or functional defects | `skills/audit/SKILL.md`, `skills/find-bugs/SKILL.md` |
 | Resolve PR comments | `skills/apply-review/SKILL.md` |

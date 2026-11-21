@@ -62,5 +62,6 @@ For each material opportunity, explain user value, project fit or exploratory
 assumptions, required adaptation and a concrete acceptance example. Link its
 supporting Evidence or identify the inference. Findings remain advisory; Main
 decides material follow-up and dispositions. Hand selected ideas and their evidence
-to [design](../design/SKILL.md) or [spec](../spec/SKILL.md) within the existing scope;
-research alone does not start implementation or activate a pipeline.
+to [architecture-design](../architecture-design/SKILL.md) or [spec](../spec/SKILL.md)
+within the existing scope.
+Research alone does not start implementation or activate a pipeline.

@@ -67,11 +67,12 @@ Impeccable's visual methods; it does not replace product direction or make every
 UI request depend on an external service. Use bounded, relevant guidance and
 preserve the project's stack, supported browsers and authorized endpoint.
 
-Use [design](../design/SKILL.md) for needed solution decisions under its
-functional-first proposal contract; reconcile canonical OpenSpec intent when
-present. Before frontend implementation, present or reuse an accurate structural
-wireframe through [sketch](../sketch/SKILL.md). A visual comp does not silently
-replace that preview or require a second proposal.
+Use [architecture-design](../architecture-design/SKILL.md) for needed solution
+decisions under its functional-first proposal contract. Reconcile canonical
+OpenSpec intent when present. Before frontend implementation, present or reuse
+an accurate structural wireframe through [sketch](../sketch/SKILL.md), including
+when a visual comp is available. Reuse the selected architecture proposals when
+solution documentation is needed.
 
 A design-only request ends with a visual result in declared real local artifact
 storage or the explicit destination and unresolved decisions, before production

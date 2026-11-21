@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.60.0] - 2026-11-21
+
+### Added
+
+- Use `architecture-design` to review and revise detailed engineering and concise team proposals, exported as PDFs by default.
+
 ## [3.59.3] - 2026-11-20
 
 ### Changed
