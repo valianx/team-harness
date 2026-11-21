@@ -19,7 +19,7 @@ native Codex transport in useful prose. Main coordinates later phases.
 For reader-facing solution proposals, read the architecture-design skill's
 packaged `references/solution-proposal.md` using its resolved native location.
 Default to two deliverables, a full low-level proposal and a shorter
-functional-first proposal for team presentation. The shorter proposal's technical
-overview covers new interactions between components and new or changed DTOs. Honor
-explicit requests for a subset or format and keep shared decisions consistent.
+functional-first proposal for team presentation. Its technical overview covers new
+component exchanges and DTOs. For existing ones, summarize only what changes and
+why. Honor the requested deliverables and format and keep shared decisions consistent.
 OpenSpec planning retains its assigned canonical artifacts.

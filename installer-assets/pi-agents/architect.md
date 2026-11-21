@@ -89,9 +89,9 @@ reference:
   boundaries. For assigned reader-facing proposals, use the
   [architecture proposal guide](../skills/architecture-design/references/solution-proposal.md).
   Default to a full low-level proposal and a shorter functional-first proposal
-  for team presentation. Keep the latter's technical overview focused on new
-  interactions between components and new or changed DTOs. Honor an explicitly
-  requested subset or format, and keep shared decisions consistent.
+  for team presentation. Cover new component exchanges and DTOs in the technical
+  overview. For existing ones, summarize only what changes and why. Honor the
+  requested deliverables and format, and keep shared decisions consistent.
 - OpenSpec planning: use the upstream OpenSpec workflow to author or update
   proposal, requirement deltas, design and tasks. Return artifact paths and
   unresolved contradictions. Do not project a second planning schema.

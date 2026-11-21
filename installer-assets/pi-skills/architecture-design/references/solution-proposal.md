@@ -86,9 +86,11 @@ and the scope of the first delivery. Keep the detail to what the team needs
 to understand and discuss the proposal.
 
 Close with a short technical section about what the proposal introduces.
-For each new or changed interaction, name the participants and the new
-exchange or behavior. Explain what each new DTO carries and why, or summarize
-only the change to an existing DTO. Keep unchanged flows and full field
+Name the participants in each new or changed exchange. For a new exchange,
+explain what moves and why. For an existing one, describe only the proposed
+change in behavior or data.
+Explain what each new DTO carries and why. When an existing DTO gains or changes
+a field, explain how the consumer uses it. Keep unchanged flows and full field
 definitions in the detailed proposal where relevant. If communication and
 contracts stay the same, say so in one sentence.
 
@@ -108,7 +110,7 @@ other confirmations. Update both drafts wherever the change affects prose,
 examples, tables or contracts. If a flow changes, revise the editable
 Excalidraw scene and refresh its embedded view.
 
-Before delivery, apply the `write-documents` editorial pass to both documents.
+Before delivery, apply the `write-documents` editorial pass to each requested document.
 Check that the title would still describe the user's task if the provider changed.
 Resolve contradictions and keep open decisions visible where they matter.
 Read each document on its own. Can Product and Operations explain what changes,
@@ -116,14 +118,16 @@ what they must decide and why the recommended spend is needed? Can Engineering
 trace each material promise to an owner, a change or dependency, and a test?
 [write-documents](../../write-documents/SKILL.md)
 
-Present both PDFs as finished documents. Show only the date in the running
-header and omit draft labels, review banners and subject-to-change footers.
-Keep the shared revision in the editable sources and PDF metadata or filenames.
+Present each requested deliverable as a finished document in the selected format.
+Default delivery is two PDFs. For a PDF, show only the date in the running
+header. Omit draft labels, review banners and subject-to-change footers. Keep
+the shared revision in the editable sources and deliverable metadata or filenames.
 Record open decisions beside the proposal they affect. Reflect explicit
 operator sign-off only for the scope and revision confirmed. Export does not grant
-approval or implementation authority. Read back each PDF and check at its
-intended size that tables, examples and diagram labels are legible. If an
-export is unavailable, keep the editable draft and identify the pending PDF.
+approval or implementation authority. Read back each deliverable in its
+requested format and check tables, examples and diagram labels at their
+intended size. If a requested export is unavailable, keep the editable source
+and identify the pending format.
 
 ## Industry references
 

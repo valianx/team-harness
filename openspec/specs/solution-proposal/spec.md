@@ -50,6 +50,7 @@ Default review delivery SHALL export two PDFs from the same identifiable working
 #### Scenario: The operator specifies the deliverables
 - **WHEN** the operator explicitly requests only one document or specifies different coverage, formats or destinations
 - **THEN** the skill follows that request while preserving consistent shared decisions across the requested deliverables
+- **AND** a request for one Markdown document delivers that document alone
 
 #### Scenario: Drafts are exported for review
 - **WHEN** the operator requests the default review delivery
@@ -110,6 +111,10 @@ After its functional explanation, the team document SHALL summarize what the des
 #### Scenario: The design introduces no exchange change
 - **WHEN** the proposal changes a local CLI argument without adding or changing component exchanges or DTOs
 - **THEN** the team document explains the functional change and closes with a sentence confirming that communication and contracts stay the same
+
+#### Scenario: An existing exchange changes
+- **WHEN** an existing notification also reports closure and its DTO gains a closure reason
+- **THEN** the team overview explains the new trigger and how the recipient uses the reason, leaving unchanged behavior and fields out
 
 ### Requirement: Proposals preserve workflow ownership and portability
 

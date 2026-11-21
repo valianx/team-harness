@@ -46,7 +46,7 @@ focused contract/invariant method. OpenCode discovers the native `full-audit` sk
 `architecture-design` writes two proposals by default. The full low-level
 proposal carries the implementation detail, affected data models and frontend
 wireframes. The shorter team presentation proposal explains functional behavior
-first, then summarizes new interactions between components and new or changed DTOs.
+first, then summarizes new or changed component exchanges and DTOs.
 Both are working drafts. The operator can validate individual decisions and
 revise them later. By default, the skill keeps the editable sources and exports
 both PDFs from the same revision. Explicit deliverables and formats take precedence.
